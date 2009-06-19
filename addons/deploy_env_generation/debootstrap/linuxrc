@@ -1,0 +1,135 @@
+#!/bin/bash
+
+(cd /dev ; ./mkdev 2>/dev/null)
+
+echo "executing deployment phase 2" > /dev/ttyS0
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+
+# global vars
+CMD_PARAM=
+
+# functions
+
+get_param() {
+        CMD_PARAM=$(grep $1 /proc/cmdline | sed s/^.*$1=// | sed s/\ .*//)
+}
+
+boot_failed() {
+    reboot -f
+}
+
+
+mount -t tmpfs -o size=100m tmpfs /rambin
+ln -s /rambin /mnt/rambin
+
+# parameters and their default values
+TTY=/dev/ttyS0
+ETH_DRV=
+ETH_DEV=eth0
+NETMASK=255.255.255.0
+IPADDR=
+BROADCAST=255.255.255.255
+
+## what should be done as soon as possible
+# mount proc
+mount -t proc none /proc
+echo "0x100" > /proc/sys/kernel/real-root-dev
+
+# get parameters values
+get_param TTY
+if [ $CMD_PARAM ]; then
+        TTY=$CMD_PARAM
+fi
+CMD_PARAM=
+
+get_param ETH_DEV
+ETH_DEV=$CMD_PARAM
+CMD_PARAM=
+
+
+get_param ETH_DRV
+ETH_DRV=$CMD_PARAM
+CMD_PARAM=
+
+get_param IPADDR
+IPADDR=$CMD_PARAM
+CMD_PARAM=
+
+get_param ETH_DRV_OPTIONS
+ETH_DRV_OPTIONS=$CMD_PARAM
+CMD_PARAM=
+
+if [ $ETH_DRV ]; then
+    if [ $ETH_DRV_OPTIONS ]; then
+        echo "Loading specified ethernet driver $ETH_DRV with options $ETH_DRV_OPTIONS..." > ${TTY}
+        modprobe $ETH_DRV $ETH_DRV_OPTIONS
+    else
+        echo "Loading specified ethernet driver $ETH_DRV..." > ${TTY}
+        modprobe $ETH_DRV
+    fi
+    if [ "$?" != "0" ] ; then
+        echo "Failed to load driver... $ETH_DRV" > ${TTY}
+        boot_failed
+    fi
+fi
+
+
+# configure network
+if [ $IPADDR ]; then
+        echo "Configuring network with adress ${IPADDR} on ${ETH_DEV}" > ${TTY}
+        ifconfig ${ETH_DEV} ${IPADDR} netmask ${NETMASK} broadcast ${BROADCAST}
+else
+        DHCP_OK=
+	DHCPFILE=/var/lib/dhcpcd/dhcpcd-${ETH_DEV}.info
+
+        echo -n "Using DHCP for device ${ETH_DEV}" > ${TTY}
+        dhcpcd -d -H -t 200 ${ETH_DEV}
+        for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+        do
+                echo -n "."  > ${TTY}
+                if [ -r ${DHCPFILE} ]; then
+                        DHCP_OK=true
+                        break
+                fi
+                sleep 5
+        done
+        if [ "$DHCP_OK"="" ]; then
+                echo "ERROR !" > ${TTY}
+        else
+                echo "OK" > ${TTY}
+        fi
+fi
+
+. ${DHCPFILE}
+
+# set hostname and its resolution
+echo "${HOSTNAME}.${DNSDOMAIN}" > /etc/hostname
+echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
+
+
+# configure DNS with dhcp info
+
+echo "nameserver ${DNS}" > /etc/resolv.conf
+
+## load disk driver
+get_param DISK_DRV
+DISK_DRV=$CMD_PARAM
+CMD_PARAM=
+
+if [ $DISK_DRV ]; then
+   # for SCSI drives
+   modprobe sd_mod
+   # for ide drives
+   echo "Loading specified disk driver: $DISK_DRV"
+   modprobe $DISK_DRV
+   # order is important for ide drivers in 2.6.pbmatics kernels
+   modprobe ide-disk
+   modprobe ide-generic
+fi
+
+
+/usr/sbin/sshd
+
+nc -l -p 25300 &
+
+exec /sbin/init 2

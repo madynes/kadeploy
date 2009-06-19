@@ -1,0 +1,5 @@
+#!/bin/sh
+
+torrent=$1
+
+/sbin/start-stop-daemon -S -x /usr/local/bin/run_bittorrent -b -- $torrent

@@ -1,0 +1,41 @@
+#!/bin/bash
+
+KIND=$1
+ROOT=$2
+PATH=$3
+LINE1=$4
+LINE2=$5
+LINE3=$6
+
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+
+MENU_GRUB=/boot/grub/menu.lst
+
+[ -e $MENU_GRUB ] && mv $MENU_GRUB $MENU_GRUB.bak || mkdir -p /boot/grub
+
+MSG="default\t 0\n"
+
+case $KIND in
+    "linux")
+	MSG=$MSG"title\t Linux\n"
+	MSG=$MSG"root\t "$ROOT"\n"
+	MSG=$MSG"kernel\t "$LINE1"\n"
+	MSG=$MSG"initrd\t "$LINE2"\n"
+	;;
+    "xen")
+	MSG=$MSG"title\t Xen\n"
+	MSG=$MSG"root\t "$ROOT"\n"
+	MSG=$MSG"kernel\t "$LINE1"\n"
+	MSG=$MSG"module\t "$LINE2"\n"
+	MSG=$MSG"module\t "$LINE3"\n"
+	;;
+    *)
+	echo "Invalid kind of system"
+	exit 1
+esac
+echo $MSG > $MENU_GRUB
+
+/usr/sbin/grub-install \($ROOT\) --root-directory=$PATH
+/usr/sbin/grub-install \($ROOT\)
+
+mv $MENU_GRUB.bak $MENU_GRUB

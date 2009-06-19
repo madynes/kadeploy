@@ -1,0 +1,29 @@
+prod_kernel = vmlinuz-2.6.24-1-686
+prod_initrd = initrd.img-2.6.24-1-686 root=/dev/hda2
+deploy_kernel = deploy-vmlinuz-2.6.27.7
+deploy_initrd = deploy-initrd-2.6.27.7 ETH_DRV=pcnet32 ETH_DEV=eth0 DISK_DRV=ide-disk console=tty0 console=ttyS0,38400n8 ramdisk_size=160000 rw init=/linuxrc
+block_device = /dev/hda
+prod_part = 2
+deploy_part = 3
+tmp_part = 4
+timeout_reboot = 120
+cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_deploy root@HOSTNAME_FQDN /sbin/reboot
+cmd_soft_reboot_rsh = rsh -l root HOSTNAME_FQDN /sbin/reboot -f
+cmd_hard_reboot = vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx reset hard
+cmd_very_hard_reboot = vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx start hard
+cmd_console = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/console.sh HOSTNAME_SHORT
+#drivers = ata_piix,ata_generic
+kernel_params = console=tty0 console=ttyS0,38400n8
+admin_pre_install = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_pre_install_g5kdev.tgz|tgz|launch_admin_pre_install.sh
+admin_post_install = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_post_install_g5kdev.tgz|tgz|launch_admin_post_install.sh
+partition_creation_kind = fdisk
+
+#Automata description
+#macrostep = SetDeploymentEnv|SetDeploymentEnvDummy:2:100
+#macrostep = SetDeploymentEnv|SetDeploymentEnvProd:2:100
+macrostep = SetDeploymentEnv|SetDeploymentEnvUntrusted:2:200
+#macrostep = BroadcastEnv|BroadcastEnvDummy:2:300
+macrostep = BroadcastEnv|BroadcastEnvChain:2:300
+#macrostep = BootNewEnv|BootNewEnvDummy:1:150,BootNewEnvClassical:2:150
+macrostep = BootNewEnv|BootNewEnvClassical:1:150
+#macrostep = BootNewEnv|BootNewEnvKexec:1:100

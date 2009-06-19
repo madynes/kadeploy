@@ -1,0 +1,316 @@
+#!/usr/bin/perl -w
+
+# Originally developped by Olivier Richard - IMAG ( - 2008)
+# Slightly modified by Emmanuel Jeanvoine - INRIA (2009)
+
+use strict;
+use IO::Socket;
+use Sys::Hostname;
+use Getopt::Long;
+use File::Basename;
+
+my $src_cmd;
+my $cat_cmd;
+my $buffer;
+my $input_tar;
+my $directory;
+my $verbose;
+my $debug;
+my $mode;
+my $flush;
+my $sos;
+my $dirname; 
+my $directory_src_tar = "";
+
+my $built_options = "";
+
+my $taktuk_args = "";
+my @kasta_args;
+
+my $double_minus = 0;
+
+my $server_socket;
+my $accepted_socket;
+my $forward_socket;
+my $forwarder = 0;
+my $src_node = 0;
+my $remote_host = ""; 
+my $remote_port = 0;
+my $nb_bytes = 0;
+
+my $buf_size = 64 * 1024;
+
+# Print help message
+sub usage()
+{
+    print <<EOU;
+Usage: kastafior [taktuk_arguments] -- -h | [[-s source_command] [-c cat_command]] | [[-i input_tar][-d directory]] [-f] [-v] [-D]
+Contact: Olivier Richard <olvier.richard at imag.fr>    
+taktuk_arguments see the taktuk documentation or examples below.
+-h display this help message
+-s command at the source of pipeline (executed on localhost) 
+-c command executed on each nodes, its stdin is the output of command source (see option -s) 
+-i file or directory to copy in default mode
+-d destination directory
+-f flush file system buffers (execute sync command)
+-D debug information mode
+-v verbose mode
+-m information mode (0: source and last nodes display the number of sent and received bytes)
+
+This command builds a pipeline between nodes by using Taktuk parallel launcher. By defaut, this comamnd copies file or directory from first node provides in taktuk arguments to other nodes.
+
+Examples:
+
+kastafior -f file_node -- -i input_file -d /tmp/
+kastafior -m localhost -f file_node -- -i input_file -d /tmp/
+kastafior -m node10 -m node12 -- -v -s "echo hello" -c "cat >/tmp/yop"
+EOU
+
+}
+
+#Create TCP server socket
+sub create_TCP_server_socket()
+{
+    my $server = IO::Socket::INET->new(
+	Type      => SOCK_STREAM,
+	ReuseAddr => 1,
+	Listen    => 10 )
+	or die "Creating a tcp server failed : $@\n";
+    return $server;
+}
+
+#Create TCP forward socket
+sub create_TCP_forward_socket($$)
+{ 
+    my $remote_host = shift;
+    my $remote_port = shift;
+    
+    my $socket;
+    my $flag = 0;
+    my $sleep_time = 1;
+    my $retry = 0;
+    my $max_retry = 60;  
+
+    while (($flag == 0) && ($retry < $max_retry)) 
+    {
+	if ($socket = IO::Socket::INET->new(PeerAddr => $remote_host,
+					    PeerPort => $remote_port,
+					    Proto    => "tcp",
+					    Type     => SOCK_STREAM))
+	{
+	    $flag = 1;
+	}
+	elsif ($retry >= $max_retry) 
+	{
+	    die "Couldn't connect to $remote_host:$remote_port";
+	}
+	else
+	{ 
+	    print "Couldn't connect to $remote_host:$remote_port : $@\n";
+	    sleep($sleep_time);
+	    $retry = $retry + 1;
+	}
+    }
+    return $socket;
+}
+
+##############
+#### MAIN ####
+##############
+
+foreach my $argument (@ARGV) 
+{
+    if (($argument =~ /^--$/) && (not $double_minus))
+    {
+	$double_minus = 1;
+    }
+    elsif ($double_minus)
+    {
+	push (@kasta_args,$argument);
+    }
+    else
+    {
+	$taktuk_args .= $argument." ";
+    }
+}
+
+if (not	$double_minus)
+{
+    print "\nWARNNING you need -- separator !!!\n\n";
+    usage();
+    exit 1;
+}
+
+#print "taktuk_arg: $taktuk_args\n" if ($verbose);
+#print "kasta_arg: $str_kasta_args\n";
+
+@ARGV = @kasta_args;
+
+# Get command line informations
+Getopt::Long::Configure ("gnu_getopt");
+GetOptions ("source_command|s=s" => \$src_cmd,
+            "cat_command|c=s" => \$cat_cmd,
+	    "input|i=s" => \$input_tar,
+	    "directory|d=s" => \$directory,
+	    "directory_src_tar|C=s"  => \$directory_src_tar,
+	    "flush|f" => \$flush,
+            "verbose|v" => \$verbose,
+	    "mode|m=s" =>  \$mode,
+	    "debug|D" => \$debug,
+            "help|h" => \$sos
+
+    );
+
+# Treate -h or --help option
+if (defined($sos)) 
+{
+    usage();
+    exit(0);
+}
+
+if (defined($input_tar) && ($taktuk_args ne "") && ($directory_src_tar eq "") )
+{
+    $directory_src_tar = dirname($input_tar);
+    $directory_src_tar = $ENV{PWD} if ($directory_src_tar eq ".");
+
+    $built_options .= " -C $directory_src_tar";
+}
+
+if (not defined($src_cmd)) 
+{
+    my $basename = basename($input_tar);
+    $directory_src_tar = "." if ($directory_src_tar eq "");
+    $src_cmd = "cat $input_tar";
+}
+
+if (not defined($cat_cmd)) 
+{
+    my $basename = basename($input_tar);
+    $cat_cmd = "cat > $directory/$basename";
+}
+
+if (not ($taktuk_args eq ""))
+{
+    my $str_kasta_args = "";
+    foreach my $argument (@kasta_args) 
+    {	
+	$str_kasta_args.= "'".$argument."' ";  
+    }
+    $str_kasta_args =  "\"$str_kasta_args\"";
+
+    my $taktuk_cmd = "taktuk -o status -o output='\$rank.\":\".\$line.\"\\n\"' $taktuk_args broadcast taktuk_perl [ -w -- - -- $str_kasta_args $built_options ]\\;broadcast input file [ $0 ]";	
+    print "[VERBOSE] taktuk command: $taktuk_cmd\n" if ($verbose);
+    system ($taktuk_cmd)
+}
+else
+{
+    print "[DEBUG] Solo mode, commands $src_cmd, $cat_cmd\n" if ($debug);
+
+    $src_node=0;
+    $forwarder=1;
+
+    print "[DEBUG] Rank $ENV{TAKTUK_RANK} among $ENV{TAKTUK_COUNT}\n" if ($debug);
+
+    if ($ENV{TAKTUK_RANK} == 1)
+    {
+	$src_node = 1;
+    }
+    elsif ( $ENV{TAKTUK_RANK} == ($ENV{TAKTUK_COUNT}) )
+    {
+	$forwarder = 0;
+    }
+
+    if ($src_node)
+    {
+	open(CMD_IN, "$src_cmd |") or die "can't run $src_cmd: $!";
+    }
+    else  
+    {
+	$server_socket = create_TCP_server_socket();
+	my $server_hostport = hostname.':'.$server_socket->sockport();
+
+	my $next = $ENV{TAKTUK_RANK}-1;
+	if (not taktuk::send(to=>$next,body=>"$server_hostport"))
+	{
+	    print taktuk::error_msg($taktuk::error), "\n";
+	    exit;
+	}
+
+	# Command to execute in local
+	open(CMD_OUT, "| $cat_cmd") or die "can't fork $cat_cmd: $!";
+    } 
+
+    if ($forwarder || $src_node) 
+    {
+	my ($to, $from, $message) = taktuk::recv();
+	if (not defined($message))
+	{
+	    print taktuk::error_msg($taktuk::error), "\n";
+	    exit;
+	}
+	else
+	{
+	    print "[DEBUG] $to received $message from $from\n" if ($debug);
+	    ($remote_host,$remote_port) =  split(/:/,$message);
+	}
+	$forward_socket = create_TCP_forward_socket($remote_host,$remote_port);
+	print "[DEBUG] Connected for forwarding\n" if ($debug);
+    }
+
+    if ($src_node) 
+    { 
+	# Source node sending
+	print "[DEBUG] Scr node : Sending\n" if ($debug);
+
+	while (sysread(CMD_IN, $buffer, $buf_size) > 0) 
+	{
+	    $nb_bytes += length($buffer); 
+	    taktuk::syswrite($forward_socket, $buffer) or die "Couldn't syswrite: $!\n";
+	}
+	close(CMD_IN) or die "Couldn't close: $!\n";
+	close($forward_socket) or die "Couldn't close: $!\n";
+	print "[DEBUG] Scr node : ending \n" if ($debug);
+    }
+    else
+    {
+	# Accept Connection
+	$accepted_socket = $server_socket->accept();
+	
+	# Receiving from previous node and forwarding if needed
+
+	while (sysread($accepted_socket, $buffer, $buf_size) > 0)
+	{
+	    $nb_bytes += length($buffer); 
+	    if ($forwarder) 
+	    {
+		taktuk::syswrite($forward_socket, $buffer) or die "Couldn't syswrite: $!\n"; 
+	    }	
+	    taktuk::syswrite(\*CMD_OUT, $buffer) or print STDERR "Couldn't syswrite to local command: $!\n";
+	}
+	close($accepted_socket) or die "Couldn't close: $!\n";
+	close(CMD_OUT) or die "Couldn't close: $!\n";
+	if ($forwarder) 
+	{
+	    close($forward_socket) or die "Couldn't close: $!\n";
+	}
+    }
+
+    if (defined ($mode) && ($mode == 0)) 
+    {
+	if ($src_node)
+	{
+	    print "Src node sent: $nb_bytes bytes\n"
+	}
+
+	elsif ( $ENV{TAKTUK_RANK} == ($ENV{TAKTUK_COUNT}) )
+	{	
+	    print "Last node received: $nb_bytes bytes\n"
+	}
+    }
+    if (defined($flush) && !$src_node)
+    {
+      	print "sync\n" if $debug;
+        system("sync");
+    }
+
+}

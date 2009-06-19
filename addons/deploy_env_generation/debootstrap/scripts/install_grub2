@@ -1,0 +1,53 @@
+#!/bin/bash
+
+KIND=$1
+ROOT=$2
+GRUBPART=$3
+DEST=$4
+LINE1=$5
+LINE2=$6
+LINE3=$7
+
+
+MENU_GRUB=/boot/grub/grub.cfg
+
+[ -e $MENU_GRUB ] && mv $MENU_GRUB $MENU_GRUB.bak || mkdir -p /boot/grub
+
+MSG="set default=0\n"
+MSG="set timeout=0\n"
+
+case $KIND in
+    "linux")
+	MSG=$MSG"menuentry Linux {\n"
+	MSG=$MSG"\tset root="$GRUBPART"\n"
+	MSG=$MSG"\tlinux "$LINE1" root="$ROOT" ro\n"
+	MSG=$MSG"\tinitrd "$LINE2"\n"
+	;;
+    "xen")
+	MSG=$MSG"menuentry Xen {\n"
+	MSG=$MSG"\tset root="$GRUBPART"\n"
+	MSG=$MSG"\tmultiboot "$LINE1"\n"
+	MSG=$MSG"\tmodule "$LINE2" root="$ROOT" ro\n"
+	MSG=$MSG"\tmodule "$LINE3"\n"
+	;;
+    *)
+	echo "Invalid kind of system"
+	exit 1
+esac
+
+MSG=$MSG"}"
+/bin/echo -e $MSG > $MENU_GRUB
+
+/usr/sbin/grub-install $ROOT --root-directory=$DEST
+RETVAL=$?
+
+if [ $RETVAL -ne 0 ]; then
+    /usr/sbin/grub-install --recheck $ROOT --root-directory=$DEST
+    RETVAL=$?
+fi
+
+
+
+mv $MENU_GRUB $DEST/$MENU_GRUB
+
+exit $RETVAL

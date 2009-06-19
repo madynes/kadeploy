@@ -1,0 +1,23 @@
+Here is a Ruby script designed to migrate the Kadeploy environment from version 2.1.* to version 3.
+
+$>./env_migrate -h
+ Usage: ruby env_migrate.rb [options]
+ Contact: kadeploy-devel@lists.grid5000.fr
+
+ General options:
+  -e, --env-name NAME          Environment name
+  -f, --env-file FILE          Environment file
+  -k, --env-kind KIND          Environment kind (linux|xen|other)
+
+
+It can be used as follows:
+ * $>./env_migrate -e envname_in_kaenvironments_db -k linux
+ * $>./env_migrate -f envfile_in_2_1_x_format -k xen
+
+The new environment description is printed on stdout.
+
+You must choose to load the old environment description either from the kaenvironments database with the -e switch or from a file with the -f switch.
+In all the cases, you must use the -k switch to choose the environment kind. The supported values are:
+ - linux: classic linux based environment
+ - xen: xen hypervisor
+ - other: any other environment like the FreeBSD based environments.
