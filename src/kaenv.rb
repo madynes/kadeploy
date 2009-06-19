@@ -386,8 +386,7 @@ def update_postinstalls_md5(config, db)
   }
 end
 
-#Remove the demolishing tag on an environment
-#
+# Remove the demolishing tag on an environment
 #
 # Arguments
 # * config: instance of Config
@@ -410,6 +409,13 @@ def remove_demolishing_tag(config, db)
   end
 end
 
+# Modify the visibility tag of an environment
+#
+# Arguments
+# * config: instance of Config
+# * db: database handler
+# Output
+# * nothing
 def set_visibility_tag(config, db)
   if (config.exec_specific.visibility_tag == "public") && (not config.common.administrators.include?(USER)) then
     puts "Only the administrators can set the \"public\" tag"
@@ -421,6 +427,42 @@ def set_visibility_tag(config, db)
     db.run_query(query)
     if (db.get_nb_affected_rows == 0) then
       puts "No update has been performed"
+    end
+  end
+end
+
+# Move some file locations in the environment table
+#
+# Arguments
+# * config: instance of Config
+# * db: database handler
+# Output
+# * nothing
+def move_files(config, db)
+  if (not config.common.administrators.include?(USER)) then
+    puts "Only the administrators can move the files in the environments"
+  else
+    query = "SELECT * FROM environments"
+    res = db.run_query(query)
+    if (res.num_rows > 0) then
+      #Let's check each environment
+      res.each_hash { |row|
+        config.exec_specific.files_to_move.each { |file|
+          ["tarball", "preinstall", "postinstall"].each { |kind_of_file|
+            if row[kind_of_file].include?(file["src"]) then
+              modified_file = row[kind_of_file].gsub(file["src"], file["dest"])
+              query2 = "UPDATE environments SET #{kind_of_file}=\"#{modified_file}\" \
+                                            WHERE id=#{row["id"]}"
+              db.run_query(query2)
+              if (db.get_nb_affected_rows > 0) then
+                puts "The #{kind_of_file} of {#{row["name"]},#{row["version"]},#{row["user"]}} has been updated"
+              end
+            end
+          }
+        }
+      }
+    else
+      puts "There is no recorded environment"
     end
   end
 end
@@ -468,6 +510,8 @@ if (config.check_config("kaenv") == true)
     remove_demolishing_tag(config, db)
   when "set-visibility-tag"
     set_visibility_tag(config, db)
+  when "move-files"
+    move_files(config, db)
   end
   _exit(0, db)
 else

@@ -1028,6 +1028,7 @@ module ConfigInformation
       @exec_specific.visibility_tag = String.new
       @exec_specific.show_all_version = false
       @exec_specific.version = String.new
+      @exec_specific.files_to_move = Array.new
       return load_kaenv_cmdline_options()
     end
 
@@ -1056,8 +1057,18 @@ module ConfigInformation
             @exec_specific.file = f
           end
         }
-        opts.on("-o", "--operation OPERATION", "Kind of operation (add, delete, list, print, remove-demolishing-tag, set-visibility-tag, update-tarball-md5, update-preinstall-md5, update-postinstalls-md5)") { |op|
-          if /\A(add|delete|list|print|remove-demolishing-tag|set-visibility-tag|update-tarball-md5|update-preinstall-md5|update-postinstalls-md5)\Z/ =~ op then
+        opts.on("-m", "--files-to-move FILES", "Files to move (src1:dst1,src2:dst2,...)") { |f|
+          if /\A.+:.+(,.+:.+)*\Z/ =~f then
+            f.split(",").each { |src_dst|
+              @exec_specific.files_to_move.push({"src"=>src_dst.split(":")[0],"dest"=>src_dst.split(":")[1]})
+            }
+          else
+            Debug::client_error("Invalid synthax for files to move")
+            return false
+          end
+        }
+        opts.on("-o", "--operation OPERATION", "Kind of operation (add, delete, list, print, remove-demolishing-tag, set-visibility-tag, update-tarball-md5, update-preinstall-md5, update-postinstalls-md5, move-files)") { |op|
+          if /\A(add|delete|list|print|remove-demolishing-tag|set-visibility-tag|update-tarball-md5|update-preinstall-md5|update-postinstalls-md5|move-files)\Z/ =~ op then
             @exec_specific.operation = op
           else
             Debug::client_error("Invalid operation")
@@ -1156,6 +1167,11 @@ module ConfigInformation
         end
         if (@exec_specific.visibility_tag == "") then
           Debug::client_error("You must define the visibility value")
+          return false          
+        end
+      when "move-files"
+        if (@exec_specific.files_to_move.empty?) then
+          Debug::client_error("You must define some files to move")
           return false          
         end
       else
