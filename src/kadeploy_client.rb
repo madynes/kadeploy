@@ -185,7 +185,7 @@ if (exec_specific_config != nil) then
     if /druby:\/\/([\w\.\-]+):(\d+)/ =~ DRb.uri
       content = Regexp.last_match
       client_host = content[1]
-      client_port= content[2]
+      client_port = content[2]
     else
       puts "The URI #{DRb.uri} is not correct"
       _exit(1, db)

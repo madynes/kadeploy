@@ -100,7 +100,7 @@ uninstall:
 	@rm -f /usr/bin/kaconsole /usr/bin/kadeploy /usr/bin/kaenv /usr/bin/kanodes /usr/bin/kareboot /usr/bin/kastat
 
 deb-pkg:
-	@(cd $(PKG); make package_all; mv kadeploy-v3-*.deb $(CURRENT_DIR); make clean; cd $(CURRENT_DIR))
+	@(cd $(PKG)/debian; make package_all; mv kadeploy-v3-*.deb $(CURRENT_DIR); make clean; cd $(CURRENT_DIR))
 
 mrproper: cleanapi uninstall
 	@find . -name '*~' | xargs rm -f	
