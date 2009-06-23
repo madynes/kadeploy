@@ -1,4 +1,4 @@
-KADEPLOY_ROOT=..
+KADEPLOY_ROOT=../..
 DEPLOY_USER=deploy
 DEB_ROOT_CLIENT=kadeploy-client
 DEB_ROOT_SERVER=kadeploy-server
@@ -47,8 +47,7 @@ install_debootstrap:
 	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
 
 install_test:
-	@install -o $(DEPLOY_USER) -m 644 $(TEST)/envfile.dsc $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
-	@install -o $(DEPLOY_USER) -m 700 $(TEST)/blackbox_tests.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
+	@install -o $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
 
 install_rc_script:
 	@install -m 755 $(ADDONS)/rc/kadeploy_server $(DEB_ROOT_SERVER)/etc/init.d
@@ -78,7 +77,6 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/ssh
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/db
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/contrib
