@@ -417,8 +417,8 @@ end
 # Output
 # * nothing
 def set_visibility_tag(config, db)
-  if (config.exec_specific.visibility_tag == "public") && (not config.common.administrators.include?(USER)) then
-    puts "Only the administrators can set the \"public\" tag"
+  if (config.exec_specific.visibility_tag == "public") && (not config.common.almighty_env_users.include?(USER)) then
+    puts "Only the environment administrators can set the \"public\" tag"
   else
     query = "UPDATE environments SET visibility=\"#{config.exec_specific.visibility_tag}\" \
                                  WHERE name=\"#{config.exec_specific.env_name}\" \
@@ -439,8 +439,8 @@ end
 # Output
 # * nothing
 def move_files(config, db)
-  if (not config.common.administrators.include?(USER)) then
-    puts "Only the administrators can move the files in the environments"
+  if (not config.common.almighty_env_users.include?(USER)) then
+    puts "Only the environment administrators can move the files in the environments"
   else
     query = "SELECT * FROM environments"
     res = db.run_query(query)

@@ -420,9 +420,9 @@ module ConfigInformation
                 puts "Invalid value for the bt_download_timeout field"
                 return false
               end
-            when "administrators"
+            when "almighty_env_users"
               if val =~ /\A\w+(,\w+)*\Z/ then
-                @common.administrators = val.split(",")
+                @common.almighty_env_users = val.split(",")
               end
             end
           end
@@ -760,12 +760,22 @@ module ConfigInformation
             }
           end
         }
-        opts.on("-k", "--key FILE", "Public key to copy in the root's authorized_keys") { |f|
-          if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
-            return false
+        opts.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
+          if (f != nil) then
+            if not File.readable?(f) then
+              Debug::client_error("The file #{f} cannot be read")
+              return false
+            else
+              exec_specific.key = File.expand_path(f)
+            end
           else
-            exec_specific.key = File.expand_path(f)
+            authorized_keys = "~/.ssh/authorized_keys"
+            if File.readable?(authorized_keys) then
+              exec_specific.key = File.expand_path(authorized_keys)
+            else
+              Debug::client_error("The authorized_keys file #{authorized_keys} cannot be read")
+              return false
+            end
           end
         }
         opts.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
@@ -1757,7 +1767,7 @@ module ConfigInformation
     attr_accessor :demolishing_env_threshold
     attr_accessor :bt_tracker_ip
     attr_accessor :bt_download_timeout
-    attr_accessor :administrators
+    attr_accessor :almighty_env_users
 
     # Constructor of CommonConfig
     #
@@ -1794,7 +1804,7 @@ module ConfigInformation
           (@reboot_window_sleep_time == nil) || (@nodes_check_window == nil) || (@nfsroot_kernel == nil) ||
           (@nfs_server == nil) || (@bootloader == nil) || (@purge_deployment_timer == nil) || (@rambin_path == nil) ||
           (@mkfs_options == nil) || (@demolishing_env_threshold == nil) ||
-          (@bt_tracker_ip == nil) || (@bt_download_timeout == nil) || (@administrators == nil)) then
+          (@bt_tracker_ip == nil) || (@bt_download_timeout == nil) || (@almighty_env_users == nil)) then
         puts "Some mandatory fields are missing in the common configuration file"
         return false
       else

@@ -497,12 +497,11 @@ Advanced options:
                                    (use this only if you know what you do)
       --disable-bootloader-install Disable the automatic installation of a bootloader for a 
                                    Linux based environment
+      --disable-disk-partitioning  Disable the disk partitioning
       --breakpoint MICROSTEP       Set a breakpoint just before launching the give micro-step, the 
                                    syntax is macrostep:microstep (use this only if you know what you do)
       --set-custom-operations FILE Add some custom operations defined in a file
       --force-steps STRING         Undocumented, for administration purpose only
-
-
 
 \end{verbatim}
 \end{small}
@@ -657,68 +656,74 @@ Kaenv can be used by using the \texttt{kaenv} command. The CLI looks like this:
 Usage: kaenv [options]
 Contact: kadeploy-devel@lists.grid5000.fr
 General options:
-  -a, --add ENVFILE                     Add the environment to the environment database
-  -d, --delete ENVNAME                  Delete the environment from the environment database
-  -l, --list                            List the environment recorded in the database for a 
-                                        given user
-  -p, --print ENVNAME                   Print the information about a given environment
-  -r, --remove-demolishing-tag ENVNAME  Remove the demolishing tag on an environment
-  -s, --show-all-versions               Show all versions of an environment
-  -u, --user USERNAME                   Specify the user
-  -v, --version NUMBER                  Specify the version
-      --update-tarball-md5 ENVNAME      Update the MD5 value of the tarball
-      --update-postinstalls-md5 ENVNAME Update the MD5 value of the postinstalls
+  -e, --environment ENVNAME            Environment name
+  -f, --file FILE                      Environment file
+  -m, --files-to-move FILES            Files to move (src1:dst1,src2:dst2,...)
+  -o, --operation OPERATION            Kind of operation (add, delete, list, print,
+                                       remove-demolishing-tag, set-visibility-tag, 
+                                       update-tarball-md5, update-preinstall-md5, 
+                                       update-postinstalls-md5, move-files)
+  -s, --show-all-versions              Show all versions of an environment
+  -t, --visibility-tag TAG             Set the visibility tag (private, shared, public)
+  -u, --user USERNAME                  Specify the user
+  -v, --version NUMBER                 Specify the version
 \end{verbatim}
 \end{small}
 
 We present now several use cases.
 \paragraph{Use case 1}
 \begin{verbatim}
-> kaenv -l
+> kaenv -o list
 \end{verbatim}
 This command lists the environment that you have previously recorded.
 
 \paragraph{Use case 2}
 \begin{verbatim}
-> kaenv -l -u johnsmith -s
+> kaenv -o list -u johnsmith -s
 \end{verbatim}
 This command lists the environment of the user \textit{johnsmith}. If you use ``*'' as a user value, it lists the environments of all the users. Furthermore, the \texttt{-s|--show-all-versions} option is used to show all the versions of each environment. If this option is not specified, only the version is displayed.
 
 \paragraph{Use case 3}
 \begin{verbatim}
-> kaenv -p FreeBSD -v 3 -u johnsmith
+> kaenv -o print -e FreeBSD -v 3 -u johnsmith
 \end{verbatim}
 This command lists prints the version \textit{3} of the environment \textit{FreeBSD} that belongs to \textit{johnsmith}. If no version number is given, the last version of the environment is printed. To print an environment you own, there is no need to use the \texttt{-u|--user} option.
 
 \paragraph{Use case 4}
 \begin{verbatim}
-> kaenv -a ~/new_env.dsc
+> kaenv -o add ~/new_env.dsc
 \end{verbatim}
 This command adds the environment defined in the file \textit{~/new\_env.dsc}. %See the~\ref{sec:env_desc} part to get information about the environment description.
 
 \paragraph{Use case 5}
 \begin{verbatim}
-> kaenv -d FreeBSD -v 2
+> kaenv -o delete FreeBSD -v 2
 \end{verbatim}
 This command deletes the version \textit{2} of the environment \textit{FreeBSD} from the environment database. If no version number is given, all the versions are deleted.
 
 \paragraph{Use case 6}
 \begin{verbatim}
-> kaenv -r FreeBSD -v 3
+> kaenv -o remove-demolishing-tag -e FreeBSD -v 3
 \end{verbatim}
 This command resets the \textit{demolishing} counter of the verion \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
 
 \paragraph{Use case 7}
 \begin{verbatim}
-> kaenv --update-tarball-md5 sidx64-base
+> kaenv -o update-tarball-md5 -e sidx64-base
 \end{verbatim}
 This command is useful if you modify the tarball of the environment \textit{sidx64-base} without modifying the kernel or the initrd and if you do not want to record a new environment. Thus, it will update the MD5 of the tarball file. This operation is required if something change in the tarball, otherwise the environment will be unusable.
 
 \paragraph{Use case 8}
 \begin{verbatim}
-> kaenv --update-postinstalls-md5 sidx64-base
+> kaenv -o update-postinstalls-md5 -e sidx64-base
 \end{verbatim}
 This command does the same thing than the precedent one but it concerns the post-install files. This operation is required if something change in the post-install files, otherwise the environment will be unusable.
+
+\paragraph{Use case 9}
+\begin{verbatim}
+> kaenv -o set-visibility-tag -t private -e sidx64-base -v 3
+\end{verbatim}
+This command allows to define the environemnt \textit{sidx64-base} version 3 as a private environment. Note that the environment version is required and only the almighty environment users are allowed to define an environment as public.
 
 \subsubsection{Environment description}\label{sec:env_desc}
 Each line if an environment description must follow the pattern: \texttt{key : value} (note that the spaces around the \texttt{:} are mandatory.
@@ -739,8 +744,8 @@ hypervisor : /boot/xen-3.0.3-1-amd64.gz
 hypervisor_params : dom0_mem=1000000
 fdisktype : 83
 filesystem : ext2
-user : johnsmith
 environment_kind : xen
+visibility : shared
 demolishing_env : 0
 \end{verbatim}
 \end{small}
@@ -761,6 +766,12 @@ Explanation of the fields used in the environment description:
 \item \texttt{fdisktype}: partition type in hexadecimal (\texttt{83} for Linux, \texttt{a4} for FreeBSD, ...). This is used as an input for fdisk.
 \item \texttt{filesystem}: type of filesystem wished on the deployment partition. It must be known by the mkfs command.
 \item \texttt{environment\_kind}: kind of environment. Expected values are linux, xen or other.
+\item \texttt{visibility}: define the visibility level of an environment. Three levels are available:
+\begin{itemize}
+\item private: only the owner of the environment can see and use it ;
+\item shared: the environment can be used by everybody but it must explicitly use with the owner name ; furtermore, it won't be listed unless the owner name is specified ;
+\item public: the environment can be used by everybody and it is listed without specifing its owner name.
+\end{itemize}
 \item \texttt{demolishing\_env}: specify that the environment is demolishing (expected values are 0 if the environment is not demolishing, 10000 otherwise). SHOULD BE IMPROVED...
 \end{itemize}
 

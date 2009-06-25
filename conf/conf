@@ -41,4 +41,4 @@ mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|ext3
 demolishing_env_threshold = 2
 bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
-administrators = root,ejeanvoine
+almighty_env_users = root,ejeanvoine
