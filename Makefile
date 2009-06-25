@@ -19,47 +19,47 @@ cleanapi:
 
 
 install_src:
-	@install -o $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DESTDIR)/usr/local/kadeploy3/src
-	@install -o $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/lib
-	@install -o $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/contrib
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DESTDIR)/usr/local/kadeploy3/src
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/lib
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/contrib
 
 install_conf_client:
-	@install -o $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DESTDIR)/etc/kadeploy3
 
 install_conf_server:
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/conf $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/specific_conf* $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/nodes $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/cmd $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/fdisk* $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/conf $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/specific_conf* $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/nodes $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/cmd $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/fdisk* $(DESTDIR)/etc/kadeploy3
 
 install_conf_common:
-	@install -o $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
 
 install_bin:
-	@install -o $(DEPLOY_USER) -m 755 $(BIN)/* $(DESTDIR)/usr/bin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/* $(DESTDIR)/usr/bin
 
 install_sbin:
-	@install -o $(DEPLOY_USER) -m 700 $(SBIN)/* $(DESTDIR)/usr/sbin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/* $(DESTDIR)/usr/sbin
 
 install_kastafior:
-	@install -o $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DESTDIR)/usr/bin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DESTDIR)/usr/bin
 
 install_debootstrap:
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/linuxrc $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/mkdev $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/make_debootstrap.sh $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/make_kernel.sh $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/linuxrc $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/mkdev $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_debootstrap.sh $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_kernel.sh $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
 
 install_test:
-	@install -o $(DEPLOY_USER) -m 700 $(TEST)/blackbox_tests.rb $(DESTDIR)/usr/local/kadeploy3/test
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DESTDIR)/usr/local/kadeploy3/test
 
 install_rc_script:
 	@install -m 644 $(ADDONS)/rc/kadeploy_server $(DESTDIR)/etc/init.d
 
 install_ssh_key:
-	@install -o $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/.keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/.keys
 
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin

@@ -15,41 +15,41 @@ TEST=$(KADEPLOY_ROOT)/test
 default: package_all
 
 install_src:
-	@install -o $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src
-	@install -o $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/lib
-	@install -o $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/contrib
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/lib
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/contrib
 
 install_conf_client:
-	@install -o $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DEB_ROOT_CLIENT)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DEB_ROOT_CLIENT)/etc/kadeploy3
 
 install_conf_server:
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/conf $(DEB_ROOT_SERVER)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/specific_conf* $(DEB_ROOT_SERVER)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/nodes $(DEB_ROOT_SERVER)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/cmd $(DEB_ROOT_SERVER)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -m 600 $(CONF)/fdisk* $(DEB_ROOT_SERVER)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/conf $(DEB_ROOT_SERVER)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/specific_conf* $(DEB_ROOT_SERVER)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/nodes $(DEB_ROOT_SERVER)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/cmd $(DEB_ROOT_SERVER)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/fdisk* $(DEB_ROOT_SERVER)/etc/kadeploy3
 
 install_conf_common:
-	@install -o $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DEB_ROOT_COMMON)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DEB_ROOT_COMMON)/etc/kadeploy3
 
 install_bin:
-	@install -o $(DEPLOY_USER) -m 755 $(BIN)/* $(DEB_ROOT_CLIENT)/usr/bin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/* $(DEB_ROOT_CLIENT)/usr/bin
 
 install_sbin:
-	@install -o $(DEPLOY_USER) -m 700 $(SBIN)/* $(DEB_ROOT_SERVER)/usr/sbin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/* $(DEB_ROOT_SERVER)/usr/sbin
 
 install_kastafior:
-	@install -o $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DEB_ROOT_SERVER)/usr/bin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DEB_ROOT_SERVER)/usr/bin
 
 install_debootstrap:
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/linuxrc $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/mkdev $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/make_debootstrap.sh $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/make_kernel.sh $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -m 700 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/linuxrc $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/mkdev $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_debootstrap.sh $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_kernel.sh $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
 
 install_test:
-	@install -o $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
 
 install_rc_script:
 	@install -m 755 $(ADDONS)/rc/kadeploy_server $(DEB_ROOT_SERVER)/etc/init.d
@@ -58,7 +58,7 @@ install_db_script:
 	@install -m 644 $(DB)/db_creation.sql $(DEB_ROOT_COMMON)/usr/local/kadeploy3/db
 
 install_ssh_key:
-	@install -o $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DEB_ROOT_SERVER)/.keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DEB_ROOT_SERVER)/.keys
 
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
