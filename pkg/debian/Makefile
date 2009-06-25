@@ -1,3 +1,4 @@
+VERSION=3-beta
 KADEPLOY_ROOT=../..
 DEPLOY_USER=deploy
 DEB_ROOT_CLIENT=kadeploy-client
@@ -10,6 +11,7 @@ CONF=$(KADEPLOY_ROOT)/conf
 ADDONS=$(KADEPLOY_ROOT)/addons
 DB=$(KADEPLOY_ROOT)/db
 TEST=$(KADEPLOY_ROOT)/test
+
 default: package_all
 
 install_src:
@@ -83,11 +85,11 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/etc/kadeploy3
 
 package_client: tree_client install_conf_client install_bin
-	@dpkg-deb --build $(DEB_ROOT_CLIENT) kadeploy-v3-client.deb
+	@dpkg-deb --build $(DEB_ROOT_CLIENT) kadeploy-client-$(VERSION).deb
 package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior
-	@dpkg-deb --build $(DEB_ROOT_SERVER) kadeploy-v3-server.deb	
+	@dpkg-deb --build $(DEB_ROOT_SERVER) kadeploy-server-$(VERSION).deb	
 package_common: tree_common install_conf_common install_src install_debootstrap install_test install_db_script
-	@dpkg-deb --build $(DEB_ROOT_COMMON) kadeploy-v3-common.deb
+	@dpkg-deb --build $(DEB_ROOT_COMMON) kadeploy-common-$(VERSION).deb
 
 package_all: package_client package_server package_common
 
@@ -95,4 +97,4 @@ clean:
 	@rm -rf $(DEB_ROOT_CLIENT)/usr $(DEB_ROOT_CLIENT)/etc
 	@rm -rf $(DEB_ROOT_SERVER)/usr $(DEB_ROOT_SERVER)/etc $(DEB_ROOT_SERVER)/.keys
 	@rm -rf $(DEB_ROOT_COMMON)/usr $(DEB_ROOT_COMMON)/etc
-	@rm -f kadeploy-v3-client.deb kadeploy-v3-server.deb kadeploy-v3-common.deb
+	@rm -f kadeploy-client-$(VERSION).deb kadeploy-server-$(VERSION).deb kadeploy-common-$(VERSION).deb

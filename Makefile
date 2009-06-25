@@ -95,8 +95,8 @@ install_all: install_common install_client install_server
 uninstall:
 	@rm -rf $(DESTDIR)/usr/local/kadeploy3
 	@rm -f $(DESTDIR)/.keys/id_deploy
-	@rm -f $(DESTDIR)/usr/sbin/kadeploy_server $(DESTDIR)/usr/sbin/karights
-	@rm -f $(DESTDIR)/usr/bin/kaconsole $(DESTDIR)/usr/bin/kadeploy $(DESTDIR)/usr/bin/kaenv $(DESTDIR)/usr/bin/kanodes $(DESTDIR)/usr/bin/kareboot $(DESTDIR)/usr/bin/kastat
+	@rm -f $(DESTDIR)/usr/sbin/kadeploy3_server $(DESTDIR)/usr/sbin/karights3
+	@rm -f $(DESTDIR)/usr/bin/kaconsole3 $(DESTDIR)/usr/bin/kadeploy3 $(DESTDIR)/usr/bin/kaenv3 $(DESTDIR)/usr/bin/kanodes3 $(DESTDIR)/usr/bin/kareboot3 $(DESTDIR)/usr/bin/kastat3
 
 dist: dist-clean
 	@./make_dist_dir.sh $(DIST_DIR)
@@ -104,16 +104,16 @@ dist: dist-clean
 dist-tgz: dist
 	@tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
 
-dist-rpm: dist
+dist-clean:
+	@rm -rf $(DIST_DIR)
+
+rpm: dist
 	cp $(PKG)/fedora/kadeploy.spec $(DIST_DIR)
 	tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
 	rpmbuild -ta $(DIST_DIR).tar.gz
 
-dist-clean:
-	@rm -rf $(DIST_DIR)
+deb:
+	@(cd $(PKG)/debian; make package_all; mv kadeploy-*.deb $(CURRENT_DIR); make clean; cd $(CURRENT_DIR))
 
-deb-pkg:
-	@(cd $(PKG)/debian; make package_all; mv kadeploy-v3-*.deb $(CURRENT_DIR); make clean; cd $(CURRENT_DIR))
-
-mrproper: cleanapi uninstall
+mrproper: cleanapi dist-clean uninstall
 	@find . -name '*~' | xargs rm -f	
