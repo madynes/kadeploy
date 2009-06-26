@@ -189,13 +189,13 @@ This will generate three rpm package in the RPMS package of your build environme
 After being installed and configured, the Kadeploy server can be run either interactively:
 \begin{small}
 \begin{verbatim}
-> /usr/local/kadeploy3/sbin/kadeploy3_server
+> /usr/local/kadeploy3/sbin/kadeploy_server
 \end{verbatim}
 \end{small}
 \noindent or in background using the rc script:
 \begin{small}
 \begin{verbatim}
-> /etc/init.d/kadeploy3_server start
+> /etc/init.d/kadeploy_server start
 \end{verbatim}
 \end{small}
 
@@ -526,7 +526,8 @@ General options:
   -d, --debug-mode                 Activate the debug mode
   -e, --env-name ENVNAME           Name of the recorded environment to deploy
   -f, --file MACHINELIST           Files containing list of nodes
-  -k, --key FILE                   Public key to copy in the root's authorized_keys
+  -k, --key [FILE]                 Public key to copy in the root's authorized_keys, 
+                                   if no argument is specified, use the authorized_keys
   -m, --machine MACHINE            Node to run on
   -n, --output-ko-nodes FILENAME   File that will contain the nodes not correctly deployed
   -o, --output-ok-nodes FILENAME   File that will contain the nodes correctly deployed
@@ -663,7 +664,8 @@ General options:
   -c, --check-prod-env          Check if the production environment has been destroyed
   -d, --debug-level VALUE       Debug level between 0 to 4
   -f, --file MACHINELIST        Files containing list of nodes
-  -k, --key FILE                Public key to copy in the root's authorized_keys
+  -k, --key [FILE]              Public key to copy in the root's authorized_keys, 
+                                if no argument is specified, use the authorized_keys
   -m, --machine MACHINE         Reboot the given machines
   -r, --reboot-kind REBOOT_KIND Specify the reboot kind (back_to_prod_env, set_pxe, 
                                 simple_reboot)
@@ -931,7 +933,6 @@ Kanodes can be used by using the \texttt{kanodes} command. The CLI looks like th
 Usage: kanodes3 [options]
 Contact: kadeploy-devel@lists.grid5000.fr
 General options:
-  -b, --get-state
   -f, --file MACHINELIST       Only print information about the given machines
   -m, --machine MACHINE        Only print information about the given machines
   -o, --operation OPERATION    Choose the operation (get_deploy_state or get_yaml_dump)

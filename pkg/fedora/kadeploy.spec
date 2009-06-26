@@ -50,14 +50,14 @@ make install_all DESTDIR=$RPM_BUILD_ROOT
 rm -rf $RPM_BUILD_ROOT
 
 %files common
-%defattr(-,root,root,-)
+%defattr(-,deploy,deploy,-)
 %doc License.txt
 /usr/local/kadeploy3
 %dir /etc/kadeploy3
 /etc/kadeploy3/load_kadeploy_env
 
 %files server
-%defattr(-,root,root,-)
+%defattr(-,deploy,deploy,-)
 /etc/init.d/kadeploy_server
 %config(noreplace) /etc/kadeploy3/nodes
 %config(noreplace) /etc/kadeploy3/specific_conf_g5kdev-cluster
@@ -65,13 +65,13 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) /etc/kadeploy3/cmd
 %config(noreplace) /etc/kadeploy3/conf
 /usr/bin/kastafior
-/usr/sbin/kadeploy3_server
+/usr/sbin/kadeploy_server
 /usr/sbin/karights3
 %dir /.keys
 /.keys/id_deploy
 
 %files client
-%defattr(-,root,root,-)
+%defattr(-,deploy,deploy,-)
 %config(noreplace) /etc/kadeploy3/client_conf
 /usr/bin/kaconsole3
 /usr/bin/kanodes3

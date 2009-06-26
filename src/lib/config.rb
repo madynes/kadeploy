@@ -716,7 +716,7 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 32
-        opts.banner = "Usage: kadeploy [options]"
+        opts.banner = "Usage: kadeploy3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
@@ -769,9 +769,9 @@ module ConfigInformation
               exec_specific.key = File.expand_path(f)
             end
           else
-            authorized_keys = "~/.ssh/authorized_keys"
+            authorized_keys = File.expand_path("~/.ssh/authorized_keys")
             if File.readable?(authorized_keys) then
-              exec_specific.key = File.expand_path(authorized_keys)
+              exec_specific.key = authorized_keys
             else
               Debug::client_error("The authorized_keys file #{authorized_keys} cannot be read")
               return false
@@ -1052,7 +1052,7 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 36
-        opts.banner = "Usage: kaenv [options]"
+        opts.banner = "Usage: kaenv3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
@@ -1221,7 +1221,7 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 28
-        opts.banner = "Usage: karights [options]"
+        opts.banner = "Usage: karights3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
@@ -1326,7 +1326,7 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 28
-        opts.banner = "Usage: kastat [options]"
+        opts.banner = "Usage: kastat3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
@@ -1463,13 +1463,10 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 28
-        opts.banner = "Usage: kanodes [options]"
+        opts.banner = "Usage: kanodes3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
-        opts.on("-b", "--get-state", "") {
-          @exec_specific.operation = list 
-        }       
         opts.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
@@ -1558,7 +1555,7 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 30
-        opts.banner = "Usage: kareboot [options]"
+        opts.banner = "Usage: kareboot3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
@@ -1579,12 +1576,22 @@ module ConfigInformation
             }
           end
         }
-        opts.on("-k", "--key FILE", "Public key to copy in the root's authorized_keys") { |f|
-          if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
-            return false
+        opts.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
+          if (f != nil) then
+            if not File.readable?(f) then
+              Debug::client_error("The file #{f} cannot be read")
+              return false
+            else
+              @exec_specific.key = File.expand_path(f)
+            end
           else
-            @exec_specific.key = File.expand_path(f)
+            authorized_keys = File.expand_path("~/.ssh/authorized_keys")
+            if File.readable?(authorized_keys) then
+              @exec_specific.key = authorized_keys
+            else
+              Debug::client_error("The authorized_keys file #{authorized_keys} cannot be read")
+              return false
+            end
           end
         }
         opts.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
@@ -1679,7 +1686,7 @@ module ConfigInformation
       opts = OptionParser::new do |opts|
         opts.summary_indent = "  "
         opts.summary_width = 28
-        opts.banner = "Usage: kaconsole [options]"
+        opts.banner = "Usage: kaconsole3 [options]"
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
