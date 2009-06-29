@@ -271,6 +271,55 @@ class KadeployServer
     GC.start
   end
 
+  # Launch the workflow from an asynchronous client (RPC)
+  #
+  # Arguments
+  # * host: hostname of the client
+  # * port: port on which the client listen to Drb
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * nothing
+  def launch_workflow_async(host, port, exec_specific)
+    puts "Let's launch an async instance of Kadeploy"
+    DRb.start_service()
+    uri = "druby://#{host}:#{port}"
+    client = DRbObject.new(nil, uri)
+
+    #We create a new instance of Config with a specific exec_specific part
+    config = ConfigInformation::Config.new("empty")
+    config.common = @config.common
+    config.exec_specific = exec_specific
+    config.cluster_specific = Hash.new
+
+    #Overide the configuration if the steps are specified in the command line
+    if (not exec_specific.steps.empty?) then
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
+      }
+    #If the environment specifies a preinstall, we override the automata to use specific preinstall
+    elsif (exec_specific.environment.preinstall != nil) then
+      puts "A specific presinstall will be used with this environment"
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
+        instance = config.cluster_specific[cluster].get_macro_step("SetDeploymentEnv").get_instance
+        max_retries = instance[1]
+        timeout = instance[2]
+        config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
+      }
+    else
+      config.cluster_specific = @config.cluster_specific
+    end
+
+    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock)
+    workflow_id = add_workflow_info(workflow)
+    client.set_workflow_id(workflow_id)
+    Thread.new {
+      workflow.run
+    }
+  end
+
   # Reboot a set of nodes from the client side (RPC)
   #
   # Arguments

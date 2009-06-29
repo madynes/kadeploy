@@ -1,6 +1,6 @@
 Name:           kadeploy
 Version:        3
-Release:        beta%{?dist}
+Release:        0.0
 Group:          System/Cluster
 License:        CeCILL V2
 URL:            http://gforge.inria.fr/scm/?group_id=2026
@@ -42,7 +42,7 @@ This package provide the client part of the Kadeploy deployment tool.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install_all DESTDIR=$RPM_BUILD_ROOT
+make install_all DESTDIR=$RPM_BUILD_ROOT DISTRIB=fedora
 
 %check
 
@@ -58,14 +58,14 @@ rm -rf $RPM_BUILD_ROOT
 
 %files server
 %defattr(-,deploy,deploy,-)
-/etc/init.d/kadeploy_server
+/etc/init.d/kadeploy3d
 %config(noreplace) /etc/kadeploy3/nodes
 %config(noreplace) /etc/kadeploy3/specific_conf_g5kdev-cluster
 %config(noreplace) /etc/kadeploy3/fdisk_g5kdev-cluster
 %config(noreplace) /etc/kadeploy3/cmd
 %config(noreplace) /etc/kadeploy3/conf
 /usr/bin/kastafior
-/usr/sbin/kadeploy_server
+/usr/sbin/kadeploy3d
 /usr/sbin/karights3
 %dir /.keys
 /.keys/id_deploy

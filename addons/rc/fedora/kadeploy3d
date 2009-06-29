@@ -1,0 +1,65 @@
+#!/bin/bash
+#
+# kadeploy3d        Startup script for the Kadeploy 3 server
+#
+# processname: kadeploy3d
+#
+### BEGIN INIT INFO
+# Provides: kadeploy3d
+# Should-Start: distcache
+# Short-Description: start and stop Kadeploy 3 Server
+# Description: Kadeploy 3 server.
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+
+prog="Kadeploy 3"
+kadeploy3d="/usr/sbin/kadeploy3d"
+pidfile=/var/run/kadeploy3d.pid
+lockfile=/var/lock/subsys/kadeploy3d
+RETVAL=0
+
+start() {
+	echo -n $"Starting $prog: "
+        daemon --pidfile=${pidfile} --user=deploy "nohup $kadeploy3d 2>/dev/null &"
+        pidof -x $kadeploy3d > ${pidfile}
+        RETVAL=$?
+        echo
+	[ $RETVAL = 0 ] && touch ${lockfile}
+        return $RETVAL
+}
+
+stop() {
+        echo -n $"Stopping $prog: "
+        killproc -p ${pidfile} -d 3 $kadeploy3d
+        RETVAL=$?
+        echo
+	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
+}
+
+case "$1" in
+  start)
+        start
+	;;
+  stop)
+       	stop
+	;;
+  status)
+	status -p ${pidfile} $kadeploy3d
+        RETVAL=$?
+        ;;
+  restart)
+	stop
+	start
+	;;
+  *)
+    	echo $"Usage: $prog {start|stop|restart|status|helpt}"
+        RETVAL=3
+esac
+
+exit $RETVAL
+
+
+

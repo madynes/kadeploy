@@ -83,6 +83,13 @@ First of all , you have to uncompress the Kadeploy tarball.
 \end{verbatim}
 \end{small}
 
+\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only debian (it includes Ubuntu at least) and fedora (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
+\begin{small}
+\begin{verbatim}
+> make install_all DISTRIB=fedora
+\end{verbatim}
+\end{small}
+
 \noindent In order to preserve a previous configuration, the configuration directory \texttt{/etc/kadeploy3} is saved, if existing, to a directory named \texttt{/etc/kadeploy3-save-TIMESTAMP} where \texttt{TIMESTAMP} is the moment of the new installation launch.
 
 \noindent Finally, Kadeploy can be simply uninstalled by executing:
@@ -110,30 +117,30 @@ The following installation method works only an Debian based distribution.
 > make deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-v3-common.deb}, \texttt{kadeploy-v3-client.deb}, and \texttt{kadeploy-v3-server.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-3-0.0.deb}, \texttt{kadeploy-client-3-0.0.deb}, and \texttt{kadeploy-server-3-0.0.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-v3-common.deb} and \texttt{kadeploy-v3-server.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3-0.0.deb} and \texttt{kadeploy-server-3-0.0.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-v3-common.deb
-> dpkg -i kadeploy-v3-server.deb
+> dpkg -i kadeploy-common-3-0.0.deb
+> dpkg -i kadeploy-server-3-0.0.deb
 \end{verbatim}
 \end{small}
 
 \noindent On the client side, you have to install the \texttt{kadeploy-v3-common.deb} and \texttt{kadeploy-v3-client.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-v3-common.deb
-> dpkg -i kadeploy-v3-client.deb
+> dpkg -i kadeploy-v3-common-3-0.0.deb
+> dpkg -i kadeploy-v3-client-3-0.0.deb
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-v3-common.deb
-> dpkg -i kadeploy-v3-client.deb
-> dpkg -i kadeploy-v3-server.deb
+> dpkg -i kadeploy-common-3-0.0.deb
+> dpkg -i kadeploy-client-3-0.0.deb
+> dpkg -i kadeploy-server-3-0.0.deb
 \end{verbatim}
 \end{small}
 
@@ -157,30 +164,30 @@ The following installation method works only an Fedora based distribution. We as
 > make rpm
 \end{verbatim}
 \end{small}
-This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3-beta.fc11.noarch.rpm}, \texttt{kadeploy-server-3-beta.fc11.noarch.rpm}, and \texttt{kadeploy-common-3-beta.fc11.noarch.rpm}.
+This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3-0.0.noarch.rpm}, \texttt{kadeploy-server-3-0.0.noarch.rpm}, and \texttt{kadeploy-common-3-0.0.noarch.rpm}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3-beta.fc11.noarch.rpm} and \texttt{kadeploy-server-3-beta.fc11.noarch.rpm} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3-0.0.noarch.rpm} and \texttt{kadeploy-server-3-0.0.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3-beta.fc11.noarch.rpm
-> rpm -i kadeploy-server-3-beta.fc11.noarch.rpm
+> rpm -i kadeploy-common-3-0.0.noarch.rpm
+> rpm -i kadeploy-server-3-0.0.noarch.rpm
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3-beta.fc11.noarch.rpm} and \texttt{kadeploy-client-3-beta.fc11.noarch.rpm} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3-0.0.noarch.rpm} and \texttt{kadeploy-client-3-0.0.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3-beta.fc11.noarch.rpm
-> rpm -i kadeploy-client-3-beta.fc11.noarch.rpm
+> rpm -i kadeploy-common-3-0.0.noarch.rpm
+> rpm -i kadeploy-client-3-0.0.noarch.rpm
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3-beta.fc11.noarch.rpm
-> rpm -i kadeploy-server-3-beta.fc11.noarch.rpm
-> rpm -i kadeploy-client-3-beta.fc11.noarch.rpm
+> rpm -i kadeploy-common-3-0.0.noarch.rpm
+> rpm -i kadeploy-server-3-0.0.noarch.rpm
+> rpm -i kadeploy-client-3-0.0.noarch.rpm
 \end{verbatim}
 \end{small}
 
@@ -189,13 +196,13 @@ This will generate three rpm package in the RPMS package of your build environme
 After being installed and configured, the Kadeploy server can be run either interactively:
 \begin{small}
 \begin{verbatim}
-> /usr/local/kadeploy3/sbin/kadeploy_server
+> /usr/local/kadeploy3/sbin/kadeploy3d
 \end{verbatim}
 \end{small}
 \noindent or in background using the rc script:
 \begin{small}
 \begin{verbatim}
-> /etc/init.d/kadeploy_server start
+> /etc/init.d/kadeploy3d start
 \end{verbatim}
 \end{small}
 
@@ -510,7 +517,7 @@ Kanodes is designed to show the state of the nodes.
 \subsection{Kadeploy server}
 All the Kadeploy tools use the Kadeploy server. On a well configured system, the Kadeploy server can be launched with the following command (with root rights):
 \begin{verbatim}
-> kadeploy_server
+> kadeploy3d
 \end{verbatim}
 
 \subsection{Kadeploy client}

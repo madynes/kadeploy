@@ -56,7 +56,12 @@ install_test:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DESTDIR)/usr/local/kadeploy3/test
 
 install_rc_script:
-	@install -m 644 $(ADDONS)/rc/kadeploy_server $(DESTDIR)/etc/init.d
+ifeq ($(DISTRIB),debian)
+	@install -m 755 $(ADDONS)/rc/debian/kadeploy3d $(DESTDIR)/etc/init.d
+endif
+ifeq ($(DISTRIB),fedora)
+	@install -m 755 $(ADDONS)/rc/fedora/kadeploy3d $(DESTDIR)/etc/init.d
+endif
 
 install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/.keys

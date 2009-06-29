@@ -1,5 +1,5 @@
 Package: kadeploy-server
-Version: 3
+Version: 3.0.0
 Section: base
 Priority: optional
 Architecture: all
