@@ -1,4 +1,4 @@
-VERSION=3-0.0
+VERSION=3.0-0
 KADEPLOY_ROOT=../..
 DEPLOY_USER=deploy
 DEB_ROOT_CLIENT=kadeploy-client

@@ -27,7 +27,7 @@ Kadeploy requires the following softwares (the Debian packages available in the 
 \item \texttt{rubylibmysql-ruby}
 \item \texttt{bittorrent}
 \item \texttt{ctorrent}
-\item \texttt{taktuk}
+\item \texttt{taktuk >= 3.6}
 \end{itemize}
 
 \subsection{DHCP and TFTP}
@@ -40,7 +40,7 @@ To allow the network booting, you must specify in the DHCP configuration file th
 Finally, the TFTP images directory (see~\ref{sec:general_config} part) must contain the following files: pxelinux.0 and/or gpxelinux.0, chain.c32, and mboot.c32. These files can be found in the Syslinux software (\url{http://syslinux.zytor.com}), the 3.73 version is at least required.
 
 \subsection{HTTP server (optional)}
-In order to use the HTTP fetching capabilites of gpxelinux, an HTTP server must be configured and must contain the production environment kernel/initrtd and the deployment environment kernel/initrd (see~\ref{sec:specific_config} part).
+In order to use the HTTP fetching capabilities of gpxelinux, an HTTP server must be configured and must contain the production environment kernel/initrtd and the deployment environment kernel/initrd (see~\ref{sec:specific_config} part).
 
 \subsection{MySql}
 A MySql server must be configured with a database and a user dedicated to Kadeploy. The rights on this database must be granted to the chosen user, from the Kadeploy server. The server used to host the database, the database name, the dedicated user and its password must be specified in the general Kadeploy configuration (see~\ref{sec:general_config} part).
@@ -56,7 +56,7 @@ Two ways are provided to install Kadeploy, a basic installer and packages (for D
 First of all , you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{verbatim}
-> tar xzf kadeploy-v3.tar.gz -C DESTINATION_DIR
+> tar xzf kadeploy-3.0-0.tar.gz -C DESTINATION_DIR
 \end{verbatim}
 \end{small}
 
@@ -89,6 +89,12 @@ First of all , you have to uncompress the Kadeploy tarball.
 > make install_all DISTRIB=fedora
 \end{verbatim}
 \end{small}
+or if you do not install the server side on the same machine than the client side:
+\begin{small}
+\begin{verbatim}
+> make install_server DISTRIB=fedora
+\end{verbatim}
+\end{small}
 
 \noindent In order to preserve a previous configuration, the configuration directory \texttt{/etc/kadeploy3} is saved, if existing, to a directory named \texttt{/etc/kadeploy3-save-TIMESTAMP} where \texttt{TIMESTAMP} is the moment of the new installation launch.
 
@@ -117,30 +123,30 @@ The following installation method works only an Debian based distribution.
 > make deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-3-0.0.deb}, \texttt{kadeploy-client-3-0.0.deb}, and \texttt{kadeploy-server-3-0.0.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-3.0-0.deb}, \texttt{kadeploy-client-3.0-0.deb}, and \texttt{kadeploy-server-3.0-0.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3-0.0.deb} and \texttt{kadeploy-server-3-0.0.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-0.deb} and \texttt{kadeploy-server-3.0-0.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3-0.0.deb
-> dpkg -i kadeploy-server-3-0.0.deb
+> dpkg -i kadeploy-common-3.0-0.deb
+> dpkg -i kadeploy-server-3.0-0.deb
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-v3-common.deb} and \texttt{kadeploy-v3-client.deb} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-0.deb} and \texttt{kadeploy-client-3.0-0.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-v3-common-3-0.0.deb
-> dpkg -i kadeploy-v3-client-3-0.0.deb
+> dpkg -i kadeploy-common-3.0-0.deb
+> dpkg -i kadeploy-client-3.0-0.deb
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3-0.0.deb
-> dpkg -i kadeploy-client-3-0.0.deb
-> dpkg -i kadeploy-server-3-0.0.deb
+> dpkg -i kadeploy-common-3.0-0.deb
+> dpkg -i kadeploy-client-3.0-0.deb
+> dpkg -i kadeploy-server-3.0-0.deb
 \end{verbatim}
 \end{small}
 
@@ -149,7 +155,7 @@ In order to preserve your configuration files, the removal of a Kadeploy package
 
 
 \subsection{Fedora packages}
-The following installation method works only an Fedora based distribution. We assume that you have a configured rpm build environment. Furtermore, Taktuk must be installed on the server side.
+The following installation method works only an Fedora based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
 \subsubsection{Build}
 \noindent First, you have to uncompress the Kadeploy tarball. 
 \begin{small}
@@ -164,30 +170,30 @@ The following installation method works only an Fedora based distribution. We as
 > make rpm
 \end{verbatim}
 \end{small}
-This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3-0.0.noarch.rpm}, \texttt{kadeploy-server-3-0.0.noarch.rpm}, and \texttt{kadeploy-common-3-0.0.noarch.rpm}.
+This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-0.noarch.rpm}, \texttt{kadeploy-server-3.0-0.noarch.rpm}, and \texttt{kadeploy-common-3.0-0.noarch.rpm}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3-0.0.noarch.rpm} and \texttt{kadeploy-server-3-0.0.noarch.rpm} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-0.noarch.rpm} and \texttt{kadeploy-server-3.0-0.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3-0.0.noarch.rpm
-> rpm -i kadeploy-server-3-0.0.noarch.rpm
+> rpm -i kadeploy-common-3.0-0.noarch.rpm
+> rpm -i kadeploy-server-3.0-0.noarch.rpm
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3-0.0.noarch.rpm} and \texttt{kadeploy-client-3-0.0.noarch.rpm} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-0.noarch.rpm} and \texttt{kadeploy-client-3.0-0.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3-0.0.noarch.rpm
-> rpm -i kadeploy-client-3-0.0.noarch.rpm
+> rpm -i kadeploy-common-3.0-0.noarch.rpm
+> rpm -i kadeploy-client-3.0-0.noarch.rpm
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3-0.0.noarch.rpm
-> rpm -i kadeploy-server-3-0.0.noarch.rpm
-> rpm -i kadeploy-client-3-0.0.noarch.rpm
+> rpm -i kadeploy-common-3.0-0.noarch.rpm
+> rpm -i kadeploy-server-3.0-0.noarch.rpm
+> rpm -i kadeploy-client-3.0-0.noarch.rpm
 \end{verbatim}
 \end{small}
 
@@ -230,7 +236,7 @@ rights_kind = db
 taktuk_ssh_connector = ssh -q -o StrictHostKeyChecking=no \
                               -o UserKnownHostsFile=/dev/null \
                               -o PreferredAuthentications=publickey \
-                              -o BatchMode=yes -i /root/.ssh/id_deploy
+                              -o BatchMode=yes -i /.keys/id_deploy
 taktuk_rsh_connector = rsh -l root
 taktuk_tree_arity = 0
 taktuk_auto_propagate = false
@@ -760,7 +766,7 @@ This command deletes the version \textit{2} of the environment \textit{FreeBSD} 
 \begin{verbatim}
 > kaenv3 -o remove-demolishing-tag -e FreeBSD -v 3
 \end{verbatim}
-This command resets the \textit{demolishing} counter of the verion \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
+This command resets the \textit{demolishing} counter of the version \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
 
 \paragraph{Use case 7}
 \begin{verbatim}
@@ -778,7 +784,7 @@ This command does the same thing than the precedent one but it concerns the post
 \begin{verbatim}
 > kaenv3 -o set-visibility-tag -t private -e sidx64-base -v 3
 \end{verbatim}
-This command allows to define the environemnt \textit{sidx64-base} version 3 as a private environment. Note that the environment version is required and only the almighty environment users are allowed to define an environment as public.
+This command allows to define the environment \textit{sidx64-base} version 3 as a private environment. Note that the environment version is required and only the almighty environment users are allowed to define an environment as public.
 
 \subsubsection{Environment description}\label{sec:env_desc}
 Each line if an environment description must follow the pattern: \texttt{key : value} (note that the spaces around the \texttt{:} are mandatory.
@@ -1040,7 +1046,7 @@ You can do want you want in the pre-install but you must that Kadeploy will extr
 \item /dev/sda6 $\mapsto$ /mnt/dest/tmp
 \end{itemize}
 
-If you choose to mount more than one partition in the pre-install, remember to unmount all the partitions excepted the one mounted on \texttt{environment\_extraction\_dir} (\texttt{/mnt/dest} in principle) in the post-install step. Indeed, the common Kadeploy workflow will automatically unmount the partition mounted on \texttt{environment\_extraction\_dir}. Thus, if other partitions are mounted, the unmount will fail.
+If you choose to mount more than one partition in the pre-install, remember to umount all the partitions excepted the one mounted on \texttt{environment\_extraction\_dir} (\texttt{/mnt/dest} in principle) in the post-install step. Indeed, the common Kadeploy workflow will automatically umount the partition mounted on \texttt{environment\_extraction\_dir}. Thus, if other partitions are mounted, the umount will fail.
 
 
 \end{document}

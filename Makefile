@@ -8,7 +8,7 @@ CONF=$(KADEPLOY_ROOT)/conf
 ADDONS=$(KADEPLOY_ROOT)/addons
 TEST=$(KADEPLOY_ROOT)/test
 PKG=$(KADEPLOY_ROOT)/pkg
-DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-3
+DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-3.0
 
 api: cleanapi
 	@echo "Generating API"
@@ -108,6 +108,7 @@ dist: dist-clean
 
 dist-tgz: dist
 	@tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
+	@rm -rf $(DIST_DIR)
 
 dist-clean:
 	@rm -rf $(DIST_DIR)

@@ -1,6 +1,6 @@
 Name:           kadeploy
-Version:        3
-Release:        0.0
+Version:        3.0
+Release:        0
 Group:          System/Cluster
 License:        CeCILL V2
 URL:            http://gforge.inria.fr/scm/?group_id=2026
@@ -23,7 +23,7 @@ This package provide the common part of the Kadeploy deployment tool.
 
 %package server
 Summary:        Server part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}, bittorrent, ctorrent
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}, bittorrent, ctorrent, taktuk >= 3.6
 Group:          System/Cluster
 %description server
 This package provide the server part of the Kadeploy deployment tool.

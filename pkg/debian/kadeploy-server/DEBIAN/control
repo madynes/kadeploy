@@ -1,8 +1,8 @@
 Package: kadeploy-server
-Version: 3.0.0
+Version: 3.0-0
 Section: base
 Priority: optional
 Architecture: all
-Depends: libmysql-ruby1.8,ruby1.8,bittorrent,ctorrent,kadeploy-common
+Depends: libmysql-ruby1.8,ruby1.8,bittorrent,ctorrent,kadeploy-common,taktuk (>= 3.6)
 Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
 Description: Kadeploy: the cluster deployment tool - server part
