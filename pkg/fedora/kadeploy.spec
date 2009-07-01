@@ -69,6 +69,7 @@ rm -rf $RPM_BUILD_ROOT
 /usr/sbin/karights3
 %dir /.keys
 /.keys/id_deploy
+/.keys/id_deploy.pub
 
 %files client
 %defattr(-,deploy,deploy,-)

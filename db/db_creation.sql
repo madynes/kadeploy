@@ -90,6 +90,6 @@ DROP TABLE IF EXISTS `rights`;
 CREATE TABLE IF NOT EXISTS `rights` (
   `user` varchar(30) NOT NULL,
   `node` varchar(30) NOT NULL,
-  `part` varchar(10) NOT NULL
+  `part` varchar(50) NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 

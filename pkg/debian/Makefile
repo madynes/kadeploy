@@ -41,24 +41,18 @@ install_sbin:
 install_kastafior:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DEB_ROOT_SERVER)/usr/bin
 
-install_debootstrap:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/linuxrc $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/mkdev $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_debootstrap.sh $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_kernel.sh $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
-
 install_test:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
 
 install_rc_script:
-	@install -m 755 $(ADDONS)/rc/debian/kadeploy3d $(DEB_ROOT_SERVER)/etc/init.d
+	@install -m 644 $(ADDONS)/rc/debian/kadeploy3d $(DEB_ROOT_SERVER)/etc/init.d
 
 install_db_script:
 	@install -m 644 $(DB)/db_creation.sql $(DEB_ROOT_COMMON)/usr/local/kadeploy3/db
 
 install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DEB_ROOT_SERVER)/.keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DEB_ROOT_SERVER)/.keys
 
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
@@ -75,10 +69,6 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/lib
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/db
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3/src/contrib
@@ -88,7 +78,7 @@ package_client: tree_client install_conf_client install_bin
 	@dpkg-deb --build $(DEB_ROOT_CLIENT) kadeploy-client-$(VERSION).deb
 package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior
 	@dpkg-deb --build $(DEB_ROOT_SERVER) kadeploy-server-$(VERSION).deb	
-package_common: tree_common install_conf_common install_src install_debootstrap install_test install_db_script
+package_common: tree_common install_conf_common install_src install_test install_db_script
 	@dpkg-deb --build $(DEB_ROOT_COMMON) kadeploy-common-$(VERSION).deb
 
 package_all: package_client package_server package_common

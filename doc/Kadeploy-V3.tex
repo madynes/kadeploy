@@ -274,7 +274,7 @@ almighty_env_users = root,ejeanvoine
 \end{small}
 
 \subsection{Explanation of the fields used in the general configuration file}
-Each line if the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
+Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
 \begin{itemize}
 \item \texttt{verbose\_level}: number between 0 and 4 that specifies the default verbose level for the client. 0 means ``no verbose'' and 4 means ``full verbose''.
 \item \texttt{tftp\_repository}: absolute path of the TFTP repository.
@@ -341,7 +341,7 @@ timeout_reboot = 220
 cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
                              -o PreferredAuthentications=publickey \
                              -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
-                             -i /root/.ssh/id_deploy root@HOSTNAME_FQDN /sbin/reboot
+                             -i /.keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
 cmd_soft_reboot_rsh = rsh -l root HOSTNAME_FQDN /usr/local/bin/reboot_detach
 cmd_hard_reboot = /usr/local/kadeploy/bin/reboot.rb HOSTNAME_SHORT
 cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
@@ -360,7 +360,7 @@ macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvClassical:1:300
 \end{small}
 
 \subsection{Explanation of the fields used in the general configuration file}
-Each line if the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
+Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
 \begin{itemize}
 \item \texttt{prod\_kernel}: name of the kernel used by the production environment.
 \item \texttt{prod\_initrd}: name of the initrd used by the production environment.
@@ -416,7 +416,7 @@ If you specify \texttt{fdisk} for the \texttt{partition\_creation\_kind} field i
 If you specify \texttt{parted} for the \texttt{partition\_creation\_kind} field in the cluster-specific configuration file, you must provide a parted script as a partition map file. Currently, only the Linux partition kind is handled with parted.
 
 \section{Nodes configuration files}
-All the nodes of the clusters that aim to be deployed must be declared in a file named \texttt{nodes} in the configuration directory. Each line of the must specify a node and the syntax is: \texttt{hostname} \texttt{ip} \texttt{cluster}.
+All the nodes of the clusters that aim to be deployed must be declared in a file named \texttt{nodes} in the configuration directory. Each line of the file must specify a node and the syntax is: \texttt{hostname} \texttt{ip} \texttt{cluster}.
 
 Here is an example:
 \begin{small}
@@ -438,7 +438,7 @@ netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
 \end{small}
 
 \section{Specific commands configuration files}
-In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the must specify a command to override for a given node and the syntax is: \texttt{hostname}|\texttt{cmd\_kind}|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for \texttt{cmd\_kind} are:
+In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|\texttt{cmd\_kind}|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for \texttt{cmd\_kind} are:
 \begin{itemize}
 \item \texttt{cmd\_soft\_reboot\_ssh}
 \item \texttt{cmd\_soft\_reboot\_rsh}
@@ -787,7 +787,7 @@ This command does the same thing than the precedent one but it concerns the post
 This command allows to define the environment \textit{sidx64-base} version 3 as a private environment. Note that the environment version is required and only the almighty environment users are allowed to define an environment as public.
 
 \subsubsection{Environment description}\label{sec:env_desc}
-Each line if an environment description must follow the pattern: \texttt{key : value} (note that the spaces around the \texttt{:} are mandatory.
+Each line of an environment description must follow the pattern: \texttt{key : value} (note that the spaces around the \texttt{:} are mandatory.
 Here is an example of an environment description:
 \begin{small}
 \begin{verbatim}

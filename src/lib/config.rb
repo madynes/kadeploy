@@ -486,26 +486,11 @@ module ConfigInformation
               when "block_device"
                 @cluster_specific[cluster].block_device = val
               when "deploy_part"
-                if val =~ /\A\d+\Z/ then
                   @cluster_specific[cluster].deploy_part = val
-                else
-                  puts "Invalid value for the deploy_part field in the #{cluster} config file"
-                  return false
-                end
               when "prod_part"
-                if val =~ /\A\d+\Z/ then
                   @cluster_specific[cluster].prod_part = val
-                else
-                  puts "Invalid value for the prod_part field in the #{cluster} config file"
-                  return false
-                end
               when "tmp_part"
-                if val =~ /\A\d+\Z/ then
                   @cluster_specific[cluster].tmp_part = val
-                else
-                  puts "Invalid value for the tmp_part field in the #{cluster} config file"
-                  return false
-                end
               when "workflow_steps"
                 @cluster_specific[cluster].workflow_steps = val
               when "timeout_reboot"
@@ -794,12 +779,7 @@ module ConfigInformation
           exec_specific.nodes_ok_file = f
         }
         opts.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
-          if /\A[1-9]\d*\Z/ =~ p then
             exec_specific.deploy_part = p
-          else
-            Debug::client_error("Invalid partition number")
-            return false
-          end
         }
         opts.on("-r", "--reformat-tmp", "Reformat the /tmp partition") {
           exec_specific.reformat_tmp = true

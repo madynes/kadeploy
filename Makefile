@@ -45,26 +45,20 @@ install_sbin:
 install_kastafior:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DESTDIR)/usr/bin
 
-install_debootstrap:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/linuxrc $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/mkdev $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_debootstrap.sh $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/make_kernel.sh $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/deploy_env_generation/debootstrap/scripts/* $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
-
 install_test:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DESTDIR)/usr/local/kadeploy3/test
 
 install_rc_script:
 ifeq ($(DISTRIB),debian)
-	@install -m 755 $(ADDONS)/rc/debian/kadeploy3d $(DESTDIR)/etc/init.d
+	@install -m 644 $(ADDONS)/rc/debian/kadeploy3d $(DESTDIR)/etc/init.d
 endif
 ifeq ($(DISTRIB),fedora)
-	@install -m 755 $(ADDONS)/rc/fedora/kadeploy3d $(DESTDIR)/etc/init.d
+	@install -m 644 $(ADDONS)/rc/fedora/kadeploy3d $(DESTDIR)/etc/init.d
 endif
 
 install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/.keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DESTDIR)/.keys
 
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
@@ -78,17 +72,13 @@ tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/src
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/src/lib
-	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/addons
-	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation
-	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap
-	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/addons/deploy_env_generation/debootstrap/scripts
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/db
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/test
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/src/contrib
 	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 
-install_common: tree_common install_conf_common install_src install_debootstrap install_test
+install_common: tree_common install_conf_common install_src install_test
 
 install_client: tree_client install_conf_client install_bin
 
