@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS `environments` (
 DROP TABLE IF EXISTS `log`;
 CREATE TABLE IF NOT EXISTS `log` (
   `deploy_id` varchar(16) NOT NULL,
-  `hostname` varchar(50) NOT NULL,
+  `hostname` varchar(256) NOT NULL,
   `step1` varchar(45) NOT NULL,
   `step2` varchar(45) NOT NULL,
   `step3` varchar(45) NOT NULL,
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS `log` (
 
 DROP TABLE IF EXISTS `nodes`;
 CREATE TABLE IF NOT EXISTS `nodes` (
-  `hostname` varchar(64) NOT NULL,
+  `hostname` varchar(256) NOT NULL,
   `state` varchar(16) NOT NULL,
   `env_id` int(10) NOT NULL,
   `date` int(10) unsigned NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS `nodes` (
 DROP TABLE IF EXISTS `rights`;
 CREATE TABLE IF NOT EXISTS `rights` (
   `user` varchar(30) NOT NULL,
-  `node` varchar(30) NOT NULL,
+  `node` varchar(256) NOT NULL,
   `part` varchar(50) NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 

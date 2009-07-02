@@ -202,7 +202,7 @@ This will generate three rpm package in the RPMS package of your build environme
 After being installed and configured, the Kadeploy server can be run either interactively:
 \begin{small}
 \begin{verbatim}
-> /usr/local/kadeploy3/sbin/kadeploy3d
+> /usr/sbin/kadeploy3d
 \end{verbatim}
 \end{small}
 \noindent or in background using the rc script:
@@ -213,7 +213,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \end{small}
 
 \chapter{Server side configuration}
-Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
+Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
 
 The file \texttt{load\_kadeploy\_env} in the configuration directory contains the \texttt{KADEPLOY\_INSTALL\_DIR} variable. You should probably fill this variable with the Kadeploy installation directory you used. This directory can be anywhere in the filesystem.
 

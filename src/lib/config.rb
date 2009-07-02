@@ -512,6 +512,7 @@ module ConfigInformation
                 @cluster_specific[cluster].cmd_console = val
               when "drivers"
                 val.split(",").each { |driver|
+                  @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
                   @cluster_specific[cluster].drivers.push(driver)
                 }
               when "kernel_params"
