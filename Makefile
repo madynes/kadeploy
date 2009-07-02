@@ -50,10 +50,10 @@ install_test:
 
 install_rc_script:
 ifeq ($(DISTRIB),debian)
-	@install -m 644 $(ADDONS)/rc/debian/kadeploy3d $(DESTDIR)/etc/init.d
+	@install -m 755 $(ADDONS)/rc/debian/kadeploy3d $(DESTDIR)/etc/init.d
 endif
 ifeq ($(DISTRIB),fedora)
-	@install -m 644 $(ADDONS)/rc/fedora/kadeploy3d $(DESTDIR)/etc/init.d
+	@install -m 755 $(ADDONS)/rc/fedora/kadeploy3d $(DESTDIR)/etc/init.d
 endif
 
 install_ssh_key:

@@ -1212,6 +1212,20 @@ module ConfigInformation
         opts.on("-d", "--delete", "Delete some rights to a user") {
           @exec_specific.operation = "delete"
         }
+        opts.on("-f", "--file FILE", "Machine file")  { |f|
+          if not File.readable?(f) then
+            Debug::client_error("The file #{f} cannot be read")
+            return false
+          else
+            IO.readlines(f).sort.uniq.each { |hostname|
+              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+                Debug::client_error("Invalid hostname: #{hostname}")
+                return false
+              end
+              @exec_specific.node_list.push(hostname.chomp)
+            }
+          end
+        }
         opts.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
           if (not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m)) and (m != "*") then
             Debug::client_error("Invalid hostname: #{m}")
