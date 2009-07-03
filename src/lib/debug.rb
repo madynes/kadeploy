@@ -108,7 +108,6 @@ module Debug
             node.last_cmd_stderr.split("\n").each { |line|
               @client.print("#{node.hostname} -- STDERR: #{line}")
             }
-            p node.last_cmd_exit_status
             node.last_cmd_exit_status.split("\n").each { |line|
             @client.print("#{node.hostname} -- EXIT STATUS: #{line}")
             }

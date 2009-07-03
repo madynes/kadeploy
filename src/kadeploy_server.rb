@@ -334,7 +334,7 @@ class KadeployServer
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
     client = DRbObject.new(nil, uri)
-    return_value = 0
+    ret = 0
     if (verbose_level != nil) then
       vl = verbose_level
     else
@@ -343,11 +343,11 @@ class KadeployServer
     @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
     output = Debug::OutputControl.new(vl, false, client, exec_specific.true_user, -1, 
                                       @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
-    if (exec_specific.reboot_kind == "back_to_prod_env") && 
+    if (exec_specific.reboot_kind == "env_recorded") && 
         exec_specific.check_prod_env && 
         exec_specific.node_list.check_demolishing_env(@db, @config.common.demolishing_env_threshold) then
       output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
-      return_value = 2
+      ret = 2
     else
       #We create a new instance of Config with a specific exec_specific part
       config = ConfigInformation::Config.new("empty")
@@ -357,8 +357,9 @@ class KadeployServer
       exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
         step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
         case exec_specific.reboot_kind
-        when "back_to_prod_env"
-          step.switch_pxe("back_to_prod_env")
+        when "env_recorded"
+          #This should be the same case than a deployed env
+          step.switch_pxe("deploy_to_deployed_env")
         when "set_pxe"
           step.switch_pxe("set_pxe", pxe_profile_msg)
         when "simple_reboot"
@@ -370,12 +371,23 @@ class KadeployServer
         end
         step.reboot("soft")
         step.wait_reboot([@config.common.ssh_port],[])
-        if (exec_specific.reboot_kind == "back_to_prod_env") then
-          set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
-          step.check_nodes("prod_env_booted")
-          if (exec_specific.check_prod_env) then
-            step.nodes_ko.tag_demolishing_env(@db)
-            return_value = 1
+        if (exec_specific.reboot_kind == "env_recorded") then
+          part = String.new
+          if (exec_specific.block_device == "") then
+            part = get_block_device(cluster) + exec_specific.deploy_part
+          else
+            part = exec_specific.block_device + exec_specific.deploy_part
+          end
+          #Reboot on the production environment
+          if (part == get_prod_part(cluster)) then
+            set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
+            step.check_nodes("prod_env_booted")
+            if (exec_specific.check_prod_env) then
+              step.nodes_ko.tag_demolishing_env(@db)
+              ret = 1
+            end
+          else
+            set.set_deployment_state("recorded_env", nil, @db, exec_specific.true_user)
           end
         end
         if (exec_specific.reboot_kind == "deploy_env") then
@@ -384,7 +396,7 @@ class KadeployServer
       }
       config = nil
     end
-    return return_value
+    return ret
   end
 end
 

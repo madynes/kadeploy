@@ -33,9 +33,10 @@ module EnvironmentManagement
     #
     # Arguments
     # * file: filename
+    # * almighty_env_users: array that contains almighty users
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(file)
+    def load_from_file(file, almighty_env_users)
       if not File.exist?(file)
         put "The file \"#{file}\" does not exist"
         return false
@@ -45,6 +46,7 @@ module EnvironmentManagement
         @demolishing_env = "0"
         @kernel_params = nil
         @visibility = "shared"
+        @user = `id -nu`.chomp
         IO::read(file).split("\n").each { |line|
           if /\A(\w+)\ :\ (.+)\Z/ =~ line then
             content = Regexp.last_match
@@ -142,10 +144,14 @@ module EnvironmentManagement
                 return false
               end
             when "visibility"
-              if val =~ /\A(private|shared)\Z/ then
+              if val =~ /\A(private|shared|public)\Z/ then
                 @visibility = val
+                if (@visibility == "public") && (not almighty_env_users.include?(@user)) then
+                  puts "Only the environment administrators can set the \"public\" tag"
+                  return false
+                end
               else
-                puts "The environment visibility must be private or shared"
+                puts "The environment visibility must be private, shared or public"
                 return false
               end
             when "demolishing_env"
@@ -168,7 +174,6 @@ module EnvironmentManagement
         return false
       end
       
-      @user = `id -nu`.chomp
       return true
     end
 

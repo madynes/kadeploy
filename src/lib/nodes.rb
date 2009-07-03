@@ -329,7 +329,7 @@ module Nodes
     # Set the deployment state on a NodeSet
     #
     # Arguments
-    # * state: state of the nodes (prod_env, deploying or deployed)
+    # * state: state of the nodes (prod_env, recorded_env, deploying, deployed and aborted)
     # * env_id: id of the environment deployed on the nodes
     # * db: database handler
     # * user: user name
@@ -358,6 +358,11 @@ module Nodes
       when "prod_env"
          @set.each { |node|
           query = "UPDATE nodes SET state=\"prod_env\" WHERE hostname=\"#{node.hostname}\""
+          db.run_query(query)
+        } 
+      when "recorded_env"
+         @set.each { |node|
+          query = "UPDATE nodes SET state=\"recorded_env\" WHERE hostname=\"#{node.hostname}\""
           db.run_query(query)
         } 
       when "aborted"

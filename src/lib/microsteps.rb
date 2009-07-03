@@ -919,7 +919,7 @@ module MicroStepsLibrary
     # Change the PXE configuration
     #
     # Arguments
-    # * step: kind of change (prod_to_deploy_env, prod_to_nfsroot_env, chainload_pxe, back_to_prod_env)
+    # * step: kind of change (prod_to_deploy_env, prod_to_nfsroot_env, chainload_pxe)
     # * pxe_profile_msg (opt): string containing the pxe profile
     # Output
     # * return true if the operation has been performed correctly, false otherwise
@@ -1036,15 +1036,6 @@ module MicroStepsLibrary
             end
           end
         end
-      when "back_to_prod_env"
-        res = PXEOperations::set_pxe_for_linux(@nodes_ok.make_array_of_ip,   
-                                               @config.cluster_specific[@cluster].prod_kernel,
-                                               "",
-                                               @config.cluster_specific[@cluster].prod_initrd,
-                                               "",
-                                               @config.common.tftp_repository,
-                                               @config.common.tftp_images_path,
-                                               @config.common.tftp_cfg)
       end
       if (res == false) then
         @output.verbosel(0, "The PXE configuration has not been performed correctly: #{step}")

@@ -157,7 +157,7 @@ db.connect(common_config.deploy_db_host,
            common_config.deploy_db_passwd,
            common_config.deploy_db_name)
 
-exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific(common_config.nodes_desc, db)
+exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific(common_config, db)
 if (exec_specific_config != nil) then
   #Rights check
   allowed_to_deploy = true

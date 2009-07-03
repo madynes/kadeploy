@@ -61,20 +61,27 @@ rescue
 end
 config.common = common_config
 
-
-if config.check_config("kareboot") then
-  db = Database::DbFactory.create(config.common.db_kind)
-  db.connect(config.common.deploy_db_host,
-             config.common.deploy_db_login,
-             config.common.deploy_db_passwd,
-             config.common.deploy_db_name)
-
+db = Database::DbFactory.create(config.common.db_kind)
+db.connect(config.common.deploy_db_host,
+           config.common.deploy_db_login,
+           config.common.deploy_db_passwd,
+           config.common.deploy_db_name)
+if config.check_config("kareboot", db) then
   #Rights check
   allowed_to_deploy = true
   part = String.new
   #The rights must be checked for each cluster if the node_list contains nodes from several clusters
   config.exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
-    part = kadeploy_server.get_default_deploy_part(cluster)
+    if ((config.exec_specific.reboot_kind != "env_recorded") || (config.exec_specific.deploy_part == "")) then
+      part = kadeploy_server.get_default_deploy_part(cluster)
+    else
+      if (config.exec_specific.block_device == "") then
+        part = kadeploy_server.get_block_device(cluster) + config.exec_specific.deploy_part
+      else
+        part = config.exec_specific.block_device + config.exec_specific.deploy_part
+      end
+    end
+
     allowed_to_deploy = CheckRights::CheckRightsFactory.create(config.common.rights_kind,
                                                                set,
                                                                db,

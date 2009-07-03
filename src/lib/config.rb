@@ -17,6 +17,7 @@ module ConfigInformation
   COMMANDS_FILE = "cmd"
   NODES_FILE = "nodes"
   COMMON_CONFIGURATION_FILE = "conf"
+  CLUSTER_CONFIGURATION_FILE = "clusters"
   CLIENT_CONFIGURATION_FILE = "client_conf"
   SPECIFIC_CONFIGURATION_FILE_PREFIX = "specific_conf_"
   PARTITION_FILE_PREFIX = "partition_file_"
@@ -81,7 +82,7 @@ module ConfigInformation
     # * kind: tool (kadeploy, kaenv, karights, kastat, kareboot, kaconsole, kanodes)
     # Output
     # * calls the chack_config method that correspond to the selected tool
-    def check_config(kind)
+    def check_config(kind, db = nil)
       case kind
       when "kadeploy"
         check_kadeploy_config
@@ -92,7 +93,7 @@ module ConfigInformation
       when "kastat"
         check_kastat_config
       when "kareboot"
-        check_kareboot_config
+        check_kareboot_config(db)
       when "kaconsole"
         check_kaconsole_config
       when "kanodes"
@@ -103,12 +104,12 @@ module ConfigInformation
     # Load the kadeploy specific stuffs
     #
     # Arguments
-    # * nodes_desc: set of nodes read from the configuration file
+    # * common_config: common part of the configuration
     # * db: database handler
     # Output
     # * exec_specific: return an open struct that contains the execution specific information
     #                  or nil if the command line is not correct
-    def Config.load_kadeploy_exec_specific(nodes_desc, db)
+    def Config.load_kadeploy_exec_specific(common_config, db)
       exec_specific = OpenStruct.new
       exec_specific.environment = EnvironmentManagement::Environment.new
       exec_specific.node_list = Nodes::NodeSet.new
@@ -139,10 +140,10 @@ module ConfigInformation
       exec_specific.nodes_state = Hash.new
       exec_specific.write_workflow_id = String.new
 
-      if (load_kadeploy_cmdline_options(nodes_desc, exec_specific) == true) then
+      if (load_kadeploy_cmdline_options(common_config.nodes_desc, exec_specific) == true) then
         case exec_specific.load_env_kind
         when "file"
-          if (exec_specific.environment.load_from_file(exec_specific.load_env_arg) == false) then
+          if (exec_specific.environment.load_from_file(exec_specific.load_env_arg, common_config.almighty_env_users) == false) then
             return nil
           end
         when "db"
@@ -205,6 +206,10 @@ module ConfigInformation
           puts "The #{CONFIGURATION_FOLDER + "/" + COMMON_CONFIGURATION_FILE} file cannot be read"
           return false
         end
+        if not File.readable?(CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE) then
+          puts "The #{CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE} file cannot be read"
+          return false
+        end
         #configuration node file
         if not File.readable?(CONFIGURATION_FOLDER + "/" + NODES_FILE) then
           puts "The #{CONFIGURATION_FOLDER + "/" + NODES_FILE} file cannot be read"
@@ -231,7 +236,7 @@ module ConfigInformation
           if /(.+)\ \=\ (.+)/ =~ line then
             content = Regexp.last_match
             attr = content[1]
-            val = content[2]
+            val = content[2].strip
             case attr
             when "verbose_level"
               if val =~ /\A[0-4]\Z/ then
@@ -317,6 +322,17 @@ module ConfigInformation
               @common.environment_extraction_dir = val
             when "log_to_file"
               @common.log_to_file = val
+              if File.exist?(@common.log_to_file) then
+                if not File.file?(@common.log_to_file) then
+                  puts "The log file #{@common.log_to_file} is not a regular file"
+                  return false
+                else
+                  if not File.writable?(@common.log_to_file) then
+                    puts "The log file #{@common.log_to_file} is not writable"
+                    return false
+                  end
+                end
+              end
             when "log_to_syslog"
               if val =~ /\A(true|false)\Z/ then
                 @common.log_to_syslog = (val == "true")
@@ -444,7 +460,7 @@ module ConfigInformation
           if /(.+)\ \=\ (.+)/ =~ line then
             content = Regexp.last_match
             attr = content[1]
-            val = content[2]
+            val = content[2].strip
             case attr
             when "kadeploy_server"
               client_config.kadeploy_server = val
@@ -464,119 +480,122 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_cluster_specific_config_files
-      Dir[CONFIGURATION_FOLDER + "/" + SPECIFIC_CONFIGURATION_FILE_PREFIX + "*"].each { |f|
-        cluster = String.new(f).sub(CONFIGURATION_FOLDER + "/" + SPECIFIC_CONFIGURATION_FILE_PREFIX, "")
-        @cluster_specific[cluster] = ClusterSpecificConfig.new
-        @cluster_specific[cluster].partition_file = CONFIGURATION_FOLDER + "/" + PARTITION_FILE_PREFIX + cluster
-        IO.readlines(f).each { |line|
-          if not (/^#/ =~ line) then #we ignore commented lines
-            if /(.+)\ \=\ (.+)/ =~ line then
-              content = Regexp.last_match
-              attr = content[1]
-              val = content[2]
-              case attr
-              when "deploy_kernel"
-                @cluster_specific[cluster].deploy_kernel = val
-              when "deploy_initrd"
-                @cluster_specific[cluster].deploy_initrd = val
-              when "prod_kernel"
-                @cluster_specific[cluster].prod_kernel = val
-              when "prod_initrd"
-                @cluster_specific[cluster].prod_initrd = val
-              when "block_device"
-                @cluster_specific[cluster].block_device = val
-              when "deploy_part"
+      IO.readlines(CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE).each { |c|
+        cluster = c.chomp
+        if (not (/^#/ =~ cluster)) && (not (/\A\s*\Z/ =~ cluster)) then
+          cluster_file = CONFIGURATION_FOLDER + "/" + SPECIFIC_CONFIGURATION_FILE_PREFIX + cluster
+          if not File.readable?(cluster_file) then
+            puts "The #{cluster_file} file cannot be read"
+            return false
+          end
+          @cluster_specific[cluster] = ClusterSpecificConfig.new
+          @cluster_specific[cluster].partition_file = CONFIGURATION_FOLDER + "/" + PARTITION_FILE_PREFIX + cluster
+          IO.readlines(cluster_file).each { |line|
+            if not (/^#/ =~ line) then #we ignore commented lines
+              if /(.+)\ \=\ (.+)/ =~ line then
+                content = Regexp.last_match
+                attr = content[1]
+                val = content[2].strip
+                case attr
+                when "deploy_kernel"
+                  @cluster_specific[cluster].deploy_kernel = val
+                when "deploy_initrd"
+                  @cluster_specific[cluster].deploy_initrd = val
+                when "block_device"
+                  @cluster_specific[cluster].block_device = val
+                when "deploy_part"
                   @cluster_specific[cluster].deploy_part = val
-              when "prod_part"
+                when "prod_part"
                   @cluster_specific[cluster].prod_part = val
-              when "tmp_part"
+                when "tmp_part"
                   @cluster_specific[cluster].tmp_part = val
-              when "workflow_steps"
-                @cluster_specific[cluster].workflow_steps = val
-              when "timeout_reboot"
-                if val =~ /\A\d+\Z/ then
-                  @cluster_specific[cluster].timeout_reboot = val.to_i
-                else
-                  puts "Invalid value for the timeout_reboot field in the #{cluster} config file"
-                  return false
-                end
-              when "cmd_soft_reboot_rsh"
-                @cluster_specific[cluster].cmd_soft_reboot_rsh = val
-              when "cmd_soft_reboot_ssh"
-                @cluster_specific[cluster].cmd_soft_reboot_ssh = val
-              when "cmd_hard_reboot"
-                @cluster_specific[cluster].cmd_hard_reboot = val
-              when "cmd_very_hard_reboot"
-                @cluster_specific[cluster].cmd_very_hard_reboot = val
-              when "cmd_console"
-                @cluster_specific[cluster].cmd_console = val
-              when "drivers"
-                val.split(",").each { |driver|
-                  @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
-                  @cluster_specific[cluster].drivers.push(driver)
-                }
-              when "kernel_params"
-                 @cluster_specific[cluster].kernel_params = val
-              when "admin_pre_install"
-                #filename|kind|script,filename|kind|script,...
-                if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-                  @cluster_specific[cluster].admin_pre_install = Array.new
-                  val.split(",").each { |tmp|
-                    val = tmp.split("|")
-                    entry = Hash.new
-                    entry["file"] = val[0]
-                    entry["kind"] = val[1]
-                    entry["script"] = val[2]
-                    @cluster_specific[cluster].admin_pre_install.push(entry)
+                when "workflow_steps"
+                  @cluster_specific[cluster].workflow_steps = val
+                when "timeout_reboot"
+                  if val =~ /\A\d+\Z/ then
+                    @cluster_specific[cluster].timeout_reboot = val.to_i
+                  else
+                    puts "Invalid value for the timeout_reboot field in the #{cluster} config file"
+                    return false
+                  end
+                when "cmd_soft_reboot_rsh"
+                  @cluster_specific[cluster].cmd_soft_reboot_rsh = val
+                when "cmd_soft_reboot_ssh"
+                  @cluster_specific[cluster].cmd_soft_reboot_ssh = val
+                when "cmd_hard_reboot"
+                  @cluster_specific[cluster].cmd_hard_reboot = val
+                when "cmd_very_hard_reboot"
+                  @cluster_specific[cluster].cmd_very_hard_reboot = val
+                when "cmd_console"
+                  @cluster_specific[cluster].cmd_console = val
+                when "drivers"
+                  val.split(",").each { |driver|
+                    @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
+                    @cluster_specific[cluster].drivers.push(driver)
                   }
-                elsif val =~ /\A(no_pre_install)\Z/ then
-                  @cluster_specific[cluster].admin_pre_install = nil
-                else
-                  puts "Invalid value for the admin_pre_install field in the #{cluster} config file"
-                  return false
-                end
-              when "admin_post_install"
-                #filename|tgz|script,filename|tgz|script,...
-                if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-                  @cluster_specific[cluster].admin_post_install = Array.new
-                  val.split(",").each { |tmp|
-                    val = tmp.split("|")
-                    entry = Hash.new
-                    entry["file"] = val[0]
-                    entry["kind"] = val[1]
-                    entry["script"] = val[2]
-                    @cluster_specific[cluster].admin_post_install.push(entry)
+                when "kernel_params"
+                  @cluster_specific[cluster].kernel_params = val
+                when "admin_pre_install"
+                  #filename|kind|script,filename|kind|script,...
+                  if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
+                    @cluster_specific[cluster].admin_pre_install = Array.new
+                    val.split(",").each { |tmp|
+                      val = tmp.split("|")
+                      entry = Hash.new
+                      entry["file"] = val[0]
+                      entry["kind"] = val[1]
+                      entry["script"] = val[2]
+                      @cluster_specific[cluster].admin_pre_install.push(entry)
+                    }
+                  elsif val =~ /\A(no_pre_install)\Z/ then
+                    @cluster_specific[cluster].admin_pre_install = nil
+                  else
+                    puts "Invalid value for the admin_pre_install field in the #{cluster} config file"
+                    return false
+                  end
+                when "admin_post_install"
+                  #filename|tgz|script,filename|tgz|script,...
+                  if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
+                    @cluster_specific[cluster].admin_post_install = Array.new
+                    val.split(",").each { |tmp|
+                      val = tmp.split("|")
+                      entry = Hash.new
+                      entry["file"] = val[0]
+                      entry["kind"] = val[1]
+                      entry["script"] = val[2]
+                      @cluster_specific[cluster].admin_post_install.push(entry)
+                    }
+                  elsif val =~ /\A(no_post_install)\Z/ then
+                    @cluster_specific[cluster].admin_post_install = nil
+                  else
+                    puts "Invalid value for the admin_post_install field in the #{cluster} config file"
+                    return false
+                  end
+                when "macrostep"
+                  macrostep_name = val.split("|")[0]
+                  microstep_list = val.split("|")[1]
+                  tmp = Array.new
+                  microstep_list.split(",").each { |instance_infos|
+                    instance_name = instance_infos.split(":")[0]
+                    instance_max_retries = instance_infos.split(":")[1].to_i
+                    instance_timeout = instance_infos.split(":")[2].to_i
+                    tmp.push([instance_name, instance_max_retries, instance_timeout])
                   }
-                elsif val =~ /\A(no_post_install)\Z/ then
-                  @cluster_specific[cluster].admin_post_install = nil
-                else
-                  puts "Invalid value for the admin_post_install field in the #{cluster} config file"
-                  return false
-                end
-              when "macrostep"
-                macrostep_name = val.split("|")[0]
-                microstep_list = val.split("|")[1]
-                tmp = Array.new
-                microstep_list.split(",").each { |instance_infos|
-                  instance_name = instance_infos.split(":")[0]
-                  instance_max_retries = instance_infos.split(":")[1].to_i
-                  instance_timeout = instance_infos.split(":")[2].to_i
-                  tmp.push([instance_name, instance_max_retries, instance_timeout])
-                }
-                @cluster_specific[cluster].workflow_steps.push(MacroStep.new(macrostep_name, tmp))
-              when "partition_creation_kind"
-                if val =~ /\A(fdisk|parted)\Z/ then
-                  @cluster_specific[cluster].partition_creation_kind = val
-                else
-                  puts "Invalid value for the partition_creation_kind in the #{cluster} config file. Expected values are fdisk or parted"
-                  return false
+                  @cluster_specific[cluster].workflow_steps.push(MacroStep.new(macrostep_name, tmp))
+                when "partition_creation_kind"
+                  if val =~ /\A(fdisk|parted)\Z/ then
+                    @cluster_specific[cluster].partition_creation_kind = val
+                  else
+                    puts "Invalid value for the partition_creation_kind in the #{cluster} config file. Expected values are fdisk or parted"
+                    return false
+                  end
                 end
               end
             end
+          }
+          if @cluster_specific[cluster].check_all_fields_filled(cluster) == false then
+            return false
           end
-        }
-        if @cluster_specific[cluster].check_all_fields_filled(cluster) == false then
-          return false
         end
       }
       return true
@@ -622,15 +641,15 @@ module ConfigInformation
               node = @common.nodes_desc.get_node_by_host(content[1])
               case content[2]
               when "reboot_soft_rsh"
-                node.cmd.reboot_soft_rsh = content[3]
+                node.cmd.reboot_soft_rsh = content[3].strip
               when "reboot_soft_ssh"
-                node.cmd.reboot_soft_ssh = content[3]
+                node.cmd.reboot_soft_ssh = content[3].strip
               when "reboot_hard"
-                node.cmd.reboot_hard = content[3]
+                node.cmd.reboot_hard = content[3].strip
               when "reboot_veryhard"
-              node.cmd.reboot_veryhard = content[3]
+              node.cmd.reboot_veryhard = content[3].strip
               when "console"
-                node.cmd.console = content[3]
+                node.cmd.console = content[3].strip
               else
                 puts "Unknown command: #{content[2]}"
                 return false
@@ -1535,7 +1554,14 @@ module ConfigInformation
       @exec_specific.pxe_profile_file = String.new
       @exec_specific.check_prod_env = false
       @exec_specific.true_user = USER
+      @exec_specific.user = USER
+      @exec_specific.load_env_kind = "db"
+      @exec_specific.env_arg = String.new
+      @exec_specific.environment = EnvironmentManagement::Environment.new
+      @exec_specific.block_device = String.new
+      @exec_specific.deploy_part = String.new
       @exec_specific.breakpoint_on_microstep = "none"
+      @exec_specific.pxe_profile_msg = ""
       @exec_specific.key = String.new
       return load_kareboot_cmdline_options(nodes_desc)
     end
@@ -1554,8 +1580,19 @@ module ConfigInformation
         opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
         opts.separator ""
         opts.separator "General options:"
-        opts.on("-c", "--check-prod-env", "Check if the production environment has been detroyed") { |d|
+        opts.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
+          if /\A[\w\/]+\Z/ =~ b then
+            @exec_specific.block_device = b
+          else
+            Debug::client_error("Invalid block device")
+            return false
+          end
+        }
+        opts.on("-c", "--check-prod-env", "Check if the production environment has been detroyed") {
           @exec_specific.check_prod_env = true
+        }
+        opts.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |e|
+          @exec_specific.env_arg = e
         }
         opts.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
           if not File.readable?(f) then
@@ -1596,8 +1633,27 @@ module ConfigInformation
           end
           Config.add_to_node_list(hostname, nodes_desc, @exec_specific)
         }
-        opts.on("-r", "--reboot-kind REBOOT_KIND", "Specify the reboot kind (back_to_prod_env, set_pxe, simple_reboot, deploy_env)") { |k|
+        opts.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
+            @exec_specific.deploy_part = p
+        }
+        opts.on("-r", "--reboot-kind REBOOT_KIND", "Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded)") { |k|
           @exec_specific.reboot_kind = k
+        }
+        opts.on("-u", "--user USERNAME", "Specify the user") { |u|
+          if /\A(\w+)|\*\Z/ =~ u then
+            @exec_specific.user = u
+          else
+            Debug::client_error("Invalid user name")
+            return false
+          end
+        }
+        opts.on("-v", "--version NUMBER", "Specify the environment version") { |v|
+          if /\A\d+\Z/ =~ v then
+            @exec_specific.env_version = v
+          else
+            Debug::client_error("Invalid version number")
+            return false
+          end
         }
         opts.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
@@ -1623,10 +1679,10 @@ module ConfigInformation
     # Check the whole configuration of the kareboot execution
     #
     # Arguments
-    # * nothing
+    # * db: database handler
     # Output
     # * return true if the options used are correct, false otherwise
-    def check_kareboot_config
+    def check_kareboot_config(db)
       if @exec_specific.node_list.empty? then
         Debug::client_error("No node is chosen")
         return false
@@ -1635,7 +1691,7 @@ module ConfigInformation
         Debug::client_error("Invalid debug level")
         return false
       end
-      authorized_ops = ["back_to_prod_env", "set_pxe", "simple_reboot", "deploy_env"]
+      authorized_ops = ["set_pxe", "simple_reboot", "deploy_env", "env_recorded"]
       if not authorized_ops.include?(@exec_specific.reboot_kind) then
         Debug::client_error("Invalid kind of reboot: #{@exec_specific.reboot_kind}")
         return false
@@ -1647,6 +1703,22 @@ module ConfigInformation
       if (@exec_specific.reboot_kind == "set_pxe") && (@exec_specific.pxe_profile_file == "") then
         Debug::client_error("The set_pxe reboot must be used with the -w option")
         return false
+      end
+      if (@exec_specific.reboot_kind == "env_recorded") then
+        if (@exec_specific.env_arg == "") then
+          Debug::client_error("An environment must be specified must be with the env_recorded kind of reboot")
+          return false
+        end
+        if (@exec_specific.deploy_part == "") then
+          Debug::client_error("A partition number must be specified must be with the env_recorded kind of reboot")
+          return false
+        end       
+        if (@exec_specific.environment.load_from_db(@exec_specific.env_arg,
+                                                    @exec_specific.env_version,
+                                                    @exec_specific.user,
+                                                    db) == false) then
+          return false
+        end
       end
       if (@exec_specific.key != "") && (@exec_specific.reboot_kind != "deploy_env") then
         Debug::client_error("The -k option can be only used with the deploy_env reboot kind")
@@ -1822,8 +1894,6 @@ module ConfigInformation
     attr_accessor :block_device
     attr_accessor :deploy_part
     attr_accessor :prod_part
-    attr_accessor :prod_kernel
-    attr_accessor :prod_initrd
     attr_accessor :tmp_part
     attr_accessor :workflow_steps   #Array of MacroStep
     attr_accessor :timeout_reboot
@@ -1852,8 +1922,6 @@ module ConfigInformation
       @block_device = nil
       @deploy_part = nil
       @prod_part = nil
-      @prod_kernel = nil
-      @prod_initrd = nil
       @tmp_part = nil
       @timeout_reboot = nil
       @cmd_soft_reboot_rsh = nil
@@ -1884,8 +1952,6 @@ module ConfigInformation
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
-      dest.prod_kernel = @prod_kernel.clone
-      dest.prod_initrd = @prod_initrd.clone
       dest.tmp_part = @tmp_part.clone
       dest.timeout_reboot = @timeout_reboot
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
@@ -1914,8 +1980,6 @@ module ConfigInformation
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
-      dest.prod_kernel = @prod_kernel.clone
-      dest.prod_initrd = @prod_initrd.clone
       dest.tmp_part = @tmp_part.clone
       dest.timeout_reboot = @timeout_reboot
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
@@ -1944,7 +2008,7 @@ module ConfigInformation
         puts "Warning: " + i + err_msg if (a == nil)
       }
       if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
-          (@prod_kernel == nil) || (@prod_initrd == nil) || (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) ||
+          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) ||
           (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) || (@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
         puts "Some mandatory fields are missing in the specific configuration file for #{cluster}"

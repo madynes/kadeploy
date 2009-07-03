@@ -327,8 +327,6 @@ To define the specific configuration of a cluster, you must create a specific fi
 \subsection{Example of a cluster-specific configuration file}
 \begin{small}
 \begin{verbatim}
-prod_kernel = memdisk
-prod_initrd = grub_img_env1173_sda2
 deploy_kernel = http://172.24.100.1/kadeploy/deploy-vmlinuz-2.6.27.8-bt
 deploy_initrd = http://172.24.100.1/kadeploy/deploy-initrd-2.6.27.8-bt \
                 ETH_DRV=tg3 ETH_DEV=eth0 DISK_DRV=sata_svw \
@@ -362,8 +360,6 @@ macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvClassical:1:300
 \subsection{Explanation of the fields used in the general configuration file}
 Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
 \begin{itemize}
-\item \texttt{prod\_kernel}: name of the kernel used by the production environment.
-\item \texttt{prod\_initrd}: name of the initrd used by the production environment.
 \item \texttt{deploy\_kernel}: name of the kernel used by the deployment environment. It is possible to specify an http location if you use gpxelinux.
 \item \texttt{deploy\_initrd}: name of the initrd used by the deployment environment and boot arguments. It is possible to specify an http location if you use gpxelinux. According your hardware, you must set the \texttt{ETH\_DRV}, \texttt{ETH\_DEV}, and \texttt{DISK\_DRV} correctly. Furthermore, if you use a deployment kernel generated with the script provided in the Kadeploy distribution, you must set the \texttt{ramdisk\_size} value correctly and you must specify \texttt{init=/linuxrc}.
 \item \texttt{block\_device}: block device of the disk used on the nodes.
@@ -407,6 +403,17 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
     \end{itemize}
   \end{itemize}
 \end{itemize}
+
+\section{Clusters file}
+The list of all the clusters must be defined in the  \texttt{/etc/kadeploy3/clusters} file. For instance, the file may contain something like :
+\begin{small}
+\begin{verbatim}
+#list of the clusters
+gdx
+netgdx
+\end{verbatim}
+\end{small}
+Warning, a cluster-specific configuration file must be defined for each cluster define in this file.
 
 \section{Partition map files}
 A partition map must be provided for each cluster with the name \texttt{partition\_file\_CLUSTER} where \texttt{CLUSTER} is the cluster name. 
@@ -674,15 +681,20 @@ Kareboot can be used by using the \texttt{kareboot} command. The CLI looks like 
 Usage: kareboot3 [options]
 Contact: kadeploy-devel@lists.grid5000.fr
 General options:
-  -c, --check-prod-env          Check if the production environment has been destroyed
-  -d, --debug-level VALUE       Debug level between 0 to 4
-  -f, --file MACHINELIST        Files containing list of nodes
-  -k, --key [FILE]              Public key to copy in the root's authorized_keys, 
-                                if no argument is specified, use the authorized_keys
-  -m, --machine MACHINE         Reboot the given machines
-  -r, --reboot-kind REBOOT_KIND Specify the reboot kind (back_to_prod_env, set_pxe, 
-                                simple_reboot)
-  -w, --set-pxe-profile FILE    Set the PXE profile (use with caution)
+  -b, --block-device BLOCKDEVICE Specify the block device to use
+  -c, --check-prod-env           Check if the production environment has been detroyed
+  -e, --env-name ENVNAME         Name of the recorded environment
+  -f, --file MACHINELIST         Files containing list of nodes
+  -k, --key [FILE]               Public key to copy in the root's authorized_keys, if 
+                                 no argument is specified, use the authorized_keys
+  -m, --machine MACHINE          Reboot the given machines
+  -p, --partition-number NUMBER  Specify the partition number to use
+  -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot,
+                                 deploy_env, env_recorded)
+  -u, --user USERNAME            Specify the user
+  -v, --version NUMBER           Specify the environment version
+      --verbose-level VALUE      Verbose level between 0 to 4
+  -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
 \end{verbatim}
 \end{small}
 
@@ -690,19 +702,20 @@ At least, Kareboot must be called with one node and a reboot kind. The nodes to 
 \begin{itemize}
 \item \texttt{simple\_reboot}: perform a simple reboot of the nodes. Kareboot firstly tries to perform a soft reboot, then a hard reboot is performed and lastly a very hard reboot if it doesn't success before.
 \item \texttt{set\_pxe}: modify the PXE profile with the one given with the \texttt{-w|--set-pxe-profile} options and perform a simple reboot.
-\item \texttt{back\_to\_prod\_env}: perform a reboot on the production environment.
+\item \texttt{env\_recorded}: perform a reboot on an environment that is already deployed (for instance, the production environment on the production part). This operation must be used with the \texttt{-e} and \texttt{-p} options at least.
 \item \texttt{deploy\_env}: perform a reboot on the deployment environment. This can be used with the \texttt{-k|--key} option.
 \end{itemize}
 
 Here are some basic examples:
 \begin{verbatim}
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot
-> kareboot3 -f nodes -r back_to_prod_env
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
 > kareboot3 -f nodes -r deploy_env -k .ssh/id_rsa
+> kareboot3 -r env_recorded -e production_environment \
+            -p 2 -u root -m gdx-5.orsay.grid5000.fr
 \end{verbatim}
 
-Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-prod-env} option (for instance: \texttt{kareboot -f nodes -r back\_to\_prod\_env -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the production environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed and a check is performed at the end of the reboot to ensure that the production environment is correctly deployed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the production environment has been destroyed and that it should be deployed again.
+Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-prod-env} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the production environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed and a check is performed at the end of the reboot to ensure that the production environment is correctly deployed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the production environment has been destroyed and that it should be deployed again.
 
 An environment is considered \textit{demolishing} if the number of failures after a reboot on the production environment (when the \texttt{-c|--check-prod-env} optionis used with Kareboot), is higher than the threshold specify in the configuration file% (see the~\ref{sec:general_config} part)
 . In the~\ref{sec:kaenv} part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
@@ -752,13 +765,13 @@ This command lists prints the version \textit{3} of the environment \textit{Free
 
 \paragraph{Use case 4}
 \begin{verbatim}
-> kaenv3 -o add ~/new_env.dsc
+> kaenv3 -o add -f ~/new_env.dsc
 \end{verbatim}
 This command adds the environment defined in the file \textit{~/new\_env.dsc}. %See the~\ref{sec:env_desc} part to get information about the environment description.
 
 \paragraph{Use case 5}
 \begin{verbatim}
-> kaenv3 -o delete FreeBSD -v 2
+> kaenv3 -o delete -e FreeBSD -v 2
 \end{verbatim}
 This command deletes the version \textit{2} of the environment \textit{FreeBSD} from the environment database. If no version number is given, all the versions are deleted.
 

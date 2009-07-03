@@ -118,7 +118,7 @@ end
 # * nothing
 def add_environment(config, db)
   env = EnvironmentManagement::Environment.new
-  if env.load_from_file(config.exec_specific.file) then
+  if env.load_from_file(config.exec_specific.file, config.common.almighty_env_users) then
     query = "SELECT * FROM environments WHERE name=\"#{env.name}\" AND version=\"#{env.version}\" AND user=\"#{env.user}\""
     res = db.run_query(query)
     if (res.num_rows != 0) then

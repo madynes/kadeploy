@@ -1,5 +1,3 @@
-prod_kernel = vmlinuz-2.6.24-1-686
-prod_initrd = initrd.img-2.6.24-1-686 root=/dev/hda2
 deploy_kernel = deploy-vmlinuz-2.6.27.7
 deploy_initrd = deploy-initrd-2.6.27.7 ETH_DRV=pcnet32 ETH_DEV=eth0 DISK_DRV=ide-disk console=tty0 console=ttyS0,38400n8 ramdisk_size=160000 rw init=/linuxrc
 block_device = /dev/hda
