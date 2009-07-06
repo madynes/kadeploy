@@ -50,7 +50,7 @@ if (config.check_config("kaconsole") == true) then
   set.push(config.exec_specific.node)
   if (CheckRights::CheckRightsFactory.create(common_config.rights_kind, set, db, part).granted?) then
     pid = Process.fork {
-      exec("#{config.exec_specific.node.cmd.console} #{config.exec_specific.node.hostname}")
+      exec(config.exec_specific.node.cmd.console)
     }
     state = "running"
     while ((CheckRights::CheckRightsFactory.create(common_config.rights_kind, set, db, part).granted?) &&

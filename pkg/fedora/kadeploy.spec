@@ -59,6 +59,7 @@ rm -rf $RPM_BUILD_ROOT
 %files server
 %defattr(-,deploy,deploy,-)
 /etc/init.d/kadeploy3d
+%config(noreplace) /etc/kadeploy3/clusters
 %config(noreplace) /etc/kadeploy3/nodes
 %config(noreplace) /etc/kadeploy3/specific_conf_g5kdev-cluster
 %config(noreplace) /etc/kadeploy3/fdisk_g5kdev-cluster
