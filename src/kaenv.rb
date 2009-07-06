@@ -283,19 +283,22 @@ end
 
 
 # Update the md5sum of the tarball
+# Sub function of update_preinstall_md5
 #
-# * config: instance of Config
 # * db: database handler
+# * env_name: environment name
+# * env_version: environment version
+# * env_user: environment user
 # Output
 # * nothing
-def update_tarball_md5(config, db)
-  if (config.exec_specific.version != "") then
-    version = config.exec_specific.version
+def _update_tarball_md5(db, env_name, env_version, env_user)
+  if (env_version != "") then
+    version = env_version
   else
-    version = get_max_version(db, config.exec_specific.env_name, USER)
+    version = get_max_version(db, env_name, env_user)
   end
-  query = "SELECT * FROM environments WHERE name=\"#{config.exec_specific.env_name}\" \
-                                      AND user=\"#{USER}\" \
+  query = "SELECT * FROM environments WHERE name=\"#{env_name}\" \
+                                      AND user=\"#{env_user}\" \
                                       AND version=\"#{version}\""
   res = db.run_query(query)
   res.each_hash  { |row|
@@ -303,8 +306,8 @@ def update_tarball_md5(config, db)
     env.load_from_hash(row)
     tarball = "#{env.tarball["file"]}|#{env.tarball["kind"]}|#{MD5::get_md5_sum(env.tarball["file"])}"
     
-    query2 = "UPDATE environments SET tarball=\"#{tarball}\" WHERE name=\"#{config.exec_specific.env_name}\" \
-                                                             AND user=\"#{USER}\" \
+    query2 = "UPDATE environments SET tarball=\"#{tarball}\" WHERE name=\"#{env_name}\" \
+                                                             AND user=\"#{env_user}\" \
                                                              AND version=\"#{version}\""
     db.run_query(query2)
     if (db.get_nb_affected_rows == 0) then
@@ -313,20 +316,33 @@ def update_tarball_md5(config, db)
   }
 end
 
-# Update the md5sum of the preinstall
+# Update the md5sum of the tarball
 #
 # * config: instance of Config
 # * db: database handler
 # Output
 # * nothing
-def update_preinstall_md5(config, db)
-  if (config.exec_specific.version != "") then
-    version = config.exec_specific.version
+def update_tarball_md5(config, db)
+  _update_tarball_md5(db, config.exec_specific.env_name, config.exec_specific.version, USER)
+end
+
+# Update the md5sum of the preinstall
+# Sub function of update_preinstall_md5
+#
+# * db: database handler
+# * env_name: environment name
+# * env_version: environment version
+# * env_user: environment user
+# Output
+# * nothing
+def _update_preinstall_md5(db, env_name, env_version, env_user)
+  if (env_version != "") then
+    version = env_version
   else
-    version = get_max_version(db, config.exec_specific.env_name, USER)
+    version = get_max_version(db, env_name, env_user)
   end
-  query = "SELECT * FROM environments WHERE name=\"#{config.exec_specific.env_name}\" \
-                                      AND user=\"#{USER}\" \
+  query = "SELECT * FROM environments WHERE name=\"#{env_name}\" \
+                                      AND user=\"#{env_user}\" \
                                       AND version=\"#{version}\""
   res = db.run_query(query)
   res.each_hash  { |row|
@@ -335,8 +351,8 @@ def update_preinstall_md5(config, db)
     if (env.preinstall != nil) then
       tarball = "#{env.preinstall["file"]}|#{env.preinstall["kind"]}|#{MD5::get_md5_sum(env.preinstall["file"])}|#{env.preinstall["script"]}"
       
-      query2 = "UPDATE environments SET preinstall=\"#{tarball}\" WHERE name=\"#{config.exec_specific.env_name}\" \
-                                                                  AND user=\"#{USER}\" \
+      query2 = "UPDATE environments SET preinstall=\"#{tarball}\" WHERE name=\"#{env_name}\" \
+                                                                  AND user=\"#{env_user}\" \
                                                                   AND version=\"#{version}\""
       db.run_query(query2)
       if (db.get_nb_affected_rows == 0) then
@@ -348,20 +364,33 @@ def update_preinstall_md5(config, db)
   }
 end
 
-# Update the md5sum of the postinstall files
+# Update the md5sum of the preinstall
 #
-# * config: instance of Config
 # * db: database handler
+# * config: instance of Config
 # Output
 # * nothing
-def update_postinstalls_md5(config, db)
-  if (config.exec_specific.version != "") then
-    version = config.exec_specific.version
+def update_preinstall_md5(config, db)
+  _update_preinstall_md5(db, config.exec_specific.env_name, config.exec_specific.version, USER)
+end
+
+# Update the md5sum of the postinstall files
+# Sub function of update_postinstalls_md5
+#
+# * db: database handler
+# * env_name: environment name
+# * env_version: environment version
+# * env_user: environment user
+# Output
+# * nothing
+def _update_postinstall_md5(db, env_name, env_version, env_user)
+  if (env_version != "") then
+    version = env_version
   else
-    version = get_max_version(db, config.exec_specific.env_name, USER)
+    version = get_max_version(db, env_name, env_user)
   end
-  query = "SELECT * FROM environments WHERE name=\"#{config.exec_specific.env_name}\" \
-                                      AND user=\"#{USER}\" \
+  query = "SELECT * FROM environments WHERE name=\"#{env_name}\" \
+                                      AND user=\"#{env_user}\" \
                                       AND version=\"#{version}\""
   res = db.run_query(query)
   res.each_hash  { |row|
@@ -373,8 +402,8 @@ def update_postinstalls_md5(config, db)
         postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{MD5::get_md5_sum(p["file"])}|#{p["script"]}")
       }
       query2 = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" \
-                                    WHERE name=\"#{config.exec_specific.env_name}\" \
-                                    AND user=\"#{USER}\" \
+                                    WHERE name=\"#{env_name}\" \
+                                    AND user=\"#{env_user}\" \
                                     AND version=\"#{version}\""
       db.run_query(query2)
       if (db.get_nb_affected_rows == 0) then
@@ -384,6 +413,16 @@ def update_postinstalls_md5(config, db)
       puts "No postinstall to update"
     end
   }
+end
+
+# Update the md5sum of the postinstall files
+#
+# * config: instance of Config
+# * db: database handler
+# Output
+# * nothing
+def update_postinstall_md5(config, db)
+  _update_postinstall_md5(db, config.exec_specific.env_name, config.exec_specific.version, USER)
 end
 
 # Remove the demolishing tag on an environment
@@ -456,6 +495,8 @@ def move_files(config, db)
               db.run_query(query2)
               if (db.get_nb_affected_rows > 0) then
                 puts "The #{kind_of_file} of {#{row["name"]},#{row["version"]},#{row["user"]}} has been updated"
+                puts "Let's now update the md5 for this file"
+                send("_update_#{kind_of_file}_md5".to_sym, db, row["name"], row["version"], row["user"])
               end
             end
           }
@@ -505,7 +546,7 @@ if (config.check_config("kaenv") == true)
   when "update-preinstall-md5"
     update_preinstall_md5(config, db)
   when "update-postinstalls-md5"
-    update_postinstalls_md5(config, db)
+    update_postinstall_md5(config, db)
   when "remove-demolishing-tag"
     remove_demolishing_tag(config, db)
   when "set-visibility-tag"
