@@ -488,8 +488,13 @@ module ConfigInformation
             puts "The #{cluster_file} file cannot be read"
             return false
           end
+          partition_file = CONFIGURATION_FOLDER + "/" + PARTITION_FILE_PREFIX + cluster
+          if not File.readable?(partition_file) then
+            puts "The #{partition_file} file cannot be read"
+            return false
+          end
           @cluster_specific[cluster] = ClusterSpecificConfig.new
-          @cluster_specific[cluster].partition_file = CONFIGURATION_FOLDER + "/" + PARTITION_FILE_PREFIX + cluster
+          @cluster_specific[cluster].partition_file = partition_file
           IO.readlines(cluster_file).each { |line|
             if not (/^#/ =~ line) then #we ignore commented lines
               if /(.+)\ \=\ (.+)/ =~ line then
@@ -1208,6 +1213,7 @@ module ConfigInformation
       @exec_specific.user = String.new
       @exec_specific.part_list = Array.new
       @exec_specific.node_list = Array.new
+      @exec_specific.overwrite_existing_rights = false
       return load_karights_cmdline_options()
     end
 
@@ -1252,6 +1258,9 @@ module ConfigInformation
           end
           @exec_specific.node_list.push(m)
         }
+        opts.on("-o", "--overwrite-rights", "Overwrite existing rights") {
+          @exec_specific.overwrite_existing_rights = true
+        }        
         opts.on("-p", "--part PARTNAME", "Include the partition in the operation") { |p|
           @exec_specific.part_list.push(p)
         }        

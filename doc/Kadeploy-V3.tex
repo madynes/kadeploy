@@ -860,6 +860,7 @@ General options:
   -a, --add                    Add some rights to a user
   -d, --delete                 Delete some rights to a user
   -m, --machine MACHINE        Include the machine in the operation
+  -o, --overwrite-rights       Overwrite existing rights
   -p, --part PARTNAME          Include the partition in the operation
   -s, --show-rights            Show the rights for a given user
   -u, --user USERNAME          Specify the user
@@ -875,11 +876,23 @@ This command gives some rights for a given user.
 
 \paragraph{Use case 2}
 \begin{verbatim}
+> karights3 -a -m "*" -p "*" -u root
+\end{verbatim}
+This command gives all the rights on all the nodes to the user \textit{root}.
+
+\paragraph{Use case 3}
+\begin{verbatim}
+> karights3 -a -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith -o
+\end{verbatim}
+This command gives some rights for a given user. Furthermore, if some rights (excepted those specified with *) were previously given on the node \textit{gdx-25.orsay.grid5000.fr}, they are deleted.
+
+\paragraph{Use case 4}
+\begin{verbatim}
 > karights3 -d -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith
 \end{verbatim}
 This command removes some rights for a given user.
 
-\paragraph{Use case 3}
+\paragraph{Use case 5}
 \begin{verbatim}
 > karights3 -s -u johnsmith
 \end{verbatim}

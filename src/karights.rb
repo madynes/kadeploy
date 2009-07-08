@@ -36,7 +36,7 @@ def show_rights(config, db)
         puts "### #{node}: #{part_list.join(", ")}"
       }
     else
-      puts "No rigths have been given for the user #{config.exec_specific.user}"
+      puts "No rights have been given for the user #{config.exec_specific.user}"
     end
   end
 end
@@ -53,31 +53,55 @@ end
 def add_rights(config, db)
   #check if other users have rights on some nodes
   nodes_to_remove = Array.new
+  hosts = Array.new
   config.exec_specific.node_list.each { |node|
-    query = "SELECT * FROM rights WHERE user<>\"*\" AND user<>\"#{config.exec_specific.user}\" AND node=\"#{node}\""
-    res = db.run_query(query)
-    if (res.num_rows > 0) then
-      nodes_to_remove.push(node)
+    if (node != "*") then
+      hosts.push("node=\"#{node}\"")
     end
   }
-  config.exec_specific.node_list.delete_if { |node|
-    nodes_to_remove.include?(node)
-  }
-  if (not nodes_to_remove.empty?) then
-    puts "The nodes #{nodes_to_remove.join(", ")} have been removed from the rights assignation since another user has some rights on them"
+  if not hosts.empty? then
+    query = "SELECT DISTINCT node FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
+    res = db.run_query(query)
+    res.each_hash { |row|
+      nodes_to_remove.push(row["node"])
+    }
   end
+  if (not nodes_to_remove.empty?) then
+    if (config.exec_specific.overwrite_existing_rights) then
+      hosts = Array.new
+      nodes_to_remove.each { |node|
+        hosts.push("node=\"#{node}\"")
+      }
+      query = "DELETE FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
+      db.run_query(query)
+      puts "Some rights have been removed on the nodes #{nodes_to_remove.join(", ")}"
+    else
+      config.exec_specific.node_list.delete_if { |node|
+        nodes_to_remove.include?(node)
+      }
+      puts "The nodes #{nodes_to_remove.join(", ")} have been removed from the rights assignation since another user has some rights on them"
+    end
+  end
+  values_to_insert = Array.new
   config.exec_specific.node_list.each { |node|
     config.exec_specific.part_list.each { |part|
-      #check if the rights are already inserted
-      query = "SELECT * FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
-      res = db.run_query(query)
-      if (res.num_rows == 0) then      
-        #add the rights
-        query = "INSERT INTO rights (user, node, part) VALUES (\"#{config.exec_specific.user}\", \"#{node}\", \"#{part}\")"
-        db.run_query(query)
+      if ((node == "*") || (part == "*")) then
+        #check if the rights are already inserted
+        query = "SELECT * FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
+        res = db.run_query(query)
+        values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{node}\", \"#{part}\")") if (res.num_rows == 0)
+      else
+        values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{node}\", \"#{part}\")")
       end
     }
   }
+  #add the rights
+  if (not values_to_insert.empty?) then
+    query = "INSERT INTO rights (user, node, part) VALUES #{values_to_insert.join(",")}"
+    db.run_query(query)
+  else
+    puts "No rights added"
+  end
 end
 
 # Remove some rights on the nodes defined in Config.exec_specific.node_list
@@ -94,6 +118,7 @@ def delete_rights(config, db)
     config.exec_specific.part_list.each { |part|
       query = "DELETE FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
       db.run_query(query)
+      puts "No rights have been removed" if (db.dbh.affected_rows == 0)
     }
   }
 end
