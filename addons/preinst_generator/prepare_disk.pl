@@ -324,7 +324,7 @@ sub output_mkfs {
 ### print_usage : output the help summary of this script
 ###
 sub print_usage {
-    my $returncode=$_;
+    my $returncode=@_;
 
     print "Usage: \t$0 [-hv] [--parted] [--fdisk] [--device <device>] [--mountfile <mountfile>] [--swapfile <swapfile>]\n";
     print "This tool gives the nodes where you can deploy\n";
