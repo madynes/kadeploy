@@ -88,7 +88,7 @@ sub get_partitions_parted {
   my ($device) = @_;
   my %partscheme = ();
 
-  open(CMD, "parted -l $device |") or die "Can not launch parted command !";
+  open(CMD, "parted -s $device print |") or die "Can not launch parted command !";
   while (<CMD>) {
     chomp ;
     if (m/^ \d+ /) {
@@ -143,6 +143,11 @@ sub output_partitions_parted {
   my %partscheme = %$partscheme_ref ;
   my $device="";
 
+  if (!%partscheme){
+      print STDERR "No output for selected device\n";
+      exit (1);
+  }
+
   for my $parts (sort keys %partscheme) {
     my $fs="";
     $device = $partscheme{$parts}{'device'};
@@ -168,11 +173,26 @@ sub output_partitions_fdisk {
   my ($partscheme_ref) = @_ ;
   my %partscheme = %$partscheme_ref ;
   my $device="";
+  my $started=0;
 
-  print "cat <<EOF | fdisk\n";
+  if (!%partscheme){
+      print STDERR "No output for selected device\n";
+      exit (1);
+  }
+
+  print "cat <<EOF | fdisk ";
   for my $parts (sort keys %partscheme) {
     my $fs="";
     $device = $partscheme{$parts}{'device'};
+    if (! $started) {
+	$started = 1;
+	print "$device\n";
+	info "Deleting partions : $partscheme{$parts}{'partnumber'}";
+	print "d\n1\n";
+	print "d\n2\n";
+	print "d\n3\n";
+	print "d\n4\n";
+    }
     $fs = $partscheme{$parts}{'fs'} if $partscheme{$parts}{'fs'} ;
     info "Creating partion : $partscheme{$parts}{'partnumber'}";
     print "n\n";
@@ -187,7 +207,9 @@ sub output_partitions_fdisk {
     print "$partscheme{$parts}{'start'}\n";
     print "$partscheme{$parts}{'end'}\n";
     print "t\n";
-    print "$partscheme{$parts}{'partnumber'}\n";
+    if ($partscheme{$parts}{'partnumber'} ne "1"){
+	print "$partscheme{$parts}{'partnumber'}\n";
+    }
     print "$partscheme{$parts}{'type'}\n";
     if ($partscheme{$parts}{'flags'}){
 	print "a\n";
@@ -290,8 +312,8 @@ sub output_mkfs {
       print "mkswap ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
     }elsif ($partscheme{$part}{'fs'}){
       print "mkfs -t ".$partscheme{$part}{'fs'}." ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
-      if ($partscheme{$part}{'fs'} =~ /^ext\d/){
-	  # If filesystem is ext[0-9]
+      if (($partscheme{$part}{'mountpoint'})&&($partscheme{$part}{'fs'} =~ /^ext[234]/)){
+	  # If filesystem is ext[234] and mounted
 	  print "e2label ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}." ".$partscheme{$part}{'mountpoint'}."\n";
       }
     }
