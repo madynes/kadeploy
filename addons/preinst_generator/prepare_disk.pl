@@ -1,10 +1,10 @@
 #!/usr/bin/perl -w
 use Term::ANSIColor;
 use Term::ANSIColor qw(:constants);
+use Getopt::Long;
 
 my $verbose=0;
-
-### all_flas : string contains all possible flags for a giving partition
+### all_flags : string contains all possible flags for a giving partition
 my $all_flags = "boot root swap hidden raid lvm lba hp-service palo prep msftres bios_grub";
 
 ### --------------------------------------------------------
@@ -46,20 +46,32 @@ sub get_partitions_fdisk {
       my $flags="";
       @output_g = @output;
       if ($output[1] =~ /\*/) {
-	$flags = "*";
+	$flags = "boot";
 	@output_g = @output[0,2..6];
       }
       #print join(":", @output_g)."\n";
       ($dev, $start, $end, $size, $fs, $type) = @output_g ;
       info ("$dev -> start : $start - end : $end ($size)");
+      $device = $partnum = $dev;
+      $partnum =~ s/.*(\d+)$/$1/;
+      $device =~ s/$partnum$//;
+      info ("Device key : $dev, device : $device, part : $partnum");
+      $partscheme{$dev}{ 'device' } = $device;
+      $partscheme{$dev}{ 'partnumber' } = $partnum ;
+      $partscheme{$dev}{ 'start' } = $start ;
+      $partscheme{$dev}{ 'end' } = $end ;
+      $partscheme{$dev}{'mounted'} = 0;
+
       if ($type) {
 	info (" -- Type: $type");
       }
       if ($fs) {
 	info (" -- Filesystem : $fs");
+	$partscheme{$dev}{ 'type' } = $fs ;
       }
       if ($flags) {
 	info (" -- Flags : $flags");
+	$partscheme{$dev}{'flags'} = $flags;
       }
     }
   }
@@ -147,6 +159,45 @@ sub output_partitions_parted {
 }
 
 ### --------------------------------------------------------
+### output_partitions_fdisk : output fdisk command for
+###                          the given hashmap containing the
+###                          patition table
+###        args : $partscheme_ref : a reference on the hashmap
+###               containing the partition table
+sub output_partitions_fdisk {
+  my ($partscheme_ref) = @_ ;
+  my %partscheme = %$partscheme_ref ;
+  my $device="";
+
+  print "cat <<EOF | fdisk\n";
+  for my $parts (sort keys %partscheme) {
+    my $fs="";
+    $device = $partscheme{$parts}{'device'};
+    $fs = $partscheme{$parts}{'fs'} if $partscheme{$parts}{'fs'} ;
+    info "Creating partion : $partscheme{$parts}{'partnumber'}";
+    print "n\n";
+    if ($partscheme{$parts}{'partnumber'} >= 5){
+	print "l\n";
+    } elsif ($partscheme{$parts}{'type'} eq "5"){
+	print "e\n";
+    } else {
+	print "p\n";
+    }
+    print "$partscheme{$parts}{'partnumber'}\n";
+    print "$partscheme{$parts}{'start'}\n";
+    print "$partscheme{$parts}{'end'}\n";
+    print "t\n";
+    print "$partscheme{$parts}{'partnumber'}\n";
+    print "$partscheme{$parts}{'type'}\n";
+    if ($partscheme{$parts}{'flags'}){
+	print "a\n";
+	print "$partscheme{$parts}{'partnumber'}\n";
+    }
+  }
+  print "w\nEOF\n";
+}
+
+### --------------------------------------------------------
 ### print_table : print the partition table
 ###        args : $partscheme_ref : a reference on the hashmap
 ###               containing the partition table
@@ -172,7 +223,7 @@ sub print_table {
 sub set_filesystem {
   local ($partscheme_ref, $mounts) = @_ ;
   local %partscheme = %$partscheme_ref ;
-  open(MOUNTS, "<$mounts") or die "Can open mounts file !";
+  open(MOUNTS, "<$mounts") or die "Can open mounts file ($mounts) !";
   while (<MOUNTS>){
     chomp;
     local ($device, $mountpoint, $fs, $options, $dump, $pass) = split (" ", $_) ;
@@ -200,7 +251,7 @@ sub set_swap {
   local ($partscheme_ref, $swap) = @_ ;
   local %partscheme = %$partscheme_ref ;
   local $count = 0;
-  open(SWAP, "<$swap") or die "Can open swap file !";
+  open(SWAP, "<$swap") or die "Can open swap file ($swap) !";
   while (<SWAP>){
     chomp ;
 
@@ -239,24 +290,73 @@ sub output_mkfs {
       print "mkswap ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
     }elsif ($partscheme{$part}{'fs'}){
       print "mkfs -t ".$partscheme{$part}{'fs'}." ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
+      if ($partscheme{$part}{'fs'} =~ /^ext\d/){
+	  # If filesystem is ext[0-9]
+	  print "e2label ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}." ".$partscheme{$part}{'mountpoint'}."\n";
+      }
     }
   }
 }
 
+### --------------------------------------------------------
+### print_usage : output the help summary of this script
+###
+sub print_usage {
+    my $returncode=$_;
+
+    print "Usage: \t$0 [-hv] [--parted] [--fdisk] [--device <device>] [--mountfile <mountfile>] [--swapfile <swapfile>]\n";
+    print "This tool gives the nodes where you can deploy\n";
+    print "\n";
+    print "\t--fdisk\t- output format for fdisk\n";
+    print "\t--parted\t- output format for parted (default)\n";
+    print "\t--device\t- device to scan (default /dev/sda)\n";
+    print "\t--mountfile\t- file containing the current mount status (default: /etc/mtab)\n";
+    print "\t--swapfile\t- file containing the current swap status (default: /proc/swaps)\n";
+    print "\t-h\n";
+    print "\t--help\t\t- gives this message\n";
+    print "\t-v\n";
+    print "\t--verbose\t- turn on verbose mode\n";
+    exit $returncode ;
+}
+
 ### Main ###
 my $device="/dev/sda";
-my $mounts="/proc/mounts";
+my $mounts="/etc/mtab";
 my $swap="/proc/swaps";
 
-info "With fdisk :";
-get_partitions_fdisk($device) ;
+my $display_help=0;
+my $parted=0;
+my $fdisk=0;
 
-info "With parted :";
+# get the command-line options
+GetOptions('device=s'                  => \$device,
+	   'mountfile=s'               => \$mounts,
+	   'swapfile=s'                => \$swap,
+	   'parted!'                   => \$parted,
+	   'fdisk!'                    => \$fdisk,
+	   'h!'                        => \$display_help,
+	   'help!'                     => \$display_help,
+	   'v!'                        => \$verbose,
+	   'verbose!'                  => \$verbose,
+    ) or print_usage(1);
 
-$partitions = get_partitions_parted($device);
-output_partitions_parted($partitions);
+if ($display_help){
+    print_usage(0);
+}
 
+# If no option given, use parted
+$parted = 1 if !($parted || $fdisk);
+
+if ($parted){
+    info "With parted :";
+    $partitions = get_partitions_parted($device);
+    output_partitions_parted($partitions);
+}
+if ($fdisk){
+    info "With fdisk :";
+    $partitions = get_partitions_fdisk($device);
+    output_partitions_fdisk($partitions);
+}
 set_filesystem($partitions, $mounts);
 set_swap($partitions, $swap);
 output_mkfs($partitions);
-#print_table($partitions);
