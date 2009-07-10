@@ -335,7 +335,7 @@ sub output_mkfs {
 sub print_usage {
     my $returncode=@_;
 
-    print "Usage: \t$0 [-hv] [--parted] [--fdisk] [--device <device>] [--mountfile <mountfile>] [--swapfile <swapfile>]\n";
+    print "Usage: \t$0 [-h] [-v] [-l] [--label] [--parted] [--fdisk] [--device <device>] [--mountfile <mountfile>] [--swapfile <swapfile>]\n";
     print "This tool gives the nodes where you can deploy\n";
     print "\n";
     print "\t--fdisk\t- output format for fdisk\n";
@@ -343,6 +343,8 @@ sub print_usage {
     print "\t--device\t- device to scan (default /dev/sda)\n";
     print "\t--mountfile\t- file containing the current mount status (default: /etc/mtab)\n";
     print "\t--swapfile\t- file containing the current swap status (default: /proc/swaps)\n";
+    print "\t-l\n";
+    print "\t--label\t\t- output labels for all partitions (not enabled by default)\n";
     print "\t-h\n";
     print "\t--help\t\t- gives this message\n";
     print "\t-v\n";
