@@ -305,15 +305,24 @@ sub set_swap {
 ### output_mkfs : output the mkfs of the hashtable
 ###                containing the partition table
 sub output_mkfs {
-  my ($partscheme_ref) = @_ ;
+  my ($partscheme_ref, $label) = @_ ;
   my %partscheme = %$partscheme_ref ;
   foreach $part ( keys(%partscheme)){
     if ($partscheme{$part}{'swap'}){
-      print "mkswap ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
+	print "mkswap ";
+	if ($label){
+	    # If we want labels, we add the -L swith to mkswap
+	    # Swap label looks like : SWAP_dev_sda1 if swap partition if /dev/sda1
+	    $_ = $partscheme{$part}{'device'};
+	    s/.*\//_/g;
+	    my $name =  $_;
+	    print "-L SWAP".$name.$partscheme{$part}{'partnumber'}." ";
+	}
+	print $partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
     }elsif ($partscheme{$part}{'fs'}){
       print "mkfs -t ".$partscheme{$part}{'fs'}." ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
-      if (($partscheme{$part}{'mountpoint'})&&($partscheme{$part}{'fs'} =~ /^ext[234]/)){
-	  # If filesystem is ext[234] and mounted
+      if (($partscheme{$part}{'mountpoint'})&&($partscheme{$part}{'fs'} =~ /^ext[234]/)&&($label)){
+	  # If filesystem is ext[234] and mounted, we se a label with e2label
 	  print "e2label ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}." ".$partscheme{$part}{'mountpoint'}."\n";
       }
     }
@@ -349,6 +358,7 @@ my $swap="/proc/swaps";
 my $display_help=0;
 my $parted=0;
 my $fdisk=0;
+my $label=0;
 
 # get the command-line options
 GetOptions('device=s'                  => \$device,
@@ -356,6 +366,8 @@ GetOptions('device=s'                  => \$device,
 	   'swapfile=s'                => \$swap,
 	   'parted!'                   => \$parted,
 	   'fdisk!'                    => \$fdisk,
+	   'label!'                    => \$label,
+	   'l!'                        => \$label,
 	   'h!'                        => \$display_help,
 	   'help!'                     => \$display_help,
 	   'v!'                        => \$verbose,
@@ -381,4 +393,4 @@ if ($fdisk){
 }
 set_filesystem($partitions, $mounts);
 set_swap($partitions, $swap);
-output_mkfs($partitions);
+output_mkfs($partitions, $label);
