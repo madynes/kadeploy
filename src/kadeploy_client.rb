@@ -169,43 +169,42 @@ db.connect(common_config.deploy_db_host,
 
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific(common_config, db)
 if (exec_specific_config != nil) then
-  #Rights check
-  allowed_to_deploy = true
-  #The rights must be checked for each cluster if the node_list contains nodes from several clusters
-  exec_specific_config.node_list.group_by_cluster.each_pair { |cluster, set|
-    if (exec_specific_config.deploy_part != "") then
-      if (exec_specific_config.block_device != "") then
+  if ((exec_specific_config.environment.environment_kind != "other") || (common_config.bootloader != "pure_pxe")) then
+    #Rights check
+    allowed_to_deploy = true
+    #The rights must be checked for each cluster if the node_list contains nodes from several clusters
+    exec_specific_config.node_list.group_by_cluster.each_pair { |cluster, set|
+      if (exec_specific_config.deploy_part != "") then
+        if (exec_specific_config.block_device != "") then
           part = exec_specific_config.block_device + exec_specific_config.deploy_part
         else
           part = kadeploy_server.get_block_device(cluster) + exec_specific_config.deploy_part
         end
-    else
-      part = kadeploy_server.get_default_deploy_part(cluster)
-    end
-    allowed_to_deploy = CheckRights::CheckRightsFactory.create(common_config.rights_kind,
-                                                               set,
-                                                               db,
-                                                               part).granted?
-  }
-
-  if (allowed_to_deploy == true) then
-    #Launch the listener on the client
-    kadeploy_client = KadeployClient.new(kadeploy_server)
-    DRb.start_service(nil, kadeploy_client)
-    if /druby:\/\/([\w\.\-]+):(\d+)/ =~ DRb.uri
-      content = Regexp.last_match
-      client_host = content[1]
-      client_port = content[2]
-    else
-      puts "The URI #{DRb.uri} is not correct"
-      _exit(1, db)
-    end
-    Signal.trap("INT") do
-      puts "SIGINT trapped, let's clean everything ..."
-      kadeploy_server.kill(kadeploy_client.workflow_id)
-      _exit(1, db)
-    end
-    if (exec_specific_config != nil) then
+      else
+        part = kadeploy_server.get_default_deploy_part(cluster)
+      end
+      allowed_to_deploy = CheckRights::CheckRightsFactory.create(common_config.rights_kind,
+                                                                 set,
+                                                                 db,
+                                                                 part).granted?
+    }
+    if (allowed_to_deploy == true) then
+      #Launch the listener on the client
+      kadeploy_client = KadeployClient.new(kadeploy_server)
+      DRb.start_service(nil, kadeploy_client)
+      if /druby:\/\/([\w\.\-]+):(\d+)/ =~ DRb.uri
+        content = Regexp.last_match
+        client_host = content[1]
+        client_port = content[2]
+      else
+        puts "The URI #{DRb.uri} is not correct"
+        _exit(1, db)
+      end
+      Signal.trap("INT") do
+        puts "SIGINT trapped, let's clean everything ..."
+        kadeploy_server.kill(kadeploy_client.workflow_id)
+        _exit(1, db)
+      end
       if (exec_specific_config.pxe_profile_file != "") then
         IO.readlines(exec_specific_config.pxe_profile_file).each { |l|
           exec_specific_config.pxe_profile_msg.concat(l)
@@ -217,9 +216,12 @@ if (exec_specific_config != nil) then
         system(exec_specific_config.script)
       end
       exec_specific_config = nil
+    else
+      puts "You do not have the deployment rights on all the nodes"
+      _exit(1, db)
     end
   else
-    puts "You do not have the deployment rights on all the nodes"
+    puts "Only linux and xen environments can be deployed with the pure PXE configuration"
     _exit(1, db)
   end
   _exit(0, db)

@@ -287,7 +287,13 @@ module ConfigInformation
             when "kadeploy_tcp_buffer_size"
               @common.kadeploy_tcp_buffer_size = val.to_i
             when "kadeploy_cache_dir"
-              @common.kadeploy_cache_dir = val
+              if (val == "no_cache") then
+                @common.kadeploy_disable_cache = true
+                #We set a default value since it is used by the Bittorrent implemantation
+                @common.kadeploy_cache_dir = "/tmp"
+              else
+                @common.kadeploy_cache_dir = val
+              end
             when "kadeploy_cache_size"
               @common.kadeploy_cache_size = val.to_i
             when "ssh_port"
@@ -640,7 +646,7 @@ module ConfigInformation
       commands_file = CONFIGURATION_FOLDER + "/" + COMMANDS_FILE
       if File.readable?(commands_file) then
         IO.readlines(commands_file).each { |line|
-          if not ((/^#/ =~ line) || (/^$/)) then #we ignore commented lines and empty lines
+          if not ((/^#/ =~ line) || (/^$/ =~ line)) then #we ignore commented lines and empty lines
             if /(.+)\|(.+)\|(.+)/ =~ line then
               content = Regexp.last_match
               node = @common.nodes_desc.get_node_by_host(content[1])
@@ -723,14 +729,14 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def Config.load_kadeploy_cmdline_options(nodes_desc, exec_specific)
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 32
-        opts.banner = "Usage: kadeploy3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-a", "--env-file ENVFILE", "File containing the envrionement description") { |f|
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 32
+        opt.banner = "Usage: kadeploy3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-a", "--env-file ENVFILE", "File containing the envrionement description") { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} does not exist or is not readable")
             return false
@@ -739,7 +745,7 @@ module ConfigInformation
             exec_specific.load_env_arg = f
           end
         }
-        opts.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
+        opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
           if /\A[\w\/]+\Z/ =~ b then
             exec_specific.block_device = b
           else
@@ -747,14 +753,14 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-d", "--debug-mode", "Activate the debug mode") {
+        opt.on("-d", "--debug-mode", "Activate the debug mode") {
           exec_specific.debug = true
         }
-        opts.on("-e", "--env-name ENVNAME", "Name of the recorded environment to deploy") { |n|
+        opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment to deploy") { |n|
           exec_specific.load_env_kind = "db"
           exec_specific.load_env_arg = n
         }
-        opts.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
+        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -770,7 +776,7 @@ module ConfigInformation
             }
           end
         }
-        opts.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
+        opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
             if not File.readable?(f) then
               Debug::client_error("The file #{f} cannot be read")
@@ -788,7 +794,7 @@ module ConfigInformation
             end
           end
         }
-        opts.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
+        opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then 
             Debug::client_error("Invalid hostname: #{hostname}")
             return false
@@ -797,19 +803,19 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
+        opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
           exec_specific.nodes_ko_file = f
         }
-        opts.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly deployed")  { |f|
+        opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly deployed")  { |f|
           exec_specific.nodes_ok_file = f
         }
-        opts.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
+        opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
             exec_specific.deploy_part = p
         }
-        opts.on("-r", "--reformat-tmp", "Reformat the /tmp partition") {
+        opt.on("-r", "--reformat-tmp", "Reformat the /tmp partition") {
           exec_specific.reformat_tmp = true
         }
-        opts.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
+        opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -822,7 +828,7 @@ module ConfigInformation
             end
           end
         }
-        opts.on("-u", "--user USERNAME", "Specify the user") { |u|
+        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
           if /\A\w+\Z/ =~ u then
             exec_specific.user = u
           else
@@ -830,7 +836,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-v", "--env-version NUMVERSION", "Number of version of the environment to deploy") { |n|
+        opt.on("-v", "--env-version NUMVERSION", "Number of version of the environment to deploy") { |n|
           if /\A\d+\Z/ =~ n then
             exec_specific.env_version = n
           else
@@ -838,7 +844,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
+        opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             exec_specific.verbose_level = d.to_i
           else
@@ -846,7 +852,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -854,20 +860,20 @@ module ConfigInformation
             exec_specific.pxe_profile_file = f
           end
         }
-        opts.separator "Advanced options:"
-        opts.on("--write-workflow-id FILE", "Write the workflow id in a file") { |file|
+        opt.separator "Advanced options:"
+        opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |file|
           exec_specific.write_workflow_id = file
         }
-        opts.on("--ignore-nodes-deploying", "Allow to deploy even on the nodes tagged as \"currently deploying\" (use this only if you know what you do)") {
+        opt.on("--ignore-nodes-deploying", "Allow to deploy even on the nodes tagged as \"currently deploying\" (use this only if you know what you do)") {
           exec_specific.ignore_nodes_deploying = true
         }        
-        opts.on("--disable-bootloader-install", "Disable the automatic installation of a bootloader for a Linux based environnment") {
+        opt.on("--disable-bootloader-install", "Disable the automatic installation of a bootloader for a Linux based environnment") {
           exec_specific.disable_bootloader_install = true
         }
-        opts.on("--disable-disk-partitioning", "Disable the disk partitioning") {
+        opt.on("--disable-disk-partitioning", "Disable the disk partitioning") {
           exec_specific.disable_disk_partitioning = true
         }
-        opts.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
+        opt.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
           if (m =~ /\A[a-zA-Z0-9_]+:[a-zA-Z0-9_]+\Z/)
             exec_specific.breakpoint_on_microstep = m
           else
@@ -875,7 +881,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
+        opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
           exec_specific.custom_operations_file = file
           if not File.readable?(file) then
             Debug::client_error("The file #{file} cannot be read")
@@ -899,7 +905,7 @@ module ConfigInformation
             }
           end
         }
-        opts.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
+        opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
           s.split("&").each { |macrostep|
             macrostep_name = macrostep.split("|")[0]
             microstep_list = macrostep.split("|")[1]
@@ -969,7 +975,7 @@ module ConfigInformation
         puts "The #{@common.tftp_repository} directory does not exist"
         return false
       end
-      if not File.exist?(@common.kadeploy_cache_dir) then
+      if ((not @common.kadeploy_disable_cache) && (not File.exist?(@common.kadeploy_cache_dir))) then
         puts "The #{@common.kadeploy_cache_dir} directory does not exist, let's create it"
         res = Dir.mkdir(@common.kadeploy_cache_dir, 0700) rescue false
         if res.kind_of? FalseClass then
@@ -1054,17 +1060,17 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_kaenv_cmdline_options
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 36
-        opts.banner = "Usage: kaenv3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-e", "--environment ENVNAME", "Environment name") { |n|
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 36
+        opt.banner = "Usage: kaenv3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-e", "--environment ENVNAME", "Environment name") { |n|
           @exec_specific.env_name = n
         }        
-        opts.on("-f", "--file FILE", "Environment file") { |f|
+        opt.on("-f", "--file FILE", "Environment file") { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -1072,7 +1078,7 @@ module ConfigInformation
             @exec_specific.file = f
           end
         }
-        opts.on("-m", "--files-to-move FILES", "Files to move (src1:dst1,src2:dst2,...)") { |f|
+        opt.on("-m", "--files-to-move FILES", "Files to move (src1:dst1,src2:dst2,...)") { |f|
           if /\A.+:.+(,.+:.+)*\Z/ =~f then
             f.split(",").each { |src_dst|
               @exec_specific.files_to_move.push({"src"=>src_dst.split(":")[0],"dest"=>src_dst.split(":")[1]})
@@ -1082,24 +1088,24 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-o", "--operation OPERATION", "Kind of operation (add, delete, list, print, remove-demolishing-tag, set-visibility-tag, update-tarball-md5, update-preinstall-md5, update-postinstalls-md5, move-files)") { |op|
+        opt.on("-o", "--operation OPERATION", "Kind of operation (add, delete, list, print, remove-demolishing-tag, set-visibility-tag, update-tarball-md5, update-preinstall-md5, update-postinstalls-md5, move-files)") { |op|
           if /\A(add|delete|list|print|remove-demolishing-tag|set-visibility-tag|update-tarball-md5|update-preinstall-md5|update-postinstalls-md5|move-files)\Z/ =~ op then
             @exec_specific.operation = op
           else
             Debug::client_error("Invalid operation")
           end
         }
-        opts.on("-s", "--show-all-versions", "Show all versions of an environment") {
+        opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
           @exec_specific.show_all_version = true
         }
-        opts.on("-t", "--visibility-tag TAG", "Set the visibility tag (private, shared, public)") { |v|
+        opt.on("-t", "--visibility-tag TAG", "Set the visibility tag (private, shared, public)") { |v|
           if /\A(private|shared|public)\Z/ =~ v then
             @exec_specific.visibility_tag = v
           else
             Debug::client_error("Invalid visibility tag")
           end
         }
-        opts.on("-u", "--user USERNAME", "Specify the user") { |u|
+        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
           if /\A(\w+)|\*\Z/ =~ u then
             @exec_specific.user = u
           else
@@ -1107,7 +1113,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-v", "--version NUMBER", "Specify the version") { |v|
+        opt.on("-v", "--version NUMBER", "Specify the version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.version = v
           else
@@ -1224,20 +1230,20 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_karights_cmdline_options
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 28
-        opts.banner = "Usage: karights3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-a", "--add", "Add some rights to a user") {
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 28
+        opt.banner = "Usage: karights3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-a", "--add", "Add some rights to a user") {
           @exec_specific.operation = "add"
         }
-        opts.on("-d", "--delete", "Delete some rights to a user") {
+        opt.on("-d", "--delete", "Delete some rights to a user") {
           @exec_specific.operation = "delete"
         }
-        opts.on("-f", "--file FILE", "Machine file")  { |f|
+        opt.on("-f", "--file FILE", "Machine file")  { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -1251,23 +1257,23 @@ module ConfigInformation
             }
           end
         }
-        opts.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
+        opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
           if (not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m)) and (m != "*") then
             Debug::client_error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
         }
-        opts.on("-o", "--overwrite-rights", "Overwrite existing rights") {
+        opt.on("-o", "--overwrite-rights", "Overwrite existing rights") {
           @exec_specific.overwrite_existing_rights = true
         }        
-        opts.on("-p", "--part PARTNAME", "Include the partition in the operation") { |p|
+        opt.on("-p", "--part PARTNAME", "Include the partition in the operation") { |p|
           @exec_specific.part_list.push(p)
         }        
-        opts.on("-s", "--show-rights", "Show the rights for a given user") {
+        opt.on("-s", "--show-rights", "Show the rights for a given user") {
           @exec_specific.operation = "show"
         }
-        opts.on("-u", "--user USERNAME", "Specify the user") { |u|
+        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
           if /\A\w+\Z/ =~ u then
             @exec_specific.user = u
           else
@@ -1346,14 +1352,14 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_kastat_cmdline_options
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 28
-        opts.banner = "Usage: kastat3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-a", "--list-min-retries NB", "Print the statistics about the nodes that need several attempts") { |n|
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 28
+        opt.banner = "Usage: kastat3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-a", "--list-min-retries NB", "Print the statistics about the nodes that need several attempts") { |n|
           if /\A\d+\Z/ =~ n then
             @exec_specific.operation = "list_retries"
             @exec_specific.min_retries = n.to_i
@@ -1362,10 +1368,10 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-b", "--list-failure-rate", "Print the failure rate for the nodes") { |n|
+        opt.on("-b", "--list-failure-rate", "Print the failure rate for the nodes") { |n|
           @exec_specific.operation = "list_failure_rate"
         }
-        opts.on("-c", "--list-min-failure-rate RATE", "Print the nodes which have a minimum failure-rate of RATE (0 <= RATE <= 100") { |r|
+        opt.on("-c", "--list-min-failure-rate RATE", "Print the nodes which have a minimum failure-rate of RATE (0 <= RATE <= 100") { |r|
           if ((/\A\d+/ =~ r) && ((r.to_i >= 0) && ((r.to_i <= 100)))) then
             @exec_specific.operation = "list_min_failure_rate"
             @exec_specific.min_rate = r.to_i
@@ -1374,26 +1380,26 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-d", "--list-all", "Print all the information") { |r|
+        opt.on("-d", "--list-all", "Print all the information") { |r|
           @exec_specific.operation = "list_all"
         }
-        opts.on("-f", "--field FIELD", "Only print the given fields (user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
+        opt.on("-f", "--field FIELD", "Only print the given fields (user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
           @exec_specific.fields.push(f)
         }
-        opts.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
+        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m) then
             Debug::client_error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
         }
-        opts.on("-s", "--step STEP", "Applies the retry filter on the given steps (1, 2 or 3)") { |s|
+        opt.on("-s", "--step STEP", "Applies the retry filter on the given steps (1, 2 or 3)") { |s|
           @exec_specific.steps.push(s) 
         }
-        opts.on("-x", "--date-min DATE", "Get the stats from this date (yyyy:mm:dd:hh:mm:ss)") { |d|
+        opt.on("-x", "--date-min DATE", "Get the stats from this date (yyyy:mm:dd:hh:mm:ss)") { |d|
           @exec_specific.date_min = d
         }
-        opts.on("-y", "--date-max DATE", "Get the stats to this date") { |d|
+        opt.on("-y", "--date-max DATE", "Get the stats to this date") { |d|
           @exec_specific.date_max = d
         }
       end
@@ -1483,14 +1489,14 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_kanodes_cmdline_options
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 28
-        opts.banner = "Usage: kanodes3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 28
+        opt.banner = "Usage: kanodes3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -1504,21 +1510,21 @@ module ConfigInformation
             }
           end
         }
-        opts.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
+        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~m) then
             Debug::client_error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
         }
-        opts.on("-o", "--operation OPERATION", "Choose the operation (get_deploy_state or get_yaml_dump)") { |o|
+        opt.on("-o", "--operation OPERATION", "Choose the operation (get_deploy_state or get_yaml_dump)") { |o|
           if not  (/\A(get_deploy_state|get_yaml_dump)\Z/ =~ o) then
             Debug::client_error("Invalid operation: #{o}")
             return false
           end
           @exec_specific.operation = o
         }
-        opts.on("-w", "--workflow-id WID", "Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped") { |w|
+        opt.on("-w", "--workflow-id WID", "Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped") { |w|
           @exec_specific.wid = w
         }
       end
@@ -1572,6 +1578,7 @@ module ConfigInformation
       @exec_specific.breakpoint_on_microstep = "none"
       @exec_specific.pxe_profile_msg = ""
       @exec_specific.key = String.new
+      @exec_specific.reboot_level = "soft"
       return load_kareboot_cmdline_options(nodes_desc)
     end
 
@@ -1582,14 +1589,14 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_kareboot_cmdline_options(nodes_desc)
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 30
-        opts.banner = "Usage: kareboot3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 30
+        opt.banner = "Usage: kareboot3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
           if /\A[\w\/]+\Z/ =~ b then
             @exec_specific.block_device = b
           else
@@ -1597,13 +1604,13 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-c", "--check-prod-env", "Check if the production environment has been detroyed") {
+        opt.on("-c", "--check-prod-env", "Check if the production environment has been detroyed") {
           @exec_specific.check_prod_env = true
         }
-        opts.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |e|
+        opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |e|
           @exec_specific.env_arg = e
         }
-        opts.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
+        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
           if not File.readable?(f) then
             Debug::client_error("The file #{f} cannot be read")
             return false
@@ -1617,7 +1624,7 @@ module ConfigInformation
             }
           end
         }
-        opts.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
+        opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
             if not File.readable?(f) then
               Debug::client_error("The file #{f} cannot be read")
@@ -1635,20 +1642,28 @@ module ConfigInformation
             end
           end
         }
-        opts.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
+        opt.on("-l", "--reboot-level VALUE", "Reboot level (soft, hard, very_hard)") { |l|
+          if l =~ /\A(soft|hard|very_hard)\Z/ then
+            @exec_specific.reboot_level = l
+          else
+            Debug::client_error("Invalid reboot level")
+            return false
+          end
+        }   
+        opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
             Debug::client_error("Invalid hostname: #{hostname}")
             return false
           end
           Config.add_to_node_list(hostname, nodes_desc, @exec_specific)
         }
-        opts.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
+        opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
             @exec_specific.deploy_part = p
         }
-        opts.on("-r", "--reboot-kind REBOOT_KIND", "Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded)") { |k|
+        opt.on("-r", "--reboot-kind REBOOT_KIND", "Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded)") { |k|
           @exec_specific.reboot_kind = k
         }
-        opts.on("-u", "--user USERNAME", "Specify the user") { |u|
+        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
           if /\A(\w+)|\*\Z/ =~ u then
             @exec_specific.user = u
           else
@@ -1656,7 +1671,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-v", "--version NUMBER", "Specify the environment version") { |v|
+        opt.on("-v", "--version NUMBER", "Specify the environment version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.env_version = v
           else
@@ -1664,7 +1679,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
+        opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             @exec_specific.verbose_level = d.to_i
           else
@@ -1672,7 +1687,7 @@ module ConfigInformation
             return false
           end
         }
-        opts.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
           @exec_specific.pxe_profile_file = file
         }      
       end
@@ -1759,14 +1774,14 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_kaconsole_cmdline_options(nodes_desc)
-      opts = OptionParser::new do |opts|
-        opts.summary_indent = "  "
-        opts.summary_width = 28
-        opts.banner = "Usage: kaconsole3 [options]"
-        opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
-        opts.separator ""
-        opts.separator "General options:"
-        opts.on("-m", "--machine MACHINE", "Obtain a console on the given machines") { |hostname|
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 28
+        opt.banner = "Usage: kaconsole3 [options]"
+        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-m", "--machine MACHINE", "Obtain a console on the given machines") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
             Debug::client_error("Invalid hostname: #{hostname}")
             return false
@@ -1828,6 +1843,7 @@ module ConfigInformation
     attr_accessor :kadeploy_tcp_buffer_size
     attr_accessor :kadeploy_cache_dir
     attr_accessor :kadeploy_cache_size
+    attr_accessor :kadeploy_disable_cache
     attr_accessor :ssh_port
     attr_accessor :rsh_port
     attr_accessor :test_deploy_env_port
@@ -1860,6 +1876,7 @@ module ConfigInformation
     # * nothing
     def initialize
       @nodes_desc = Nodes::NodeSet.new
+      @kadeploy_disable_cache = false
     end
 
     # Check if all the fields of the common configuration file are filled

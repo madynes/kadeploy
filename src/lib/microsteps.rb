@@ -650,7 +650,11 @@ module MicroStepsLibrary
         @output.verbosel(0, "The torrent file (#{torrent}) has not been created")
         return false
       end
-      seed_pid = Bittorrent::launch_seed(torrent, @config.common.kadeploy_cache_dir)
+      if @config.kadeploy_disable_cache then
+        seed_pid = Bittorrent::launch_seed(torrent, @config.common.kadeploy_cache_dir)
+      else
+
+      end
       if (seed_pid == -1) then
         @output.verbosel(0, "The seed of #{torrent} has not been launched")
         return false
@@ -1067,11 +1071,21 @@ module MicroStepsLibrary
           return parallel_exec_command_wrapper("(/usr/local/bin/kexec_detach #{kernel} #{initrd} #{root_part} #{get_kernel_params()})",
                                                @config.common.taktuk_connector)
         else
-          @output.verbosel(3, "The Kexec optimization can only be used with a linux environment")
+          @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
           reboot_wrapper("soft", use_rsh_for_reboot)
         end
       end
       return true
+    end
+
+    # Perform a detached reboot from the deployment environment
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return true if the reboot has been successfully performed, false otherwise
+    def ms_reboot_from_deploy_env
+      return parallel_exec_command_wrapper("/usr/local/bin/reboot_detach", @config.common.taktuk_connector)
     end
 
     # Check the state of a set of nodes
@@ -1120,7 +1134,7 @@ module MicroStepsLibrary
     # * return true if the operation has been successfully performed, false otherwise
     def ms_create_partition_table(env)
       if @config.exec_specific.disable_disk_partitioning then
-        @output.verbosel(3, "Bypass the disk partitioning")
+        @output.verbosel(3, "   Bypass the disk partitioning")
         return true
       else
         case @config.cluster_specific[@cluster].partition_creation_kind
@@ -1154,7 +1168,7 @@ module MicroStepsLibrary
                                                @config.common.taktuk_connector)
         end
       else
-        @output.verbosel(3, "Bypass the format of the deploy part")
+        @output.verbosel(3, "   Bypass the format of the deploy part")
         return true
       end
     end
@@ -1194,7 +1208,7 @@ module MicroStepsLibrary
         return parallel_exec_command_wrapper("mount #{get_deploy_part_str()} #{@config.common.environment_extraction_dir}",
                                              @config.common.taktuk_connector)
       else
-        @output.verbosel(3, "Bypass the mount of the deploy part")
+        @output.verbosel(3, "   Bypass the mount of the deploy part")
         return true
       end
     end
@@ -1262,12 +1276,14 @@ module MicroStepsLibrary
                                             @config.exec_specific.environment.initrd.sub(/\A\//,''),
                                             @config.exec_specific.environment.hypervisor.sub(/\A\//,'')])
         when "other"
-          @output.verbosel(0, "Only linux and xen environments can be booted with a pure PXE configuration")
+          @output.verbosel(0, "   Only linux and xen environments can be booted with a pure PXE configuration")
+          @nodes_ok.set_error_msg("Boot method not supported")
+          @nodes_ok.duplicate_and_free(@nodes_ko)
           return false
         end
       when "chainload_pxe"
         if @config.exec_specific.disable_bootloader_install then
-          @output.verbosel(3, "Bypass the bootloader installation")
+          @output.verbosel(3, "   Bypass the bootloader installation")
           return true
         else
           case @config.exec_specific.environment.environment_kind
@@ -1275,7 +1291,7 @@ module MicroStepsLibrary
             return install_grub2_on_nodes("linux")
           when "xen"
 #           return install_grub2_on_nodes("xen")
-            @output.verbosel(3, "Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
+            @output.verbosel(3, "   Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
             return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel.sub(/\A\//,''),
                                               @config.exec_specific.environment.initrd.sub(/\A\//,''),
                                               @config.exec_specific.environment.hypervisor.sub(/\A\//,'')])
@@ -1313,7 +1329,7 @@ module MicroStepsLibrary
           (@config.exec_specific.environment.tarball["kind"] == "tbz2")) then
         return parallel_exec_command_wrapper("umount #{get_deploy_part_str()}", @config.common.taktuk_connector)
       else
-        @output.verbosel(3, "Bypass the umount of the deploy part")
+        @output.verbosel(3, "   Bypass the umount of the deploy part")
         return true
       end
     end
@@ -1382,7 +1398,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "Bypass the admin preinstalls")
+        @output.verbosel(3, "   Bypass the admin preinstalls")
       end
       return res
     end
@@ -1408,7 +1424,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "Bypass the admin postinstalls")
+        @output.verbosel(3, "   Bypass the admin postinstalls")
       end
       return res
     end
@@ -1434,7 +1450,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "Bypass the user postinstalls")
+        @output.verbosel(3, "   Bypass the user postinstalls")
       end
       return res
     end

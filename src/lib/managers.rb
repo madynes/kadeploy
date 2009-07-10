@@ -684,7 +684,7 @@ module Managers
       end
       @deployments_table_lock.unlock
       if (not nodes_ok.empty?) then
-        if grab_user_files then
+        if (@config.common.kadeploy_disable_cache || grab_user_files()) then
           nodes_ok.group_by_cluster.each_pair { |cluster, set|
             @queue_manager.next_macro_step(nil, set)
           }

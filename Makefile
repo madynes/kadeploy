@@ -28,6 +28,7 @@ install_conf_client:
 
 install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/conf $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/clusters $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/specific_conf* $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/nodes $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/cmd $(DESTDIR)/etc/kadeploy3

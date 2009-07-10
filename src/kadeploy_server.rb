@@ -99,8 +99,8 @@ class KadeployServer
       hash = nil
     elsif (wid == "") then
       hash = Hash.new
-      @workflow_info_hash.each_pair { |id,workflow_info_hash|
-        hash[id] = workflow_info_hash.get_state
+      @workflow_info_hash.each_pair { |key,workflow_info_hash|
+        hash[key] = workflow_info_hash.get_state
       }
       str = hash.to_yaml
       hash = nil
@@ -320,7 +320,7 @@ class KadeployServer
         else
           raise "Invalid kind of reboot: #{@reboot_kind}"
         end
-        step.reboot("soft")
+        step.reboot(exec_specific.reboot_level)
         step.wait_reboot([@config.common.ssh_port],[])
         if (exec_specific.reboot_kind == "env_recorded") then
           part = String.new

@@ -242,7 +242,7 @@ module BootNewEnvironment
             result = true
             #Here are the micro steps 
             result = result && @step.umount_deploy_part
-            result = result && @step.reboot("soft", use_rsh_for_reboot)
+            result = result && @step.reboot_from_deploy_env
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
             #End of micro steps
           }

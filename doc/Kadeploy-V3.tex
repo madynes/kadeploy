@@ -24,7 +24,7 @@ KADEPLOY 3.0, CECILL 2.0 license, All rights reserved.
 Kadeploy requires the following softwares (the Debian packages available in the Lenny flavor are given):
 \begin{itemize}
 \item \texttt{ruby1.8}
-\item \texttt{rubylibmysql-ruby}
+\item \texttt{rubylibmysql-ruby1.8}
 \item \texttt{bittorrent}
 \item \texttt{ctorrent}
 \item \texttt{taktuk >= 3.6}
@@ -296,7 +296,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{kadeploy\_server}: hostname of the Kadeploy server.
 \item \texttt{kadeploy\_server\_port}: port of the Kadeploy server.
 \item \texttt{kadeploy\_tcp\_buffer\_size}: TCP buffer size for the Kadeploy file server.
-\item \texttt{kadeploy\_cache\_dir}: absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment.
+\item \texttt{kadeploy\_cache\_dir}: absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment. It is possible to disable the use of a cache by setting \textit{no\_cache} to this field.
 \item \texttt{kadeploy\_cache\_size}: size in MB of the Kadeploy cache.
 \item \texttt{ssh\_port}: port used by SSH
 \item \texttt{rsh\_port}: port used by RSH
@@ -687,6 +687,7 @@ General options:
   -f, --file MACHINELIST         Files containing list of nodes
   -k, --key [FILE]               Public key to copy in the root's authorized_keys, if 
                                  no argument is specified, use the authorized_keys
+  -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
   -m, --machine MACHINE          Reboot the given machines
   -p, --partition-number NUMBER  Specify the partition number to use
   -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot,
@@ -710,6 +711,7 @@ Here are some basic examples:
 \begin{verbatim}
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
+> kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile -l hard
 > kareboot3 -f nodes -r deploy_env -k .ssh/id_rsa
 > kareboot3 -r env_recorded -e production_environment \
             -p 2 -u root -m gdx-5.orsay.grid5000.fr
@@ -718,7 +720,7 @@ Here are some basic examples:
 Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-prod-env} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the production environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed and a check is performed at the end of the reboot to ensure that the production environment is correctly deployed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the production environment has been destroyed and that it should be deployed again.
 
 An environment is considered \textit{demolishing} if the number of failures after a reboot on the production environment (when the \texttt{-c|--check-prod-env} optionis used with Kareboot), is higher than the threshold specify in the configuration file% (see the~\ref{sec:general_config} part)
-. In the~\ref{sec:kaenv} part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
+. In the Kaenv part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
 
 
 \subsection{Kaenv}\label{sec:kaenv}
