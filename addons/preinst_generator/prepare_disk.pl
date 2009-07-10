@@ -304,6 +304,8 @@ sub set_swap {
 ### --------------------------------------------------------
 ### output_mkfs : output the mkfs of the hashtable
 ###                containing the partition table
+###        args : $partscheme_ref : a reference on the hashmap
+###               $label : do we need to output labels ?
 sub output_mkfs {
   my ($partscheme_ref, $label) = @_ ;
   my %partscheme = %$partscheme_ref ;
