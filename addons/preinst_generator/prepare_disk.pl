@@ -273,7 +273,7 @@ sub set_swap {
   local ($partscheme_ref, $swap) = @_ ;
   local %partscheme = %$partscheme_ref ;
   local $count = 0;
-  open(SWAP, "<$swap") or die "Can open swap file ($swap) !";
+  open(SWAP, "<$swap") or die "Can't open swap file ($swap) !";
   while (<SWAP>){
     chomp ;
 
@@ -291,6 +291,55 @@ sub set_swap {
 }
 
 ### --------------------------------------------------------
+### set_label : set the existing label of a partition
+###             (based on /deb/disk/by-label)
+### --------------------------------------------------------
+###        args : $partscheme_ref : a reference on the hashmap
+###                             containing the partition table
+###               $genlabel : do we need to generate labels ?
+sub set_labels {
+  local ($partscheme_ref, $genlabel) = @_ ;
+  local %partscheme = %$partscheme_ref ;
+  local $labeldir = "/dev/disk/by-label";
+  local $label;
+  local $dev;
+
+  if ($genlabel){
+      info "Generate labels";
+      foreach $part ( keys(%partscheme)){
+	  if ($partscheme{$part}{'swap'}){
+	      # If we want labels, we add the -L swith to mkswap
+	      # Swap label looks like : SWAP_dev_sda1 if swap partition if /dev/sda1
+	      $_ = $partscheme{$part}{'device'};
+	      s/.*\//_/g;
+	      local $name =  $_;
+	      $partscheme{$part}{'label'} = "SWAP".$name.$partscheme{$part}{'partnumber'};
+	      info "Swap partition ($part), label = ".$partscheme{$part}{'label'};
+	  }elsif ($partscheme{$part}{'fs'}){
+	      if (($partscheme{$part}{'mountpoint'})&&($partscheme{$part}{'fs'} =~ /^ext[234]/)){
+		  # If filesystem is ext[234] and mounted, we set a label (to be use by e2label)
+		  $partscheme{$part}{'label'} = $partscheme{$part}{'mountpoint'};
+		  info "Ext partition ($part), label = ".$partscheme{$part}{'label'};
+	      }
+	  }
+      }
+  }else{
+      opendir(LABELS, $labeldir) or die "Can't labels directory ($labeldir)";
+      while ($label=readdir(LABELS)) {
+	  $_ = $label;
+	  if (! m/\.\.?/){
+	      $dev = readlink $labeldir."/".$label ;
+	      local $device = $dev ;
+	      $device =~ s/^\..\/\../\/dev/;
+	      $partscheme{$device}{'label'} = $label ;
+	      info "Label : $label, partition : $device";
+	  }
+      }
+      closedir LABELS;
+  }
+}
+
+### --------------------------------------------------------
 ### output_fstab : output the fstab of the hashtable
 ###                containing the partition table
 ### WARNING : seems not useful, in fact the fstab will be in the
@@ -305,27 +354,24 @@ sub set_swap {
 ### output_mkfs : output the mkfs of the hashtable
 ###                containing the partition table
 ###        args : $partscheme_ref : a reference on the hashmap
-###               $label : do we need to output labels ?
+###
 sub output_mkfs {
-  my ($partscheme_ref, $label) = @_ ;
+  my ($partscheme_ref) = @_ ;
   my %partscheme = %$partscheme_ref ;
   foreach $part ( keys(%partscheme)){
     if ($partscheme{$part}{'swap'}){
 	print "mkswap ";
-	if ($label){
+	if ($partscheme{$part}{'label'}){
 	    # If we want labels, we add the -L swith to mkswap
 	    # Swap label looks like : SWAP_dev_sda1 if swap partition if /dev/sda1
-	    $_ = $partscheme{$part}{'device'};
-	    s/.*\//_/g;
-	    my $name =  $_;
-	    print "-L SWAP".$name.$partscheme{$part}{'partnumber'}." ";
+	    print "-L ".$partscheme{$part}{'label'}." ";
 	}
 	print $partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
     }elsif ($partscheme{$part}{'fs'}){
       print "mkfs -t ".$partscheme{$part}{'fs'}." ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}."\n";
-      if (($partscheme{$part}{'mountpoint'})&&($partscheme{$part}{'fs'} =~ /^ext[234]/)&&($label)){
+      if ($partscheme{$part}{'label'}){
 	  # If filesystem is ext[234] and mounted, we se a label with e2label
-	  print "e2label ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}." ".$partscheme{$part}{'mountpoint'}."\n";
+	  print "e2label ".$partscheme{$part}{'device'}.$partscheme{$part}{'partnumber'}." ".$partscheme{$part}{'label'}."\n";
       }
     }
   }
@@ -345,8 +391,8 @@ sub print_usage {
     print "\t--device\t- device to scan (default /dev/sda)\n";
     print "\t--mountfile\t- file containing the current mount status (default: /etc/mtab)\n";
     print "\t--swapfile\t- file containing the current swap status (default: /proc/swaps)\n";
-    print "\t-l\n";
-    print "\t--label\t\t- output labels for all partitions (not enabled by default)\n";
+    print "\t-g\n";
+    print "\t--genlabel\t\t- generate labels for all partitions (not enabled by default)\n";
     print "\t-h\n";
     print "\t--help\t\t- gives this message\n";
     print "\t-v\n";
@@ -362,7 +408,7 @@ my $swap="/proc/swaps";
 my $display_help=0;
 my $parted=0;
 my $fdisk=0;
-my $label=0;
+my $genlabel=0;
 
 # get the command-line options
 GetOptions('device=s'                  => \$device,
@@ -370,8 +416,8 @@ GetOptions('device=s'                  => \$device,
 	   'swapfile=s'                => \$swap,
 	   'parted!'                   => \$parted,
 	   'fdisk!'                    => \$fdisk,
-	   'label!'                    => \$label,
-	   'l!'                        => \$label,
+	   'genlabel!'                 => \$genlabel,
+	   'g!'                        => \$genlabel,
 	   'h!'                        => \$display_help,
 	   'help!'                     => \$display_help,
 	   'v!'                        => \$verbose,
@@ -395,6 +441,8 @@ if ($fdisk){
     $partitions = get_partitions_fdisk($device);
     output_partitions_fdisk($partitions);
 }
+
 set_filesystem($partitions, $mounts);
 set_swap($partitions, $swap);
-output_mkfs($partitions, $label);
+set_labels($partitions, $genlabel);
+output_mkfs($partitions);
