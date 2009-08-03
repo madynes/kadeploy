@@ -24,9 +24,11 @@ RETVAL=0
 start() {
 	echo -n $"Starting $prog: "
         daemon --pidfile=${pidfile} --user=deploy "nohup $kadeploy3d 2>/dev/null &"
-        pidof -x $kadeploy3d > ${pidfile}
+        PID=`pidof -x $kadeploy3d`
+	echo ${PID} > ${pidfile}
         RETVAL=$?
         echo
+	sleep 1; [ -x /proc/${PID} ] || (echo ""; echo "Daemon not launched, probably a problem in the configuration" ; rm ${pidfile} ; return 1)
 	[ $RETVAL = 0 ] && touch ${lockfile}
         return $RETVAL
 }
