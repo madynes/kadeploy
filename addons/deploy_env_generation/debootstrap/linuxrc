@@ -35,6 +35,8 @@ BROADCAST=255.255.255.255
 mount -t proc none /proc
 echo "0x100" > /proc/sys/kernel/real-root-dev
 
+/sbin/depmod -a
+
 # get parameters values
 get_param TTY
 if [ $CMD_PARAM ]; then

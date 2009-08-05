@@ -522,13 +522,13 @@ module Managers
                 @logger.set("success", true, @nodes_ok)
                 @nodes_ok.group_by_cluster.each_pair { |cluster, set|
                   @output.verbosel(0, "Nodes correctly deployed on cluster #{cluster}")
-                  @output.verbosel(0, set.to_s)
+                  @output.verbosel(0, set.to_s(false, "\n"))
                 }
                 @logger.set("success", false, @nodes_ko)
                 @logger.error(@nodes_ko)
                 @nodes_ko.group_by_cluster.each_pair { |cluster, set|
                   @output.verbosel(0, "Nodes not Correctly deployed on cluster #{cluster}")
-                  @output.verbosel(0, set.to_s(true))
+                  @output.verbosel(0, set.to_s(true, "\n"))
                 }
                 @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file)
                 @logger.dump

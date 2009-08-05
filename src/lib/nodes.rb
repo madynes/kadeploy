@@ -215,15 +215,16 @@ module Nodes
     # Make a string with the characteristics of the nodes of a NodeSet
     #
     # Arguments
-    # * nothing
+    # * dbg (opt): specify if the debug mode must be used
+    # * delimiter (opt): specify a delimiter
     # Output
     # * return a string that contains the information
-    def to_s(dbg = false)
+    def to_s(dbg = false, delimiter = ", ")
       out = Array.new
       @set.each { |node|
         out.push(node.to_s(dbg))
       }
-      return out.join(", ")
+      return out.join(delimiter)
     end
 
     # Get the number of elements

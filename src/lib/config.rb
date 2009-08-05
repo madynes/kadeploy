@@ -22,6 +22,7 @@ module ConfigInformation
   SPECIFIC_CONFIGURATION_FILE_PREFIX = "specific_conf_"
   PARTITION_FILE_PREFIX = "partition_file_"
   USER = `id -nu`.chomp
+  CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
 
   class Config
     public
@@ -733,7 +734,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 32
         opt.banner = "Usage: kadeploy3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the envrionement description") { |f|
@@ -1064,7 +1065,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 36
         opt.banner = "Usage: kaenv3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-e", "--environment ENVNAME", "Environment name") { |n|
@@ -1234,7 +1235,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 28
         opt.banner = "Usage: karights3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--add", "Add some rights to a user") {
@@ -1356,7 +1357,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 28
         opt.banner = "Usage: kastat3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--list-min-retries NB", "Print the statistics about the nodes that need several attempts") { |n|
@@ -1493,7 +1494,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 28
         opt.banner = "Usage: kanodes3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
@@ -1593,7 +1594,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 30
         opt.banner = "Usage: kareboot3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
@@ -1778,7 +1779,7 @@ module ConfigInformation
         opt.summary_indent = "  "
         opt.summary_width = 28
         opt.banner = "Usage: kaconsole3 [options]"
-        opt.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
         opt.on("-m", "--machine MACHINE", "Obtain a console on the given machines") { |hostname|
