@@ -51,7 +51,7 @@ module Debug
       @syslog = syslog
       @syslog_dbg_level = syslog_dbg_level
       @syslog_lock = syslog_lock
-      @client_output = true
+      @client_output = (client != nil)
     end
 
     # Disable the output redirection on the client

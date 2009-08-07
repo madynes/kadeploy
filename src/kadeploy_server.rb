@@ -151,7 +151,7 @@ class KadeployServer
     # id == -1 means that the workflow has not been launched yet
     if (id != -1) then
       workflow = @workflow_info_hash[id]
-      workflow.kill_workflow()
+      workflow.kill()
       delete_workflow_info(id)
     end
   end
@@ -250,23 +250,109 @@ class KadeployServer
         rescue DRb::DRbConnError
           workflow.output.disable_client_output()
           workflow.output.verbosel(3, "Client disconnection")
-          workflow.kill_workflow()
+          workflow.kill()
           finished = true
         end
         sleep(1)
       end
     }
-    workflow.run
+    if (workflow.prepare() && workflow.manage_files()) then
+      workflow.run_sync()
+    end
     finished = true
     #let's free memory at the end of the workflow
     tid = nil
     delete_workflow_info(workflow_id)
     workflow.finalize
-    config.cluster_specific = nil
-    config = nil
     workflow = nil
     exec_specific = nil
     client = nil
+    DRb.stop_service()
+    GC.start
+  end
+
+
+  # Launch the workflow in an asynchronous way (RPC)
+  #
+  # Arguments
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return a workflow id
+  def launch_workflow_async(exec_specific)
+    puts "Let's launch an instance of Kadeploy"
+
+    #We create a new instance of Config with a specific exec_specific part
+    config = ConfigInformation::Config.new("empty")
+    config.common = @config.common
+    config.exec_specific = exec_specific
+    config.cluster_specific = Hash.new
+
+    #Overide the configuration if the steps are specified in the command line
+    if (not exec_specific.steps.empty?) then
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
+      }
+    #If the environment specifies a preinstall, we override the automata to use specific preinstall
+    elsif (exec_specific.environment.preinstall != nil) then
+      puts "A specific presinstall will be used with this environment"
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
+        instance = config.cluster_specific[cluster].get_macro_step("SetDeploymentEnv").get_instance
+        max_retries = instance[1]
+        timeout = instance[2]
+        config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
+      }
+    else
+      config.cluster_specific = @config.cluster_specific
+    end
+
+    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock)
+    workflow_id = add_workflow_info(workflow)
+    if (workflow.prepare()) then
+      workflow.run_async()
+    end
+
+    return workflow_id
+  end
+
+  # Test if the workflow has reached the end (RPC: only for async execution)
+  #
+  # Arguments
+  # * id: worklfow id
+  # Output
+  # * return true if the workflow has reached the end, false otherwise
+  def ended?(id)
+    workflow = @workflow_info_hash[id]
+    return workflow.ended?
+  end
+
+  # Get the results of a workflow (RPC: only for async execution)
+  #
+  # Arguments
+  # * id: worklfow id
+  # Output
+  # * return a hastable containing the state of all the nodes involved in the deployment
+  def get_results(id)
+    workflow = @workflow_info_hash[id]
+    return workflow.get_results
+  end
+
+  # Clean the stuff related to the deployment (RPC: only for async execution)
+  #
+  # Arguments
+  # * id: worklfow id
+  # Output
+  # * nothing
+  def free(id)
+    workflow = @workflow_info_hash[id]
+    #let's free memory at the end of the workflow
+    tid = nil
+    delete_workflow_info(id)
+    workflow.finalize
+    workflow = nil
+    exec_specific = nil
     DRb.stop_service()
     GC.start
   end

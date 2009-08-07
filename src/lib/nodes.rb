@@ -227,6 +227,19 @@ module Nodes
       return out.join(delimiter)
     end
 
+    def to_h(dbg = false)
+      out = Hash.new
+      @set.each { |node|
+        out[node.hostname] = Hash["ip" => node.ip, "cluster" => node.cluster, "state" => node.state,
+                                  "current_step" => node.current_step,
+                                  "last_cmd_exit_status" => node.last_cmd_exit_status,
+                                  "last_cmd_stdout" => node.last_cmd_stdout,
+                                  "last_cmd_stderr" => node.last_cmd_stderr,
+                                  "cmd" => node.cmd]
+      }
+      return out
+    end
+
     # Get the number of elements
     #
     # Arguments

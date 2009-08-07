@@ -305,6 +305,8 @@ module Managers
     @deploy = nil
     attr_accessor :nodes_ok
     attr_accessor :nodes_ko
+    @nodes_to_deploy = nil
+    @nodes_to_deploy_backup = nil
     @killed = nil
 
     # Constructor of WorkflowManager
@@ -365,81 +367,7 @@ module Managers
       }
     end
 
-    def get_state
-      hash = Hash.new
-      hash["user"] = @config.exec_specific.true_user
-      hash["deploy_id"] = @deploy_id
-      hash["environment_name"] = @config.exec_specific.environment.name
-      hash["environment_version"] = @config.exec_specific.environment.version
-      hash["environment_user"] = @config.exec_specific.user
-      hash["anonymous_environment"] = (@config.exec_specific.load_env_kind == "file")
-      hash["nodes"] = @config.exec_specific.nodes_state
-      return hash
-    end
-
-    def finalize
-      @db = nil
-      @deployments_table_lock = nil
-      @config = nil
-      @client = nil
-      @output = nil
-      @nodes_ok = nil
-      @nodes_ko = nil
-      @nodeset = nil
-      @queue_manager = nil
-      @reboot_window = nil
-      @mutex = nil
-      @set_deployment_environment_instances = nil
-      @broadcast_environment_instances = nil
-      @boot_new_environment_instances = nil
-      @thread_tab = nil
-      @logger = nil
-      @thread_set_deployment_environment = nil
-      @thread_broadcast_environment = nil
-      @thread_boot_new_environment = nil
-      @thread_process_finished_nodes = nil
-    end
-
-    # Kill all the threads of a Kadeploy workflow
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def kill_workflow
-      @output.verbosel(0, "Deployment aborted by user")
-      @killed = true
-      @logger.set("success", false, @nodeset)
-      @logger.dump
-      @nodeset.set_deployment_state("aborted", nil, @db, "")
-      @set_deployment_environment_instances.each { |instance|
-        if (instance != nil) then
-          instance.kill()
-          @output.verbosel(3, " *** Kill a set_deployment_environment_instance")
-        end
-      }
-      @broadcast_environment_instances.each { |instance|
-        if (instance != nil) then
-          @output.verbosel(3, " *** Kill a broadcast_environment_instance")
-          instance.kill()
-        end
-      }
-      @boot_new_environment_instances.each { |instance|
-        if (instance != nil) then
-          @output.verbosel(3, " *** Kill a boot_new_environment_instance")
-          instance.kill()
-        end
-      }
-      @thread_tab.each { |tid|
-        @output.verbosel(3, " *** Kill a main thread")
-        Thread.kill(tid)
-      }
-      Thread.kill(@thread_set_deployment_environment)
-      Thread.kill(@thread_broadcast_environment)
-      Thread.kill(@thread_boot_new_environment)
-      Thread.kill(@thread_process_finished_nodes)
-    end
-
+    private
     # Launch a thread for a macro step
     #
     # Arguments
@@ -457,10 +385,7 @@ module Managers
         else
           if kind != "ProcessFinishedNodes" then
             nodes.group_by_cluster.each_pair { |cluster, set|
-              macro_step_instance = @config.cluster_specific[cluster].get_macro_step(kind).get_instance
-              instance_name = macro_step_instance[0]
-              instance_max_retries = macro_step_instance[1]
-              instance_timeout = macro_step_instance[2]
+              instance_name,instance_max_retries,instance_timeout = @config.cluster_specific[cluster].get_macro_step(kind).get_instance
               case kind
               when "SetDeploymentEnv"
                 ptr = SetDeploymentEnvironnment::SetDeploymentEnvFactory.create(instance_name, 
@@ -527,10 +452,10 @@ module Managers
                 @logger.set("success", false, @nodes_ko)
                 @logger.error(@nodes_ko)
                 @nodes_ko.group_by_cluster.each_pair { |cluster, set|
-                  @output.verbosel(0, "Nodes not Correctly deployed on cluster #{cluster}")
+                  @output.verbosel(0, "Nodes not correctly deployed on cluster #{cluster}")
                   @output.verbosel(0, set.to_s(true, "\n"))
                 }
-                @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file)
+                @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file) if @client != nil
                 @logger.dump
                 @queue_manager.send_exit_signal
                 @thread_set_deployment_environment.join
@@ -654,53 +579,198 @@ module Managers
       return true
     end
 
-    # Main of WorkflowManager
+    public
+
+    # Prepare a deployment
     #
     # Arguments
     # * nothing
     # Output
-    # * nothing  
-    def run
+    # * return true in case of success, false otherwise
+    def prepare
       @output.verbosel(0, "Launching a deployment ...")
       @deployments_table_lock.lock
       if (@config.exec_specific.ignore_nodes_deploying) then
-        nodes_ok = @nodeset
+        @nodes_to_deploy = @nodeset
       else
-        res = @nodeset.check_nodes_in_deployment(@db, @config.common.purge_deployment_timer)
-        nodes_ok = res[0]
-        nodes_ko = res[1]
-        @output.verbosel(0, "The nodes #{nodes_ko.to_s} are already involved in deployment, let's discard them") if (not nodes_ko.empty?)
+        @nodes_to_deploy,nodes_to_discard = @nodeset.check_nodes_in_deployment(@db, @config.common.purge_deployment_timer)
+        @output.verbosel(0, "The nodes #{nodes_to_discard.to_s} are already involved in deployment, let's discard them") if (not nodes_ko.empty?)
       end
       #We backup the set of nodes used in the deployement to be able to update their deployment state at the end of the deployment
-      if not nodes_ok.empty? then
-        nodes_ok_backup = Nodes::NodeSet.new
-        nodes_ok.duplicate(nodes_ok_backup)
+      if not @nodes_to_deploy.empty? then
+        @nodes_to_deploy_backup = Nodes::NodeSet.new
+        @nodes_to_deploy.duplicate(@nodes_to_deploy_backup)
         #If the environment is not recorded in the DB (anonymous environment), we do not record an environment id in the node state
         if @config.exec_specific.load_env_kind == "file" then
-          nodes_ok.set_deployment_state("deploying", -1, @db, @config.exec_specific.true_user)
+          @nodes_to_deploy.set_deployment_state("deploying", -1, @db, @config.exec_specific.true_user)
         else
-          nodes_ok.set_deployment_state("deploying", @config.exec_specific.environment.id, @db, @config.exec_specific.true_user)
+          @nodes_to_deploy.set_deployment_state("deploying", @config.exec_specific.environment.id, @db, @config.exec_specific.true_user)
         end
-      end
-      @deployments_table_lock.unlock
-      if (not nodes_ok.empty?) then
-        if (@config.common.kadeploy_disable_cache || grab_user_files()) then
-          nodes_ok.group_by_cluster.each_pair { |cluster, set|
-            @queue_manager.next_macro_step(nil, set)
-          }
-          @thread_process_finished_nodes.join
-          if not @killed then
-            @deployments_table_lock.lock
-            nodes_ok_backup.set_deployment_state("deployed", nil, @db, "")
-            @deployments_table_lock.unlock
-          end
-        else
-          @output.verbosel(0, "Some error occurs when grabbing the files")
-        end
-        nodes_ok_backup = nil
+        @deployments_table_lock.unlock
+        return true
       else
+        @deployments_table_lock.unlock
         @output.verbosel(0, "All the nodes have been discarded ...")
+        return false
       end
     end
+
+    # Grab eventually some file from the client side
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return true in case of success, false otherwise
+    def manage_files
+      return (@config.common.kadeploy_disable_cache || grab_user_files())
+    end
+
+    # Run a workflow synchronously
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def run_sync
+      @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
+        @queue_manager.next_macro_step(nil, set)
+      }
+      @thread_process_finished_nodes.join
+      if not @killed then
+        @deployments_table_lock.lock
+        @nodes_to_deploy_backup.set_deployment_state("deployed", nil, @db, "")
+        @deployments_table_lock.unlock
+      end
+      @nodes_to_deploy_backup = nil
+    end
+
+    # Run a workflow asynchronously
+    #
+    # Arguments
+    # * nothing
+    # Output
+    def run_async
+      @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
+        @queue_manager.next_macro_step(nil, set)
+      }
+    end
+
+    # Test if the workflow has reached the end
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return true if the workflow has reached the end, false otherwise
+    def ended?
+      if (@thread_process_finished_nodes.status == false) then
+        if not @killed then
+          @deployments_table_lock.lock
+          @nodes_to_deploy_backup.set_deployment_state("deployed", nil, @db, "")
+          @deployments_table_lock.unlock
+        end
+        @nodes_to_deploy_backup = nil
+        return true
+      else
+        return false
+      end
+    end
+
+    # Get the results of a workflow (RPC: only for async execution)
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return a hastable containing the state of all the nodes involved in the deployment
+    def get_results
+      return Hash["nodes_ok" => @nodes_ok.to_h, "nodes_ko" => @nodes_ko.to_h]
+    end
+
+    # Get the state of a deployment workflow
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * retun a hashtable containing the state of a deployment workflow
+    def get_state
+      hash = Hash.new
+      hash["user"] = @config.exec_specific.true_user
+      hash["deploy_id"] = @deploy_id
+      hash["environment_name"] = @config.exec_specific.environment.name
+      hash["environment_version"] = @config.exec_specific.environment.version
+      hash["environment_user"] = @config.exec_specific.user
+      hash["anonymous_environment"] = (@config.exec_specific.load_env_kind == "file")
+      hash["nodes"] = @config.exec_specific.nodes_state
+      return hash
+    end
+
+    # Finalize a deployment workflow
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def finalize
+      @db = nil
+      @deployments_table_lock = nil
+      @config = nil
+      @client = nil
+      @output = nil
+      @nodes_ok = nil
+      @nodes_ko = nil
+      @nodeset = nil
+      @queue_manager = nil
+      @reboot_window = nil
+      @mutex = nil
+      @set_deployment_environment_instances = nil
+      @broadcast_environment_instances = nil
+      @boot_new_environment_instances = nil
+      @thread_tab = nil
+      @logger = nil
+      @thread_set_deployment_environment = nil
+      @thread_broadcast_environment = nil
+      @thread_boot_new_environment = nil
+      @thread_process_finished_nodes = nil
+    end
+
+    # Kill all the threads of a Kadeploy workflow
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def kill
+      @output.verbosel(0, "Deployment aborted by user")
+      @killed = true
+      @logger.set("success", false, @nodeset)
+      @logger.dump
+      @nodeset.set_deployment_state("aborted", nil, @db, "")
+      @set_deployment_environment_instances.each { |instance|
+        if (instance != nil) then
+          instance.kill()
+          @output.verbosel(3, " *** Kill a set_deployment_environment_instance")
+        end
+      }
+      @broadcast_environment_instances.each { |instance|
+        if (instance != nil) then
+          @output.verbosel(3, " *** Kill a broadcast_environment_instance")
+          instance.kill()
+        end
+      }
+      @boot_new_environment_instances.each { |instance|
+        if (instance != nil) then
+          @output.verbosel(3, " *** Kill a boot_new_environment_instance")
+          instance.kill()
+        end
+      }
+      @thread_tab.each { |tid|
+        @output.verbosel(3, " *** Kill a main thread")
+        Thread.kill(tid)
+      }
+      Thread.kill(@thread_set_deployment_environment)
+      Thread.kill(@thread_broadcast_environment)
+      Thread.kill(@thread_boot_new_environment)
+      Thread.kill(@thread_process_finished_nodes)
+    end
+
   end
 end
