@@ -13,9 +13,14 @@ module Debug
   # * msg: error message
   # Output
   # * nothing
-  def Debug::client_error(msg)
+  def Debug::client_error(msg, usage_handler = nil)
     puts "ERROR: #{msg}."
-    puts "       Use the -h or --help option for correct use."
+    puts "---"
+    if (usage_handler == nil) then
+      puts "Use the -h or --help option for correct use."
+    else
+      usage_handler.call
+    end
   end
 
   class OutputControl
@@ -28,7 +33,7 @@ module Debug
     @syslog_dbg_level = nil
     @syslog_lock = nil
     @client_output = nil
-    
+
     # Constructor of OutputControl
     #
     # Arguments

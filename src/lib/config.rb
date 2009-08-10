@@ -30,6 +30,7 @@ module ConfigInformation
     attr_accessor :common
     attr_accessor :cluster_specific
     attr_accessor :exec_specific
+    @opts = nil
 
     # Constructor of Config
     #
@@ -48,6 +49,7 @@ module ConfigInformation
           res = res && load_cluster_specific_config_files
           res = res && load_nodes_config_file
           res = res && load_commands
+          puts "Problem in configuration" if not res
         when "kaenv"
           res = load_kaenv_exec_specific
         when "karights"
@@ -67,7 +69,6 @@ module ConfigInformation
           raise
         end
         if not res then
-          puts "Problem in configuration"
           raise
         end
       else
@@ -75,7 +76,6 @@ module ConfigInformation
         raise
       end
     end
-
 
     # Check the config of the Kadeploy tools
     #
@@ -155,7 +155,7 @@ module ConfigInformation
             return nil
           end
         when ""
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return nil
         else
           puts "Invalid method for environment loading"
@@ -189,7 +189,25 @@ module ConfigInformation
     end
 
     private
+    # Print an error message with the usage message
+    #
+    # Arguments
+    # * msg: message to print
+    # Output
+    # * nothing
+    def error(msg)
+      Debug::client_error(msg, Proc.new { @opts.display })
+    end
 
+    # Print an error message with the usage message (class method required by the Kadeploy client)
+    #
+    # Arguments
+    # * msg: message to print
+    # Output
+    # * nothing
+    def Config.error(msg)
+      Debug::client_error(msg, Proc.new { @opts.display })
+    end
 ##################################
 #         Generic part           #
 ##################################
@@ -739,7 +757,7 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the envrionement description") { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} does not exist or is not readable")
+            error("The file #{f} does not exist or is not readable")
             return false
           else
             exec_specific.load_env_kind = "file"
@@ -750,7 +768,7 @@ module ConfigInformation
           if /\A[\w\/]+\Z/ =~ b then
             exec_specific.block_device = b
           else
-            Debug::client_error("Invalid block device")
+            error("Invalid block device")
             return false
           end
         }
@@ -763,12 +781,12 @@ module ConfigInformation
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
-                Debug::client_error("Invalid hostname: #{hostname}")
+                error("Invalid hostname: #{hostname}")
                 return false
               end
               if (not add_to_node_list(hostname.chomp, nodes_desc, exec_specific)) then
@@ -780,7 +798,7 @@ module ConfigInformation
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
             if not File.readable?(f) then
-              Debug::client_error("The file #{f} cannot be read")
+              error("The file #{f} cannot be read")
               return false
             else
               exec_specific.key = File.expand_path(f)
@@ -790,14 +808,14 @@ module ConfigInformation
             if File.readable?(authorized_keys) then
               exec_specific.key = authorized_keys
             else
-              Debug::client_error("The authorized_keys file #{authorized_keys} cannot be read")
+              error("The authorized_keys file #{authorized_keys} cannot be read")
               return false
             end
           end
         }
         opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then 
-            Debug::client_error("Invalid hostname: #{hostname}")
+            error("Invalid hostname: #{hostname}")
             return false
           end
           if (not add_to_node_list(hostname, nodes_desc, exec_specific)) then
@@ -818,11 +836,11 @@ module ConfigInformation
         }
         opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             if not File.stat(f).executable? then
-              Debug::client_error("The file #{f} must be executable to be run at the end of the deployment")
+              error("The file #{f} must be executable to be run at the end of the deployment")
               return false
             else
               exec_specific.script = File.expand_path(f)
@@ -833,7 +851,7 @@ module ConfigInformation
           if /\A\w+\Z/ =~ u then
             exec_specific.user = u
           else
-            Debug::client_error("Invalid user name")
+            error("Invalid user name")
             return false
           end
         }
@@ -841,7 +859,7 @@ module ConfigInformation
           if /\A\d+\Z/ =~ n then
             exec_specific.env_version = n
           else
-            Debug::client_error("Invalid version number")
+            error("Invalid version number")
             return false
           end
         }
@@ -849,13 +867,13 @@ module ConfigInformation
           if d =~ /\A[0-4]\Z/ then
             exec_specific.verbose_level = d.to_i
           else
-            Debug::client_error("Invalid verbose level")
+            error("Invalid verbose level")
             return false
           end
         }
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             exec_specific.pxe_profile_file = f
@@ -878,14 +896,14 @@ module ConfigInformation
           if (m =~ /\A[a-zA-Z0-9_]+:[a-zA-Z0-9_]+\Z/)
             exec_specific.breakpoint_on_microstep = m
           else
-            Debug::client_error("The value #{m} for the breakpoint entry is invalid")
+            error("The value #{m} for the breakpoint entry is invalid")
             return false
           end
         }
         opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
           exec_specific.custom_operations_file = file
           if not File.readable?(file) then
-            Debug::client_error("The file #{file} cannot be read")
+            error("The file #{file} cannot be read")
             return false
           else
             exec_specific.custom_operations = Hash.new
@@ -921,19 +939,20 @@ module ConfigInformation
           }
         }
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        Debug::client_error("Option parsing error")
+        error("Option parsing error")
         return false
       end
       if exec_specific.node_list.empty? then
-        Debug::client_error("You must specify some nodes to deploy")
+        error("You must specify some nodes to deploy")
         return false
       end
 
       if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
-        Debug::client_error("The files used for the output of the OK and the KO nodes must not be the same")
+        error("The files used for the output of the OK and the KO nodes must not be the same")
         return false
       end
 
@@ -954,7 +973,7 @@ module ConfigInformation
         exec_specific.node_list.push(n)
         return true
       else
-        Debug::client_error("The node #{hostname} does not exist in the Kadeploy configuration")
+        error("The node #{hostname} does not exist in the Kadeploy configuration")
         return false
       end
     end
@@ -1073,7 +1092,7 @@ module ConfigInformation
         }        
         opt.on("-f", "--file FILE", "Environment file") { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             @exec_specific.file = f
@@ -1085,7 +1104,7 @@ module ConfigInformation
               @exec_specific.files_to_move.push({"src"=>src_dst.split(":")[0],"dest"=>src_dst.split(":")[1]})
             }
           else
-            Debug::client_error("Invalid synthax for files to move")
+            error("Invalid synthax for files to move")
             return false
           end
         }
@@ -1093,7 +1112,7 @@ module ConfigInformation
           if /\A(add|delete|list|print|remove-demolishing-tag|set-visibility-tag|update-tarball-md5|update-preinstall-md5|update-postinstalls-md5|move-files)\Z/ =~ op then
             @exec_specific.operation = op
           else
-            Debug::client_error("Invalid operation")
+            error("Invalid operation")
           end
         }
         opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
@@ -1103,14 +1122,14 @@ module ConfigInformation
           if /\A(private|shared|public)\Z/ =~ v then
             @exec_specific.visibility_tag = v
           else
-            Debug::client_error("Invalid visibility tag")
+            error("Invalid visibility tag")
           end
         }
         opt.on("-u", "--user USERNAME", "Specify the user") { |u|
           if /\A(\w+)|\*\Z/ =~ u then
             @exec_specific.user = u
           else
-            Debug::client_error("Invalid user name")
+            error("Invalid user name")
             return false
           end
         }
@@ -1118,15 +1137,16 @@ module ConfigInformation
           if /\A\d+\Z/ =~ v then
             @exec_specific.version = v
           else
-            Debug::client_error("Invalid version number")
+            error("Invalid version number")
             return false
           end
         }
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
-      rescue 
-        Debug::client_error("Option parsing error")
+      rescue
+        error("Option parsing error")
         return false
       end
       return true
@@ -1144,60 +1164,60 @@ module ConfigInformation
       case @exec_specific.operation 
       when "add"
         if (@exec_specific.file == "") then
-          Debug::client_error("You must choose a file that contains the environment description")
+          error("You must choose a file that contains the environment description")
           return false
         end
       when "delete"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
       when "list"
       when "print"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
       when "update-tarball-md5"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
       when "update-preinstall-md5"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
       when "update-postinstalls-md5"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
       when "remove-demolishing-tag"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
       when "set-visibility-tag"
         if (@exec_specific.env_name == "") then
-          Debug::client_error("You must choose an environment")
+          error("You must choose an environment")
           return false
         end
         if (@exec_specific.version == "") then
-          Debug::client_error("You must choose a version")
+          error("You must choose a version")
           return false
         end
         if (@exec_specific.visibility_tag == "") then
-          Debug::client_error("You must define the visibility value")
+          error("You must define the visibility value")
           return false          
         end
       when "move-files"
         if (@exec_specific.files_to_move.empty?) then
-          Debug::client_error("You must define some files to move")
+          error("You must define some files to move")
           return false          
         end
       else
-        Debug::client_error("You must choose an operation")
+        error("You must choose an operation")
         return false
       end
       return true
@@ -1246,12 +1266,12 @@ module ConfigInformation
         }
         opt.on("-f", "--file FILE", "Machine file")  { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
-                Debug::client_error("Invalid hostname: #{hostname}")
+                error("Invalid hostname: #{hostname}")
                 return false
               end
               @exec_specific.node_list.push(hostname.chomp)
@@ -1260,7 +1280,7 @@ module ConfigInformation
         }
         opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
           if (not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m)) and (m != "*") then
-            Debug::client_error("Invalid hostname: #{m}")
+            error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
@@ -1278,15 +1298,16 @@ module ConfigInformation
           if /\A\w+\Z/ =~ u then
             @exec_specific.user = u
           else
-            Debug::client_error("Invalid user name")
+            error("Invalid user name")
             return false
           end
         }
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        Debug::client_error("Option parsing error")
+        error("Option parsing error")
         return false
       end
       return true
@@ -1300,22 +1321,22 @@ module ConfigInformation
     # * return true if the options used are correct, false otherwise
     def check_karights_config
       if (@exec_specific.user == "") then
-        Debug::client_error("You must choose a user")
+        error("You must choose a user")
         return false
       end
       case
       when @exec_specific.operation == "add" || @exec_specific.operation  == "delete"
         if (@exec_specific.part_list.empty?) then
-          Debug::client_error("You must specify at list one partition")
+          error("You must specify at list one partition")
           return false
         end
         if (@exec_specific.node_list.empty?) then
-          Debug::client_error("You must specify at list one node")
+          error("You must specify at list one node")
           return false
         end
       when @exec_specific.operation == "show"
       else
-        Debug::client_error("You must choose an operation")
+        error("You must choose an operation")
         return false
       end
       return true
@@ -1365,7 +1386,7 @@ module ConfigInformation
             @exec_specific.operation = "list_retries"
             @exec_specific.min_retries = n.to_i
           else
-            Debug::client_error("Invalid number of minimum retries, ignoring the option")
+            error("Invalid number of minimum retries, ignoring the option")
             return false
           end
         }
@@ -1377,7 +1398,7 @@ module ConfigInformation
             @exec_specific.operation = "list_min_failure_rate"
             @exec_specific.min_rate = r.to_i
           else
-            Debug::client_error("Invalid number for the minimum failure rate, ignoring the option")
+            error("Invalid number for the minimum failure rate, ignoring the option")
             return false
           end
         }
@@ -1389,7 +1410,7 @@ module ConfigInformation
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m) then
-            Debug::client_error("Invalid hostname: #{m}")
+            error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
@@ -1404,10 +1425,11 @@ module ConfigInformation
           @exec_specific.date_max = d
         }
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        Debug::client_error("Option parsing error")
+        error("Option parsing error")
         return false
       end
       return true
@@ -1421,7 +1443,7 @@ module ConfigInformation
     # * return true if the options used are correct, false otherwise
     def check_kastat_config
       if (@exec_specific.operation == "") then
-        Debug::client_error("You must choose an operation")
+        error("You must choose an operation")
         return false
       end
       authorized_fields = ["user","hostname","step1","step2","step3", \
@@ -1433,13 +1455,13 @@ module ConfigInformation
                            "success","error"]
       @exec_specific.fields.each { |f|
         if (not authorized_fields.include?(f)) then
-          Debug::client_error("The field \"#{f}\" does not exist")
+          error("The field \"#{f}\" does not exist")
           return false
         end
       }
       if (@exec_specific.date_min != 0) then
         if not (/^\d{4}:\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/ === @exec_specific.date_min) then
-          Debug::client_error("The date #{@exec_specific.date_min} is not correct")
+          error("The date #{@exec_specific.date_min} is not correct")
           return false
         else
           str = @exec_specific.date_min.split(":")
@@ -1448,7 +1470,7 @@ module ConfigInformation
       end
       if (@exec_specific.date_max != 0) then
         if not (/^\d{4}:\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/ === @exec_specific.date_max) then
-          Debug::client_error("The date #{@exec_specific.date_max} is not correct")
+          error("The date #{@exec_specific.date_max} is not correct")
           return false
         else
           str = @exec_specific.date_max.split(":")
@@ -1458,7 +1480,7 @@ module ConfigInformation
       authorized_steps = ["1","2","3"]
       @exec_specific.steps.each { |s|
          if (not authorized_steps.include?(s)) then
-           Debug::client_error("The step \"#{s}\" does not exist")
+           error("The step \"#{s}\" does not exist")
            return false
          end
        }
@@ -1499,12 +1521,12 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
-                Debug::client_error("Invalid hostname: #{hostname}")
+                error("Invalid hostname: #{hostname}")
                 return false
               end
               @exec_specific.node_list.push(hostname.chomp)
@@ -1513,14 +1535,14 @@ module ConfigInformation
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~m) then
-            Debug::client_error("Invalid hostname: #{m}")
+            error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
         }
         opt.on("-o", "--operation OPERATION", "Choose the operation (get_deploy_state or get_yaml_dump)") { |o|
           if not  (/\A(get_deploy_state|get_yaml_dump)\Z/ =~ o) then
-            Debug::client_error("Invalid operation: #{o}")
+            error("Invalid operation: #{o}")
             return false
           end
           @exec_specific.operation = o
@@ -1529,10 +1551,11 @@ module ConfigInformation
           @exec_specific.wid = w
         }
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        Debug::client_error("Option parsing error")
+        error("Option parsing error")
         return false
       end
       return true
@@ -1546,7 +1569,7 @@ module ConfigInformation
     # * return true if the options used are correct, false otherwise
     def check_kanodes_config
       if (exec_specific.operation == "") then
-        Debug::client_error("You must choose an operation")
+        error("You must choose an operation")
         return false
       end
       return true
@@ -1601,7 +1624,7 @@ module ConfigInformation
           if /\A[\w\/]+\Z/ =~ b then
             @exec_specific.block_device = b
           else
-            Debug::client_error("Invalid block device")
+            error("Invalid block device")
             return false
           end
         }
@@ -1613,12 +1636,12 @@ module ConfigInformation
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
           if not File.readable?(f) then
-            Debug::client_error("The file #{f} cannot be read")
+            error("The file #{f} cannot be read")
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
-                Debug::client_error("Invalid hostname: #{hostname}")
+                error("Invalid hostname: #{hostname}")
                 return false
               end
               Config.add_to_node_list(hostname.chomp, nodes_desc, @exec_specific)
@@ -1628,7 +1651,7 @@ module ConfigInformation
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
             if not File.readable?(f) then
-              Debug::client_error("The file #{f} cannot be read")
+              error("The file #{f} cannot be read")
               return false
             else
               @exec_specific.key = File.expand_path(f)
@@ -1638,7 +1661,7 @@ module ConfigInformation
             if File.readable?(authorized_keys) then
               @exec_specific.key = authorized_keys
             else
-              Debug::client_error("The authorized_keys file #{authorized_keys} cannot be read")
+              error("The authorized_keys file #{authorized_keys} cannot be read")
               return false
             end
           end
@@ -1647,13 +1670,13 @@ module ConfigInformation
           if l =~ /\A(soft|hard|very_hard)\Z/ then
             @exec_specific.reboot_level = l
           else
-            Debug::client_error("Invalid reboot level")
+            error("Invalid reboot level")
             return false
           end
         }   
         opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
-            Debug::client_error("Invalid hostname: #{hostname}")
+            error("Invalid hostname: #{hostname}")
             return false
           end
           Config.add_to_node_list(hostname, nodes_desc, @exec_specific)
@@ -1668,7 +1691,7 @@ module ConfigInformation
           if /\A(\w+)|\*\Z/ =~ u then
             @exec_specific.user = u
           else
-            Debug::client_error("Invalid user name")
+            error("Invalid user name")
             return false
           end
         }
@@ -1676,7 +1699,7 @@ module ConfigInformation
           if /\A\d+\Z/ =~ v then
             @exec_specific.env_version = v
           else
-            Debug::client_error("Invalid version number")
+            error("Invalid version number")
             return false
           end
         }
@@ -1684,7 +1707,7 @@ module ConfigInformation
           if d =~ /\A[0-4]\Z/ then
             @exec_specific.verbose_level = d.to_i
           else
-            Debug::client_error("Invalid verbose level")
+            error("Invalid verbose level")
             return false
           end
         }
@@ -1692,10 +1715,11 @@ module ConfigInformation
           @exec_specific.pxe_profile_file = file
         }      
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        Debug::client_error("Option parsing error")
+        error("Option parsing error")
         return false
       end
       return true
@@ -1709,33 +1733,33 @@ module ConfigInformation
     # * return true if the options used are correct, false otherwise
     def check_kareboot_config(db)
       if @exec_specific.node_list.empty? then
-        Debug::client_error("No node is chosen")
+        error("No node is chosen")
         return false
       end    
       if (@exec_specific.verbose_level != "") && ((@exec_specific.verbose_level > 4) || (@exec_specific.verbose_level < 0)) then
-        Debug::client_error("Invalid debug level")
+        error("Invalid debug level")
         return false
       end
       authorized_ops = ["set_pxe", "simple_reboot", "deploy_env", "env_recorded"]
       if not authorized_ops.include?(@exec_specific.reboot_kind) then
-        Debug::client_error("Invalid kind of reboot: #{@exec_specific.reboot_kind}")
+        error("Invalid kind of reboot: #{@exec_specific.reboot_kind}")
         return false
       end        
       if (@exec_specific.pxe_profile_file != "") && (not File.readable?(@exec_specific.pxe_profile_file)) then
-        Debug::client_error("The file #{@exec_specific.pxe_profile_file} cannot be read")
+        error("The file #{@exec_specific.pxe_profile_file} cannot be read")
         return false
       end
       if (@exec_specific.reboot_kind == "set_pxe") && (@exec_specific.pxe_profile_file == "") then
-        Debug::client_error("The set_pxe reboot must be used with the -w option")
+        error("The set_pxe reboot must be used with the -w option")
         return false
       end
       if (@exec_specific.reboot_kind == "env_recorded") then
         if (@exec_specific.env_arg == "") then
-          Debug::client_error("An environment must be specified must be with the env_recorded kind of reboot")
+          error("An environment must be specified must be with the env_recorded kind of reboot")
           return false
         end
         if (@exec_specific.deploy_part == "") then
-          Debug::client_error("A partition number must be specified must be with the env_recorded kind of reboot")
+          error("A partition number must be specified must be with the env_recorded kind of reboot")
           return false
         end       
         if (@exec_specific.environment.load_from_db(@exec_specific.env_arg,
@@ -1746,7 +1770,7 @@ module ConfigInformation
         end
       end
       if (@exec_specific.key != "") && (@exec_specific.reboot_kind != "deploy_env") then
-        Debug::client_error("The -k option can be only used with the deploy_env reboot kind")
+        error("The -k option can be only used with the deploy_env reboot kind")
         return false
       end
       return true
@@ -1784,22 +1808,23 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-m", "--machine MACHINE", "Obtain a console on the given machines") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
-            Debug::client_error("Invalid hostname: #{hostname}")
+            error("Invalid hostname: #{hostname}")
             return false
           end
           n = nodes_desc.get_node_by_host(hostname)
           if (n != nil) then
             @exec_specific.node = n
           else
-            Debug::client_error("Invalid hostname \"#{hostname}\"")
+            error("Invalid hostname \"#{hostname}\"")
             return false
           end
         }
       end
+      @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        Debug::client_error("Option parsing error")
+        error("Option parsing error")
         return false
       end
       return true
@@ -1813,7 +1838,7 @@ module ConfigInformation
     # * return true if the options used are correct, false otherwise
     def check_kaconsole_config
       if (@exec_specific.node == nil) then
-        Debug::client_error("You must choose one node")
+        error("You must choose one node")
         return false
       end
       return true

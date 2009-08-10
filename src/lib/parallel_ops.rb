@@ -390,7 +390,7 @@ module ParallelOperations
             ns.set.each { |node|
               sub_tid = Thread.new {
                 all_ports_ok = true
-                if Ping.pingecho(node.hostname, 1, 22) then
+                if Ping.pingecho(node.hostname, 1, @config.common.ssh_port) then
                   ports_up.each { |port|
                     begin
                       s = TCPsocket.open(node.hostname, port)
@@ -399,6 +399,7 @@ module ParallelOperations
                       all_ports_ok = false
                       next
                     rescue Errno::EHOSTUNREACH
+                      all_ports_ok = false
                       next
                     end
                   }
@@ -411,6 +412,7 @@ module ParallelOperations
                       rescue Errno::ECONNREFUSED
                         next
                       rescue Errno::EHOSTUNREACH
+                        all_ports_ok = false
                         next
                       end
                     }

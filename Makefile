@@ -2,6 +2,7 @@ CURRENT_DIR:=$(shell pwd)
 DEPLOY_USER=deploy
 KADEPLOY_ROOT=$(CURRENT_DIR)
 SRC=$(KADEPLOY_ROOT)/src
+DB=$(KADEPLOY_ROOT)/db
 BIN=$(KADEPLOY_ROOT)/bin
 SBIN=$(KADEPLOY_ROOT)/sbin
 CONF=$(KADEPLOY_ROOT)/conf
@@ -22,6 +23,9 @@ install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DESTDIR)/usr/local/kadeploy3/src
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/lib
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/contrib
+
+install_db:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(DB)/db_creation.sql $(DESTDIR)/usr/local/kadeploy3/db
 
 install_conf_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DESTDIR)/etc/kadeploy3
@@ -79,7 +83,7 @@ tree_common:
 	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 
-install_common: tree_common install_conf_common install_src install_test
+install_common: tree_common install_conf_common install_src install_test install_db
 
 install_client: tree_client install_conf_client install_bin
 
