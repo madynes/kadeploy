@@ -26,7 +26,7 @@ def parse_opts
     opts.summary_indent = "  "
     opts.summary_width = 28
     opts.banner = "Usage: env_migrate [options]"
-    opts.separator "Contact: kadeploy-devel@lists.grid5000.fr"
+    opts.separator "Contact: kadeploy3-users@lists.grid5000.fr"
     opts.separator ""
     opts.separator "General options:"
     opts.on("-e", "--env-name NAME", "Environment name") { |e|

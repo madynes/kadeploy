@@ -93,6 +93,5 @@ if (config.check_config("kanodes") == true) then
   end
   _exit(0, db)
 else
-  puts "Invalid configuration"
   _exit(1, db)
 end

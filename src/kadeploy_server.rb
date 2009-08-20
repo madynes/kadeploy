@@ -407,32 +407,46 @@ class KadeployServer
           raise "Invalid kind of reboot: #{@reboot_kind}"
         end
         step.reboot(exec_specific.reboot_level)
-        step.wait_reboot([@config.common.ssh_port],[])
-        if (exec_specific.reboot_kind == "env_recorded") then
-          part = String.new
-          if (exec_specific.block_device == "") then
-            part = get_block_device(cluster) + exec_specific.deploy_part
+        if exec_specific.wait then
+          if (exec_specific.reboot_kind == "deploy_env") then
+            step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
+            step.send_key_in_deploy_env("tree")
+            set.set_deployment_state("deploy_env", nil, @db, exec_specific.true_user)
           else
-            part = exec_specific.block_device + exec_specific.deploy_part
+            step.wait_reboot([@config.common.ssh_port],[])
           end
-          #Reboot on the production environment
-          if (part == get_prod_part(cluster)) then
-            set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
-            step.check_nodes("prod_env_booted")
-            if (exec_specific.check_prod_env) then
-              step.nodes_ko.tag_demolishing_env(@db)
-              ret = 1
+          if (exec_specific.reboot_kind == "env_recorded") then
+            part = String.new
+            if (exec_specific.block_device == "") then
+              part = get_block_device(cluster) + exec_specific.deploy_part
+            else
+              part = exec_specific.block_device + exec_specific.deploy_part
             end
-          else
-            set.set_deployment_state("recorded_env", nil, @db, exec_specific.true_user)
+            #Reboot on the production environment
+            if (part == get_prod_part(cluster)) then
+              set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
+              step.check_nodes("prod_env_booted")
+              if (exec_specific.check_prod_env) then
+                step.nodes_ko.tag_demolishing_env(@db)
+                ret = 1
+              end
+            else
+              set.set_deployment_state("recorded_env", nil, @db, exec_specific.true_user)
+            end
           end
-        end
-        if (exec_specific.reboot_kind == "deploy_env") then
-          step.send_key_in_deploy_env("tree")
+          if not step.nodes_ok.empty? then
+            output.verbosel(0, "Nodes correctly rebooted:")
+            output.verbosel(0, step.nodes_ok.to_s(false, "\n"))
+          end
+          if not step.nodes_ko.empty? then
+            output.verbosel(0, "Nodes not correctly rebooted:")
+            output.verbosel(0, step.nodes_ko.to_s(true, "\n"))
+          end
+          client.generate_files(step.nodes_ok, config.exec_specific.nodes_ok_file, step.nodes_ko, config.exec_specific.nodes_ko_file)
         end
       }
-      config = nil
     end
+    config = nil
     return ret
   end
 end

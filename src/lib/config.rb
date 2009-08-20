@@ -1602,7 +1602,10 @@ module ConfigInformation
       @exec_specific.breakpoint_on_microstep = "none"
       @exec_specific.pxe_profile_msg = ""
       @exec_specific.key = String.new
+      @exec_specific.nodes_ok_file = String.new
+      @exec_specific.nodes_ko_file = String.new
       @exec_specific.reboot_level = "soft"
+      @exec_specific.wait = true
       return load_kareboot_cmdline_options(nodes_desc)
     end
 
@@ -1681,6 +1684,12 @@ module ConfigInformation
           end
           Config.add_to_node_list(hostname, nodes_desc, @exec_specific)
         }
+        opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly rebooted")  { |f|
+          @exec_specific.nodes_ko_file = f
+        }
+        opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly rebooted")  { |f|
+          @exec_specific.nodes_ok_file = f
+        }
         opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
             @exec_specific.deploy_part = p
         }
@@ -1703,6 +1712,12 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
+          @exec_specific.pxe_profile_file = file
+        }
+        opt.on("--no-wait", "Do not wait the end of the reboot") {
+          @exec_specific.wait = false
+        }
         opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             @exec_specific.verbose_level = d.to_i
@@ -1711,9 +1726,6 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
-          @exec_specific.pxe_profile_file = file
-        }      
       end
       @opts = opts
       begin
@@ -1772,6 +1784,24 @@ module ConfigInformation
       if (@exec_specific.key != "") && (@exec_specific.reboot_kind != "deploy_env") then
         error("The -k option can be only used with the deploy_env reboot kind")
         return false
+      end
+      if (@exec_specific.nodes_ok_file != "") && (@exec_specific.nodes_ok_file == @exec_specific.nodes_ko_file) then
+        error("The files used for the output of the OK and the KO nodes must not be the same")
+        return false
+      end
+      if not @exec_specific.wait then
+        if @exec_specific.check_prod_env then
+          error("-c/--check-prod-env cannot be used with --no-wait")
+          return false
+        end
+        if (@exec_specific.nodes_ok_file != "") || (@exec_specific.nodes_ko_file != "") then
+          error("-o/--output-ok-nodes and/or -n/--output-ko-nodes cannot be used with --no-wait")
+          return false          
+        end
+        if (@exec_specific.key != "") then
+          error("-k/--key cannot be used with --no-wait")
+          return false
+        end
       end
       return true
     end
@@ -2061,7 +2091,8 @@ module ConfigInformation
       }
       if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
           (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) ||
-          (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) || (@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
+          (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
+          #(@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
         puts "Some mandatory fields are missing in the specific configuration file for #{cluster}"
         return false

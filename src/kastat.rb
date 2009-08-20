@@ -221,6 +221,5 @@ if (config.check_config("kastat") == true) then
   end
   _exit(0, db)
 else
-  puts "Invalid configuration"
   _exit(1, db)
 end

@@ -212,6 +212,22 @@ After being installed and configured, the Kadeploy server can be run either inte
 \end{verbatim}
 \end{small}
 
+\subsection{Automatic launch on a Debian based distribution}
+\noindent On a Debian based distribution, the rc script can be automatically launched at the startup by launching, with root rights, the following command:
+\begin{small}
+\begin{verbatim}
+> update-rc.d kadeploy3d defaults
+\end{verbatim}
+\end{small}
+
+\subsection{Automatic launch on a Fedora based distribution}
+\noindent On a Fedora based distribution, the rc script can be automatically launched at the startup by launching, with root rights, the following command:
+\begin{small}
+\begin{verbatim}
+> chkconfig --add kadeploy3d
+\end{verbatim}
+\end{small}
+
 \chapter{Server side configuration}
 Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
 
@@ -539,7 +555,7 @@ The Kadeploy client is actually the user interface for the Kadeploy software. It
 \begin{verbatim}
 > kadeploy3 -h
 Usage: kadeploy3 [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --env-file ENVFILE           File containing the environment description
   -b, --block-device BLOCKDEVICE   Specify the block device to use
@@ -679,23 +695,27 @@ Kareboot can be used by using the \texttt{kareboot} command. The CLI looks like 
 \begin{verbatim}
 > kareboot3 -h
 Usage: kareboot3 [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.gforge.inria.fr
+
 General options:
   -b, --block-device BLOCKDEVICE Specify the block device to use
   -c, --check-prod-env           Check if the production environment has been detroyed
   -e, --env-name ENVNAME         Name of the recorded environment
   -f, --file MACHINELIST         Files containing list of nodes
-  -k, --key [FILE]               Public key to copy in the root's authorized_keys, if 
-                                 no argument is specified, use the authorized_keys
+  -k, --key [FILE]               Public key to copy in the root's authorized_keys, 
+                                 if no argument is specified, use the authorized_keys
   -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
   -m, --machine MACHINE          Reboot the given machines
+  -n, --output-ko-nodes FILENAME File that will contain the nodes not correctly rebooted
+  -o, --output-ok-nodes FILENAME File that will contain the nodes correctly rebooted
   -p, --partition-number NUMBER  Specify the partition number to use
-  -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot,
+  -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot, 
                                  deploy_env, env_recorded)
   -u, --user USERNAME            Specify the user
   -v, --version NUMBER           Specify the environment version
-      --verbose-level VALUE      Verbose level between 0 to 4
   -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
+      --no-wait                  Do not wait the end of the reboot
+      --verbose-level VALUE      Verbose level between 0 to 4
 \end{verbatim}
 \end{small}
 
@@ -710,17 +730,24 @@ At least, Kareboot must be called with one node and a reboot kind. The nodes to 
 Here are some basic examples:
 \begin{verbatim}
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot
+> kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot -o reboot_ok.txt \
+                                                        -n reboot_ko.txt
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile -l hard
 > kareboot3 -f nodes -r deploy_env -k .ssh/id_rsa
 > kareboot3 -r env_recorded -e production_environment \
             -p 2 -u root -m gdx-5.orsay.grid5000.fr
+> kareboot3 -r env_recorded -e production_environment \
+            -p 2 -u root -m gdx-5.orsay.grid5000.fr \
+            --no-wait
 \end{verbatim}
 
 Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-prod-env} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the production environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed and a check is performed at the end of the reboot to ensure that the production environment is correctly deployed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the production environment has been destroyed and that it should be deployed again.
 
 An environment is considered \textit{demolishing} if the number of failures after a reboot on the production environment (when the \texttt{-c|--check-prod-env} optionis used with Kareboot), is higher than the threshold specify in the configuration file% (see the~\ref{sec:general_config} part)
 . In the Kaenv part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
+
+Warning, if the \texttt{--no-wait} option is used, Kareboot won't wait the end of the reboot to exit. Thus, this option cannot be used with the \texttt{-c|--check-prod-env}, \texttt{-o, --output-ok-nodes} and \texttt{-n, --output-ko-nodes} options.
 
 
 \subsection{Kaenv}\label{sec:kaenv}
@@ -730,7 +757,7 @@ Kaenv can be used by using the \texttt{kaenv} command. The CLI looks like this:
 \begin{verbatim}
 > kaenv3 -h
 Usage: kaenv3 [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -e, --environment ENVNAME            Environment name
   -f, --file FILE                      Environment file
@@ -857,7 +884,7 @@ Karights can be used by using the \texttt{karights} command (it is designed for 
 \begin{verbatim}
 > karights3 -h
 Usage: karights3 [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --add                    Add some rights to a user
   -d, --delete                 Delete some rights to a user
@@ -914,7 +941,7 @@ Kastat can be used by using the \texttt{kastat} command. The CLI looks like this
 \begin{verbatim}
 > kastat3 -h
 Usage: kastat3 [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --list-min-retries NB        Print the statistics about the nodes that need several attempts
   -b, --list-failure-rate          Print the failure rate for the nodes
@@ -972,7 +999,7 @@ Kanodes can be used by using the \texttt{kanodes} command. The CLI looks like th
 \begin{verbatim}
 > kanodes3 -h
 Usage: kanodes3 [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -f, --file MACHINELIST       Only print information about the given machines
   -m, --machine MACHINE        Only print information about the given machines
@@ -1008,7 +1035,7 @@ This commands prints a YAML output of the deployment state of all the nodes curr
 \end{verbatim}
 This commands prints a YAML output of the deployment state of all the nodes currently in the deployment number 78. The deployment number, or workflow id, can be obtained thanks to a Kadeploy option.% (see the~\ref{par:usecase-wid} part to know how to get the workflow id of a deployment).
 
-\section{Migrate your environment for Kadeploy 2.1.x}
+\section{Migrate your Kadeploy 2.1.x environment}
 Migrating your environments from Kadeploy 2.1.x is quite easy. Please refer to the~\ref{sec:env_desc} part to get the full information about the environment description with Kadeploy 3.
 
 \subsubsection{Differences}
@@ -1031,7 +1058,7 @@ A small script named \texttt{env\_migrate} has been written to ease the translat
 \begin{verbatim}
 > env_migrate -h
 Usage: env_migrate [options]
-Contact: kadeploy-devel@lists.grid5000.fr
+Contact: kadeploy3-users@lists.grid5000.fr
 
 General options:
   -e, --env-name NAME          Environment name

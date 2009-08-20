@@ -170,7 +170,7 @@ module EnvironmentManagement
       end
       if ((@name == nil) || (@version == nil) || (@tarball == nil) || (@kernel == nil) ||
           (@initrd == nil) || (@fdisk_type == nil) || (@filesystem == nil) || (@environment_kind == nil)) then
-        puts "The name, version, tarball, kernel, initrd, fdisk_type, filesystem and environment_kind fileds are mandatory"
+        puts "The name, version, tarball, kernel, initrd, fdisktype, filesystem and environment_kind fileds are mandatory"
         return false
       end
       

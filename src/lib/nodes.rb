@@ -354,11 +354,11 @@ module Nodes
       @set.each { |node|
         hosts.push("hostname=\"#{node.hostname}\"")
       }
+      date = Time.now.to_i
       case state
       when "deploying"
         query = "DELETE FROM nodes WHERE #{hosts.join(" OR ")}"
         db.run_query(query)
-        date = Time.now.to_i
         @set.each { |node|
           query = "INSERT INTO nodes (hostname, state, env_id, date, user) \
                    VALUES (\"#{node.hostname}\",\"deploying\",\"#{env_id}\",\"#{date}\",\"#{user}\")"
@@ -377,6 +377,11 @@ module Nodes
       when "recorded_env"
          @set.each { |node|
           query = "UPDATE nodes SET state=\"recorded_env\" WHERE hostname=\"#{node.hostname}\""
+          db.run_query(query)
+        }
+      when "deploy_env"
+         @set.each { |node|
+          query = "UPDATE nodes SET state=\"deploy_env\",user=\"#{user}\",env_id=\"-1\",date=\"#{date}\" WHERE hostname=\"#{node.hostname}\""
           db.run_query(query)
         } 
       when "aborted"

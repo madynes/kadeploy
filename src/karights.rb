@@ -157,6 +157,5 @@ if (config.check_config("karights") == true)
   end
   _exit(0, db)
 else
-  puts "Invalid configuration"
   _exit(1, db)
 end
