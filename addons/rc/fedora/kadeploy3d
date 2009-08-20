@@ -11,6 +11,8 @@
 # Description: Kadeploy 3 server.
 ### END INIT INFO
 
+# chkconfig: 2345 90 10
+
 # Source function library.
 . /etc/rc.d/init.d/functions
 
