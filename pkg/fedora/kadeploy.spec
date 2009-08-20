@@ -62,7 +62,7 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) /etc/kadeploy3/clusters
 %config(noreplace) /etc/kadeploy3/nodes
 %config(noreplace) /etc/kadeploy3/specific_conf_g5kdev-cluster
-%config(noreplace) /etc/kadeploy3/fdisk_g5kdev-cluster
+%config(noreplace) /etc/kadeploy3/partition_file_g5kdev-cluster
 %config(noreplace) /etc/kadeploy3/cmd
 %config(noreplace) /etc/kadeploy3/conf
 /usr/bin/kastafior
