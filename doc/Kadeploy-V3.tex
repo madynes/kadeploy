@@ -151,8 +151,7 @@ This will generate three Debian package: \texttt{kadeploy-common-3.0-0.deb}, \te
 \end{small}
 
 \paragraph{Warning}
-In order to preserve your configuration files, the removal of a Kadeploy package will preserve the configuration files (unless you specify the \texttt{--purge} tag). But if you install a new version of the package, the new configuration files will override the old ones. Thus you can use the \texttt{--force-confold} with \texttt{dpkg} if you want to keep them.
-
+In order to preserve your configuration files, the removal of a Kadeploy package will preserve the configuration files (unless you specify the \texttt{--purge} tag).
 
 \subsection{Fedora packages}
 The following installation method works only an Fedora based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
@@ -252,7 +251,7 @@ rights_kind = db
 taktuk_ssh_connector = ssh -q -o StrictHostKeyChecking=no \
                               -o UserKnownHostsFile=/dev/null \
                               -o PreferredAuthentications=publickey \
-                              -o BatchMode=yes -i /.keys/id_deploy
+                              -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
 taktuk_rsh_connector = rsh -l root
 taktuk_tree_arity = 0
 taktuk_auto_propagate = false
@@ -355,7 +354,7 @@ timeout_reboot = 220
 cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
                              -o PreferredAuthentications=publickey \
                              -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
-                             -i /.keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
+                             -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
 cmd_soft_reboot_rsh = rsh -l root HOSTNAME_FQDN /usr/local/bin/reboot_detach
 cmd_hard_reboot = /usr/local/kadeploy/bin/reboot.rb HOSTNAME_SHORT
 cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
@@ -513,7 +512,7 @@ After the execution of \texttt{make\_kernel.sh}, a directory prefixed with \text
 TODO
 
 \section{Configuration of the deploy user}
-In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastafior} macro-step), the server must be able to perform an ssh connection on itself. Thus, you must add the deploy key installed in the \texttt{/.keys/id\_deploy.pub} in the \texttt{.ssh/authorized\_keys} file of the \texttt{deploy} user. This step is optional if you do not plan to use the \texttt{BroadcastEnvKastafior} macro-step.
+In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastafior} macro-step), the server must be able to perform an ssh connection on itself. Thus, you must add the deploy key installed in the \texttt{/etc/kadeploy3/keys/id\_deploy.pub} in the \texttt{.ssh/authorized\_keys} file of the \texttt{deploy} user. This step is optional if you do not plan to use the \texttt{BroadcastEnvKastafior} macro-step.
 
 \chapter{Client side configuration}
 On the client side, you only have to configure the file named \texttt{client\_conf}. This file only defines two values used to find the kadeploy server: \texttt{kadeploy\_server} and \texttt{kadeploy\_server\_port}.

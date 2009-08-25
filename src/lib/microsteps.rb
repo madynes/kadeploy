@@ -7,7 +7,6 @@
 require 'debug'
 require 'nodes'
 require 'parallel_ops'
-#require 'cmdctrl_wrapper'
 require 'parallel_runner'
 require 'pxe_ops'
 require 'cache'

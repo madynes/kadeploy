@@ -9,7 +9,9 @@ CONF=$(KADEPLOY_ROOT)/conf
 ADDONS=$(KADEPLOY_ROOT)/addons
 TEST=$(KADEPLOY_ROOT)/test
 PKG=$(KADEPLOY_ROOT)/pkg
-DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-3.0
+MAJOR_VERSION:=$(shell cat major_version)
+MINOR_VERSION:=$(shell cat minor_version)
+DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-$(MAJOR_VERSION)
 
 api: cleanapi
 	@echo "Generating API"
@@ -62,8 +64,8 @@ ifeq ($(DISTRIB),fedora)
 endif
 
 install_ssh_key:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/.keys
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DESTDIR)/.keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/etc/kadeploy3/keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DESTDIR)/etc/kadeploy3/keys
 
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
@@ -71,7 +73,7 @@ tree_client:
 tree_server:
 	@mkdir -p $(DESTDIR)/usr/sbin
 	@mkdir -p $(DESTDIR)/etc/init.d
-	@mkdir -p $(DESTDIR)/.keys
+	@mkdir -p $(DESTDIR)/etc/kadeploy3/keys
 
 tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3
@@ -94,7 +96,6 @@ install_all: install_common install_client install_server
 
 uninstall:
 	@rm -rf $(DESTDIR)/usr/local/kadeploy3
-	@rm -f $(DESTDIR)/.keys/id_deploy $(DESTDIR)/.keys/id_deploy.pub
 	@rm -f $(DESTDIR)/usr/sbin/kadeploy3d $(DESTDIR)/usr/sbin/karights3
 	@rm -f $(DESTDIR)/usr/bin/kaconsole3 $(DESTDIR)/usr/bin/kadeploy3 $(DESTDIR)/usr/bin/kaenv3 $(DESTDIR)/usr/bin/kanodes3 $(DESTDIR)/usr/bin/kareboot3 $(DESTDIR)/usr/bin/kastat3
 
@@ -109,9 +110,10 @@ dist-clean:
 	@rm -rf $(DIST_DIR)
 
 rpm: dist
-	cp $(PKG)/fedora/kadeploy.spec $(DIST_DIR)
-	tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
-	rpmbuild -ta $(DIST_DIR).tar.gz
+	@(cd $(PKG)/fedora && sh set_version.sh) > $(DIST_DIR)/kadeploy.spec
+	@tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
+	@rpmbuild -ta $(DIST_DIR).tar.gz
+	@rm -rf $(DIST_DIR) $(DIST_DIR).tar.gz
 
 deb:
 	@(cd $(PKG)/debian; make package_all; mv kadeploy-*.deb $(CURRENT_DIR); make clean; cd $(CURRENT_DIR))

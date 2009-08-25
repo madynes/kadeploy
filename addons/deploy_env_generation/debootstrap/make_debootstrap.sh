@@ -26,8 +26,9 @@ EOF
 
 mkdir -p $DIR/root/.ssh
 cat ../../ssh/id_deploy.pub > $DIR/root/.ssh/authorized_keys
-mkdir -p $DIR/.keys
-cp ../../ssh/* $DIR/.keys/
+mkdir -p $DIR/etc/kadeploy3/keys
+cp ../../ssh/* $DIR/etc/kadeploy3/keys/
+chmod 400 $DIR/etc/kadeploy3/keys/*
 
 cat > $DIR/etc/nsswitch.conf <<EOF
 passwd:     files

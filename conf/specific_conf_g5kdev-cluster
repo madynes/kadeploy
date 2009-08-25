@@ -5,7 +5,7 @@ prod_part = 2
 deploy_part = 3
 tmp_part = 4
 timeout_reboot = 120
-cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_deploy root@HOSTNAME_FQDN /sbin/reboot
+cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
 cmd_soft_reboot_rsh = rsh -l root HOSTNAME_FQDN /sbin/reboot -f
 cmd_hard_reboot = vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx reset hard
 cmd_very_hard_reboot = vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx start hard

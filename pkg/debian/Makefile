@@ -1,5 +1,7 @@
-VERSION=3.0-0
 KADEPLOY_ROOT=../..
+MAJOR_VERSION:=$(shell cat ../../major_version)
+MINOR_VERSION:=$(shell cat ../../minor_version)
+VERSION=$(MAJOR_VERSION)-$(MINOR_VERSION)
 DEPLOY_USER=deploy
 DEB_ROOT_CLIENT=kadeploy-client
 DEB_ROOT_SERVER=kadeploy-server
@@ -52,8 +54,8 @@ install_db_script:
 	@install -m 644 $(DB)/db_creation.sql $(DEB_ROOT_COMMON)/usr/local/kadeploy3/db
 
 install_ssh_key:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DEB_ROOT_SERVER)/.keys
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DEB_ROOT_SERVER)/.keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DEB_ROOT_SERVER)/etc/kadeploy3/keys
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DEB_ROOT_SERVER)/etc/kadeploy3/keys
 
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
@@ -63,8 +65,8 @@ tree_server:
 	@mkdir -p $(DEB_ROOT_SERVER)/usr/bin
 	@mkdir -p $(DEB_ROOT_SERVER)/usr/sbin
 	@mkdir -p $(DEB_ROOT_SERVER)/etc/init.d
-	@mkdir -p $(DEB_ROOT_SERVER)/.keys
 	@mkdir -p $(DEB_ROOT_SERVER)/etc/kadeploy3
+	@mkdir -p $(DEB_ROOT_SERVER)/etc/kadeploy3/keys
 
 tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3
@@ -86,6 +88,6 @@ package_all: package_client package_server package_common
 
 clean:
 	@rm -rf $(DEB_ROOT_CLIENT)/usr $(DEB_ROOT_CLIENT)/etc
-	@rm -rf $(DEB_ROOT_SERVER)/usr $(DEB_ROOT_SERVER)/etc $(DEB_ROOT_SERVER)/.keys
+	@rm -rf $(DEB_ROOT_SERVER)/usr $(DEB_ROOT_SERVER)/etc
 	@rm -rf $(DEB_ROOT_COMMON)/usr $(DEB_ROOT_COMMON)/etc
 	@rm -f kadeploy-client-$(VERSION).deb kadeploy-server-$(VERSION).deb kadeploy-common-$(VERSION).deb
