@@ -33,13 +33,13 @@ def list_environments(config, db)
                                             GROUP BY name \
                                             ORDER BY user,name"
       else
-        query = "SELECT name, MAX(version) AS version, description, author, tarball, \
-                        preinstall, postinstall, kernel, kernel_params, \
-                        initrd, hypervisor, hypervisor_params, fdisk_type, filesystem, user, environment_kind, demolishing_env \
-                        FROM environments \
-                        WHERE visibility<>\"private\"
-                        GROUP BY user,name \
-                        ORDER BY user,name"
+        query = "SELECT * FROM environments e1 \
+                          WHERE visibility<>\"private\" \
+                          AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
+                                                                 WHERE e2.name=e1.name \
+                                                                 AND e2.user=e1.user \
+                                                                 GROUP BY e2.user,e2.name) \
+                          ORDER BY user,name"
       end
     else
       query = "SELECT * FROM environments WHERE visibility<>\"private\" ORDER BY user,name,version"
@@ -65,23 +65,23 @@ def list_environments(config, db)
         end
       else
         if mask_private_env then
-          query = "SELECT name, MAX(version) AS version, description, author, tarball, \
-                          preinstall, postinstall, kernel, kernel_params, \
-                          initrd, hypervisor, hypervisor_params, fdisk_type, filesystem, user, environment_kind, demolishing_env \
-                          FROM environments \
-                          WHERE user=\"#{config.exec_specific.user}\" \
-                          AND visibility<>\"private\" \
-                          GROUP BY user,name \
-                          ORDER BY user,name"
+          query = "SELECT * FROM environments e1\
+                            WHERE e1.user=\"#{config.exec_specific.user}\" \
+                            AND e1.visibility<>\"private\" \
+                            AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
+                                                                   WHERE e2.name=e1.name \
+                                                                   AND e2.user=e1.user \
+                                                                   GROUP BY e2.user,e2.name) \
+                            ORDER BY e1.user,e1.name"
         else
-          query = "SELECT name, MAX(version) AS version, description, author, tarball, \
-                          preinstall, postinstall, kernel, kernel_params, \
-                          initrd, hypervisor, hypervisor_params, fdisk_type, filesystem, user, environment_kind, demolishing_env \
-                          FROM environments \
-                          WHERE user=\"#{config.exec_specific.user}\" \
-                          OR (user<>\"#{config.exec_specific.user}\" AND visibility=\"public\") \
-                          GROUP BY user,name \
-                          ORDER BY user,name"
+          query = "SELECT * FROM environments e1\
+                            WHERE (e1.user=\"#{config.exec_specific.user}\" \
+                            OR (e1.user<>\"#{config.exec_specific.user}\" AND e1.visibility=\"public\")) \
+                            AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
+                                                                   WHERE e2.name=e1.name \
+                                                                   AND e2.user=e1.user \
+                                                                   GROUP BY e2.user,e2.name) \
+                            ORDER BY e1.user,e1.name"
         end
       end
     else
