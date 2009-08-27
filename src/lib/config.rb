@@ -1327,11 +1327,11 @@ module ConfigInformation
       case
       when @exec_specific.operation == "add" || @exec_specific.operation  == "delete"
         if (@exec_specific.part_list.empty?) then
-          error("You must specify at list one partition")
+          error("You must specify at least one partition")
           return false
         end
         if (@exec_specific.node_list.empty?) then
-          error("You must specify at list one node")
+          error("You must specify at least one node")
           return false
         end
       when @exec_specific.operation == "show"
