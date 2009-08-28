@@ -78,16 +78,19 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/etc/kadeploy3
 
 package_client: tree_client install_conf_client install_bin
+	@sh set_version.sh kadeploy-client-control.in > $(DEB_ROOT_CLIENT)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_CLIENT) kadeploy-client-$(VERSION).deb
 package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior
+	@sh set_version.sh kadeploy-server-control.in > $(DEB_ROOT_SERVER)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_SERVER) kadeploy-server-$(VERSION).deb	
 package_common: tree_common install_conf_common install_src install_test install_db_script
+	@sh set_version.sh kadeploy-common-control.in > $(DEB_ROOT_COMMON)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_COMMON) kadeploy-common-$(VERSION).deb
 
 package_all: package_client package_server package_common
 
 clean:
-	@rm -rf $(DEB_ROOT_CLIENT)/usr $(DEB_ROOT_CLIENT)/etc
-	@rm -rf $(DEB_ROOT_SERVER)/usr $(DEB_ROOT_SERVER)/etc
-	@rm -rf $(DEB_ROOT_COMMON)/usr $(DEB_ROOT_COMMON)/etc
+	@rm -rf $(DEB_ROOT_CLIENT)/usr $(DEB_ROOT_CLIENT)/etc $(DEB_ROOT_CLIENT)/DEBIAN/control
+	@rm -rf $(DEB_ROOT_SERVER)/usr $(DEB_ROOT_SERVER)/etc $(DEB_ROOT_SERVER)/DEBIAN/control
+	@rm -rf $(DEB_ROOT_COMMON)/usr $(DEB_ROOT_COMMON)/etc $(DEB_ROOT_COMMON)/DEBIAN/control
 	@rm -f kadeploy-client-$(VERSION).deb kadeploy-server-$(VERSION).deb kadeploy-common-$(VERSION).deb

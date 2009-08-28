@@ -1,5 +1,5 @@
 Package: kadeploy-common
-Version: 3.0-1
+Version: MAJOR_VERSION-MINOR_VERSION
 Section: base
 Priority: optional
 Architecture: all

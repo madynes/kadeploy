@@ -18,7 +18,7 @@
 
 
 prog="Kadeploy 3"
-kadeploy3d="/usr/sbin/kadeploy3d"
+kadeploy3d=/usr/sbin/kadeploy3d
 pidfile=/var/run/kadeploy3d.pid
 lockfile=/var/lock/subsys/kadeploy3d
 RETVAL=0
