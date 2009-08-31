@@ -34,10 +34,11 @@ def list_environments(config, db)
                                             ORDER BY user,name"
       else
         query = "SELECT * FROM environments e1 \
-                          WHERE visibility<>\"private\" \
+                          WHERE e1.visibility<>\"private\" \
                           AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
                                                                  WHERE e2.name=e1.name \
                                                                  AND e2.user=e1.user \
+                                                                 AND e2.visibility<>\"private\" \
                                                                  GROUP BY e2.user,e2.name) \
                           ORDER BY user,name"
       end
@@ -71,6 +72,7 @@ def list_environments(config, db)
                             AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
                                                                    WHERE e2.name=e1.name \
                                                                    AND e2.user=e1.user \
+                                                                   AND e2.visibility<>\"private\" \
                                                                    GROUP BY e2.user,e2.name) \
                             ORDER BY e1.user,e1.name"
         else
@@ -80,6 +82,8 @@ def list_environments(config, db)
                             AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
                                                                    WHERE e2.name=e1.name \
                                                                    AND e2.user=e1.user \
+                                                                   AND (e2.user=\"#{config.exec_specific.user}\" \
+                                                                    OR (e2.user<>\"#{config.exec_specific.user}\" AND e2.visibility=\"public\")) \
                                                                    GROUP BY e2.user,e2.name) \
                             ORDER BY e1.user,e1.name"
         end
