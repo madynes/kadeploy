@@ -56,7 +56,7 @@ Two ways are provided to install Kadeploy, a basic installer and packages (for D
 First of all , you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{verbatim}
-> tar xzf kadeploy-3.0-0.tar.gz -C DESTINATION_DIR
+> tar xzf kadeploy-3.0-1.tar.gz -C DESTINATION_DIR
 \end{verbatim}
 \end{small}
 
@@ -123,30 +123,30 @@ The following installation method works only an Debian based distribution.
 > make deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-3.0-0.deb}, \texttt{kadeploy-client-3.0-0.deb}, and \texttt{kadeploy-server-3.0-0.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-3.0-1.deb}, \texttt{kadeploy-client-3.0-1.deb}, and \texttt{kadeploy-server-3.0-1.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-0.deb} and \texttt{kadeploy-server-3.0-0.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-1.deb} and \texttt{kadeploy-server-3.0-1.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-0.deb
-> dpkg -i kadeploy-server-3.0-0.deb
+> dpkg -i kadeploy-common-3.0-1.deb
+> dpkg -i kadeploy-server-3.0-1.deb
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-0.deb} and \texttt{kadeploy-client-3.0-0.deb} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-1.deb} and \texttt{kadeploy-client-3.0-1.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-0.deb
-> dpkg -i kadeploy-client-3.0-0.deb
+> dpkg -i kadeploy-common-3.0-1.deb
+> dpkg -i kadeploy-client-3.0-1.deb
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-0.deb
-> dpkg -i kadeploy-client-3.0-0.deb
-> dpkg -i kadeploy-server-3.0-0.deb
+> dpkg -i kadeploy-common-3.0-1.deb
+> dpkg -i kadeploy-client-3.0-1.deb
+> dpkg -i kadeploy-server-3.0-1.deb
 \end{verbatim}
 \end{small}
 
@@ -169,30 +169,30 @@ The following installation method works only an Fedora based distribution. We as
 > make rpm
 \end{verbatim}
 \end{small}
-This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-0.noarch.rpm}, \texttt{kadeploy-server-3.0-0.noarch.rpm}, and \texttt{kadeploy-common-3.0-0.noarch.rpm}.
+This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-1.noarch.rpm}, \texttt{kadeploy-server-3.0-1.noarch.rpm}, and \texttt{kadeploy-common-3.0-1.noarch.rpm}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-0.noarch.rpm} and \texttt{kadeploy-server-3.0-0.noarch.rpm} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-1.noarch.rpm} and \texttt{kadeploy-server-3.0-1.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-0.noarch.rpm
-> rpm -i kadeploy-server-3.0-0.noarch.rpm
+> rpm -i kadeploy-common-3.0-1.noarch.rpm
+> rpm -i kadeploy-server-3.0-1.noarch.rpm
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-0.noarch.rpm} and \texttt{kadeploy-client-3.0-0.noarch.rpm} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-1.noarch.rpm} and \texttt{kadeploy-client-3.0-1.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-0.noarch.rpm
-> rpm -i kadeploy-client-3.0-0.noarch.rpm
+> rpm -i kadeploy-common-3.0-1.noarch.rpm
+> rpm -i kadeploy-client-3.0-1.noarch.rpm
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-0.noarch.rpm
-> rpm -i kadeploy-server-3.0-0.noarch.rpm
-> rpm -i kadeploy-client-3.0-0.noarch.rpm
+> rpm -i kadeploy-common-3.0-1.noarch.rpm
+> rpm -i kadeploy-server-3.0-1.noarch.rpm
+> rpm -i kadeploy-client-3.0-1.noarch.rpm
 \end{verbatim}
 \end{small}
 
@@ -368,7 +368,7 @@ admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
 #Automata description
 macrostep = SetDeploymentEnv|SetDeploymentEnvProd:1:200,SetDeploymentEnvUntrusted:1:400
 macrostep = BroadcastEnv|BroadcastEnvChain:2:500
-macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvClassical:1:300
+macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvHardReboot:1:300
 \end{verbatim}
 \end{small}
 
@@ -412,8 +412,9 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
     \end{itemize}
   \item \texttt{BootNewEnv}
     \begin{itemize}
-      \item \texttt{BootNewEnvKexec}
       \item \texttt{BootNewEnvClassical}
+      \item \texttt{BootNewEnvKexec}
+      \item \texttt{BootNewEnvHardReboot}
       \item \texttt{BootNewEnvDummy}
     \end{itemize}
   \end{itemize}
