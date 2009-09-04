@@ -649,10 +649,10 @@ module MicroStepsLibrary
         @output.verbosel(0, "The torrent file (#{torrent}) has not been created")
         return false
       end
-      if @config.kadeploy_disable_cache then
-        seed_pid = Bittorrent::launch_seed(torrent, @config.common.kadeploy_cache_dir)
+      if @config.common.kadeploy_disable_cache then
+        seed_pid = Bittorrent::launch_seed(torrent, File.dirname(tarball_file))
       else
-
+        seed_pid = Bittorrent::launch_seed(torrent, @config.common.kadeploy_cache_dir)
       end
       if (seed_pid == -1) then
         @output.verbosel(0, "The seed of #{torrent} has not been launched")
