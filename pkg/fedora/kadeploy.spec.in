@@ -81,3 +81,15 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/kadeploy3
 /usr/bin/kaenv3
 /usr/bin/kareboot3
+
+%pre common
+if ! getent passwd deploy >/dev/null 2>&1 ; then
+  /usr/sbin/useradd -d /home/deploy deploy >/dev/null 2>&1 || exit 1
+fi
+
+%post server
+chkconfig --add kadeploy3d
+
+%preun server
+chkconfig --del kadeploy3d
+

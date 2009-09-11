@@ -45,6 +45,14 @@ In order to use the HTTP fetching capabilities of gpxelinux, an HTTP server must
 \subsection{MySql}
 A MySql server must be configured with a database and a user dedicated to Kadeploy. The rights on this database must be granted to the chosen user, from the Kadeploy server. The server used to host the database, the database name, the dedicated user and its password must be specified in the general Kadeploy configuration (see~\ref{sec:general_config} part).
 
+Just provided as an example, let's see a way to create the database \texttt{deploy3} and to give the suitable rights to the \texttt{deploy} user.
+\begin{verbatim}
+mysql> CREATE DATABASE deploy3;
+mysql> GRANT select, insert, update, delete, create, drop, alter, \
+             create temporary tables, lock tables ON deploy3.* \
+             TO 'deploy'@'frontale.site.grid5000.fr';
+\end{verbatim}
+
 Once the database is created and the user granted, you can use the SQL script provided in the distribution (\texttt{db/db\_creation.sql}) to create the tables in the database.
 
 \section{Kadeploy installation}
@@ -211,21 +219,8 @@ After being installed and configured, the Kadeploy server can be run either inte
 \end{verbatim}
 \end{small}
 
-\subsection{Automatic launch on a Debian based distribution}
-\noindent On a Debian based distribution, the rc script can be automatically launched at the startup by launching, with root rights, the following command:
-\begin{small}
-\begin{verbatim}
-> update-rc.d kadeploy3d defaults
-\end{verbatim}
-\end{small}
-
-\subsection{Automatic launch on a Fedora based distribution}
-\noindent On a Fedora based distribution, the rc script can be automatically launched at the startup by launching, with root rights, the following command:
-\begin{small}
-\begin{verbatim}
-> chkconfig --add kadeploy3d
-\end{verbatim}
-\end{small}
+\subsection{Automatic launch on a Debian and a Fedora based distribution}
+\noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
 \chapter{Server side configuration}
 Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
@@ -372,7 +367,7 @@ macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvHardReboot:1:300
 \end{verbatim}
 \end{small}
 
-\subsection{Explanation of the fields used in the general configuration file}
+\subsection{Explanation of the fields used in the cluster-specific configuration file}
 Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
 \begin{itemize}
 \item \texttt{deploy\_kernel}: name of the kernel used by the deployment environment. It is possible to specify an http location if you use gpxelinux.
@@ -603,7 +598,7 @@ We present now several use cases.
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
-            --verbose_level 4 \
+            --verbose-level 4 \
             -k ~/.ssh/id_rsa.pub
 \end{verbatim}
 This command performs the deployment of the environment \textit{lenny-x64-nfs-1.0} on the node \textit{gdx-5.orsay.grid5000.fr} and copies the SSH public key \textit{~/.ssh/id\_rsa.pub} of the user in the deployed environment to allow a direct connection with the root account. Furthermore, the verbose level is set to 4, which means that you want the maximum verbose information.
