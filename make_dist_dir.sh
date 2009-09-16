@@ -1,5 +1,5 @@
 #!/bin/sh
-DIST_DIR=$1
+DIST_DIR=`basename $1`
 
 mkdir -p $DIST_DIR
 

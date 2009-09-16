@@ -1087,9 +1087,19 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-e", "--environment ENVNAME", "Environment name") { |n|
+        opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
+          if not File.readable?(f) then
+            error("The file #{f} cannot be read")
+            return false
+          else
+            @exec_specific.file = f
+          end
+          @exec_specific.operation = "add"
+        }
+        opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
           @exec_specific.env_name = n
-        }        
+          @exec_specific.operation = "delete"
+        }  
         opt.on("-f", "--file FILE", "Environment file") { |f|
           if not File.readable?(f) then
             error("The file #{f} cannot be read")
@@ -1097,6 +1107,9 @@ module ConfigInformation
           else
             @exec_specific.file = f
           end
+        }
+        opt.on("-l", "--list", "List environments") {
+          @exec_specific.operation = "list"
         }
         opt.on("-m", "--files-to-move FILES", "Files to move (src1:dst1,src2:dst2,...)") { |f|
           if /\A.+:.+(,.+:.+)*\Z/ =~f then
@@ -1108,13 +1121,10 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-o", "--operation OPERATION", "Kind of operation (add, delete, list, print, remove-demolishing-tag, set-visibility-tag, update-tarball-md5, update-preinstall-md5, update-postinstalls-md5, move-files)") { |op|
-          if /\A(add|delete|list|print|remove-demolishing-tag|set-visibility-tag|update-tarball-md5|update-preinstall-md5|update-postinstalls-md5|move-files)\Z/ =~ op then
-            @exec_specific.operation = op
-          else
-            error("Invalid operation")
-          end
-        }
+        opt.on("-p", "--print ENVNAME", "Print an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "print"
+        }        
         opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
           @exec_specific.show_all_version = true
         }
@@ -1140,6 +1150,30 @@ module ConfigInformation
             error("Invalid version number")
             return false
           end
+        }
+        opt.on("--remove-demolishing-tag ENVNAME", "Remove demolishing tag on an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "remove-demolishing-tag"
+        }
+        opt.on("--set-visibility-tag ENVNAME", "Set the visibility tag on an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "set-visibility-tag"
+        }
+        opt.on("--update-tarball-md5 ENVNAME", "Update the MD5 of the environment tarball") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "update-tarball-md5"
+        }
+        opt.on("--update-preinstall-md5 ENVNAME", "Update the MD5 of the environment preinstall") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "update-preinstall-md5"
+        }
+        opt.on("--update-postinstalls-md5 ENVNAME", "Update the MD5 of the environment postinstalls") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "update-postinstalls-md5"
+        }
+        opt.on("--move-files ENVNAME", "Move the files of the environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "move-files"
         }
       end
       @opts = opts
@@ -1519,6 +1553,9 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
+        opt.on("-d", "--get-deploy-state", "Get the deploy state of the nodes") {
+          @exec_specific.operation = "get_deploy_state"
+        }
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
           if not File.readable?(f) then
             error("The file #{f} cannot be read")
@@ -1540,15 +1577,11 @@ module ConfigInformation
           end
           @exec_specific.node_list.push(m)
         }
-        opt.on("-o", "--operation OPERATION", "Choose the operation (get_deploy_state or get_yaml_dump)") { |o|
-          if not  (/\A(get_deploy_state|get_yaml_dump)\Z/ =~ o) then
-            error("Invalid operation: #{o}")
-            return false
-          end
-          @exec_specific.operation = o
-        }
         opt.on("-w", "--workflow-id WID", "Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped") { |w|
           @exec_specific.wid = w
+        }
+        opt.on("-y", "--get-yaml-dump", "Get the yaml dump") {
+          @exec_specific.operation = "get_yaml_dump"
         }
       end
       @opts = opts
