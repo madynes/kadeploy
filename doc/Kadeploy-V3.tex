@@ -37,7 +37,7 @@ A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed.
 
 To allow the network booting, you must specify in the DHCP configuration file the filename option that define the file retrieve by a client. This filename can be pxelinux.0 or gpxelinux.0.
 
-Finally, the TFTP images directory (see~\ref{sec:general_config} part) must contain the following files: pxelinux.0 and/or gpxelinux.0, chain.c32, and mboot.c32. These files can be found in the Syslinux software (\url{http://syslinux.zytor.com}), the 3.73 version is at least required.
+Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files: pxelinux.0 (or gpxelinux.0), chain.c32, and mboot.c32. These files can be found in the Syslinux software (\url{http://syslinux.zytor.com}), the 3.73 version is at least required.
 
 \subsection{HTTP server (optional)}
 In order to use the HTTP fetching capabilities of gpxelinux, an HTTP server must be configured and must contain the production environment kernel/initrtd and the deployment environment kernel/initrd (see~\ref{sec:specific_config} part).
@@ -64,7 +64,7 @@ Two ways are provided to install Kadeploy, a basic installer and packages (for D
 First of all , you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{verbatim}
-> tar xzf kadeploy-3.0-1.tar.gz -C DESTINATION_DIR
+> tar xzf kadeploy-3.0-2.tar.gz -C DESTINATION_DIR
 \end{verbatim}
 \end{small}
 
@@ -131,30 +131,30 @@ The following installation method works only an Debian based distribution.
 > make deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-3.0-1.deb}, \texttt{kadeploy-client-3.0-1.deb}, and \texttt{kadeploy-server-3.0-1.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-3.0-2.deb}, \texttt{kadeploy-client-3.0-2.deb}, and \texttt{kadeploy-server-3.0-2.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-1.deb} and \texttt{kadeploy-server-3.0-1.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-2.deb} and \texttt{kadeploy-server-3.0-2.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-1.deb
-> dpkg -i kadeploy-server-3.0-1.deb
+> dpkg -i kadeploy-common-3.0-2.deb
+> dpkg -i kadeploy-server-3.0-2.deb
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-1.deb} and \texttt{kadeploy-client-3.0-1.deb} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-2.deb} and \texttt{kadeploy-client-3.0-2.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-1.deb
-> dpkg -i kadeploy-client-3.0-1.deb
+> dpkg -i kadeploy-common-3.0-2.deb
+> dpkg -i kadeploy-client-3.0-2.deb
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-1.deb
-> dpkg -i kadeploy-client-3.0-1.deb
-> dpkg -i kadeploy-server-3.0-1.deb
+> dpkg -i kadeploy-common-3.0-2.deb
+> dpkg -i kadeploy-client-3.0-2.deb
+> dpkg -i kadeploy-server-3.0-2.deb
 \end{verbatim}
 \end{small}
 
@@ -177,30 +177,30 @@ The following installation method works only an Fedora based distribution. We as
 > make rpm
 \end{verbatim}
 \end{small}
-This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-1.noarch.rpm}, \texttt{kadeploy-server-3.0-1.noarch.rpm}, and \texttt{kadeploy-common-3.0-1.noarch.rpm}.
+This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-2.noarch.rpm}, \texttt{kadeploy-server-3.0-2.noarch.rpm}, and \texttt{kadeploy-common-3.0-2.noarch.rpm}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-1.noarch.rpm} and \texttt{kadeploy-server-3.0-1.noarch.rpm} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-2.noarch.rpm} and \texttt{kadeploy-server-3.0-2.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-1.noarch.rpm
-> rpm -i kadeploy-server-3.0-1.noarch.rpm
+> rpm -i kadeploy-common-3.0-2.noarch.rpm
+> rpm -i kadeploy-server-3.0-2.noarch.rpm
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-1.noarch.rpm} and \texttt{kadeploy-client-3.0-1.noarch.rpm} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-2.noarch.rpm} and \texttt{kadeploy-client-3.0-2.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-1.noarch.rpm
-> rpm -i kadeploy-client-3.0-1.noarch.rpm
+> rpm -i kadeploy-common-3.0-2.noarch.rpm
+> rpm -i kadeploy-client-3.0-2.noarch.rpm
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-1.noarch.rpm
-> rpm -i kadeploy-server-3.0-1.noarch.rpm
-> rpm -i kadeploy-client-3.0-1.noarch.rpm
+> rpm -i kadeploy-common-3.0-2.noarch.rpm
+> rpm -i kadeploy-server-3.0-2.noarch.rpm
+> rpm -i kadeploy-client-3.0-2.noarch.rpm
 \end{verbatim}
 \end{small}
 
@@ -391,25 +391,103 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
   \item \texttt{SetDeploymentEnv}
     \begin{itemize}
     \item \texttt{SetDeploymentEnvProd}
+      \begin{itemize}
+      \item check\_nodes
+      \item create\_partition\_table
+      \item format\_deploy\_part
+      \item mount\_deploy\_part
+      \item format\_tmp\_part
+      \end{itemize}
     \item \texttt{SetDeploymentEnvUntrusted}
+      \begin{itemize}
+      \item switch\_pxe
+      \item reboot
+      \item wait\_reboot
+      \item send\_key\_in\_deploy\_env
+      \item create\_partition\_table
+      \item format\_deploy\_part
+      \item mount\_deploy\_part
+      \item format\_tmp\_part
+      \end{itemize}
     \item \texttt{SetDeploymentEnvUntrustedCustomPreInstall}
+      \begin{itemize}
+      \item switch\_pxe
+      \item reboot
+      \item wait\_reboot
+      \item send\_key\_in\_deploy\_env
+      \item manage\_admin\_pre\_install
+      \end{itemize}
     \item \texttt{SetDeploymentEnvNfsroot}
+      \begin{itemize}
+      \item switch\_pxe
+      \item reboot
+      \item wait\_reboot
+      \item send\_key\_in\_deploy\_env
+      \item create\_partition\_table
+      \item format\_deploy\_part
+      \item mount\_deploy\_part
+      \item format\_tmp\_part
+      \end{itemize}
     \item \texttt{SetDeploymentEnvDummy}
     \end{itemize}
-
   \item \texttt{BroadcastEnv}
     \begin{itemize}
       \item \texttt{BroadcastEnvChain}
+        \begin{itemize}
+        \item send\_environment(``chain'')
+        \item manage\_admin\_post\_install
+        \item manage\_user\_post\_install
+        \item send\_key
+        \item install\_bootloader
+        \item switch\_pxe
+        \end{itemize}
       \item \texttt{BroadcastEnvKastafior}
+        \begin{itemize}
+        \item send\_environment(``kastafior'')
+        \item manage\_admin\_post\_install
+        \item manage\_user\_post\_install
+        \item send\_key
+        \item install\_bootloader
+        \item switch\_pxe
+        \end{itemize}
       \item \texttt{BroadcastEnvTree}
+        \begin{itemize}
+        \item send\_environment(``tree'')
+        \item manage\_admin\_post\_install
+        \item manage\_user\_post\_install
+        \item send\_key
+        \item install\_bootloader
+        \item switch\_pxe
+        \end{itemize}
       \item \texttt{BroadcastEnvBittorrent}
+        \begin{itemize}
+        \item send\_environment(``bittorrent'')
+        \item manage\_admin\_post\_install
+        \item manage\_user\_post\_install
+        \item send\_key
+        \item install\_bootloader
+        \item switch\_pxe
+        \end{itemize}
       \item \texttt{BroadcastEnvDummy}
     \end{itemize}
   \item \texttt{BootNewEnv}
     \begin{itemize}
       \item \texttt{BootNewEnvClassical}
+        \begin{itemize}
+        \item umount\_deploy\_part
+        \item reboot\_from\_deploy\_env
+        \item wait\_reboot
+        \end{itemize}
       \item \texttt{BootNewEnvKexec}
+        \begin{itemize}
+        \item reboot(``kexec'')
+        \item wait\_reboot
+        \end{itemize}
       \item \texttt{BootNewEnvHardReboot}
+        \begin{itemize}
+        \item reboot(``hard'')
+        \item wait\_reboot
+        \end{itemize}
       \item \texttt{BootNewEnvDummy}
     \end{itemize}
   \end{itemize}
@@ -563,12 +641,13 @@ General options:
   -n, --output-ko-nodes FILENAME   File that will contain the nodes not correctly deployed
   -o, --output-ok-nodes FILENAME   File that will contain the nodes correctly deployed
   -p, --partition-number NUMBER    Specify the partition number to use
-  -r, --reformat-tmp               Reformat the /tmp partition
+  -r, --reformat-tmp FSTYPE        Reformat the /tmp partition with the given filesystem type
+                                   (ext[234] are allowed)
   -s, --script FILE                Execute a script at the end of the deployment
   -u, --user USERNAME              Specify the user
-  -v, --env-version NUMVERSION     Number of version of the environment to deploy
-      --verbose-level VALUE        Verbose level between 0 to 4
   -w, --set-pxe-profile FILE       Set the PXE profile (use with caution)
+      --env-version NUMBER         Number of version of the environment to deploy
+      --verbose-level VALUE        Verbose level between 0 to 4
 Advanced options:
       --write-workflow-id FILE     Write the workflow id in a file
       --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying" 
@@ -616,7 +695,7 @@ This command uses the environment \textit{custom\_env} of the user \textit{johns
 \begin{verbatim}
 > kadeploy3 -f $OAR_NODE_FILE \
             -a ~/my-lenny.dsc \
-            -r \
+            -r ext3 \
             -p 4 \
             -s ~/launcher.sh
 \end{verbatim}
@@ -707,7 +786,7 @@ General options:
   -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot, 
                                  deploy_env, env_recorded)
   -u, --user USERNAME            Specify the user
-  -v, --version NUMBER           Specify the environment version
+      --env-version NUMBER       Specify the environment version
   -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
       --no-wait                  Do not wait the end of the reboot
       --verbose-level VALUE      Verbose level between 0 to 4
@@ -739,8 +818,7 @@ Here are some basic examples:
 
 Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-prod-env} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the production environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed and a check is performed at the end of the reboot to ensure that the production environment is correctly deployed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the production environment has been destroyed and that it should be deployed again.
 
-An environment is considered \textit{demolishing} if the number of failures after a reboot on the production environment (when the \texttt{-c|--check-prod-env} optionis used with Kareboot), is higher than the threshold specify in the configuration file% (see the~\ref{sec:general_config} part)
-. In the Kaenv part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
+An environment is considered \textit{demolishing} if the number of failures after a reboot on the production environment (when the \texttt{-c|--check-prod-env} optionis used with Kareboot), is higher than the threshold specify in the configuration file. In the Kaenv part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
 
 Warning, if the \texttt{--no-wait} option is used, Kareboot won't wait the end of the reboot to exit. Thus, this option cannot be used with the \texttt{-c|--check-prod-env}, \texttt{-o, --output-ok-nodes} and \texttt{-n, --output-ko-nodes} options.
 
@@ -754,72 +832,77 @@ Kaenv can be used by using the \texttt{kaenv} command. The CLI looks like this:
 Usage: kaenv3 [options]
 Contact: kadeploy3-users@lists.grid5000.fr
 General options:
-  -e, --environment ENVNAME            Environment name
-  -f, --file FILE                      Environment file
-  -m, --files-to-move FILES            Files to move (src1:dst1,src2:dst2,...)
-  -o, --operation OPERATION            Kind of operation (add, delete, list, print,
-                                       remove-demolishing-tag, set-visibility-tag, 
-                                       update-tarball-md5, update-preinstall-md5, 
-                                       update-postinstalls-md5, move-files)
-  -s, --show-all-versions              Show all versions of an environment
-  -t, --visibility-tag TAG             Set the visibility tag (private, shared, public)
-  -u, --user USERNAME                  Specify the user
-  -v, --version NUMBER                 Specify the version
+  -a, --add ENVFILE                     Add an environment
+  -d, --delete ENVNAME                  Delete an environment
+  -l, --list                            List environments
+  -m, --files-to-move FILES             Files to move (src1:dst1,src2:dst2,...)
+  -p, --print ENVNAME                   Print an environment
+  -s, --show-all-versions               Show all versions of an environment
+  -t, --visibility-tag TAG              Set the visibility tag (private, shared, public)
+  -u, --user USERNAME                   Specify the user
+      --env-version NUMBER              Specify the version
+      --remove-demolishing-tag ENVNAME  Remove demolishing tag on an environment
+      --set-visibility-tag ENVNAME      Set the visibility tag on an environment
+      --update-tarball-md5 ENVNAME      Update the MD5 of the environment tarball
+      --update-preinstall-md5 ENVNAME   Update the MD5 of the environment preinstall
+      --update-postinstalls-md5 ENVNAME Update the MD5 of the environment postinstalls
+      --move-files ENVNAME              Move the files of the environment
+
 \end{verbatim}
 \end{small}
 
 We present now several use cases.
 \paragraph{Use case 1}
 \begin{verbatim}
-> kaenv3 -o list
+> kaenv3 -l
 \end{verbatim}
 This command lists the environment that you have previously recorded.
 
 \paragraph{Use case 2}
 \begin{verbatim}
-> kaenv3 -o list -u johnsmith -s
+> kaenv3 -l -u johnsmith -s
 \end{verbatim}
 This command lists the environment of the user \textit{johnsmith}. If you use ``*'' as a user value, it lists the environments of all the users. Furthermore, the \texttt{-s|--show-all-versions} option is used to show all the versions of each environment. If this option is not specified, only the version is displayed.
 
 \paragraph{Use case 3}
 \begin{verbatim}
-> kaenv3 -o print -e FreeBSD -v 3 -u johnsmith
+> kaenv3 -p FreeBSD --env-version 3 -u johnsmith
 \end{verbatim}
 This command lists prints the version \textit{3} of the environment \textit{FreeBSD} that belongs to \textit{johnsmith}. If no version number is given, the last version of the environment is printed. To print an environment you own, there is no need to use the \texttt{-u|--user} option.
 
 \paragraph{Use case 4}
 \begin{verbatim}
-> kaenv3 -o add -f ~/new_env.dsc
+> kaenv3 -a ~/new_env.dsc
 \end{verbatim}
 This command adds the environment defined in the file \textit{~/new\_env.dsc}. %See the~\ref{sec:env_desc} part to get information about the environment description.
 
 \paragraph{Use case 5}
 \begin{verbatim}
-> kaenv3 -o delete -e FreeBSD -v 2
+> kaenv3 -d FreeBSD --env-version 2
 \end{verbatim}
 This command deletes the version \textit{2} of the environment \textit{FreeBSD} from the environment database. If no version number is given, all the versions are deleted.
 
 \paragraph{Use case 6}
 \begin{verbatim}
-> kaenv3 -o remove-demolishing-tag -e FreeBSD -v 3
+> kaenv3 --remove-demolishing-tag FreeBSD --env-version 3
 \end{verbatim}
 This command resets the \textit{demolishing} counter of the version \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
 
 \paragraph{Use case 7}
 \begin{verbatim}
-> kaenv3 -o update-tarball-md5 -e sidx64-base
+> kaenv3 --update-tarball-md5 sidx64-base
 \end{verbatim}
 This command is useful if you modify the tarball of the environment \textit{sidx64-base} without modifying the kernel or the initrd and if you do not want to record a new environment. Thus, it will update the MD5 of the tarball file. This operation is required if something change in the tarball, otherwise the environment will be unusable.
 
 \paragraph{Use case 8}
 \begin{verbatim}
-> kaenv3 -o update-postinstalls-md5 -e sidx64-base
+> kaenv3 --update-postinstalls-md5 sidx64-base
 \end{verbatim}
 This command does the same thing than the precedent one but it concerns the post-install files. This operation is required if something change in the post-install files, otherwise the environment will be unusable.
 
 \paragraph{Use case 9}
 \begin{verbatim}
-> kaenv3 -o set-visibility-tag -t private -e sidx64-base -v 3
+> kaenv3 --set-visibility-tag sidx64-base --env-version 3 -t private
 \end{verbatim}
 This command allows to define the environment \textit{sidx64-base} version 3 as a private environment. Note that the environment version is required and only the almighty environment users are allowed to define an environment as public.
 
@@ -996,39 +1079,40 @@ Kanodes can be used by using the \texttt{kanodes} command. The CLI looks like th
 Usage: kanodes3 [options]
 Contact: kadeploy3-users@lists.grid5000.fr
 General options:
+  -d, --get-deploy-state       Get the deploy state of the nodes
   -f, --file MACHINELIST       Only print information about the given machines
   -m, --machine MACHINE        Only print information about the given machines
-  -o, --operation OPERATION    Choose the operation (get_deploy_state or get_yaml_dump)
   -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 
-                               operation). If no workflow id is specified, the information 
-                               of all the running worklfows will be dumped
+                               operation. If no wid is specified, the information of all
+                               the running worklfows will be dumped
+  -y, --get-yaml-dump          Get the yaml dump
 \end{verbatim}
 \end{small}
 
 We present now the use cases.
 \paragraph{Use case 1}
 \begin{verbatim}
-> kanodes3 -o get_deploy_state
+> kanodes3 -d
 \end{verbatim}
 This commands prints the global state of all the nodes managed by a Kadeploy server.
 
 \paragraph{Use case 2}
 \begin{verbatim}
-> kanodes3 -o get_deploy_state -m gdx-25.orsay.grid5000.fr -f machine_file
+> kanodes3 -d -m gdx-25.orsay.grid5000.fr -f machine_file
 \end{verbatim}
 This command prints the global state of the node \textit{gdx-25.orsay.grid5000.fr} and of the nodes listed in the file \texttt{machine\_file}.
 
 \paragraph{Use case 3}
 \begin{verbatim}
-> kanodes3 -o get_yaml_dump
+> kanodes3 -y
 \end{verbatim}
 This commands prints a YAML output of the deployment state of all the nodes currently in deployment. On the YAML output, the nodes are sorted according to the deployment workflow they belong to.
 
 \paragraph{Use case 4}
 \begin{verbatim}
-> kanodes3 -o get_yaml_dump -w 78
+> kanodes3 -y -w 78
 \end{verbatim}
-This commands prints a YAML output of the deployment state of all the nodes currently in the deployment number 78. The deployment number, or workflow id, can be obtained thanks to a Kadeploy option.% (see the~\ref{par:usecase-wid} part to know how to get the workflow id of a deployment).
+This commands prints a YAML output of the deployment state of all the nodes currently in the deployment number 78. The deployment number, or workflow id, can be obtained thanks to a Kadeploy option.
 
 \section{Migrate your Kadeploy 2.1.x environment}
 Migrating your environments from Kadeploy 2.1.x is quite easy. Please refer to the~\ref{sec:env_desc} part to get the full information about the environment description with Kadeploy 3.

@@ -1180,14 +1180,15 @@ module MicroStepsLibrary
     # * return true if the format has been successfully performed, false otherwise
     def ms_format_tmp_part
       if (@config.exec_specific.reformat_tmp) then
-        if @config.common.mkfs_options.has_key?("ext2") then
-          opts = @config.common.mkfs_options["ext2"]
+        fstype = @config.exec_specific.reformat_tmp_fstype
+        if @config.common.mkfs_options.has_key?(fstype) then
+          opts = @config.common.mkfs_options[fstype]
           tmp_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].tmp_part
-          return parallel_exec_command_wrapper("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.ext2 #{opts} #{tmp_part}",
+          return parallel_exec_command_wrapper("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{opts} #{tmp_part}",
                                                @config.common.taktuk_connector)
         else
           tmp_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].tmp_part
-          return parallel_exec_command_wrapper("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.ext2 #{tmp_part}",
+          return parallel_exec_command_wrapper("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{tmp_part}",
                                                @config.common.taktuk_connector)
         end
       end

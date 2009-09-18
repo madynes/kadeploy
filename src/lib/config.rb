@@ -639,7 +639,7 @@ module ConfigInformation
     # * return true in case of success, false otherwise
     def load_nodes_config_file
       IO.readlines(CONFIGURATION_FOLDER + "/" + NODES_FILE).each { |line|
-        if /\A([A-Za-z0-9\.\-]+)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([A-Za-z0-9\.\-]+)\Z/ =~ line
+        if /\A([a-zA-Z]+[-\w.]*)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([\w.-]+)\Z/ =~ line
           content = Regexp.last_match
           host = content[1]
           ip = content[2]
@@ -831,8 +831,13 @@ module ConfigInformation
         opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
             exec_specific.deploy_part = p
         }
-        opt.on("-r", "--reformat-tmp", "Reformat the /tmp partition") {
+        opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (ext[234] are allowed)") { |t|
+          if not (/\A(ext2|ext3|ext4)\Z/ =~ t) then
+            error("Invalid FSTYPE, only ext2, ext3 and ext4 are allowed")
+            return false
+          end
           exec_specific.reformat_tmp = true
+          exec_specific.reformat_tmp_fstype = t
         }
         opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
           if not File.readable?(f) then
@@ -855,7 +860,15 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-v", "--env-version NUMVERSION", "Number of version of the environment to deploy") { |n|
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+          if not File.readable?(f) then
+            error("The file #{f} cannot be read")
+            return false
+          else
+            exec_specific.pxe_profile_file = f
+          end
+        }
+        opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
           if /\A\d+\Z/ =~ n then
             exec_specific.env_version = n
           else
@@ -869,14 +882,6 @@ module ConfigInformation
           else
             error("Invalid verbose level")
             return false
-          end
-        }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            exec_specific.pxe_profile_file = f
           end
         }
         opt.separator "Advanced options:"
@@ -1100,14 +1105,6 @@ module ConfigInformation
           @exec_specific.env_name = n
           @exec_specific.operation = "delete"
         }  
-        opt.on("-f", "--file FILE", "Environment file") { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            @exec_specific.file = f
-          end
-        }
         opt.on("-l", "--list", "List environments") {
           @exec_specific.operation = "list"
         }
@@ -1143,7 +1140,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-v", "--version NUMBER", "Specify the version") { |v|
+        opt.on("--env-version NUMBER", "Specify the version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.version = v
           else
@@ -1737,16 +1734,16 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-v", "--version NUMBER", "Specify the environment version") { |v|
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
+          @exec_specific.pxe_profile_file = file
+        }
+        opt.on("--env-version NUMBER", "Specify the environment version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.env_version = v
           else
             error("Invalid version number")
             return false
           end
-        }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
-          @exec_specific.pxe_profile_file = file
         }
         opt.on("--no-wait", "Do not wait the end of the reboot") {
           @exec_specific.wait = false

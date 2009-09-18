@@ -332,6 +332,7 @@ module SetDeploymentEnvironnment
             result = result && @step.switch_pxe("prod_to_nfsroot_env")
             result = result && @step.reboot("soft")
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
             result = result && @step.format_deploy_part
             result = result && @step.mount_deploy_part

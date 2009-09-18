@@ -132,6 +132,6 @@ fi
 
 /usr/sbin/sshd
 
-nc -l -p 25300 &
+(while true; do nc -l -p 25300; done) &
 
 exec /sbin/init 2

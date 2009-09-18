@@ -192,7 +192,7 @@ if (exec_specific_config != nil) then
       #Launch the listener on the client
       kadeploy_client = KadeployClient.new(kadeploy_server)
       DRb.start_service(nil, kadeploy_client)
-      if /druby:\/\/([\w\.\-]+):(\d+)/ =~ DRb.uri
+      if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
         content = Regexp.last_match
         client_host = content[1]
         client_port = content[2]

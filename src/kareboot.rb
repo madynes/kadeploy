@@ -126,7 +126,7 @@ if config.check_config("kareboot", db) then
     #Launch the listener on the client
     kareboot_client = KarebootClient.new(kadeploy_server)
     DRb.start_service(nil, kareboot_client)
-    if /druby:\/\/([\w+.+]+):(\w+)/ =~ DRb.uri
+    if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
       content = Regexp.last_match
       client_host = content[1]
       client_port= content[2]
