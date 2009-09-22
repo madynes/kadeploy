@@ -116,7 +116,7 @@ echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
 
 for ns in ${DNSSERVERS}
 do
-    echo "nameserver $ns" >> /etc/resolv.conv
+    echo "nameserver $ns" >> /etc/resolv.conf
 done
 
 ## load disk driver
