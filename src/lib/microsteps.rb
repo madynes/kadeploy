@@ -1063,12 +1063,17 @@ module MicroStepsLibrary
         reboot_wrapper("very_hard")
       when "kexec"
         if (@config.exec_specific.environment.environment_kind == "linux") then
-          kernel = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.kernel}"
-          initrd = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.initrd}"
-          root_part = get_deploy_part_str()
-          #Warning, this require the /usr/local/bin/kexec_detach script
-          return parallel_exec_command_wrapper("(/usr/local/bin/kexec_detach #{kernel} #{initrd} #{root_part} #{get_kernel_params()})",
-                                               @config.common.taktuk_connector)
+          if (@config.exec_specific.environment.disable_kexec == "false") then
+            kernel = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.kernel}"
+            initrd = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.initrd}"
+            root_part = get_deploy_part_str()
+            #Warning, this require the /usr/local/bin/kexec_detach script
+            return parallel_exec_command_wrapper("(/usr/local/bin/kexec_detach #{kernel} #{initrd} #{root_part} #{get_kernel_params()})",
+                                                 @config.common.taktuk_connector)
+          else
+            @output.verbosel(3, "   The Kexec optimization has been disabled with this environment")
+            reboot_wrapper("soft", use_rsh_for_reboot)
+          end
         else
           @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
           reboot_wrapper("soft", use_rsh_for_reboot)

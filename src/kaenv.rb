@@ -152,9 +152,10 @@ def add_environment(config, db)
                                        fdisk_type, \
                                        filesystem, \
                                        user, \
-                                       environment_kind,
-                                       visibility,
-                                       demolishing_env) \
+                                       environment_kind, \
+                                       visibility, \
+                                       demolishing_env, \
+                                       disable_kexec) \
                                VALUES (\"#{env.name}\", \
                                        \"#{env.version}\", \
                                        \"#{env.description}\", \
@@ -172,7 +173,8 @@ def add_environment(config, db)
                                        \"#{env.user}\", \
                                        \"#{env.environment_kind}\", \
                                        \"#{env.visibility}\", \
-                                       \"#{env.demolishing_env}\")"
+                                       \"#{env.demolishing_env}\", \
+                                       \"#{env.disable_kexec}\")"
     db.run_query(query)
   end
 end

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `environments` (
   `environment_kind` varchar(10) NOT NULL,
   `visibility` varchar(8) NOT NULL,
   `demolishing_env` int(8) NOT NULL default '0',
-  PRIMARY KEY  (`id`)
+  `disable_kexec` varchar(6) NOT NULL default 'false'
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------
