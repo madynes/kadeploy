@@ -111,7 +111,13 @@ echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
 
 # configure DNS with dhcp info
 
-echo "nameserver ${DNS}" > /etc/resolv.conf
+#useless but we never know ... a day ...
+#echo "search ${DNSDOMAIN/,/ }" > /etc/resolv.conf
+
+for ns in ${DNSSERVERS}
+do
+    echo "nameserver $ns" >> /etc/resolv.conv
+done
 
 ## load disk driver
 get_param DISK_DRV
