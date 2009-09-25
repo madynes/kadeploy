@@ -456,7 +456,7 @@ end
 begin
   config = ConfigInformation::Config.new("kadeploy")
 rescue
-  puts "Bad configuration"
+  puts "Bad configuration: #{$!}"
   exit(1)
 end
 if (config.check_config("kadeploy") == true)

@@ -29,8 +29,7 @@ CREATE TABLE IF NOT EXISTS `environments` (
   `allowed_users` varchar(512) NOT NULL,
   `environment_kind` varchar(10) NOT NULL,
   `visibility` varchar(8) NOT NULL,
-  `demolishing_env` int(8) NOT NULL default '0',
-  `disable_kexec` varchar(6) NOT NULL default 'false'
+  `demolishing_env` int(8) NOT NULL default '0'
 ) ENGINE=MyISAM  DEFAULT CHARSET=utf8;
 
 -- --------------------------------------------------------

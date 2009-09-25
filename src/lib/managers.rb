@@ -497,7 +497,10 @@ module Managers
         #We first check if the file can be reached locally
         if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
           @output.verbosel(3, "Do a local copy for the #{file_tag} #{client_file}")
-          system("cp #{client_file} #{local_file}")
+          if not system("cp #{client_file} #{local_file}") then
+            @output.verbosel(0, "Unable to do the local copy")
+            return false
+          end
         else
           @output.verbosel(3, "Grab the #{file_tag} #{client_file}")
           if not @client.get_file(client_file, prefix) then
@@ -506,7 +509,10 @@ module Managers
           end
         end
       else
-        system("touch -a #{local_file}")
+        if not system("touch -a #{local_file}") then
+          @output.verbosel(0, "Unable to touch the local file")
+          return false
+        end
       end
       return true
     end
@@ -594,7 +600,7 @@ module Managers
         @nodes_to_deploy = @nodeset
       else
         @nodes_to_deploy,nodes_to_discard = @nodeset.check_nodes_in_deployment(@db, @config.common.purge_deployment_timer)
-        @output.verbosel(0, "The nodes #{nodes_to_discard.to_s} are already involved in deployment, let's discard them") if (not nodes_ko.empty?)
+        @output.verbosel(0, "The nodes #{nodes_to_discard.to_s} are already involved in deployment, let's discard them") if (not nodes_to_discard.empty?)
       end
       #We backup the set of nodes used in the deployement to be able to update their deployment state at the end of the deployment
       if not @nodes_to_deploy.empty? then

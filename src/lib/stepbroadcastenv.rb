@@ -100,6 +100,9 @@ module BroadcastEnvironment
     # * nothing
     def kill
       @instances.each { |tid|
+        #first, we clean all the pending processes
+        @step.process_container.killall(tid)
+        #then, we kill the thread
         Thread.kill(tid)
       }
     end

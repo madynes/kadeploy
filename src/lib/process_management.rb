@@ -66,4 +66,36 @@ module ProcessManagement
     rescue
     end
   end
+
+  class Container
+    @instances = nil
+    
+    def initialize
+      @instances = Hash.new
+    end
+
+    def add_process(tid, pid)
+      if not @instances.has_key?(tid) then
+        @instances[tid] = Array.new
+      end
+      @instances[tid].push(pid)
+    end
+
+    def remove_process(tid, pid)
+      if @instances.has_key?(tid) then
+        @instances[tid].delete(pid)
+      end
+    end
+
+    def killall(tid)
+      if @instances.has_key?(tid) then
+        @instances[tid].each { |pid|
+          ProcessManagement::killall(pid)
+          remove_process(tid, pid)
+        }
+        @instances[tid] = nil
+        @instances.delete(tid)
+      end
+    end
+  end
 end

@@ -102,6 +102,9 @@ module SetDeploymentEnvironnment
     # * nothing
     def kill
       @instances.each { |tid|
+        #first, we clean all the pending processes
+        @step.process_container.killall(tid)
+        #then, we kill the thread
         Thread.kill(tid)
       }
     end
@@ -154,8 +157,8 @@ module SetDeploymentEnvironnment
             @output.verbosel(1, "Performing a SetDeploymentEnvUntrusted step on the nodes: #{@nodes_ok.to_s}")
             result = true
             #Here are the micro steps
-            result = result && @step.switch_pxe("prod_to_deploy_env")
-            result = result && @step.reboot("soft")
+            result = result && @step.switch_pxe("prod_to_deploy_env", "")
+            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
@@ -217,7 +220,7 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
-            result = result && @step.reboot("soft")
+            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.manage_admin_pre_install("tree")
@@ -330,7 +333,7 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_nfsroot_env")
-            result = result && @step.reboot("soft")
+            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")

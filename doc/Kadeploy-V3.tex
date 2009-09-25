@@ -928,7 +928,6 @@ filesystem : ext2
 environment_kind : xen
 visibility : shared
 demolishing_env : 0
-disable_kexec : false
 \end{verbatim}
 \end{small}
 
@@ -955,7 +954,6 @@ Explanation of the fields used in the environment description:
 \item public: the environment can be used by everybody and it is listed without specifing its owner name.
 \end{itemize}
 \item \texttt{demolishing\_env}: specify that the environment is demolishing (expected values are 0 if the environment is not demolishing, 10000 otherwise). SHOULD BE IMPROVED...
-\item \texttt{disable\_kexec (opt)}: specify if Kadeploy can use or not the Kexec optimization to deploy this environment (true of false).
 \end{itemize}
 
 \subsection{Karights}\label{sec:karights}

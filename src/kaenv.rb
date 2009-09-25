@@ -154,8 +154,7 @@ def add_environment(config, db)
                                        user, \
                                        environment_kind, \
                                        visibility, \
-                                       demolishing_env, \
-                                       disable_kexec) \
+                                       demolishing_env) \
                                VALUES (\"#{env.name}\", \
                                        \"#{env.version}\", \
                                        \"#{env.description}\", \
@@ -173,8 +172,7 @@ def add_environment(config, db)
                                        \"#{env.user}\", \
                                        \"#{env.environment_kind}\", \
                                        \"#{env.visibility}\", \
-                                       \"#{env.demolishing_env}\", \
-                                       \"#{env.disable_kexec}\")"
+                                       \"#{env.demolishing_env}\")"
     db.run_query(query)
   end
 end

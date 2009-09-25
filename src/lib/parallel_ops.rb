@@ -19,6 +19,8 @@ module ParallelOperations
     @taktuk_auto_propagate = nil
     @output = nil
     @config = nil
+    @instance_thread = nil
+    @process_container = nil
 
     # Constructor of ParallelOps
     #
@@ -29,13 +31,15 @@ module ParallelOperations
     # * output: OutputControl instance
     # Output
     # * nothing
-    def initialize(nodes, config, taktuk_connector, output)
+    def initialize(nodes, config, taktuk_connector, output, instance_thread, process_container)
       @nodes = nodes
       @config = config
       @taktuk_connector = taktuk_connector
       @taktuk_tree_arity = config.common.taktuk_tree_arity
       @taktuk_auto_propagate = config.common.taktuk_auto_propagate
       @output = output
+      @instance_thread = instance_thread
+      @process_container = process_container
     end
 
     # Generate the header of a Taktuk command
@@ -233,6 +237,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd(cmd)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -259,6 +266,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd(cmd)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -286,6 +296,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd(cmd)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -314,6 +327,9 @@ module ParallelOperations
       command_array = make_taktuk_send_file_cmd(file, dest_dir, scattering_kind)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_send_file_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -341,6 +357,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd_with_input_file(file, cmd, scattering_kind)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_cmd_with_input_file_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new

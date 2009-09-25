@@ -100,6 +100,9 @@ module BootNewEnvironment
     # * nothing
     def kill
       @instances.each { |tid|
+        #first, we clean all the pending processes
+        @step.process_container.killall(tid)
+        #then, we kill the thread
         Thread.kill(tid)
       }
     end
@@ -294,7 +297,7 @@ module BootNewEnvironment
             @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s}")
             result = true
             #Here are the micro steps 
-            result = result && @step.reboot("hard")
+            result = result && @step.reboot("hard", use_rsh_for_reboot)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
             #End of micro steps
           }

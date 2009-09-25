@@ -71,6 +71,8 @@ module ParallelRunner
   class PRunner
     @nodes = nil
     @output = nil
+    @instance_thread = nil
+    @process_container = nil
 
     # Constructor of PRunner
     #
@@ -78,9 +80,11 @@ module ParallelRunner
     # * output: instance of OutputControl
     # Output
     # * nothing
-    def initialize(output)
+    def initialize(output, instance_thread, process_container)
       @nodes = Hash.new
       @output = output
+      @instance_thread = instance_thread
+      @process_container = process_container
     end
 
     # Add a command related to a node
@@ -107,6 +111,7 @@ module ParallelRunner
     def run
       @nodes.each_key { |node|
         @nodes[node]["cmd"].run
+        @process_container.add_process(@instance_thread, @nodes[node]["cmd"].pid)
         @nodes[node]["stdout_fd"] = @nodes[node]["cmd"].stdout
         @nodes[node]["stderr_fd"] = @nodes[node]["cmd"].stderr
         @nodes[node]["stdout_reader"] = Thread.new { 
@@ -141,6 +146,7 @@ module ParallelRunner
     def wait
       @nodes.each_key { |node|
         @nodes[node]["cmd"].wait
+        @process_container.remove_process(@instance_thread, @nodes[node]["cmd"].pid)
         node.last_cmd_exit_status = @nodes[node]["cmd"].status.to_s
         @nodes[node]["stdout_reader"].join
         @nodes[node]["stderr_reader"].join

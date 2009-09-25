@@ -28,7 +28,6 @@ module EnvironmentManagement
     attr_reader :environment_kind
     attr_reader :visibility
     attr_reader :demolishing_env
-    attr_reader :disable_kexec
 
     # Load an environment file
     #
@@ -47,7 +46,6 @@ module EnvironmentManagement
         @demolishing_env = "0"
         @kernel_params = nil
         @visibility = "shared"
-        @disable_kexec = "false"
         @user = `id -nu`.chomp
         IO::read(file).split("\n").each { |line|
           if /\A(\w+)\ :\ (.+)\Z/ =~ line then
@@ -161,13 +159,6 @@ module EnvironmentManagement
                 @demolishing_env = val
               else
                 puts "The environment demolishing_env must be a number"
-                return false
-              end
-            when "disable_kexec"
-              if val =~ /\A(true|false)\Z/ then
-                @disable_kexec = val
-              else
-                puts "The disable_kexec value must be true or false"
                 return false
               end
             else
@@ -326,7 +317,6 @@ module EnvironmentManagement
       @environment_kind = hash["environment_kind"]
       @visibility = hash["visibility"]
       @demolishing_env = hash["demolishing_env"]
-      @disable_kexec = hash["disable_kexec"]
     end
 
     # Check the MD5 digest of the files
@@ -398,7 +388,6 @@ module EnvironmentManagement
       puts "environment_kind : #{@environment_kind}"
       puts "visibility : #{@visibility}"
       puts "demolishing_env : #{@demolishing_env}"
-      puts "disable_kexec : #{@disable_kexec}" if (@disable_kexec == "true")
     end
 
     # Give the flatten view of the tarball info without the md5sum
