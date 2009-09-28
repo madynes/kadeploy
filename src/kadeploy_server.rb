@@ -152,7 +152,7 @@ class KadeployServer
   def kill(workflow_id)
     # id == -1 means that the workflow has not been launched yet
     @workflow_info_hash_lock.lock
-    if ((id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
+    if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
       workflow = @workflow_info_hash[workflow_id]
       workflow.kill()
       delete_workflow_info(workflow_id)

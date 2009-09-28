@@ -47,6 +47,7 @@ module EnvironmentManagement
         @kernel_params = nil
         @visibility = "shared"
         @user = `id -nu`.chomp
+        @version = "0"
         IO::read(file).split("\n").each { |line|
           if /\A(\w+)\ :\ (.+)\Z/ =~ line then
             content = Regexp.last_match
@@ -168,7 +169,7 @@ module EnvironmentManagement
           end
         }
       end
-      if ((@name == nil) || (@version == nil) || (@tarball == nil) || (@kernel == nil) ||
+      if ((@name == nil) || (@tarball == nil) || (@kernel == nil) ||
           (@initrd == nil) || (@fdisk_type == nil) || (@filesystem == nil) || (@environment_kind == nil)) then
         puts "The name, version, tarball, kernel, initrd, fdisktype, filesystem and environment_kind fileds are mandatory"
         return false
