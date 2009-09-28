@@ -6,10 +6,32 @@
 # For details on use and redistribution please refer to License.txt
 
 require 'optparse'
+require 'yaml'
 
 KADEPLOY="kadeploy3"
-ENV_LIST="sid-x64-base-1.1,freebsd7"
-MAX_SIMULTANEOUS_DEPLOY=8
+ENV_LIST="lenny-x64-base,lenny-x64-big,sid-x64-base,sid-x64-big"
+MAX_SIMULTANEOUS_DEPLOY=4
+RESULTS=Array.new
+
+def add_result(kind, testname, result, time)
+  h = Hash.new
+  h["kind"] = kind
+  h["testname"] = testname
+  h["result"] = result
+  h["time"] = time
+  RESULTS.push(h)
+end
+
+def show_results
+  puts "--- Summary ---"
+  RESULTS.each { |h|
+    puts "---"
+    puts " - kind: #{h["kind"]}"
+    puts " - name: #{h["testname"]}"
+    puts " - time: #{h["time"]}"
+    puts " - result: #{h["result"]}"
+  }
+end
 
 def load_cmdline_options
   nodes = Array.new
@@ -84,10 +106,14 @@ end
 def test_deploy(nodes, step1, step2, step3, test_name, key)
   ENV_LIST.split(",").each { |env|
     start = Time.now.to_i
-    if _test_deploy(nodes, step1, step2, step3, test_name, key, env) then
-      puts "[ PASSED ] (#{Time.now.to_i - start}s)"
+    res = _test_deploy(nodes, step1, step2, step3, test_name, key, env)
+    time = Time.now.to_i - start
+    if res then
+      add_result("seq", test_name, "ok", time)
+      puts "[ PASSED ] (#{time}s)"
     else
-      puts "[ ERROR ] (#{Time.now.to_i - start}s)"
+      add_result("seq", test_name, "ko", time)
+      puts "[ ERROR ] (#{time}s)"
     end
   }
 end
@@ -116,10 +142,13 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key)
         result = false
       end
     }
+    time = Time.now.to_i - start
     if result then
-      puts "[ PASSED ] (#{Time.now.to_i - start}s)"
+      add_result("simult", test_name, "ok", time)
+      puts "[ PASSED ] (#{time}s)"
     else
-      puts "[ ERROR ] (#{Time.now.to_i - start}s)"
+      add_result("simult", test_name, "ko", time)
+      puts "[ ERROR ] (#{time}s)"
     end
     simult += 2
   end
@@ -136,10 +165,13 @@ def test_dummy(nodes, step1, step2, step3, test_name, ok = "nodes_ok", ko = "nod
   cmd = "#{KADEPLOY} #{node_list} -e \"#{ENV_LIST.split(",")[0]}\" --verbose-level 0 --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko}"
   start = Time.now.to_i
   system(cmd)
+  time = Time.now.to_i - start
   if File.exist?(ko) then
-    puts "[ ERROR ] (#{Time.now.to_i - start}s)"
+    add_result("seq", test_name, "ko", time)
+    puts "[ ERROR ] (#{time}s)"
   else
-    puts "[ PASSED ] (#{Time.now.to_i - start}s)"
+    add_result("seq", test_name, "ok", time)
+    puts "[ PASSED ] (#{time}s)"
   end
 end
 
@@ -157,13 +189,15 @@ puts "--------------- Dummy test ------------------"
 test_dummy(nodes, "SetDeploymentEnvDummy:1:10", "BroadcastEnvDummy:1:10", "BootNewEnvDummy:1:10", "Dummy")
 
 puts "----------- Simple deploy tests -------------"
-test_deploy(nodes, "SetDeploymentEnvProd:2:100", "BroadcastEnvChainWithFS:2:300", "BootNewEnvKexec:1:150", "ProdEnv - Kexec reboot")
-test_deploy(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvChain:1:400", "BootNewEnvKexec:1:400", "UntrustedEnv - Taktuk broadcast - Kexec reboot", key)
-test_deploy(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvChain:1:400", "BootNewEnvClassical:1:500", "UntrustedEnv - Taktuk broadcast - Classical reboot", key)
+#test_deploy(nodes, "SetDeploymentEnvProd:2:100", "BroadcastEnvChainWithFS:2:300", "BootNewEnvKexec:1:150", "ProdEnv - Kexec reboot")
+#test_deploy(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvChain:1:400", "BootNewEnvKexec:1:400", "UntrustedEnv - Taktuk broadcast - Kexec reboot", key)
+#test_deploy(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvChain:1:400", "BootNewEnvClassical:1:500", "UntrustedEnv - Taktuk broadcast - Classical reboot", key)
 test_deploy(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvKastafior:1:400", "BootNewEnvKexec:1:400", "UntrustedEnv - Kastafior broadcast - Kexec reboot", key)
 test_deploy(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvKastafior:1:400", "BootNewEnvClassical:1:500", "UntrustedEnv - Kastafior broadcast - Classical reboot", key)
 
 puts "-------- Simultaneous deploy tests ----------"
 test_simultaneous_deployments(nodes, "SetDeploymentEnvUntrusted:1:500", "BroadcastEnvKastafior:1:400", "BootNewEnvClassical:1:500", "UntrustedEnv - Kastafior broadcast - Classical reboot", key)
+
+show_results()
 
 exit 0
