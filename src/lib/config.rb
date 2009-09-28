@@ -16,6 +16,7 @@ module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
   COMMANDS_FILE = "cmd"
   NODES_FILE = "nodes"
+  VERSION_FILE = "version"
   COMMON_CONFIGURATION_FILE = "conf"
   CLUSTER_CONFIGURATION_FILE = "clusters"
   CLIENT_CONFIGURATION_FILE = "client_conf"
@@ -49,6 +50,7 @@ module ConfigInformation
           res = res && load_cluster_specific_config_files
           res = res && load_nodes_config_file
           res = res && load_commands
+          res = res && load_version
           puts "Problem in configuration" if not res
         when "kaenv"
           res = load_kaenv_exec_specific
@@ -140,28 +142,33 @@ module ConfigInformation
       exec_specific.nodes_ko_file = String.new
       exec_specific.nodes_state = Hash.new
       exec_specific.write_workflow_id = String.new
+      exec_specific.get_version = false
 
       if (load_kadeploy_cmdline_options(common_config.nodes_desc, exec_specific) == true) then
-        case exec_specific.load_env_kind
-        when "file"
-          if (exec_specific.environment.load_from_file(exec_specific.load_env_arg, common_config.almighty_env_users) == false) then
+        if not exec_specific.get_version then
+          case exec_specific.load_env_kind
+          when "file"
+            if (exec_specific.environment.load_from_file(exec_specific.load_env_arg, common_config.almighty_env_users) == false) then
+              return nil
+            end
+          when "db"
+            if (exec_specific.environment.load_from_db(exec_specific.load_env_arg,
+                                                       exec_specific.env_version,
+                                                       exec_specific.user,
+                                                       db) == false) then
+              return nil
+            end
+          when ""
+            error("You must choose an environment")
             return nil
+          else
+            puts "Invalid method for environment loading"
+            raise
           end
-        when "db"
-          if (exec_specific.environment.load_from_db(exec_specific.load_env_arg,
-                                                     exec_specific.env_version,
-                                                     exec_specific.user,
-                                                     db) == false) then
-            return nil
-          end
-        when ""
-          error("You must choose an environment")
-          return nil
+          return exec_specific
         else
-          puts "Invalid method for environment loading"
-          raise
+          return exec_specific
         end
-        return exec_specific
       else
         return nil
       end
@@ -232,6 +239,10 @@ module ConfigInformation
         #configuration node file
         if not File.readable?(CONFIGURATION_FOLDER + "/" + NODES_FILE) then
           puts "The #{CONFIGURATION_FOLDER + "/" + NODES_FILE} file cannot be read"
+          return false
+        end
+        if not File.readable?(CONFIGURATION_FOLDER + "/" + VERSION_FILE) then
+          puts "The #{CONFIGURATION_FOLDER + "/" + VERSION_FILE} file cannot be read"
           return false
         end
       when "kaenv"
@@ -694,6 +705,17 @@ module ConfigInformation
       return true
     end
 
+    # Load the version of Kadeploy
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def load_version
+      line = IO.readlines(CONFIGURATION_FOLDER + "/" + VERSION_FILE)
+      @common.version = line[0].chomp
+    end
+
     # Replace the substrings HOSTNAME_FQDN and HOSTNAME_SHORT in a string by a value
     #
     # Arguments
@@ -868,6 +890,9 @@ module ConfigInformation
             exec_specific.pxe_profile_file = f
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          exec_specific.get_version = true
+        }
         opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
           if /\A\d+\Z/ =~ n then
             exec_specific.env_version = n
@@ -951,16 +976,16 @@ module ConfigInformation
         error("Option parsing error")
         return false
       end
-      if exec_specific.node_list.empty? then
-        error("You must specify some nodes to deploy")
-        return false
+      if not exec_specific.get_version then
+        if exec_specific.node_list.empty? then
+          error("You must specify some nodes to deploy")
+          return false
+        end
+        if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
+          error("The files used for the output of the OK and the KO nodes must not be the same")
+          return false
+        end
       end
-
-      if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
-        error("The files used for the output of the OK and the KO nodes must not be the same")
-        return false
-      end
-
       return true
     end
 
@@ -1075,6 +1100,7 @@ module ConfigInformation
       @exec_specific.show_all_version = false
       @exec_specific.version = String.new
       @exec_specific.files_to_move = Array.new
+      @exec_specific.get_version = false
       return load_kaenv_cmdline_options()
     end
 
@@ -1140,6 +1166,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
         opt.on("--env-version NUMBER", "Specify the version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.version = v
@@ -1192,6 +1221,9 @@ module ConfigInformation
     # Fixme
     # * should add more tests
     def check_kaenv_config
+      if @exec_specific.get_version then
+        return true
+      end
       case @exec_specific.operation 
       when "add"
         if (@exec_specific.file == "") then
@@ -1272,6 +1304,7 @@ module ConfigInformation
       @exec_specific.part_list = Array.new
       @exec_specific.node_list = Array.new
       @exec_specific.overwrite_existing_rights = false
+      @exec_specific.get_version = false
       return load_karights_cmdline_options()
     end
 
@@ -1333,6 +1366,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
       end
       @opts = opts
       begin
@@ -1351,6 +1387,9 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_karights_config
+      if @exec_specific.get_version then
+        return true
+      end
       if (@exec_specific.user == "") then
         error("You must choose a user")
         return false
@@ -1395,6 +1434,7 @@ module ConfigInformation
       @exec_specific.node_list = Array.new
       @exec_specific.steps = Array.new
       @exec_specific.fields = Array.new
+      @exec_specific.get_version = false
       return load_kastat_cmdline_options()
     end
 
@@ -1449,6 +1489,9 @@ module ConfigInformation
         opt.on("-s", "--step STEP", "Applies the retry filter on the given steps (1, 2 or 3)") { |s|
           @exec_specific.steps.push(s) 
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
         opt.on("-x", "--date-min DATE", "Get the stats from this date (yyyy:mm:dd:hh:mm:ss)") { |d|
           @exec_specific.date_min = d
         }
@@ -1473,6 +1516,9 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kastat_config
+      if @exec_specific.get_version then
+        return true
+      end
       if (@exec_specific.operation == "") then
         error("You must choose an operation")
         return false
@@ -1533,6 +1579,7 @@ module ConfigInformation
       @exec_specific.operation = String.new
       @exec_specific.node_list = Array.new
       @exec_specific.wid = String.new
+      @exec_specific.get_version = false
       return load_kanodes_cmdline_options()
     end
 
@@ -1574,6 +1621,9 @@ module ConfigInformation
           end
           @exec_specific.node_list.push(m)
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
         opt.on("-w", "--workflow-id WID", "Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped") { |w|
           @exec_specific.wid = w
         }
@@ -1598,7 +1648,7 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kanodes_config
-      if (exec_specific.operation == "") then
+      if ((exec_specific.operation == "") && (not @exec_specific.get_version)) then
         error("You must choose an operation")
         return false
       end
@@ -1636,6 +1686,7 @@ module ConfigInformation
       @exec_specific.nodes_ko_file = String.new
       @exec_specific.reboot_level = "soft"
       @exec_specific.wait = true
+      @exec_specific.get_version = false
       return load_kareboot_cmdline_options(nodes_desc)
     end
 
@@ -1734,6 +1785,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
           @exec_specific.pxe_profile_file = file
         }
@@ -1774,6 +1828,9 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kareboot_config(db)
+      if @exec_specific.get_version then
+        return true
+      end
       if @exec_specific.node_list.empty? then
         error("No node is chosen")
         return false
@@ -1849,6 +1906,7 @@ module ConfigInformation
     def load_kaconsole_exec_specific(nodes_desc)
       @exec_specific = OpenStruct.new
       @exec_specific.node = nil
+      @exec_specific.get_version = false
       return load_kaconsole_cmdline_options(nodes_desc)
     end
 
@@ -1879,6 +1937,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }        
       end
       @opts = opts
       begin
@@ -1897,7 +1958,10 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kaconsole_config
-      if (@exec_specific.node == nil) then
+      if @exec_specific.get_version then
+        return true
+      end
+      if (@exec_specific.node == nil)then
         error("You must choose one node")
         return false
       end
@@ -1953,6 +2017,7 @@ module ConfigInformation
     attr_accessor :bt_tracker_ip
     attr_accessor :bt_download_timeout
     attr_accessor :almighty_env_users
+    attr_accessor :version
 
     # Constructor of CommonConfig
     #

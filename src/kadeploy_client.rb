@@ -169,6 +169,11 @@ db.connect(common_config.deploy_db_host,
 
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific(common_config, db)
 if (exec_specific_config != nil) then
+  if exec_specific_config.get_version then
+    puts "Kadeploy version: #{kadeploy_server.get_version()}"
+    _exit(0, db)
+  end
+
   if ((exec_specific_config.environment.environment_kind != "other") || (common_config.bootloader != "pure_pxe")) then
     #Rights check
     allowed_to_deploy = true

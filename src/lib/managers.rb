@@ -308,6 +308,7 @@ module Managers
     @nodes_to_deploy = nil
     @nodes_to_deploy_backup = nil
     @killed = nil
+    @deploy_id = nil
 
     # Constructor of WorkflowManager
     #
@@ -319,14 +320,15 @@ module Managers
     # * db: database handler
     # * deployments_table_lock: mutex to protect the deployments table
     # * syslog_lock: mutex on Syslog
+    # * deploy_id: deployment id
     # Output
     # * nothing
-    def initialize(config, client, reboot_window, nodes_check_window, db, deployments_table_lock, syslog_lock)
+    def initialize(config, client, reboot_window, nodes_check_window, db, deployments_table_lock, syslog_lock, deploy_id)
       @db = db
       @deployments_table_lock = deployments_table_lock
       @config = config
       @client = client
-      @deploy_id = Time.now.to_f #we use the timestamp as a deploy_id
+      @deploy_id = deploy_id
       if (@config.exec_specific.verbose_level != nil) then
         @output = Debug::OutputControl.new(@config.exec_specific.verbose_level, @config.exec_specific.debug, client, 
                                            @config.exec_specific.true_user, @deploy_id,

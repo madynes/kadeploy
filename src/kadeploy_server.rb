@@ -52,52 +52,54 @@ class KadeployServer
     @db = db
     @workflow_info_hash = Hash.new
     @workflow_info_hash_lock = Mutex.new
-    @workflow_info_hash_index = 0
+  end
+
+  # Give the current version of Kadeploy
+  #
+  # Arguments
+  # * nothing
+  # Output
+  # * nothing
+  def get_version
+    return @config.common.version
   end
 
   # Record a Managers::WorkflowManager pointer
   #
   # Arguments
   # * workflow_ptr: reference toward a Managers::WorkflowManager
+  # * workflow_id: workflow_id
   # Output
-  # * return an id that allows to find the right Managers::WorkflowManager reference
-  def add_workflow_info(workflow_ptr)
-    @workflow_info_hash_lock.lock
-    id = @workflow_info_hash_index
-    @workflow_info_hash[id] = workflow_ptr
-    @workflow_info_hash_index += 1
-    @workflow_info_hash_lock.unlock
-    return id
+  # * nothing
+  def add_workflow_info(workflow_ptr, workflow_id)
+    @workflow_info_hash[workflow_id] = workflow_ptr
   end
 
   # Delete the information of a workflow
   #
   # Arguments
-  # * id: workflow id
+  # * workflow_id: workflow id
   # Output
   # * nothing
-  def delete_workflow_info(id)
-    @workflow_info_hash_lock.lock
-    @workflow_info_hash.delete(id)
-    @workflow_info_hash_lock.unlock
+  def delete_workflow_info(workflow_id)
+    @workflow_info_hash.delete(workflow_id)
   end
 
   # Get a YAML output of the workflows (RPC)
   #
   # Arguments
-  # * wid: workflow id
+  # * workflow_id (opt): workflow id
   # Output
   # * return a string containing the YAML output
-  def get_workflow_state(wid = "")
+  def get_workflow_state(workflow_id = "")
     str = String.new
-    id = wid.to_i if (wid != "")
     @workflow_info_hash_lock.lock
-    if (@workflow_info_hash.has_key?(id)) then
+    if (@workflow_info_hash.has_key?(workflow_id)) then
       hash = Hash.new
-      hash[id] = @workflow_info_hash[id].get_state
+      hash[workflow_id] = @workflow_info_hash[workflow_id].get_state
       str = hash.to_yaml
       hash = nil
-    elsif (wid == "") then
+    elsif (workflow_id == "") then
       hash = Hash.new
       @workflow_info_hash.each_pair { |key,workflow_info_hash|
         hash[key] = workflow_info_hash.get_state
@@ -144,16 +146,18 @@ class KadeployServer
   # Kill a workflow (RPC)
   #
   # Arguments
-  # * id: id of the workflow
+  # * workflow_id: id of the workflow
   # Output
   # * nothing  
-  def kill(id)
+  def kill(workflow_id)
     # id == -1 means that the workflow has not been launched yet
-    if (id != -1) then
-      workflow = @workflow_info_hash[id]
+    @workflow_info_hash_lock.lock
+    if ((id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
+      workflow = @workflow_info_hash[workflow_id]
       workflow.kill()
-      delete_workflow_info(id)
+      delete_workflow_info(workflow_id)
     end
+    @workflow_info_hash_lock.unlock
   end
 
   # Get the common configuration (RPC)
@@ -237,9 +241,12 @@ class KadeployServer
     else
       config.cluster_specific = @config.cluster_specific
     end
-
-    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock)
-    workflow_id = add_workflow_info(workflow)
+    @workflow_info_hash_lock.lock
+    deploy_id = Time.now.to_f #we use the timestamp as a deploy_id
+    workflow_id = "#{config.exec_specific.true_user}-#{deploy_id}"
+    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, deploy_id)
+    add_workflow_info(workflow, workflow_id)
+    @workflow_info_hash_lock.unlock
     client.set_workflow_id(workflow_id)
     client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
     finished = false
@@ -262,7 +269,9 @@ class KadeployServer
     finished = true
     #let's free memory at the end of the workflow
     tid = nil
+    @workflow_info_hash_lock.lock
     delete_workflow_info(workflow_id)
+    @workflow_info_hash_lock.unlock
     workflow.finalize
     workflow = nil
     exec_specific = nil
@@ -307,9 +316,12 @@ class KadeployServer
     else
       config.cluster_specific = @config.cluster_specific
     end
-
-    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock)
-    workflow_id = add_workflow_info(workflow)
+    @workflow_info_hash_lock.lock
+    deploy_id = Time.now.to_f #we use the timestamp as a deploy_id
+    workflow_id = "#{config.exec_specific.true_user}-#{deploy_id}"
+    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, deploy_id)
+    add_workflow_info(workflow, workflow_id)
+    @workflow_info_hash_lock.unlock
     if (workflow.prepare()) then
       workflow.run_async()
     end
@@ -320,23 +332,37 @@ class KadeployServer
   # Test if the workflow has reached the end (RPC: only for async execution)
   #
   # Arguments
-  # * id: worklfow id
+  # * workflow_id: worklfow id
   # Output
-  # * return true if the workflow has reached the end, false otherwise
-  def ended?(id)
-    workflow = @workflow_info_hash[id]
-    return workflow.ended?
+  # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
+  def ended?(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.ended?
+    else
+      ret nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
   end
 
   # Get the results of a workflow (RPC: only for async execution)
   #
   # Arguments
-  # * id: worklfow id
+  # * workflow_id: worklfow id
   # Output
-  # * return a hastable containing the state of all the nodes involved in the deployment
-  def get_results(id)
-    workflow = @workflow_info_hash[id]
-    return workflow.get_results
+  # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
+  def get_results(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.get_results
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
   end
 
   # Clean the stuff related to the deployment (RPC: only for async execution)
@@ -345,16 +371,23 @@ class KadeployServer
   # * id: worklfow id
   # Output
   # * nothing
-  def free(id)
-    workflow = @workflow_info_hash[id]
-    #let's free memory at the end of the workflow
-    tid = nil
-    delete_workflow_info(id)
-    workflow.finalize
-    workflow = nil
-    exec_specific = nil
-    DRb.stop_service()
-    GC.start
+  def free(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      delete_workflow_info(workflow_id)
+      #let's free memory at the end of the workflow
+      tid = nil
+      workflow.finalize
+      workflow = nil
+      exec_specific = nil
+      GC.start
+      ret = true
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
   end
 
   # Reboot a set of nodes from the client side (RPC)

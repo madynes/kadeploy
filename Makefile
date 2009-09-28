@@ -67,6 +67,10 @@ install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/etc/kadeploy3/keys
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DESTDIR)/etc/kadeploy3/keys
 
+install_version:
+	@echo "$(MAJOR_VERSION)-$(MINOR_VERSION)" > $(DESTDIR)/etc/kadeploy3/version
+	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DESTDIR)/etc/kadeploy3/version
+
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
 
@@ -89,7 +93,7 @@ install_common: tree_common install_conf_common install_src install_test install
 
 install_client: tree_client install_conf_client install_bin
 
-install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior
+install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version
 
 install_all: install_common install_client install_server
 

@@ -755,7 +755,6 @@ module MicroStepsLibrary
       end
       return true
     end
-   
 
     # Execute a custom command on the nodes
     #

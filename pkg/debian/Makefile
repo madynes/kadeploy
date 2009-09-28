@@ -57,6 +57,10 @@ install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DEB_ROOT_SERVER)/etc/kadeploy3/keys
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DEB_ROOT_SERVER)/etc/kadeploy3/keys
 
+install_version:
+	@echo $(VERSION) > $(DEB_ROOT_SERVER)/etc/kadeploy3/version
+	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DEB_ROOT_SERVER)/etc/kadeploy3/version
+
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
 	@mkdir -p $(DEB_ROOT_CLIENT)/etc/kadeploy3
@@ -80,7 +84,7 @@ tree_common:
 package_client: tree_client install_conf_client install_bin
 	@sh set_version.sh kadeploy-client-control.in > $(DEB_ROOT_CLIENT)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_CLIENT) kadeploy-client-$(VERSION).deb
-package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior
+package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version
 	@sh set_version.sh kadeploy-server-control.in > $(DEB_ROOT_SERVER)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_SERVER) kadeploy-server-$(VERSION).deb	
 package_common: tree_common install_conf_common install_src install_test install_db_script

@@ -101,6 +101,10 @@ db.connect(config.common.deploy_db_host,
            config.common.deploy_db_passwd,
            config.common.deploy_db_name)
 if config.check_config("kareboot", db) then
+  if config.exec_specific.get_version then
+    puts "Kareboot version: #{kadeploy_server.get_version()}"
+    _exit(0, db)
+  end
   #Rights check
   allowed_to_deploy = true
   part = String.new
