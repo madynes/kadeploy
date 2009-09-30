@@ -1177,6 +1177,7 @@ module ConfigInformation
             return false
           end
         }
+        opt.separator "Advanced options:"
         opt.on("--remove-demolishing-tag ENVNAME", "Remove demolishing tag on an environment") { |n|
           @exec_specific.env_name = n
           @exec_specific.operation = "remove-demolishing-tag"
@@ -1486,7 +1487,7 @@ module ConfigInformation
           end
           @exec_specific.node_list.push(m)
         }
-        opt.on("-s", "--step STEP", "Applies the retry filter on the given steps (1, 2 or 3)") { |s|
+        opt.on("-s", "--step STEP", "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
           @exec_specific.steps.push(s) 
         }
         opt.on("-v", "--version", "Get the version") {
@@ -1924,7 +1925,7 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-m", "--machine MACHINE", "Obtain a console on the given machines") { |hostname|
+        opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false

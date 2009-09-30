@@ -1,0 +1,219 @@
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+	  "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd"
+	  [
+	  <!ENTITY program "kadeploy3">
+	  <!ENTITY command "<command>&program;</command>">
+	  <!ENTITY firstname "Emmanuel">
+	  <!ENTITY surname "Jeanvoine">
+	  <!ENTITY address "emmanuel.jeanvoine@inria.fr">
+	  ]>
+<refentry>
+  <refentryinfo>
+    <author>
+      <firstname>&firstname;</firstname>
+      <surname>&surname;</surname>
+    </author>
+    <address>&address;</address>
+    <copyright>
+      <year>2008-2009</year>
+      <holder>INRIA - &firstname; &surname;</holder>
+    </copyright>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>&program;</refentrytitle>
+    <manvolnum>1</manvolnum>
+  </refmeta>
+  <refnamediv>
+    <refname>The Kadeploy software suite V3</refname>
+    <refpurpose>Kadeploy client</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&program; [OPTIONS]</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+    
+    <para><command>kadeploy3</command> allows to perform efficient deployments on cluster nodes.</para>
+
+    <para>General options:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-a</option></term>
+	<term><option>--env-file <replaceable>ENVFILE</replaceable></option></term>
+	<listitem>
+	  <para>File containing the envrionement description.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-b</option></term>
+	<term><option>--block-device <replaceable>BLOCKDEVICE</replaceable></option></term>
+	<listitem>
+	  <para>Specify the block device to use.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-d</option></term>
+	<term><option>--debug-mode</option></term>
+	<listitem>
+	  <para>Activate the debug mode.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-e</option></term>
+	<term><option>--env-name <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Name of the recorded environment to deploy.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-f</option></term>
+	<term><option>--file <replaceable>MACHINELIST</replaceable></option></term>
+	<listitem>
+	  <para>Files containing list of nodes.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-k</option></term>
+	<term><option>--key <replaceable>[FILE]</replaceable></option></term>
+	<listitem>
+	  <para>Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-m</option></term>
+	<term><option>--machine <replaceable>MACHINE</replaceable></option></term>
+	<listitem>
+	  <para>Node to run on.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-n</option></term>
+	<term><option>--output-ko-nodes <replaceable>FILENAME</replaceable></option></term>
+	<listitem>
+	  <para>File that will contain the nodes not correctly deployed.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-o</option></term>
+	<term><option>--output-ok-nodes <replaceable>FILENAME</replaceable></option></term>
+	<listitem>
+	  <para>File that will contain the nodes correctly deployed.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-p</option></term>
+	<term><option>--partition-number <replaceable>NUMBER</replaceable></option></term>
+	<listitem>
+	  <para>Specify the partition number to use.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-r</option></term>
+	<term><option>--partition-number <replaceable>FSTYPE</replaceable></option></term>
+	<listitem>
+	  <para>Reformat the /tmp partition with the given filesystem type (ext[234] are allowed).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-s</option></term>
+	<term><option>--script <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Execute a script at the end of the deployment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-u</option></term>
+	<term><option>--user <replaceable>USERNAME</replaceable></option></term>
+	<listitem>
+	  <para>Specify the user.</para>
+	</listitem>
+      </varlistentry>      
+      <varlistentry>
+	<term><option>-w</option></term>
+	<term><option>--set-pxe-profile <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Set the PXE profile (use with caution).</para>
+	</listitem>
+      </varlistentry>   
+      <varlistentry>
+	<term><option>-v</option></term>
+	<term><option>--version</option></term>
+	<listitem>
+	  <para>Get the version.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--env-version <replaceable>NUMBER</replaceable></option></term>
+	<listitem>
+	  <para>Number of version of the environment to deploy.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--verbose-level <replaceable>VALUE</replaceable></option></term>
+	<listitem>
+	  <para>Verbose level between 0 to 4.</para>
+	</listitem>
+      </varlistentry>
+
+      <para>Advanced options:</para>
+      <varlistentry>
+	<term><option>--write-workflow-id <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Write the workflow id in a file.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--ignore-nodes-deploying</option></term>
+	<listitem>
+	  <para>Allow to deploy even on the nodes tagged as "currently deploying" (use this only if you know what you do).</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--disable-bootloader-install</option></term>
+	<listitem>
+	  <para>Disable the disk partitioning.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--breakpoint <replaceable>MICROSTEP</replaceable></option></term>
+	<listitem>
+	  <para>Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do).</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--set-custom-operations <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Add some custom operations defined in a file.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--force-steps <replaceable>STRNG</replaceable></option></term>
+	<listitem>
+	  <para>Undocumented, for administration purpose only.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+    <para>
+      <citerefentry><refentrytitle>kareboot3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kaenv3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kaconsole3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kastat3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kanodes3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>karights3</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+    </para>
+  
+    <para>Project homepage: <ulink url="https://gforge.inria.fr/projects/kadeploy3/">https://gforge.inria.fr/projects/kadeploy3/</ulink></para>
+    <para>Contact: kadeploy3-users@lists.gforge.inria.fr</para>
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009 <email>emmanuel.jeanvoine@inria.fr</email></para>
+    <para>CECILL License V2 - http://www.cecill.info</para>
+  </refsect1>
+</refentry>

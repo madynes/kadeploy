@@ -1,0 +1,137 @@
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+	  "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd"
+	  [
+	  <!ENTITY program "karights3">
+	  <!ENTITY command "<command>&program;</command>">
+	  <!ENTITY firstname "Emmanuel">
+	  <!ENTITY surname "Jeanvoine">
+	  <!ENTITY address "emmanuel.jeanvoine@inria.fr">
+	  ]>
+<refentry>
+  <refentryinfo>
+    <author>
+      <firstname>&firstname;</firstname>
+      <surname>&surname;</surname>
+    </author>
+    <address>&address;</address>
+    <copyright>
+      <year>2008-2009</year>
+      <holder>INRIA - &firstname; &surname;</holder>
+    </copyright>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>&program;</refentrytitle>
+    <manvolnum>1</manvolnum>
+  </refmeta>
+  <refnamediv>
+    <refname>The Kadeploy software suite V3</refname>
+    <refpurpose>Karights</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&program; [OPTIONS]</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+    
+    <para><command>&program;</command> allows to set the deployment rights to users.</para>
+
+    <para>General options:</para>
+
+    <variablelist>
+      -a, --add                    Add some rights to a user
+      -d, --delete                 Delete some rights to a user
+      -f, --file FILE              Machine file
+      -m, --machine MACHINE        Include the machine in the operation
+      -o, --overwrite-rights       Overwrite existing rights
+      -p, --part PARTNAME          Include the partition in the operation
+      -s, --show-rights            Show the rights for a given user
+      -u, --user USERNAME          Specify the user
+      -v, --version                Get the version
+      
+      <varlistentry>
+	<term><option>-a</option></term>
+	<term><option>--add</option></term>
+	<listitem>
+	  <para>Add some rights to a user.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-d</option></term>
+	<term><option>--delete</option></term>
+	<listitem>
+	  <para>Delete some rights to a user.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-f</option></term>
+	<term><option>--file <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Machine file.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-m</option></term>
+	<term><option>--machine <replaceable>MACHINE</replaceable></option></term>
+	<listitem>
+	  <para>Include the machine in the operation.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-o</option></term>
+	<term><option>--overwrite-rights</option></term>
+	<listitem>
+	  <para>Overwrite existing rights.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-p</option></term>
+	<term><option>--part <replaceable>PARTNAME</replaceable></option></term>
+	<listitem>
+	  <para>Include the partition in the operation.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-s</option></term>
+	<term><option>--show-rights</option></term>
+	<listitem>
+	  <para>Show the rights for a given user.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-u</option></term>
+	<term><option>--user <replaceable>USERNAME</replaceable></option></term>
+	<listitem>
+	  <para>Specify the user.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-v</option></term>
+	<term><option>--version</option></term>
+	<listitem>
+	  <para>Get the version.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+    <para>
+      <citerefentry><refentrytitle>kadeploy3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kareboot3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kaenv3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kanodes3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kaconsole3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kastat3</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+    </para>
+    
+    <para>Project homepage: <ulink url="https://gforge.inria.fr/projects/kadeploy3/">https://gforge.inria.fr/projects/kadeploy3/</ulink></para>
+    <para>Contact: kadeploy3-users@lists.gforge.inria.fr</para>
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009 <email>emmanuel.jeanvoine@inria.fr</email></para>
+    <para>CECILL License V2 - http://www.cecill.info</para>
+  </refsect1>
+</refentry>

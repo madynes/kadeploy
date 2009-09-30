@@ -55,6 +55,13 @@ rm -rf $RPM_BUILD_ROOT
 /usr/local/kadeploy3
 %dir /etc/kadeploy3
 /etc/kadeploy3/load_kadeploy_env
+%doc %attr(0444,root,root) /usr/local/man/man1/kadeploy3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kareboot3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kaenv3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kastat3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/karights3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kanodes3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kaconsole3.1
 
 %files server
 %defattr(-,deploy,deploy,-)

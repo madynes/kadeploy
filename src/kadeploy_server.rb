@@ -54,7 +54,7 @@ class KadeployServer
     @workflow_info_hash_lock = Mutex.new
   end
 
-  # Give the current version of Kadeploy
+  # Give the current version of Kadeploy (RPC)
   #
   # Arguments
   # * nothing
@@ -286,9 +286,9 @@ class KadeployServer
   # Arguments
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return a workflow id
+  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded)
   def launch_workflow_async(exec_specific)
-    puts "Let's launch an instance of Kadeploy"
+    puts "Let's launch an instance of Kadeploy (async)"
 
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new("empty")
@@ -324,9 +324,11 @@ class KadeployServer
     @workflow_info_hash_lock.unlock
     if (workflow.prepare()) then
       workflow.run_async()
+      return workflow_id, 0
+    else
+      free(workflow_id)
+      return nil, 1 # all the nodes are involved in another deployment
     end
-
-    return workflow_id
   end
 
   # Test if the workflow has reached the end (RPC: only for async execution)
@@ -341,7 +343,7 @@ class KadeployServer
       workflow = @workflow_info_hash[workflow_id]
       ret = workflow.ended?
     else
-      ret nil
+      ret = nil
     end
     @workflow_info_hash_lock.unlock
     return ret
@@ -504,18 +506,21 @@ if (config.check_config("kadeploy") == true)
     db.disconnect
     exit(1)
   end
-  db.connect(config.common.deploy_db_host,
-             config.common.deploy_db_login,
-             config.common.deploy_db_passwd,
-             config.common.deploy_db_name)
-  kadeployServer = KadeployServer.new(config, 
-                                      Managers::WindowManager.new(config.common.reboot_window, config.common.reboot_window_sleep_time),
-                                      Managers::WindowManager.new(config.common.nodes_check_window, 1),
-                                      db)
-  puts "Launching the Kadeploy RPC server"
-  uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
-  DRb.start_service(uri, kadeployServer)
-  DRb.thread.join
+  if not db.connect(config.common.deploy_db_host,
+                    config.common.deploy_db_login,
+                    config.common.deploy_db_passwd,
+                    config.common.deploy_db_name)
+    puts "Cannot connect to the database"
+  else
+    kadeployServer = KadeployServer.new(config, 
+                                        Managers::WindowManager.new(config.common.reboot_window, config.common.reboot_window_sleep_time),
+                                        Managers::WindowManager.new(config.common.nodes_check_window, 1),
+                                        db)
+    puts "Launching the Kadeploy RPC server"
+    uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
+    DRb.start_service(uri, kadeployServer)
+    DRb.thread.join
+  end
 else
   puts "Bad configuration"
 end

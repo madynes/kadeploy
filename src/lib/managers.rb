@@ -602,7 +602,12 @@ module Managers
         @nodes_to_deploy = @nodeset
       else
         @nodes_to_deploy,nodes_to_discard = @nodeset.check_nodes_in_deployment(@db, @config.common.purge_deployment_timer)
-        @output.verbosel(0, "The nodes #{nodes_to_discard.to_s} are already involved in deployment, let's discard them") if (not nodes_to_discard.empty?)
+        if (not nodes_to_discard.empty?) then
+          @output.verbosel(0, "The nodes #{nodes_to_discard.to_s} are already involved in deployment, let's discard them")
+          nodes_to_discard.make_array_of_hostname.each { |hostname|
+            @config.set_node_state(hostname, "", "", "discarded")
+          }
+        end
       end
       #We backup the set of nodes used in the deployement to be able to update their deployment state at the end of the deployment
       if not @nodes_to_deploy.empty? then
@@ -672,9 +677,11 @@ module Managers
     def ended?
       if (@thread_process_finished_nodes.status == false) then
         if not @killed then
-          @deployments_table_lock.lock
-          @nodes_to_deploy_backup.set_deployment_state("deployed", nil, @db, "")
-          @deployments_table_lock.unlock
+          if (@nodes_to_deploy_backup != nil) then #it may be called several time in async mode
+            @deployments_table_lock.lock
+            @nodes_to_deploy_backup.set_deployment_state("deployed", nil, @db, "")
+            @deployments_table_lock.unlock
+          end
         end
         @nodes_to_deploy_backup = nil
         return true

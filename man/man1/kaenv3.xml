@@ -1,0 +1,171 @@
+<!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+	  "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd"
+	  [
+	  <!ENTITY program "kaenv3">
+	  <!ENTITY command "<command>&program;</command>">
+	  <!ENTITY firstname "Emmanuel">
+	  <!ENTITY surname "Jeanvoine">
+	  <!ENTITY address "emmanuel.jeanvoine@inria.fr">
+	  ]>
+<refentry>
+  <refentryinfo>
+    <author>
+      <firstname>&firstname;</firstname>
+      <surname>&surname;</surname>
+    </author>
+    <address>&address;</address>
+    <copyright>
+      <year>2008-2009</year>
+      <holder>INRIA - &firstname; &surname;</holder>
+    </copyright>
+  </refentryinfo>
+  <refmeta>
+    <refentrytitle>&program;</refentrytitle>
+    <manvolnum>1</manvolnum>
+  </refmeta>
+  <refnamediv>
+    <refname>The Kadeploy software suite V3</refname>
+    <refpurpose>Kaenv</refpurpose>
+  </refnamediv>
+  <refsynopsisdiv>
+    <cmdsynopsis>
+      <command>&program; [OPTIONS]</command>
+    </cmdsynopsis>
+  </refsynopsisdiv>
+  <refsect1>
+    <title>DESCRIPTION</title>
+    
+    <para><command>&program;</command> allows to manage the Kadeploy environments.</para>
+
+    <para>General options:</para>
+
+    <variablelist>
+      <varlistentry>
+	<term><option>-a</option></term>
+	<term><option>--add <replaceable>ENVFILE</replaceable></option></term>
+	<listitem>
+	  <para>Add an environment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-d</option></term>
+	<term><option>--delete <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Delete an environment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-l</option></term>
+	<term><option>--list</option></term>
+	<listitem>
+	  <para>List environments.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-m</option></term>
+	<term><option>--files-to-move <replaceable>FILES</replaceable></option></term>
+	<listitem>
+	  <para>Files to move (src1:dst1,src2:dst2,...).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-p</option></term>
+	<term><option>--print <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Print an environment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-s</option></term>
+	<term><option>--show-all-versions</option></term>
+	<listitem>
+	  <para>Show all versions of an environment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-t</option></term>
+	<term><option>--visibility-tag <replaceable>TAG</replaceable></option></term>
+	<listitem>
+	  <para>Set the visibility tag (private, shared, public).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-u</option></term>
+	<term><option>--user <replaceable>USERNAME</replaceable></option></term>
+	<listitem>
+	  <para>Specify the user.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-v</option></term>
+	<term><option>--version</option></term>
+	<listitem>
+	  <para>Get the version.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--env-version <replaceable>NUMBER</replaceable></option></term>
+	<listitem>
+	  <para>Specify the version.</para>
+	</listitem>
+      </varlistentry>
+
+<para>Advanced options:</para>
+      <varlistentry>
+	<term><option>--remove-demolishing-tag <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Remove demolishing tag on an environment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--set-visibility-tag <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Set the visibility tag on an environment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--update-tarball-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Update the MD5 of the environment tarball.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--update-preinstall-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Update the MD5 of the environment preinstall.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--update-postinstalls-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Update the MD5 of the environment postinstalls.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--move-files <replaceable>ENVNAME</replaceable></option></term>
+	<listitem>
+	  <para>Move the files of the environment.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
+  </refsect1>
+  <refsect1>
+    <title>SEE ALSO</title>
+    <para>
+      <citerefentry><refentrytitle>kadeploy3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kareboot3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kaconsole3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kastat3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kanodes3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>karights3</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+    </para>
+  
+    <para>Project homepage: <ulink url="https://gforge.inria.fr/projects/kadeploy3/">https://gforge.inria.fr/projects/kadeploy3/</ulink></para>
+    <para>Contact: kadeploy3-users@lists.gforge.inria.fr</para>
+  </refsect1>
+  <refsect1>
+    <title>AUTHOR</title>
+    <para>Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009 <email>emmanuel.jeanvoine@inria.fr</email></para>
+    <para>CECILL License V2 - http://www.cecill.info</para>
+  </refsect1>
+</refentry>

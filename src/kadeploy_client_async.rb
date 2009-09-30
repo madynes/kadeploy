@@ -70,13 +70,19 @@ if (exec_specific_config != nil) then
           exec_specific_config.pxe_profile_msg.concat(l)
         }
       end
-      workflow_id = kadeploy_server.launch_workflow_async(exec_specific_config)
-
-      while (not kadeploy_server.ended?(workflow_id)) do
-        sleep(10)        
+      workflow_id, error = kadeploy_server.launch_workflow_async(exec_specific_config)
+      
+      if (workflow_id != nil) then
+        while (not kadeploy_server.ended?(workflow_id)) do
+          sleep(10)        
+        end
+        puts kadeploy_server.get_results(workflow_id)
+        kadeploy_server.free(workflow_id)
+      else
+        if (error == 1) then
+          puts "All the nodes have been discarded"
+        end
       end
-      puts kadeploy_server.get_results(workflow_id)
-      kadeploy_server.free(workflow_id)
       exec_specific_config = nil
     else
       puts "You do not have the deployment rights on all the nodes"

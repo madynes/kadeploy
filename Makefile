@@ -9,9 +9,11 @@ CONF=$(KADEPLOY_ROOT)/conf
 ADDONS=$(KADEPLOY_ROOT)/addons
 TEST=$(KADEPLOY_ROOT)/test
 PKG=$(KADEPLOY_ROOT)/pkg
+MAN=$(KADEPLOY_ROOT)/man
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
 DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-$(MAJOR_VERSION)
+
 
 api: cleanapi
 	@echo "Generating API"
@@ -71,9 +73,12 @@ install_version:
 	@echo "$(MAJOR_VERSION)-$(MINOR_VERSION)" > $(DESTDIR)/etc/kadeploy3/version
 	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DESTDIR)/etc/kadeploy3/version
 
+install_man:
+	@(cd $(MAN); sh generate.sh $(DESTDIR)/usr/local/man)
+
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
-
+	@mkdir -p $(DESTDIR)/
 tree_server:
 	@mkdir -p $(DESTDIR)/usr/sbin
 	@mkdir -p $(DESTDIR)/etc/init.d
@@ -89,7 +94,7 @@ tree_common:
 	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 
-install_common: tree_common install_conf_common install_src install_test install_db
+install_common: tree_common install_conf_common install_src install_test install_db install_man
 
 install_client: tree_client install_conf_client install_bin
 
