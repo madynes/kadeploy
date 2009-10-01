@@ -15,6 +15,7 @@ require 'process_management'
 require 'drb'
 require 'socket'
 require 'yaml'
+require 'digest/sha1'
 
 class KadeployServer
   @config = nil
@@ -242,9 +243,8 @@ class KadeployServer
       config.cluster_specific = @config.cluster_specific
     end
     @workflow_info_hash_lock.lock
-    deploy_id = Time.now.to_f #we use the timestamp as a deploy_id
-    workflow_id = "#{config.exec_specific.true_user}-#{deploy_id}"
-    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, deploy_id)
+    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
+    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, workflow_id)
     add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
     client.set_workflow_id(workflow_id)
@@ -317,9 +317,8 @@ class KadeployServer
       config.cluster_specific = @config.cluster_specific
     end
     @workflow_info_hash_lock.lock
-    deploy_id = Time.now.to_f #we use the timestamp as a deploy_id
-    workflow_id = "#{config.exec_specific.true_user}-#{deploy_id}"
-    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, deploy_id)
+    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_f + @config.exec_specific.node_list.to_s)
+    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, workflow_id)
     add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
     if (workflow.prepare()) then
