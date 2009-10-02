@@ -777,7 +777,7 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-a", "--env-file ENVFILE", "File containing the envrionement description") { |f|
+        opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
           if not File.readable?(f) then
             error("The file #{f} does not exist or is not readable")
             return false
@@ -819,11 +819,15 @@ module ConfigInformation
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
+            if (f =~ /^http:\/\//) then
+              exec_specific.key = f
             else
-              exec_specific.key = File.expand_path(f)
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.key = File.expand_path(f)
+              end
             end
           else
             authorized_keys = File.expand_path("~/.ssh/authorized_keys")

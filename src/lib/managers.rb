@@ -12,9 +12,13 @@ require 'stepdeployenv'
 require 'stepbroadcastenv'
 require 'stepbootnewenv'
 require 'md5'
+require 'http'
 
 #Ruby libs
 require 'thread'
+require 'uri'
+#require 'net/http'
+require 'tempfile'
 
 module Managers
   class MagicCookie
@@ -481,38 +485,108 @@ module Managers
     # Output
     # * return the name of the file in the local cache directory
     def use_local_path_dirname(file, prefix)
-      return @config.common.kadeploy_cache_dir + "/" + prefix + File.basename(file)
+      case file
+      when /^http:\/\//
+        return @config.common.kadeploy_cache_dir + "/" + prefix + file.slice((file.rindex("/") + 1)..(file.length - 1))
+      else
+        return @config.common.kadeploy_cache_dir + "/" + prefix + File.basename(file)
+      end
     end
 
     # Grab a file from the client side or locally
     #
     # Arguments
     # * client_file: client file to grab
-    # * local_file: name of the file in the local cache
+    # * local_file: path to local cached file
     # * expected_md5: expected md5 for the client file
     # * file_tag: tag used to specify the kind of file to grab
     # * prefix: prefix used to store the file in the cache
     # Output
     # * return true if everything is successfully performed, false otherwise
     def grab_file(client_file, local_file, expected_md5, file_tag, prefix)
-      if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
-        #We first check if the file can be reached locally
-        if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
-          @output.verbosel(3, "Do a local copy for the #{file_tag} #{client_file}")
-          if not system("cp #{client_file} #{local_file}") then
-            @output.verbosel(0, "Unable to do the local copy")
+      #http fetch
+      if (client_file =~ /^http:\/\//) then
+        if (not File.exist?(local_file)) then
+          resp,etag = HTTP::fetch_file(client_file, local_file, nil)
+          if (resp != "200") then
+            @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error #{resp}")
+            return false
+          else
+            @output.verbosel(4, "File #{client_file} fetched")
+          end
+          if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
+            @output.verbosel(0, "Cannot update the md5 of #{client_file}")
             return false
           end
         else
-          @output.verbosel(3, "Grab the #{file_tag} #{client_file}")
-          if not @client.get_file(client_file, prefix) then
-            @output.verbosel(0, "Unable to grab the #{file_tag} #{client_file}")
+          resp,etag = HTTP::fetch_file(client_file, local_file, expected_md5)
+          case resp
+          when "200"
+            @output.verbosel(4, "File #{client_file} fetched")
+            if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
+              @output.verbosel(0, "Cannot update the md5 of #{client_file}")
+              return false
+            end
+          when "304"
+            @output.verbosel(4, "File #{client_file} already in cache")
+            if not system("touch -a #{local_file}") then
+              @output.verbosel(0, "Unable to touch the local file")
+              return false
+            end
+          else
+            @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error: #{resp}")
             return false
           end
         end
+     #classical fetch
       else
-        if not system("touch -a #{local_file}") then
-          @output.verbosel(0, "Unable to touch the local file")
+        if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
+          #We first check if the file can be reached locally
+          if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
+            @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
+            if not system("cp #{client_file} #{local_file}") then
+              @output.verbosel(0, "Unable to do the local copy")
+              return false
+            end
+          else
+            @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
+            if not @client.get_file(client_file, prefix) then
+              @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
+              return false
+            end
+          end
+        else
+          if not system("touch -a #{local_file}") then
+            @output.verbosel(0, "Unable to touch the local file")
+            return false
+          end
+        end
+      end
+      return true
+    end
+
+    # Grab a file from the client side or locally without recording the hash of the file
+    #
+    # Arguments
+    # * client_file: client file to grab
+    # * local_file: path to local cached file
+    # * file_tag: tag used to specify the kind of file to grab
+    # * prefix: prefix used to store the file in the cache
+    # Output
+    # * return true if everything is successfully performed, false otherwise
+    def grab_file_without_caching(client_file, local_file, file_tag, prefix)
+      @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
+      #http fetch
+      if (client_file =~ /^http:\/\//) then
+        resp,etag = HTTP::fetch_file(client_file, local_file, nil)
+        if (resp != "200") then
+          @output.verbosel(0, "Unable to grab the #{file_tag} file #{key}")
+          return false
+        end
+      #classical fetch
+      else
+        if not @client.get_file(client_file, prefix) then
+          @output.verbosel(0, "Unable to grab the file #{key}")
           return false
         end
       end
@@ -532,26 +606,26 @@ module Managers
         env_prefix = "e-#{@config.exec_specific.environment.id}--"
       end
       user_prefix = "u-#{@config.exec_specific.true_user}--"
-      local_tarball = use_local_path_dirname(@config.exec_specific.environment.tarball["file"], env_prefix)
-      if not grab_file(@config.exec_specific.environment.tarball["file"], local_tarball, 
-                       @config.exec_specific.environment.tarball["md5"], "tarball file", env_prefix) then 
+      tarball = @config.exec_specific.environment.tarball
+      local_tarball = use_local_path_dirname(tarball["file"], env_prefix)
+      if not grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix) then 
         return false
       end
-      @config.exec_specific.environment.tarball["file"] = local_tarball
+      tarball["file"] = local_tarball
 
       if @config.exec_specific.key != "" then
-        @output.verbosel(3, "Grab the key file #{@config.exec_specific.key}")
-        if not @client.get_file(@config.exec_specific.key, user_prefix) then
-          @output.verbosel(0, "Unable to grab the file #{@config.exec_specific.key}")
+        key = @config.exec_specific.key
+        local_key = use_local_path_dirname(key, user_prefix)
+        if not grab_file_without_caching(key, local_key, "key", user_prefix) then
           return false
         end
-        @config.exec_specific.key = use_local_path_dirname(@config.exec_specific.key, user_prefix)
+        @config.exec_specific.key = local_key
       end
 
       if (@config.exec_specific.environment.preinstall != nil) then
         preinstall = @config.exec_specific.environment.preinstall
-        local_preinstall = use_local_path_dirname(preinstall["file"], env_prefix)
-        if not grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall file", env_prefix) then 
+        local_preinstall =  use_local_path_dirname(preinstall["file"], env_prefix)
+        if not grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix) then 
           return false
         end
         preinstall["file"] = local_preinstall
@@ -560,7 +634,7 @@ module Managers
       if (@config.exec_specific.environment.postinstall != nil) then
         @config.exec_specific.environment.postinstall.each { |postinstall|
           local_postinstall = use_local_path_dirname(postinstall["file"], env_prefix)
-          if not grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall file", env_prefix) then 
+          if not grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix) then 
             return false
           end
           postinstall["file"] = local_postinstall
@@ -572,12 +646,12 @@ module Managers
           @config.exec_specific.custom_operations[macro_step].each_key { |micro_step|
             @config.exec_specific.custom_operations[macro_step][micro_step].each { |entry|
               if (entry[0] == "send") then
-                @output.verbosel(3, "Grab the file #{entry[1]} for custom operations")
-                if not @client.get_file(entry[1], user_prefix) then
-                  @output.verbosel(0, "Unable to grab the file #{entry[1]}")
+                custom_file = entry[1]
+                local_custom_file = use_local_path_dirname(custom_file, user_prefix)
+                if not grab_file_without_caching(custom_file, local_custom_file, "custom_file", user_prefix) then
                   return false
                 end
-                entry[1] = use_local_path_dirname(entry[1], user_prefix)
+                entry[1] = local_custom_file
               end
             }
           }

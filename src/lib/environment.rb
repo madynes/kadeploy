@@ -73,15 +73,20 @@ module EnvironmentManagement
                 @tarball = Hash.new
                 tmp = val.split("|")
                 @tarball["file"] = tmp[0]
-                if not File.readable?(@tarball["file"]) then
-                  puts "The tarball file #{@tarball["file"]} cannot be read"
-                  return false
-                end
                 @tarball["kind"] = tmp[1]
-                puts "Computing the md5sum for #{@tarball["file"]}"
-                @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
+                if @tarball["file"] =~ /^http:\/\// then
+                  puts "#{@tarball["file"]} is an HTTP file, let's bypass the md5sum"
+                  @tarball["md5"] = ""
+                else
+                  if not File.readable?(@tarball["file"]) then
+                    puts "The tarball file #{@tarball["file"]} cannot be read"
+                    return false
+                  end
+                  puts "Computing the md5sum for #{@tarball["file"]}"
+                  @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
+                end
               else
-                puts "The environment tarball must be described like filename|kind|md5sum where kind is tgz, tbz2, ddgz, or ddbz2"
+                puts "The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2"
                 return false
               end
             when "preinstall"
@@ -91,12 +96,17 @@ module EnvironmentManagement
                 @preinstall["file"] = entry[0]
                 @preinstall["kind"] = entry[1]
                 @preinstall["script"] = entry[2]
-                if not File.readable?(@preinstall["file"]) then
-                  puts "The pre-install file #{@preinstall["file"]} cannot be read"
-                  return false
+                if @preinstall["file"] =~ /^http:\/\// then
+                  puts "#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum"
+                  @preinstall["md5"] = ""
+                else
+                  if not File.readable?(@preinstall["file"]) then
+                    puts "The pre-install file #{@preinstall["file"]} cannot be read"
+                    return false
+                  end
+                  puts "Computing the md5sum for #{@preinstall["file"]}"
+                  @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
                 end
-                puts "Computing the md5sum for #{@preinstall["file"]}"
-                @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
               else
                 puts "The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2"
                 return false
@@ -109,14 +119,19 @@ module EnvironmentManagement
                   tmp2 = tmp.split("|")
                   entry = Hash.new
                   entry["file"] = tmp2[0]
-                  if not File.readable?(entry["file"]) then
-                    puts "The post-install file #{entry["file"]} cannot be read"
-                    return false
-                  end
                   entry["kind"] = tmp2[1]
-                  puts "Computing the md5sum for #{entry["file"]}"
-                  entry["md5"] = MD5::get_md5_sum(entry["file"])
                   entry["script"] = tmp2[2]
+                  if entry["file"] =~ /^http:\/\// then
+                    puts "#{entry["file"]} is an HTTP file, let's bypass the md5sum"
+                    entry["md5"] = ""
+                  else
+                    if not File.readable?(entry["file"]) then
+                      puts "The post-install file #{entry["file"]} cannot be read"
+                      return false
+                    end
+                    puts "Computing the md5sum for #{entry["file"]}"
+                    entry["md5"] = MD5::get_md5_sum(entry["file"])
+                  end
                   @postinstall.push(entry)
                 }
               else
@@ -465,6 +480,38 @@ module EnvironmentManagement
         }
       end
       return out.join(",")
+    end
+
+    # Set the md5 value of a file in an environment
+    # Arguments
+    # * kind: kind of file (tarball, preinstall or postinstall)
+    # * file: filename
+    # * hash: hash value
+    # * dbh: database handler
+    # Output
+    # * return true
+    def set_md5(kind, file, hash, dbh)
+      query = String.new
+      case kind
+      when "tarball"
+        tarball = "#{@tarball["file"]}|#{@tarball["kind"]}|#{hash}"
+        query = "UPDATE environments SET tarball=\"#{tarball}\" WHERE id=\"#{@id}\""
+      when "presinstall"
+        preinstall = "#{@preinstall["file"]}|#{@preinstall["kind"]}|#{hash}"
+        query = "UPDATE environments SET presinstall=\"#{preinstall}\" WHERE id=\"#{@id}\""
+      when "postinstall"
+        postinstall_array = Array.new
+        @postinstall.each { |p|
+          if (file == p["file"]) then
+            postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{hash}|#{p["script"]}")
+          else
+            postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{p["md5"]}|#{p["script"]}")
+          end
+        }
+        query = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" WHERE id=\"#{@id}\""
+      end
+      dbh.run_query(query)
+      return true
     end
   end
 end
