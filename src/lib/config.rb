@@ -650,12 +650,31 @@ module ConfigInformation
     # * return true in case of success, false otherwise
     def load_nodes_config_file
       IO.readlines(CONFIGURATION_FOLDER + "/" + NODES_FILE).each { |line|
-        if /\A([a-zA-Z]+[-\w.]*)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([\w.-]+)\Z/ =~ line
+        if /\A([a-zA-Z]+[-\w.]*)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([\w.-]+)\Z/ =~ line then
           content = Regexp.last_match
           host = content[1]
           ip = content[2]
           cluster = content[3]
           @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+        end
+        if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
+          content = Regexp.last_match
+          hostnames = content[1]
+          ips = content[2]
+          cluster = content[3]
+          hostnames_list = Nodes::NodeSet::nodes_list_expand(hostnames)
+          ips_list = Nodes::NodeSet::nodes_list_expand(ips)
+          if (hostnames_list.to_a.length == ips_list.to_a.length) then
+            for i in (0 ... hostnames_list.to_a.length)
+              host = hostnames_list[i] 
+              ip = ips_list[i] 
+              @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+            end
+          else
+            puts line
+            puts "The number of hostnames and IP addresses are incoherent in the #{NODES_FILE} file"
+            return false
+          end
         end
       }
       if @common.nodes_desc.empty? then
@@ -807,7 +826,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -819,7 +838,7 @@ module ConfigInformation
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
-            if (f =~ /^http:\/\//) then
+            if (f =~ /^http[s]?:\/\//) then
               exec_specific.key = f
             else
               if not File.readable?(f) then
@@ -840,7 +859,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then 
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false
           end
@@ -977,7 +996,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       if not exec_specific.get_version then
@@ -1002,16 +1021,23 @@ module ConfigInformation
     # Output
     # * return true if the node exists in the Kadeploy configuration, false otherwise
     def Config.add_to_node_list(hostname, nodes_desc, exec_specific)
-      n = nodes_desc.get_node_by_host(hostname)
-      if (n != nil) then
-        exec_specific.node_list.push(n)
-        return true
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ hostname
+        hostnames = Nodes::NodeSet::nodes_list_expand("#{hostname}") 
       else
-        error("The node #{hostname} does not exist in the Kadeploy configuration")
-        return false
+        hostnames = [hostname]
       end
+      hostnames.each{|hostname|
+        n = nodes_desc.get_node_by_host(hostname)
+        if (n != nil) then
+          exec_specific.node_list.push(n)
+        else
+          Debug::client_error("The node #{hostname} does not exist in the Kadeploy configuration")
+          return false
+        end
+      }
+      return true
     end
-
+    
     # Check the whole configuration of the kadeploy execution
     #
     # Arguments
@@ -1339,7 +1365,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -1348,7 +1374,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
-          if (not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m)) and (m != "*") then
+          if (not (/\A[A-Za-z0-9\[\]\.\-]+\Z/ =~ m)) and (m != "*") then
             error("Invalid hostname: #{m}")
             return false
           end
@@ -1485,7 +1511,7 @@ module ConfigInformation
           @exec_specific.fields.push(f)
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m) then
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ m) then
             error("Invalid hostname: #{m}")
             return false
           end
@@ -1611,7 +1637,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -1620,7 +1646,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~m) then
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ m) then
             error("Invalid hostname: #{m}")
             return false
           end
@@ -1729,7 +1755,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -1764,7 +1790,7 @@ module ConfigInformation
           end
         }   
         opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false
           end

@@ -47,7 +47,6 @@ class KadeployServer
     @tcp_buffer_size = @config.common.kadeploy_tcp_buffer_size
     @reboot_window = reboot_window
     @nodes_check_window = nodes_check_window
-    puts "Launching the Kadeploy file server"
     @deployments_table_lock = Mutex.new
     @syslog_lock = Mutex.new
     @db = db
@@ -263,8 +262,10 @@ class KadeployServer
         sleep(1)
       end
     }
-    if (workflow.prepare() && workflow.manage_files()) then
+    if (workflow.prepare() && workflow.manage_files(false)) then
       workflow.run_sync()
+    else
+      workflow.output.verbosel(0, "Cannot run the deployment")
     end
     finished = true
     #let's free memory at the end of the workflow
@@ -286,7 +287,7 @@ class KadeployServer
   # Arguments
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded)
+  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed)
   def launch_workflow_async(exec_specific)
     puts "Let's launch an instance of Kadeploy (async)"
 
@@ -317,13 +318,18 @@ class KadeployServer
       config.cluster_specific = @config.cluster_specific
     end
     @workflow_info_hash_lock.lock
-    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_f + @config.exec_specific.node_list.to_s)
+    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
     workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, workflow_id)
     add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
-    if (workflow.prepare()) then
-      workflow.run_async()
-      return workflow_id, 0
+    if workflow.prepare() then
+      if workflow.manage_files(true) then
+        workflow.run_async()
+        return workflow_id, 0
+      else
+        free(workflow_id)
+        return nil, 2 # some files cannot be grabbed
+      end
     else
       free(workflow_id)
       return nil, 1 # all the nodes are involved in another deployment

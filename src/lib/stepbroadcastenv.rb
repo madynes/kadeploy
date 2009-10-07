@@ -145,7 +145,7 @@ module BroadcastEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step2", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BroadcastEnvChain step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BroadcastEnvChain step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.send_environment("chain")
@@ -198,7 +198,7 @@ module BroadcastEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step2", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BroadcastEnvKastafior step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BroadcastEnvKastafior step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.send_environment("kastafior")
@@ -251,7 +251,7 @@ module BroadcastEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step2", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BroadcastEnvChain step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BroadcastEnvChain step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
             result = result && @step.send_environment("tree")
@@ -304,7 +304,7 @@ module BroadcastEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step2", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BroadcastEnvBittorrent step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BroadcastEnvBittorrent step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
             result = result && @step.mount_tmp_part #we need /tmp to store the tarball

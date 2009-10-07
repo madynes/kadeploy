@@ -74,7 +74,7 @@ module EnvironmentManagement
                 tmp = val.split("|")
                 @tarball["file"] = tmp[0]
                 @tarball["kind"] = tmp[1]
-                if @tarball["file"] =~ /^http:\/\// then
+                if @tarball["file"] =~ /^http[s]?:\/\// then
                   puts "#{@tarball["file"]} is an HTTP file, let's bypass the md5sum"
                   @tarball["md5"] = ""
                 else
@@ -96,7 +96,7 @@ module EnvironmentManagement
                 @preinstall["file"] = entry[0]
                 @preinstall["kind"] = entry[1]
                 @preinstall["script"] = entry[2]
-                if @preinstall["file"] =~ /^http:\/\// then
+                if @preinstall["file"] =~ /^http[s]?:\/\// then
                   puts "#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum"
                   @preinstall["md5"] = ""
                 else
@@ -121,7 +121,7 @@ module EnvironmentManagement
                   entry["file"] = tmp2[0]
                   entry["kind"] = tmp2[1]
                   entry["script"] = tmp2[2]
-                  if entry["file"] =~ /^http:\/\// then
+                  if entry["file"] =~ /^http[s]?:\/\// then
                     puts "#{entry["file"]} is an HTTP file, let's bypass the md5sum"
                     entry["md5"] = ""
                   else

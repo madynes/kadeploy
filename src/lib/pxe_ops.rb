@@ -77,12 +77,12 @@ module PXEOperations
   # Output
   # * returns the value of write_pxe
   def PXEOperations::set_pxe_for_linux(ips, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg)
-    if /\Ahttp:\/\/.+/ =~ kernel then
+    if /\Ahttp[s]?:\/\/.+/ =~ kernel then
       kernel_line = "\tKERNEL " + kernel + "\n" #gpxelinux
     else
       kernel_line = "\tKERNEL " + tftp_img + "/" + kernel + "\n" #pxelinux
     end
-    if /\Ahttp:\/\/.+/ =~ initrd then
+    if /\Ahttp[s]?:\/\/.+/ =~ initrd then
       append_line = "\tAPPEND initrd=" + initrd #gpxelinux
     else
       append_line = "\tAPPEND initrd=" + tftp_img + "/" + initrd #pxelinux
@@ -135,7 +135,7 @@ module PXEOperations
   # Output
   # * returns the value of write_pxe
   def PXEOperations::set_pxe_for_nfsroot(ips, kernel, nfs_server, tftp_repository, tftp_img, tftp_cfg)
-    if /\Ahttp:\/\/.+/ =~ kernel then
+    if /\Ahttp[s]?:\/\/.+/ =~ kernel then
       kernel_line = "\tKERNEL " + kernel + "\n" #gpxelinux 
     else
       kernel_line = "\tKERNEL " + tftp_img + "/" + kernel + "\n" #pxelinux

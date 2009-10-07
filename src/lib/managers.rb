@@ -486,7 +486,7 @@ module Managers
     # * return the name of the file in the local cache directory
     def use_local_path_dirname(file, prefix)
       case file
-      when /^http:\/\//
+      when /^http[s]?:\/\//
         return @config.common.kadeploy_cache_dir + "/" + prefix + file.slice((file.rindex("/") + 1)..(file.length - 1))
       else
         return @config.common.kadeploy_cache_dir + "/" + prefix + File.basename(file)
@@ -501,11 +501,12 @@ module Managers
     # * expected_md5: expected md5 for the client file
     # * file_tag: tag used to specify the kind of file to grab
     # * prefix: prefix used to store the file in the cache
+    # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file(client_file, local_file, expected_md5, file_tag, prefix)
+    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, async = false)
       #http fetch
-      if (client_file =~ /^http:\/\//) then
+      if (client_file =~ /^http[s]?:\/\//) then
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, nil)
           if (resp != "200") then
@@ -540,25 +541,30 @@ module Managers
         end
      #classical fetch
       else
-        if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
-          #We first check if the file can be reached locally
-          if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
-            @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
-            if not system("cp #{client_file} #{local_file}") then
-              @output.verbosel(0, "Unable to do the local copy")
-              return false
+        if async then
+          @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
+          return false
+        else
+          if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
+            #We first check if the file can be reached locally
+            if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
+              @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
+              if not system("cp #{client_file} #{local_file}") then
+                @output.verbosel(0, "Unable to do the local copy")
+                return false
+              end
+            else
+              @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
+              if not @client.get_file(client_file, prefix) then
+                @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
+                return false
+              end
             end
           else
-            @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
-            if not @client.get_file(client_file, prefix) then
-              @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
+            if not system("touch -a #{local_file}") then
+              @output.verbosel(0, "Unable to touch the local file")
               return false
             end
-          end
-        else
-          if not system("touch -a #{local_file}") then
-            @output.verbosel(0, "Unable to touch the local file")
-            return false
           end
         end
       end
@@ -572,12 +578,13 @@ module Managers
     # * local_file: path to local cached file
     # * file_tag: tag used to specify the kind of file to grab
     # * prefix: prefix used to store the file in the cache
+    # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file_without_caching(client_file, local_file, file_tag, prefix)
+    def grab_file_without_caching(client_file, local_file, file_tag, prefix, async)
       @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
       #http fetch
-      if (client_file =~ /^http:\/\//) then
+      if (client_file =~ /^http[s]?:\/\//) then
         resp,etag = HTTP::fetch_file(client_file, local_file, nil)
         if (resp != "200") then
           @output.verbosel(0, "Unable to grab the #{file_tag} file #{key}")
@@ -585,9 +592,14 @@ module Managers
         end
       #classical fetch
       else
-        if not @client.get_file(client_file, prefix) then
-          @output.verbosel(0, "Unable to grab the file #{key}")
+        if async then
+          @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
           return false
+        else          
+          if not @client.get_file(client_file, prefix) then
+            @output.verbosel(0, "Unable to grab the file #{key}")
+            return false
+          end
         end
       end
       return true
@@ -596,10 +608,10 @@ module Managers
     # Grab files from the client side (tarball, ssh public key, preinstall, user postinstall, files for custom operations)
     #
     # Arguments
-    # * nothing
+    # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if the files have been successfully grabbed, false otherwise
-    def grab_user_files
+    def grab_user_files(async = false)
       if @config.exec_specific.load_env_kind == "file" then
         env_prefix = "e-anon--"
       else
@@ -608,7 +620,7 @@ module Managers
       user_prefix = "u-#{@config.exec_specific.true_user}--"
       tarball = @config.exec_specific.environment.tarball
       local_tarball = use_local_path_dirname(tarball["file"], env_prefix)
-      if not grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix) then 
+      if not grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, async) then 
         return false
       end
       tarball["file"] = local_tarball
@@ -616,7 +628,7 @@ module Managers
       if @config.exec_specific.key != "" then
         key = @config.exec_specific.key
         local_key = use_local_path_dirname(key, user_prefix)
-        if not grab_file_without_caching(key, local_key, "key", user_prefix) then
+        if not grab_file_without_caching(key, local_key, "key", user_prefix, async) then
           return false
         end
         @config.exec_specific.key = local_key
@@ -625,7 +637,7 @@ module Managers
       if (@config.exec_specific.environment.preinstall != nil) then
         preinstall = @config.exec_specific.environment.preinstall
         local_preinstall =  use_local_path_dirname(preinstall["file"], env_prefix)
-        if not grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix) then 
+        if not grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, async) then 
           return false
         end
         preinstall["file"] = local_preinstall
@@ -634,7 +646,7 @@ module Managers
       if (@config.exec_specific.environment.postinstall != nil) then
         @config.exec_specific.environment.postinstall.each { |postinstall|
           local_postinstall = use_local_path_dirname(postinstall["file"], env_prefix)
-          if not grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix) then 
+          if not grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, async) then 
             return false
           end
           postinstall["file"] = local_postinstall
@@ -648,7 +660,7 @@ module Managers
               if (entry[0] == "send") then
                 custom_file = entry[1]
                 local_custom_file = use_local_path_dirname(custom_file, user_prefix)
-                if not grab_file_without_caching(custom_file, local_custom_file, "custom_file", user_prefix) then
+                if not grab_file_without_caching(custom_file, local_custom_file, "custom_file", user_prefix, async) then
                   return false
                 end
                 entry[1] = local_custom_file
@@ -705,11 +717,16 @@ module Managers
     # Grab eventually some file from the client side
     #
     # Arguments
-    # * nothing
+    # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true in case of success, false otherwise
-    def manage_files
-      return (@config.common.kadeploy_disable_cache || grab_user_files())
+    def manage_files(async = false)
+      if (@config.common.kadeploy_disable_cache || grab_user_files(async)) then
+        return true
+      else
+        @nodes_to_deploy.set_deployment_state("aborted", nil, @db, "")
+        return false
+      end
     end
 
     # Run a workflow synchronously

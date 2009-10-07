@@ -64,7 +64,7 @@ Two ways are provided to install Kadeploy, a basic installer and packages (for D
 First of all , you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{verbatim}
-> tar xzf kadeploy-3.0-2.tar.gz -C DESTINATION_DIR
+> tar xzf kadeploy-3.0-3.tar.gz -C DESTINATION_DIR
 \end{verbatim}
 \end{small}
 
@@ -131,30 +131,30 @@ The following installation method works only an Debian based distribution.
 > make deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-3.0-2.deb}, \texttt{kadeploy-client-3.0-2.deb}, and \texttt{kadeploy-server-3.0-2.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-3.0-3.deb}, \texttt{kadeploy-client-3.0-3.deb}, and \texttt{kadeploy-server-3.0-3.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-2.deb} and \texttt{kadeploy-server-3.0-2.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-3.deb} and \texttt{kadeploy-server-3.0-3.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-2.deb
-> dpkg -i kadeploy-server-3.0-2.deb
+> dpkg -i kadeploy-common-3.0-3.deb
+> dpkg -i kadeploy-server-3.0-3.deb
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-2.deb} and \texttt{kadeploy-client-3.0-2.deb} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-3.deb} and \texttt{kadeploy-client-3.0-3.deb} packages.
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-2.deb
-> dpkg -i kadeploy-client-3.0-2.deb
+> dpkg -i kadeploy-common-3.0-3.deb
+> dpkg -i kadeploy-client-3.0-3.deb
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> dpkg -i kadeploy-common-3.0-2.deb
-> dpkg -i kadeploy-client-3.0-2.deb
-> dpkg -i kadeploy-server-3.0-2.deb
+> dpkg -i kadeploy-common-3.0-3.deb
+> dpkg -i kadeploy-client-3.0-3.deb
+> dpkg -i kadeploy-server-3.0-3.deb
 \end{verbatim}
 \end{small}
 
@@ -177,30 +177,30 @@ The following installation method works only an Fedora based distribution. We as
 > make rpm
 \end{verbatim}
 \end{small}
-This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-2.noarch.rpm}, \texttt{kadeploy-server-3.0-2.noarch.rpm}, and \texttt{kadeploy-common-3.0-2.noarch.rpm}.
+This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-3.noarch.rpm}, \texttt{kadeploy-server-3.0-3.noarch.rpm}, and \texttt{kadeploy-common-3.0-3.noarch.rpm}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-2.noarch.rpm} and \texttt{kadeploy-server-3.0-2.noarch.rpm} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-3.noarch.rpm} and \texttt{kadeploy-server-3.0-3.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-2.noarch.rpm
-> rpm -i kadeploy-server-3.0-2.noarch.rpm
+> rpm -i kadeploy-common-3.0-3.noarch.rpm
+> rpm -i kadeploy-server-3.0-3.noarch.rpm
 \end{verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-2.noarch.rpm} and \texttt{kadeploy-client-3.0-2.noarch.rpm} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-3.noarch.rpm} and \texttt{kadeploy-client-3.0-3.noarch.rpm} packages.
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-2.noarch.rpm
-> rpm -i kadeploy-client-3.0-2.noarch.rpm
+> rpm -i kadeploy-common-3.0-3.noarch.rpm
+> rpm -i kadeploy-client-3.0-3.noarch.rpm
 \end{verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
 \begin{verbatim}
-> rpm -i kadeploy-common-3.0-2.noarch.rpm
-> rpm -i kadeploy-server-3.0-2.noarch.rpm
-> rpm -i kadeploy-client-3.0-2.noarch.rpm
+> rpm -i kadeploy-common-3.0-3.noarch.rpm
+> rpm -i kadeploy-server-3.0-3.noarch.rpm
+> rpm -i kadeploy-client-3.0-3.noarch.rpm
 \end{verbatim}
 \end{small}
 
@@ -512,7 +512,7 @@ If you specify \texttt{fdisk} for the \texttt{partition\_creation\_kind} field i
 If you specify \texttt{parted} for the \texttt{partition\_creation\_kind} field in the cluster-specific configuration file, you must provide a parted script as a partition map file. Currently, only the Linux partition kind is handled with parted.
 
 \section{Nodes configuration files}
-All the nodes of the clusters that aim to be deployed must be declared in a file named \texttt{nodes} in the configuration directory. Each line of the file must specify a node and the syntax is: \texttt{hostname} \texttt{ip} \texttt{cluster}.
+All the nodes of the clusters that aim to be deployed must be declared in a file named \texttt{nodes} in the configuration directory. Each line of the file must specify a node and the syntax is: \texttt{hostname} \texttt{ip} \texttt{cluster}. Ranges can also be used to define the nodes.
 
 Here is an example:
 \begin{small}
@@ -529,6 +529,15 @@ gdx-9.orsay.grid5000.fr 172.24.1.9 gdx
 netgdx-1.orsay.grid5000.fr 172.25.1.1 netgdx
 netgdx-2.orsay.grid5000.fr 172.25.1.2 netgdx
 netgdx-3.orsay.grid5000.fr 172.25.1.3 netgdx
+netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
+\end{verbatim}
+\end{small}
+
+Another example:
+\begin{small}
+\begin{verbatim}
+gdx-[1-9].orsay.grid5000.fr 172.24.1.[1-9] gdx
+netgdx-[1-3].orsay.grid5000.fr 172.25.1.[1-3] netgdx
 netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
 \end{verbatim}
 \end{small}
@@ -667,6 +676,7 @@ At least, Kadeploy must be called with one node and an environment. The nodes to
 The environment can be specified with the \texttt{-e|--env-name} option if you want to use an environment recorded in the environment database or with the \texttt{-a|--env-file} options if you want to use an environment described in a file. Refer to the~\ref{sec:kaenv} part for information about the environment description. Here are some examples:
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr -e lenny-x64-nfs-1.0 -o nodes_ok -n nodes_ko
+> kadeploy3 -m gdx-[5-12].orsay.grid5000.fr -e lenny-x64-base -o nodes_ok -n nodes_ko
 > kadeploy3 -f nodes -a custom_env.dsc
 > kadeploy3 -f nodes -m gdx-5.orsay.grid5000.fr -a custom_env.dsc
 \end{verbatim}
@@ -701,7 +711,15 @@ This command uses the environment \textit{custom\_env} of the user \textit{johns
 \end{verbatim}
 This command performs the deployment of the environment described by the file \textit{~/my-lenny.dsc} (useful if you don't want to share your environment with the other users) on the nodes specified in the file pointed by \texttt{\$OAR\_NODE\_FILE} (typically a variable set by the resource manager). We specify here that we want the /tmp partition to be reformated. Furthermore, we specify that we want to deploy the environment on the 4th disk partition, instead of the default one. Finally, we ask to execute the script \textit{~/launcher.sh} at the end of the deployment.
 
-\paragraph{Use case 4 - advanced usage}
+\paragraph{Use case 4 - basic usage}
+\begin{verbatim}
+> kadeploy3 -m gdx-[45-51].orsay.grid5000.fr  \
+            -e lenny-x64-base \
+            -k
+\end{verbatim}
+This command performs the deployment of the environment \textit{lenny-x64-base} on the nodes \textit{gdx-45.orsay.grid5000.fr}, \textit{gdx-46.orsay.grid5000.fr}, ..., \textit{gdx-51.orsay.grid5000.fr}. Furthermore, it copies the entries of the \texttt{~/.ssh/authorized\_keys} user file in the \texttt{/root/.ssh/authorized\_keys} of the deployed nodes.
+
+\paragraph{Use case 5 - advanced usage}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
@@ -711,7 +729,7 @@ This command performs the deployment of the environment described by the file \t
 \end{verbatim}
 This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvChain} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.
 
-\paragraph{Use case 5 - advanced usage}
+\paragraph{Use case 6 - advanced usage}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e FreeBSD \
@@ -719,7 +737,7 @@ This kind of command can be used for debug purpose. It performs a deployment wit
 \end{verbatim}
 In some specific case, you may want to use a specific PXE profil to boot your nodes. For instance, if you want to test a new Syslinux Comboot not used by default on the Kadeploy server, you can write your own PXE profil that uses this Comboot. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server.
 
-\paragraph{Use case 6 - advanced usage}
+\paragraph{Use case 7 - advanced usage}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e Custom_linux_env \
@@ -727,7 +745,7 @@ In some specific case, you may want to use a specific PXE profil to boot your no
 \end{verbatim}
 If you deploy a Linux based environment and if the administrator choose to boot the nodes with the \textit{chainload} fashion, Kadeploy will install automatically a bootloader on the deployment partition. In some cases, you may want to bypass this installation because you have installed at the time of a previous deployment another bootloader. This allows to avoid the overriding of the installed bootloader. However, if no bootloader is installed or if the installed bootdloader is not able to boot your environment, the won't be reachable at the end of the deployment.
 
-\paragraph{Use case 7 - advanced usage}\label{par:usecase-wid}
+\paragraph{Use case 8 - advanced usage}\label{par:usecase-wid}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e Custom_linux_env \
@@ -735,7 +753,7 @@ If you deploy a Linux based environment and if the administrator choose to boot 
 \end{verbatim}
 This command performs the deployment of the \textit{Custom\_linux\_env} environment and write the workflow id of this deployment in the file \textit{wid\_file}. The aim of getting the deployment id is to monitor the deployment from an extern tool thanks to the Kanodes tool.
 
-\paragraph{Use case 8 - expert usage}
+\paragraph{Use case 9 - expert usage}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e "FreeBSD 7.1" \
@@ -804,6 +822,7 @@ At least, Kareboot must be called with one node and a reboot kind. The nodes to 
 Here are some basic examples:
 \begin{verbatim}
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot
+> kareboot3 -m gdx-[5-8].orsay.grid5000.fr -r simple_reboot
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot -o reboot_ok.txt \
                                                         -n reboot_ko.txt
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
@@ -981,25 +1000,31 @@ We present now the use cases.
 \end{verbatim}
 This command gives some rights for a given user.
 
-\paragraph{Use case 2}
+\paragraph{Use case 1}
+\begin{verbatim}
+> karights3 -a -m gdx-[25-32].orsay.grid5000.fr -p /dev/sda3 -u johnsmith
+\end{verbatim}
+This command gives some rights for a given user on a range of nodes.
+
+\paragraph{Use case 3}
 \begin{verbatim}
 > karights3 -a -m "*" -p "*" -u root
 \end{verbatim}
 This command gives all the rights on all the nodes to the user \textit{root}.
 
-\paragraph{Use case 3}
+\paragraph{Use case 4}
 \begin{verbatim}
 > karights3 -a -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith -o
 \end{verbatim}
 This command gives some rights for a given user. Furthermore, if some rights (excepted those specified with *) were previously given on the node \textit{gdx-25.orsay.grid5000.fr}, they are deleted.
 
-\paragraph{Use case 4}
+\paragraph{Use case 5}
 \begin{verbatim}
 > karights3 -d -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith
 \end{verbatim}
 This command removes some rights for a given user.
 
-\paragraph{Use case 5}
+\paragraph{Use case 6}
 \begin{verbatim}
 > karights3 -s -u johnsmith
 \end{verbatim}
@@ -1048,23 +1073,29 @@ This commands prints all the deployment performed on the node \textit{gdx-25.ors
 
 \paragraph{Use case 2}
 \begin{verbatim}
+> kastat3 -d -m gdx-[25-130].orsay.grid5000.fr
+\end{verbatim}
+This commands prints all the deployment performed on the nodes \textit{gdx-25.orsay.grid5000.fr}, \textit{gdx-26.orsay.grid5000.fr}, ..., \textit{gdx-130.orsay.grid5000.fr}.
+
+\paragraph{Use case 3}
+\begin{verbatim}
 > kastat3 -d -f hostname -f env -f success
 \end{verbatim}
 This command prints all the deployment performed. Because the \texttt{-f|--field} option is used, only the fields \textit{hostname}, \textit{env}, and \textit{success} are printed. If the option \texttt{-f|--field} is not used, all the fields are printed.
 
-\paragraph{Use case 3}
+\paragraph{Use case 4}
 \begin{verbatim}
 > kastat3 -b -x 2009:02:12:08:00:00 -y 2009:02:13:08:00:00
 \end{verbatim}
 This commands prints the failure rate of all the nodes (at least deployed one time) during the period between the 2009/02/12 - 8h00 and the 2009/02/13 - 8h00. The \texttt{-x|--date-min} and \texttt{-y|--date-max} options can be used separately or can be omitted.
 
-\paragraph{Use case 4}
+\paragraph{Use case 5}
 \begin{verbatim}
 > kastat3 -c 25 -x 2009:02:12:08:00:00
 \end{verbatim}
 This commands prints the nodes that have a failure rate of at least 25\% from the 2009/02/12 - 8h00.
 
-\paragraph{Use case 5}
+\paragraph{Use case 6}
 \begin{verbatim}
 > kastat3 -a 3 -s 1
 \end{verbatim}
@@ -1098,9 +1129,9 @@ This commands prints the global state of all the nodes managed by a Kadeploy ser
 
 \paragraph{Use case 2}
 \begin{verbatim}
-> kanodes3 -d -m gdx-25.orsay.grid5000.fr -f machine_file
+> kanodes3 -d -m gdx-25.orsay.grid5000.fr -m netgdx-[1-30].orsay.grid5000.fr -f machine_file
 \end{verbatim}
-This command prints the global state of the node \textit{gdx-25.orsay.grid5000.fr} and of the nodes listed in the file \texttt{machine\_file}.
+This command prints the global state of the node \textit{gdx-25.orsay.grid5000.fr} the nodes \textit{netgdx-1.orsay.grid5000.fr}, \textit{netgdx-2.orsay.grid5000.fr}, ..., \textit{netgdx-30.orsay.grid5000.fr} and of the nodes listed in the file \texttt{machine\_file}.
 
 \paragraph{Use case 3}
 \begin{verbatim}

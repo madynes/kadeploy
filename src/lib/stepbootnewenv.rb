@@ -145,7 +145,7 @@ module BootNewEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.reboot("kexec")
@@ -194,7 +194,7 @@ module BootNewEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvPivotRoot step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvPivotRoot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             @output.verbosel(0, "BootNewEnvPivotRoot is not yet implemented")
@@ -243,7 +243,7 @@ module BootNewEnvironment
             use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
             result = result && @step.umount_deploy_part
@@ -294,7 +294,7 @@ module BootNewEnvironment
             use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
             result = result && @step.reboot("hard", use_rsh_for_reboot)

@@ -79,8 +79,11 @@ if (exec_specific_config != nil) then
         puts kadeploy_server.get_results(workflow_id)
         kadeploy_server.free(workflow_id)
       else
-        if (error == 1) then
+        case error
+        when 1
           puts "All the nodes have been discarded"
+        when 2
+          puts "Some files cannot be grabbed"
         end
       end
       exec_specific_config = nil

@@ -31,9 +31,15 @@ def get_deploy_state(config, db)
   else
     hosts = Array.new
     config.exec_specific.node_list.each { |node|
-      hosts.push("nodes.hostname=\"#{node}\"")
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+      else
+        nodes = [node]
+      end
+      nodes.each { |n|
+        hosts.push("nodes.hostname=\"#{n}\"")
+      }
     }
-
     query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
              FROM nodes \
              LEFT JOIN environments ON nodes.env_id = environments.id \

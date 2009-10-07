@@ -223,7 +223,7 @@ module MicroStepsLibrary
     # Output
     # * nothing
     def _reboot_wrapper(kind, node_set, use_rsh_for_reboot, instance_thread)
-      @output.verbosel(3, "  *** A #{kind} reboot will be performed on the nodes #{node_set.to_s}")
+      @output.verbosel(3, "  *** A #{kind} reboot will be performed on the nodes #{node_set.to_s_fold}")
       pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
       node_set.set.each { |node|
         case kind
@@ -764,7 +764,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the command has been correctly performed, false otherwise
     def custom_exec_cmd(instance_thread, cmd)
-      @output.verbosel(3, "CUS exec_cmd: #{@nodes_ok.to_s}")
+      @output.verbosel(3, "CUS exec_cmd: #{@nodes_ok.to_s_fold}")
       return parallel_exec_command_wrapper(cmd, @config.common.taktuk_connector, instance_thread)
     end
 
@@ -777,7 +777,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the file has been correctly sent, false otherwise
     def custom_send_file(instance_thread, file, dest_dir)
-      @output.verbosel(3, "CUS send_file: #{@nodes_ok.to_s}")
+      @output.verbosel(3, "CUS send_file: #{@nodes_ok.to_s_fold}")
       return parallel_send_file_command_wrapper(file,
                                                 dest_dir,
                                                 "chain",
@@ -948,7 +948,7 @@ module MicroStepsLibrary
             brk_on_macrostep = @config.exec_specific.breakpoint_on_microstep.split(":")[0]
             brk_on_microstep = @config.exec_specific.breakpoint_on_microstep.split(":")[1]
             if ((brk_on_macrostep == @macro_step) && (brk_on_microstep == method_sym.to_s)) then
-              @output.verbosel(0, "BRK #{method_sym.to_s}: #{@nodes_ok.to_s}")
+              @output.verbosel(0, "BRK #{method_sym.to_s}: #{@nodes_ok.to_s_fold}")
               @config.exec_specific.breakpointed = true
               return false
             end
@@ -956,14 +956,14 @@ module MicroStepsLibrary
           if custom_methods_attached?(@macro_step, method_sym.to_s) then
             if run_custom_methods(Thread.current, @macro_step, method_sym.to_s) then
               @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)")
-              @output.verbosel(3, "  >>>  #{@nodes_ok.to_s}")
+              @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}")
               send(real_method, Thread.current, *args)
             else
               return false
             end
           else
             @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)")
-            @output.verbosel(3, "  >>>  #{@nodes_ok.to_s}")
+            @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}")
             send(real_method, Thread.current, *args)
           end
         else
@@ -1255,7 +1255,7 @@ module MicroStepsLibrary
     # * return true if the operation has been successfully performed, false otherwise
     def ms_create_partition_table(instance_thread, env)
       if @config.exec_specific.disable_disk_partitioning then
-        @output.verbosel(3, "   Bypass the disk partitioning")
+        @output.verbosel(3, "  *** Bypass the disk partitioning")
         return true
       else
         case @config.cluster_specific[@cluster].partition_creation_kind
@@ -1291,7 +1291,7 @@ module MicroStepsLibrary
                                                instance_thread)
         end
       else
-        @output.verbosel(3, "   Bypass the format of the deploy part")
+        @output.verbosel(3, "  *** Bypass the format of the deploy part")
         return true
       end
     end
@@ -1317,6 +1317,8 @@ module MicroStepsLibrary
                                                @config.common.taktuk_connector,
                                                instance_thread)
         end
+      else
+        @output.verbosel(3, "  *** Bypass the format of the tmp part")
       end
       return true
     end
@@ -1335,7 +1337,7 @@ module MicroStepsLibrary
                                              @config.common.taktuk_connector,
                                              instance_thread)
       else
-        @output.verbosel(3, "   Bypass the mount of the deploy part")
+        @output.verbosel(3, "  *** Bypass the mount of the deploy part")
         return true
       end
     end
@@ -1413,7 +1415,7 @@ module MicroStepsLibrary
         end
       when "chainload_pxe"
         if @config.exec_specific.disable_bootloader_install then
-          @output.verbosel(3, "   Bypass the bootloader installation")
+          @output.verbosel(3, "  *** Bypass the bootloader installation")
           return true
         else
           case @config.exec_specific.environment.environment_kind
@@ -1461,7 +1463,7 @@ module MicroStepsLibrary
                                              @config.common.taktuk_connector,
                                              instance_thread)
       else
-        @output.verbosel(3, "   Bypass the umount of the deploy part")
+        @output.verbosel(3, "  *** Bypass the umount of the deploy part")
         return true
       end
     end
@@ -1496,7 +1498,7 @@ module MicroStepsLibrary
                                                          get_deploy_part_str(),
                                                          instance_thread)        
       end
-      @output.verbosel(3, "Broadcast time: #{Time.now.to_i - start} seconds") if res
+      @output.verbosel(3, "  *** Broadcast time: #{Time.now.to_i - start} seconds") if res
       return res
     end
 
@@ -1544,7 +1546,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "   Bypass the admin preinstalls")
+        @output.verbosel(3, "  *** Bypass the admin preinstalls")
       end
       return true
     end
@@ -1575,7 +1577,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "   Bypass the admin postinstalls")
+        @output.verbosel(3, "  *** Bypass the admin postinstalls")
       end
       return true
     end
@@ -1606,7 +1608,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "   Bypass the user postinstalls")
+        @output.verbosel(3, "  *** Bypass the user postinstalls")
       end
       return true
     end

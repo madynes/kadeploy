@@ -154,7 +154,7 @@ module SetDeploymentEnvironnment
           instance_thread = Thread.new {
             @logger.increment("retry_step1", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a SetDeploymentEnvUntrusted step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a SetDeploymentEnvUntrusted step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
@@ -216,7 +216,7 @@ module SetDeploymentEnvironnment
           instance_thread = Thread.new {
             @logger.increment("retry_step1", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a SetDeploymentEnvUntrustedCustomPreInstall step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a SetDeploymentEnvUntrustedCustomPreInstall step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
@@ -269,7 +269,7 @@ module SetDeploymentEnvironnment
           instance_thread = Thread.new {
             @logger.increment("retry_step1", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a SetDeploymentEnvProd step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a SetDeploymentEnvProd step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.check_nodes("prod_env_booted")
@@ -329,7 +329,7 @@ module SetDeploymentEnvironnment
           instance_thread = Thread.new {
             @logger.increment("retry_step1", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a SetDeploymentEnvUntrusted step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a SetDeploymentEnvUntrusted step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_nfsroot_env")

@@ -111,6 +111,13 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>-r</option></term>
+	<term><option>---reboot-kind <replaceable>REBOOT_KIND</replaceable></option></term>
+	<listitem>
+	  <para>Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-u</option></term>
 	<term><option>--user <replaceable>USERNAME</replaceable></option></term>
 	<listitem>

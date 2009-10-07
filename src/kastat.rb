@@ -26,7 +26,14 @@ def append_generic_where_clause(config)
   date_max = String.new
   if (not config.exec_specific.node_list.empty?) then
     config.exec_specific.node_list.each { |node|
-      hosts.push("hostname=\"#{node}\"")
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+      else
+        nodes = [node]
+      end     
+      nodes.each{ |n|
+        hosts.push("hostname=\"#{n}\"")
+      }
     }
     node_list = "(#{hosts.join(" OR ")})"
   end
