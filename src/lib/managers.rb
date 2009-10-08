@@ -55,7 +55,7 @@ module Managers
       @mutex.synchronize {
         remaining_resources = @resources_max - @resources_used
         if (remaining_resources == 0) then
-          return 0, 0
+          return n, 0
         else
           if (n <= remaining_resources) then
             @resources_used += n
@@ -68,7 +68,7 @@ module Managers
         end
       }
     end
-
+    
     # Release a given number of resources
     #
     # Arguments
@@ -877,6 +877,5 @@ module Managers
       Thread.kill(@thread_boot_new_environment)
       Thread.kill(@thread_process_finished_nodes)
     end
-
   end
 end
