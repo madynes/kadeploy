@@ -170,6 +170,10 @@ class KadeployServer
     return @config.common
   end
 
+  def get_cluster_config(cluster)
+    return @config.cluster_specific[cluster]
+  end
+
   # Get the default deployment partition (RPC)
   #
   # Arguments
@@ -239,7 +243,10 @@ class KadeployServer
         config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
       }
     else
-      config.cluster_specific = @config.cluster_specific
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
+      }
     end
     @workflow_info_hash_lock.lock
     workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
@@ -277,6 +284,7 @@ class KadeployServer
     workflow = nil
     exec_specific = nil
     client = nil
+    config = nil
     DRb.stop_service()
     GC.start
   end
@@ -315,7 +323,10 @@ class KadeployServer
         config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
       }
     else
-      config.cluster_specific = @config.cluster_specific
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
+      }
     end
     @workflow_info_hash_lock.lock
     workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
@@ -465,7 +476,6 @@ class KadeployServer
             #Reboot on the production environment
             if (part == get_prod_part(cluster)) then
               set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
-              step.check_nodes("prod_env_booted")
               if (exec_specific.check_prod_env) then
                 step.nodes_ko.tag_demolishing_env(@db)
                 ret = 1

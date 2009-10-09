@@ -2182,7 +2182,10 @@ module ConfigInformation
     # Output
     # * nothing      
     def duplicate_all(dest)
-      dest.workflow_steps = @workflow_steps.clone
+      dest.workflow_steps = Array.new
+      @workflow_steps.each_index { |i|
+        dest.workflow_steps[i] = @workflow_steps[i].clone
+      }
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_initrd = @deploy_initrd.clone
       dest.block_device = @block_device.clone
@@ -2295,8 +2298,8 @@ module ConfigInformation
     # * nothing
     # Output
     # * return an array: [0] is the name of the instance, 
-    #                     [1] is the number of retries available for the instance
-    #                     [2] is the timeout for the instance
+    #                    [1] is the number of retries available for the instance
+    #                    [2] is the timeout for the instance
     def get_instance
       return @array_of_instances[@current]
     end
