@@ -286,6 +286,7 @@ module MicroStepsLibrary
         @reboot_window.launch(node_set, &callback)
       }
       tid.join
+      @nodes_ko.add(node_set) if @nodes_ok.empty?
     end
 
     # Test if the given symlink is an absolute link
