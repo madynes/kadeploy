@@ -543,13 +543,21 @@ module MicroStepsLibrary
       when "linux"
         line1 = "#{@config.exec_specific.environment.kernel}"
         line1 += " #{kernel_params}" if kernel_params != ""
-        line2 = "#{@config.exec_specific.environment.initrd}"
+        if (@config.exec_specific.environment.initrd == nil) then
+          line2 = "none"
+        else
+          line2 = "#{@config.exec_specific.environment.initrd}"
+        end
       when "xen"
         line1 = "#{@config.exec_specific.environment.hypervisor}"
-        line1 += " #{@config.exec_specific.environment.hypervisor_params}" if @config.exec_specific.environment.hypervisor_params != ""
+        line1 += " #{@config.exec_specific.environment.hypervisor_params}" if @config.exec_specific.environment.hypervisor_params != nil
         line2 = "#{@config.exec_specific.environment.kernel}"
         line2 += " #{kernel_params}" if kernel_params != ""
-        line3 = "#{@config.exec_specific.environment.initrd}"
+        if (@config.exec_specific.environment.initrd == nil) then
+          line3 = "none"
+        else
+          line3 = "#{@config.exec_specific.environment.initrd}"
+        end
       else
         failed_microstep("Invalid os kind #{kind}")
         return false
@@ -579,13 +587,21 @@ module MicroStepsLibrary
       when "linux"
         line1 = "#{@config.exec_specific.environment.kernel}"
         line1 += " #{kernel_params}" if kernel_params != ""
-        line2 = "#{@config.exec_specific.environment.initrd}"
+        if (@config.exec_specific.environment.initrd == nil) then
+          line2 = "none"
+        else
+          line2 = "#{@config.exec_specific.environment.initrd}"
+        end
       when "xen"
         line1 = "#{@config.exec_specific.environment.hypervisor}"
-        line1 += " #{@config.exec_specific.environment.hypervisor_params}" if @config.exec_specific.environment.hypervisor_params != ""
+        line1 += " #{@config.exec_specific.environment.hypervisor_params}" if @config.exec_specific.environment.hypervisor_params != nil
         line2 = "#{@config.exec_specific.environment.kernel}"
         line2 += " #{kernel_params}" if kernel_params != ""
-        line3 = "#{@config.exec_specific.environment.initrd}"
+        if (@config.exec_specific.environment.initrd == nil) then
+          line3 = "none"
+        else
+          line3 = "#{@config.exec_specific.environment.initrd}"
+        end
       else
         failed_microstep("Invalid os kind #{kind}")
         return false
@@ -661,7 +677,11 @@ module MicroStepsLibrary
       @nodes_ok.make_sorted_array_of_nodes.each { |node|
         list += " -m #{node.hostname}"
       }
-      cmd = "kastafior -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
+      if @config.common.taktuk_auto_propagate then
+        cmd = "kastafior -s -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
+      else
+        cmd = "kastafior -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
+      end
       @output.debug(cmd, nil)
       c = ParallelRunner::Command.new(cmd)
       c.run

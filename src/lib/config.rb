@@ -797,13 +797,12 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
-          if not File.readable?(f) then
+          if (not (f =~ /^http[s]?:\/\//)) && (not File.readable?(f)) then
             error("The file #{f} does not exist or is not readable")
             return false
-          else
-            exec_specific.load_env_kind = "file"
-            exec_specific.load_env_arg = f
           end
+          exec_specific.load_env_kind = "file"
+          exec_specific.load_env_arg = f
         }
         opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
           if /\A[\w\/]+\Z/ =~ b then
@@ -1149,7 +1148,7 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
-          if not File.readable?(f) then
+          if (not (f =~ /^http[s]?:\/\//)) && (not File.readable?(f)) then
             error("The file #{f} cannot be read")
             return false
           else

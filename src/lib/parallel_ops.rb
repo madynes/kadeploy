@@ -438,6 +438,8 @@ module ParallelOperations
                   end
                   if all_ports_ok then
                     node.state = "OK"
+                    node.last_cmd_exit_status = "0"
+                    node.last_cmd_stderr = ""
                     @output.verbosel(4, "  *** #{node.hostname} is here after #{Time.now.tv_sec - start}s")
                     @config.set_node_state(node.hostname, "", "", "rebooted")
                   else

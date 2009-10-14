@@ -21,14 +21,14 @@ case $KIND in
 	MSG=$MSG"menuentry Linux {\n"
 	MSG=$MSG"\tset root="$GRUBPART"\n"
 	MSG=$MSG"\tlinux "$LINE1" root="$ROOT" ro\n"
-	MSG=$MSG"\tinitrd "$LINE2"\n"
+	[ "$LINE2" != "none" ] && MSG=$MSG"\tinitrd "$LINE2"\n"
 	;;
     "xen")
 	MSG=$MSG"menuentry Xen {\n"
 	MSG=$MSG"\tset root="$GRUBPART"\n"
 	MSG=$MSG"\tmultiboot "$LINE1"\n"
 	MSG=$MSG"\tmodule "$LINE2" root="$ROOT" ro\n"
-	MSG=$MSG"\tmodule "$LINE3"\n"
+	[ "$LINE3" != "none" ] && MSG=$MSG"\tmodule "$LINE3"\n"
 	;;
     *)
 	echo "Invalid kind of system"

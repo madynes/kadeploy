@@ -82,16 +82,15 @@ module PXEOperations
     else
       kernel_line = "\tKERNEL " + tftp_img + "/" + kernel + "\n" #pxelinux
     end
-    if /\Ahttp[s]?:\/\/.+/ =~ initrd then
-      append_line = "\tAPPEND initrd=" + initrd #gpxelinux
-    else
-      append_line = "\tAPPEND initrd=" + tftp_img + "/" + initrd #pxelinux
+    if (initrd != nil) then
+      if /\Ahttp[s]?:\/\/.+/ =~ initrd then
+        append_line = "\tAPPEND initrd=" + initrd #gpxelinux
+      else
+        append_line = "\tAPPEND initrd=" + tftp_img + "/" + initrd #pxelinux
+      end
     end
-    if (boot_part != "")
-      append_line += " root=" + boot_part + " " + kernel_params
-    else
-      append_line += " " + kernel_params
-    end
+    append_line += " root=" + boot_part if (boot_part != "")
+    append_line += " " + kernel_params if (kernel_params != "")
     append_line += "\n"
     msg = get_pxe_header() + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
@@ -114,10 +113,12 @@ module PXEOperations
   # * returns the value of write_pxe
   def PXEOperations::set_pxe_for_xen(ips, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg)
     kernel_line = "\tKERNEL " + "/mboot.c32\n"
-    append_line = "\tAPPEND " + tftp_img + "/" + hypervisor + " " + hypervisor_params 
-    append_line += " --- " + tftp_img + "/" + kernel + " " + kernel_params
+    append_line = "\tAPPEND " + tftp_img + "/" + hypervisor + 
+    append_line +=  " " + hypervisor_params if (hypervisor_params != nil)
+    append_line += " --- " + tftp_img + "/" + kernel 
+    append_line += " " + kernel_params  if (kernel_params != "")
     append_line += " root=" + boot_part if (boot_part != "")
-    append_line += " --- " + tftp_img + "/" + initrd
+    append_line += " --- " + tftp_img + "/" + initrd if (initrd != nil)
     append_line += "\n"
     msg = get_pxe_header() + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)

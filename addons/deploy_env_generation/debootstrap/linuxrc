@@ -61,6 +61,10 @@ get_param ETH_DRV_OPTIONS
 ETH_DRV_OPTIONS=$CMD_PARAM
 CMD_PARAM=
 
+get_param SLEEP_TIME
+SLEEP_TIME=$CMD_PARAM
+CMD_PARAM=
+
 if [ $ETH_DRV ]; then
     if [ $ETH_DRV_OPTIONS ]; then
         echo "Loading specified ethernet driver $ETH_DRV with options $ETH_DRV_OPTIONS..." > ${TTY}
@@ -135,6 +139,10 @@ if [ $DISK_DRV ]; then
    modprobe ide-generic
 fi
 
+#we wait slow disks ...
+if [ $SLEEP_TIME ]; then
+    sleep $SLEEP_TIME
+fi
 
 /usr/sbin/sshd
 

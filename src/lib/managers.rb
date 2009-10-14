@@ -17,7 +17,6 @@ require 'http'
 #Ruby libs
 require 'thread'
 require 'uri'
-#require 'net/http'
 require 'tempfile'
 
 module Managers
@@ -539,20 +538,20 @@ module Managers
             return false
           end
         end
-     #classical fetch
+      #classical fetch
       else
-        if async then
-          @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
-          return false
-        else
-          if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
-            #We first check if the file can be reached locally
-            if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
-              @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
-              if not system("cp #{client_file} #{local_file}") then
-                @output.verbosel(0, "Unable to do the local copy")
-                return false
-              end
+        if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
+          #We first check if the file can be reached locally
+          if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
+            @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
+            if not system("cp #{client_file} #{local_file}") then
+              @output.verbosel(0, "Unable to do the local copy")
+              return false
+            end
+          else
+            if async then
+              @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
+              return false
             else
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
               if not @client.get_file(client_file, prefix) then
@@ -560,11 +559,11 @@ module Managers
                 return false
               end
             end
-          else
-            if not system("touch -a #{local_file}") then
-              @output.verbosel(0, "Unable to touch the local file")
-              return false
-            end
+          end
+        else
+          if not system("touch -a #{local_file}") then
+            @output.verbosel(0, "Unable to touch the local file")
+            return false
           end
         end
       end
