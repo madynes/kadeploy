@@ -264,7 +264,7 @@ module Debug
       end
       sl = Syslog.open("Kadeploy-log")
       @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"]
+        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
         str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
         str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
         str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
@@ -316,7 +316,7 @@ module Debug
       fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
       fd.flock(File::LOCK_EX)
       @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"]
+        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
         str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
         str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
         str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","

@@ -112,8 +112,8 @@ module PXEOperations
   # Output
   # * returns the value of write_pxe
   def PXEOperations::set_pxe_for_xen(ips, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg)
-    kernel_line = "\tKERNEL " + "/mboot.c32\n"
-    append_line = "\tAPPEND " + tftp_img + "/" + hypervisor + 
+    kernel_line = "\tKERNEL " + "mboot.c32\n"
+    append_line = "\tAPPEND " + tftp_img + "/" + hypervisor
     append_line +=  " " + hypervisor_params if (hypervisor_params != nil)
     append_line += " --- " + tftp_img + "/" + kernel 
     append_line += " " + kernel_params  if (kernel_params != "")
@@ -157,7 +157,7 @@ module PXEOperations
   # Output
   # * returns the value of write_pxe
   def PXEOperations::set_pxe_for_chainload(ips, boot_part, tftp_repository, tftp_img, tftp_cfg)
-    kernel_line = "\tKERNEL " + "/chain.c32\n"
+    kernel_line = "\tKERNEL " + "chain.c32\n"
     append_line = "\tAPPEND hd0 #{boot_part}\n"
     msg = get_pxe_header() + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)

@@ -45,7 +45,7 @@ module EnvironmentManagement
       if (file =~ /^http[s]?:\/\//) then
         http_response, etag = HTTP::fetch_file(file, temp_env_file.path, nil)
         if http_response != "200" then
-          puts "The file #{file} cannot be fetched"
+          puts "The file #{file} cannot be fetched: http_response #{http_response}"
           return false
         else
           file = temp_env_file.path
@@ -70,6 +70,7 @@ module EnvironmentManagement
       @visibility = "shared"
       @user = `id -nu`.chomp
       @version = 0
+      @id = -1
       IO::read(file).split("\n").each { |line|
         if /\A(\w+)\ :\ (.+)\Z/ =~ line then
           content = Regexp.last_match
@@ -212,7 +213,7 @@ module EnvironmentManagement
           return false
         end
       when "xen"
-        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) || (@hypervisor) ||(@fdisk_type == nil) || (@filesystem == nil)) then
+        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) || (@hypervisor == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
           puts "The name, tarball, kernel, hypervisor, fdisktype, filesystem, and environment_kind fields are mandatory"
           return false
         end
@@ -441,13 +442,13 @@ module EnvironmentManagement
       puts "tarball : #{flatten_tarball()}"
       puts "preinstall : #{flatten_pre_install()}" if (@preinstall != nil)
       puts "postinstall : #{flatten_post_install()}" if (@postinstall != nil)
-      puts "kernel : #{@kernel}"
+      puts "kernel : #{@kernel}" if (@kernel != nil)
       puts "kernel_params : #{@kernel_params}" if (@kernel_params != nil)
-      puts "initrd : #{@initrd}"
+      puts "initrd : #{@initrd}" if (@initrd != nil)
       puts "hypervisor : #{@hypervisor}" if (@hypervisor != nil)
       puts "hypervisor_params : #{@hypervisor_params}" if (@hypervisor_params != nil)
       puts "fdisktype : #{@fdisk_type}"
-      puts "filesystem : #{@filesystem}"
+      puts "filesystem : #{@filesystem}" if (@filesystem != nil)
       puts "environment_kind : #{@environment_kind}"
       puts "visibility : #{@visibility}"
       puts "demolishing_env : #{@demolishing_env}"

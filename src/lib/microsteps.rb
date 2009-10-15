@@ -417,10 +417,14 @@ module MicroStepsLibrary
     # Copy the kernel and the initrd into the PXE directory
     #
     # Arguments
-    # * files: array of file
+    # * files_array: array of file
     # Output
     # * return true if the operation is correctly performed, false
-    def copy_kernel_initrd_to_pxe(files)
+    def copy_kernel_initrd_to_pxe(files_array)
+      files = Array.new
+      files_array.each { |f|
+        files.push(f.sub(/\A\//,'')) if (f != nil)
+      }
       must_extract = false
       archive = @config.exec_specific.environment.tarball["file"]
       dest_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
@@ -1074,15 +1078,17 @@ module MicroStepsLibrary
             case @config.exec_specific.environment.environment_kind
             when "linux"
               kernel = prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
-              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd)
+              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
               if not system("touch -a #{images_dir}/#{kernel}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
                 return false
               end
-              if not system("touch -a #{images_dir}/#{initrd}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
-                return false
+              if (@config.exec_specific.environment.initrd != nil) then
+                if not system("touch -a #{images_dir}/#{initrd}") then
+                  @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
+                  return false
+                end
               end
               if not PXEOperations::set_pxe_for_linux(@nodes_ok.make_array_of_ip,
                                                       kernel,
@@ -1097,16 +1103,18 @@ module MicroStepsLibrary
               end
             when "xen"
               kernel = prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
-              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd)
+              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
               images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
               if not system("touch -a #{images_dir}/#{kernel}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
                 return false
               end
-              if not system("touch -a #{images_dir}/#{initrd}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
-                return false
+              if (@config.exec_specific.environment.initrd != nil) then
+                if not system("touch -a #{images_dir}/#{initrd}") then
+                  @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
+                  return false
+                end
               end
               if not system("touch -a #{images_dir}/#{hypervisor}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{hypervisor}")
@@ -1145,16 +1153,18 @@ module MicroStepsLibrary
                 prefix_in_cache = "e-anon--"
               end
               kernel = prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
-              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd)
+              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
               images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
               if not system("touch -a #{images_dir}/#{kernel}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
                 return false
               end
-              if not system("touch -a #{images_dir}/#{initrd}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
-                return false
+              if (@config.exec_specific.environment.initrd != nil) then
+                if not system("touch -a #{images_dir}/#{initrd}") then
+                  @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
+                  return false
+                end
               end
               if not system("touch -a #{images_dir}/#{hypervisor}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{hypervisor}")
@@ -1176,7 +1186,7 @@ module MicroStepsLibrary
               Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                  @config.common.tftp_images_max_size * 1024 * 1024,
                                  6,
-                                 /^e\d+--.+$/)              
+                                 /^e\d+--.+$/)
             end
           end
         end
@@ -1424,12 +1434,12 @@ module MicroStepsLibrary
       when "pure_pxe"
         case @config.exec_specific.environment.environment_kind
         when "linux"
-          return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel.sub(/\A\//,''),
-                                            @config.exec_specific.environment.initrd.sub(/\A\//,'')])
+          return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
+                                            @config.exec_specific.environment.initrd])
         when "xen"
-          return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel.sub(/\A\//,''),
-                                            @config.exec_specific.environment.initrd.sub(/\A\//,''),
-                                            @config.exec_specific.environment.hypervisor.sub(/\A\//,'')])
+          return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
+                                            @config.exec_specific.environment.initrd,
+                                            @config.exec_specific.environment.hypervisor])
         when "other"
           failed_microstep("Only linux and xen environments can be booted with a pure PXE configuration")
           return false
@@ -1445,9 +1455,9 @@ module MicroStepsLibrary
           when "xen"
 #           return install_grub2_on_nodes("xen", instance_thread)
             @output.verbosel(3, "   Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
-            return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel.sub(/\A\//,''),
-                                              @config.exec_specific.environment.initrd.sub(/\A\//,''),
-                                              @config.exec_specific.environment.hypervisor.sub(/\A\//,'')])
+            return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
+                                              @config.exec_specific.environment.initrd,
+                                              @config.exec_specific.environment.hypervisor])
 
           when "other"
             #in this case, the bootloader must be installed by the user (dd partition)

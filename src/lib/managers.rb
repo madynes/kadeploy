@@ -301,7 +301,7 @@ module Managers
     @reboot_window = nil
     @nodes_check_window = nil
     @logger = nil
-    @db = nil
+    attr_accessor :db
     @deployments_table_lock = nil
     @mutex = nil
     @thread_tab = nil
@@ -492,7 +492,7 @@ module Managers
       end
     end
 
-    # Grab a file from the client side or locally
+    # Grab a file from the client side or locally with recording the hash of the file
     #
     # Arguments
     # * client_file: client file to grab
@@ -503,7 +503,7 @@ module Managers
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, async = false)
+    def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, async = false)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         if (not File.exist?(local_file)) then
@@ -602,6 +602,27 @@ module Managers
         end
       end
       return true
+    end
+
+    # Grab a file from the client side or locally
+    #
+    # Arguments
+    # * client_file: client file to grab
+    # * local_file: path to local cached file
+    # * expected_md5: expected md5 for the client file
+    # * file_tag: tag used to specify the kind of file to grab
+    # * prefix: prefix used to store the file in the cache
+    # * async (opt) : specify if the caller client is asynchronous
+    # Output
+    # * return true if everything is successfully performed, false otherwise
+    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, async = false)
+      #anonymous environment
+      if (@config.exec_specific.load_env_kind == "file") then
+        return grab_file_without_caching(client_file, local_file, file_tag, prefix, async)
+      #recorded environement
+      else
+        return grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, async)
+      end
     end
 
     # Grab files from the client side (tarball, ssh public key, preinstall, user postinstall, files for custom operations)

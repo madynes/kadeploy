@@ -24,7 +24,6 @@ class KadeployServer
   attr_reader :tcp_buffer_size
   attr_reader :dest_host
   attr_reader :dest_port
-  @db = nil
   @reboot_window = nil
   @nodes_check_window = nil
   @syslog_lock = nil
@@ -38,10 +37,9 @@ class KadeployServer
   # * config: instance of Config
   # * reboot_window: instance of WindowManager to manage the reboot window
   # * nodes_check_window: instance of WindowManager to manage the check of the nodes
-  # * db: database handler
   # Output
   # * raises an exception if the file server can not open a socket
-  def initialize(config, reboot_window, nodes_check_window, db)
+  def initialize(config, reboot_window, nodes_check_window)
     @config = config
     @dest_host = @config.common.kadeploy_server
     @tcp_buffer_size = @config.common.kadeploy_tcp_buffer_size
@@ -49,7 +47,6 @@ class KadeployServer
     @nodes_check_window = nodes_check_window
     @deployments_table_lock = Mutex.new
     @syslog_lock = Mutex.new
-    @db = db
     @workflow_info_hash = Hash.new
     @workflow_info_hash_lock = Mutex.new
   end
@@ -212,8 +209,17 @@ class KadeployServer
   # * port: port on which the client listen to Drb
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * nothing
+  # * return false if cannot connect to DB, true otherwise
   def launch_workflow(host, port, exec_specific)
+    db = Database::DbFactory.create(@config.common.db_kind)
+    if not db.connect(@config.common.deploy_db_host,
+                      @config.common.deploy_db_login,
+                      @config.common.deploy_db_passwd,
+                      @config.common.deploy_db_name) then
+      puts "Kadeploy server cannot connect to DB"
+      return false
+    end
+
     puts "Let's launch an instance of Kadeploy"
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
@@ -250,7 +256,7 @@ class KadeployServer
     end
     @workflow_info_hash_lock.lock
     workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
-    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, workflow_id)
+    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
     add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
     client.set_workflow_id(workflow_id)
@@ -276,6 +282,7 @@ class KadeployServer
     end
     finished = true
     #let's free memory at the end of the workflow
+    db.disconnect
     tid = nil
     @workflow_info_hash_lock.lock
     delete_workflow_info(workflow_id)
@@ -287,6 +294,7 @@ class KadeployServer
     config = nil
     DRb.stop_service()
     GC.start
+    return true
   end
 
 
@@ -295,8 +303,17 @@ class KadeployServer
   # Arguments
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed)
+  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed, 3: server cannot connect to DB)
   def launch_workflow_async(exec_specific)
+    db = Database::DbFactory.create(@config.common.db_kind)
+    if not db.connect(@config.common.deploy_db_host,
+                      @config.common.deploy_db_login,
+                      @config.common.deploy_db_passwd,
+                      @config.common.deploy_db_name) then
+      puts "Kadeploy server cannot connect to DB"
+      return nil, 3
+    end
+
     puts "Let's launch an instance of Kadeploy (async)"
 
     #We create a new instance of Config with a specific exec_specific part
@@ -330,7 +347,7 @@ class KadeployServer
     end
     @workflow_info_hash_lock.lock
     workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
-    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock, workflow_id)
+    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
     add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
     if workflow.prepare() then
@@ -393,6 +410,7 @@ class KadeployServer
     @workflow_info_hash_lock.lock
     if @workflow_info_hash.has_key?(workflow_id) then
       workflow = @workflow_info_hash[workflow_id]
+      workflow.db.disconnect
       delete_workflow_info(workflow_id)
       #let's free memory at the end of the workflow
       tid = nil
@@ -417,8 +435,17 @@ class KadeployServer
   # * verbose_level: level of verbosity
   # * pxe_profile_msg: PXE profile
   # Output
-  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched
+  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if the server cannot connect to DB
   def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg)
+    db = Database::DbFactory.create(@config.common.db_kind)
+    if not db.connect(@config.common.deploy_db_host,
+                      @config.common.deploy_db_login,
+                      @config.common.deploy_db_passwd,
+                      @config.common.deploy_db_name) then
+      puts "Kadeploy server cannot connect to DB"
+      return 3
+    end
+
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
     client = DRbObject.new(nil, uri)
@@ -433,7 +460,7 @@ class KadeployServer
                                       @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
     if (exec_specific.reboot_kind == "env_recorded") && 
         exec_specific.check_prod_env && 
-        exec_specific.node_list.check_demolishing_env(@db, @config.common.demolishing_env_threshold) then
+        exec_specific.node_list.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
       output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
       ret = 2
     else
@@ -462,7 +489,7 @@ class KadeployServer
           if (exec_specific.reboot_kind == "deploy_env") then
             step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
             step.send_key_in_deploy_env("tree")
-            set.set_deployment_state("deploy_env", nil, @db, exec_specific.true_user)
+            set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
           else
             step.wait_reboot([@config.common.ssh_port],[])
           end
@@ -475,13 +502,13 @@ class KadeployServer
             end
             #Reboot on the production environment
             if (part == get_prod_part(cluster)) then
-              set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
+              set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
               if (exec_specific.check_prod_env) then
-                step.nodes_ko.tag_demolishing_env(@db)
+                step.nodes_ko.tag_demolishing_env(db)
                 ret = 1
               end
             else
-              set.set_deployment_state("recorded_env", nil, @db, exec_specific.true_user)
+              set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
             end
           end
           if not step.nodes_ok.empty? then
@@ -496,11 +523,11 @@ class KadeployServer
         end
       }
     end
+    db.disconnect
     config = nil
     return ret
   end
 end
-
 
 
 begin
@@ -513,12 +540,10 @@ if (config.check_config("kadeploy") == true)
   db = Database::DbFactory.create(config.common.db_kind)
   Signal.trap("TERM") do
     puts "TERM trapped, let's clean everything ..."
-    db.disconnect
     exit(1)
   end
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
-    db.disconnect
     exit(1)
   end
   if not db.connect(config.common.deploy_db_host,
@@ -526,11 +551,12 @@ if (config.check_config("kadeploy") == true)
                     config.common.deploy_db_passwd,
                     config.common.deploy_db_name)
     puts "Cannot connect to the database"
+    exit(1)
   else
+    db.disconnect
     kadeployServer = KadeployServer.new(config, 
                                         Managers::WindowManager.new(config.common.reboot_window, config.common.reboot_window_sleep_time),
-                                        Managers::WindowManager.new(config.common.nodes_check_window, 1),
-                                        db)
+                                        Managers::WindowManager.new(config.common.nodes_check_window, 1))
     puts "Launching the Kadeploy RPC server"
     uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
     DRb.start_service(uri, kadeployServer)

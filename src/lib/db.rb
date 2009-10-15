@@ -93,6 +93,7 @@ module Database
     def connect(host, user, passwd, base)
       begin
         @dbh = Mysql.real_connect(host, user, passwd, base)
+        @dbh.reconnect = true
         ret = true
       rescue Mysql::Error => e
         puts "Error code: #{e.errno}"
