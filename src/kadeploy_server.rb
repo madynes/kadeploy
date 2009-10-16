@@ -220,7 +220,6 @@ class KadeployServer
       return false
     end
 
-    puts "Let's launch an instance of Kadeploy"
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
     client = DRbObject.new(nil, uri)

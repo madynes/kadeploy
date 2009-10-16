@@ -14,7 +14,7 @@ require 'db'
 require 'thread'
 require 'drb'
 require 'socket'
-
+require 'md5'
 
 class KadeployClient
   @kadeploy_server = nil
@@ -86,7 +86,34 @@ class KadeployClient
       return false
     end
   end
+  
+  # Get the mtime of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the mtime of the file, or 0 if it cannot be read.
+  def get_file_mtime(file_name)
+    if File.readable?(file_name) then
+      return File.mtime(file_name).to_i
+    else
+      return 0
+    end
+  end
 
+  # Get the MD5 of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the MD5 of the file, or 0 if it cannot be read.
+  def get_file_md5(file_name)
+    if File.readable?(file_name) then
+      return MD5::get_md5_sum(file_name)
+    else
+      return 0
+    end
+  end
 
   # Print the results of the deployment (RPC)
   #

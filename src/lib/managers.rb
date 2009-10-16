@@ -561,6 +561,33 @@ module Managers
             end
           end
         else
+          if (not async) then
+            #file can be reached on the local filesytem
+            if (File.readable?(client_file)) then
+              if (File.mtime(local_file).to_i < File.mtime(client_file).to_i) then
+                if (MD5::get_md5_sum(client_file)  != expected_md5) then
+                  @output.verbosel(0, "Warning!!! The file #{client_file} have been modified, you should run kaenv3 to update its MD5")
+                else
+                  if not system("touch -m #{local_file}") then
+                    @output.verbosel(0, "Unable to touch the local file")
+                    return false
+                  end
+                end
+              end
+            #file can only be read by the client
+            else 
+              if (File.mtime(local_file).to_i < @client.get_file_mtime(client_file)) then
+                if (@client.get_file_md5(client_file) != expected_md5) then
+                  @output.verbosel(0, "Warning!!! The file #{client_file} have been modified, you should run kaenv3 to update its MD5")
+                else
+                  if not system("touch -m #{local_file}") then
+                    @output.verbosel(0, "Unable to touch the local file")
+                    return false
+                  end
+                end
+              end
+            end
+          end
           if not system("touch -a #{local_file}") then
             @output.verbosel(0, "Unable to touch the local file")
             return false
