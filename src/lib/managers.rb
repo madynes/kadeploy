@@ -562,28 +562,22 @@ module Managers
           end
         else
           if (not async) then
-            #file can be reached on the local filesytem
             if (File.readable?(client_file)) then
-              if (File.mtime(local_file).to_i < File.mtime(client_file).to_i) then
-                if (MD5::get_md5_sum(client_file)  != expected_md5) then
-                  @output.verbosel(0, "Warning!!! The file #{client_file} have been modified, you should run kaenv3 to update its MD5")
-                else
-                  if not system("touch -m #{local_file}") then
-                    @output.verbosel(0, "Unable to touch the local file")
-                    return false
-                  end
-                end
-              end
-            #file can only be read by the client
-            else 
-              if (File.mtime(local_file).to_i < @client.get_file_mtime(client_file)) then
-                if (@client.get_file_md5(client_file) != expected_md5) then
-                  @output.verbosel(0, "Warning!!! The file #{client_file} have been modified, you should run kaenv3 to update its MD5")
-                else
-                  if not system("touch -m #{local_file}") then
-                    @output.verbosel(0, "Unable to touch the local file")
-                    return false
-                  end
+              #the file is reachable on the local filesystem
+              get_mtime = lambda { return File.mtime(client_file).to_i }
+              get_md5 = lambda { return MD5::get_md5_sum(client_file) }
+            else
+              #the file is only reachable by the client
+              get_mtime = lambda { return @client.get_file_mtime(client_file) }
+              get_md5 = lambda { return @client.get_file_md5(client_file) }
+            end
+            if (File.mtime(local_file).to_i < get_mtime.call) then
+              if (get_md5.call  != expected_md5) then
+                @output.verbosel(0, "Warning!!! The file #{client_file} has been modified, you should run kaenv3 to update its MD5")
+              else
+                if not system("touch -m #{local_file}") then
+                  @output.verbosel(0, "Unable to touch the local file")
+                  return false
                 end
               end
             end
