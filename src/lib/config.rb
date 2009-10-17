@@ -458,6 +458,13 @@ module ConfigInformation
                 puts "Invalid value for the demolishing_env_threshold field"
                 return false
               end
+            when "demolishing_env_auto_tag"
+              if val =~ /\A(true|false)\Z/ then
+                @common.demolishing_env_auto_tag = (val == "true")
+              else
+                puts "Invalid value for the demolishing_env_auto_tag field"
+                return false
+              end
             when "bt_tracker_ip"
               if val =~ /\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/ then
                 @common.bt_tracker_ip = val
@@ -2044,6 +2051,7 @@ module ConfigInformation
     attr_accessor :rambin_path
     attr_accessor :mkfs_options
     attr_accessor :demolishing_env_threshold
+    attr_accessor :demolishing_env_auto_tag
     attr_accessor :bt_tracker_ip
     attr_accessor :bt_download_timeout
     attr_accessor :almighty_env_users
@@ -2058,6 +2066,7 @@ module ConfigInformation
     def initialize
       @nodes_desc = Nodes::NodeSet.new
       @kadeploy_disable_cache = false
+      @demolishing_env_auto_tag = false
     end
 
     # Check if all the fields of the common configuration file are filled

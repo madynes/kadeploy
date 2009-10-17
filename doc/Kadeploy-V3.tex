@@ -277,6 +277,7 @@ rambin_path = /rambin
 mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|\
                ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index
 demolishing_env_threshold = 2
+demolishing_env_auto_tag = false
 bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
 almighty_env_users = root,ejeanvoine
@@ -327,6 +328,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{rambin\_path}: path of the ramdisk directory in the deployment environment (/rambin seems to be a good value).
 \item \texttt{mkfs\_options}: options for mkfs. The options for several FS can be defined here with the following syntax: fstype1@options|fstype2@options|... (no newline is expected)
 \item \texttt{demolishing\_env\_threshold}: maximum number of reboot failures (on the production environment) before considering that an environment is demolishing.
+\item \texttt{demolishing\_env\_auto\_tag}: specify if Kareboot must tag automatically an environment as demolishing after a failed reboot on the production environment.
 \item \texttt{bt\_tracker\_ip}: ip of the Bittorrent tracker.
 \item \texttt{bt\_download\_timeout}: timeout for the Bittorrent file download.
 \item \texttt{almighty\_env\_users}: list of users allowed to perform special operations on the environments like publishing environments or moving files.
@@ -893,33 +895,39 @@ This command lists prints the version \textit{3} of the environment \textit{Free
 \begin{verbatim}
 > kaenv3 -a ~/new_env.dsc
 \end{verbatim}
-This command adds the environment defined in the file \textit{~/new\_env.dsc}. %See the~\ref{sec:env_desc} part to get information about the environment description.
+This command adds the environment defined in the file \textit{~/new\_env.dsc}.
 
 \paragraph{Use case 5}
+\begin{verbatim}
+> kaenv3 -a http://www.grid5000.fr/pub/johnsmith/env.desc
+\end{verbatim}
+This command adds the environment defined in the file \textit{http://www.grid5000.fr/pub/johnsmith/env.desc}.
+
+\paragraph{Use case 6}
 \begin{verbatim}
 > kaenv3 -d FreeBSD --env-version 2
 \end{verbatim}
 This command deletes the version \textit{2} of the environment \textit{FreeBSD} from the environment database. If no version number is given, all the versions are deleted.
 
-\paragraph{Use case 6}
+\paragraph{Use case 7}
 \begin{verbatim}
 > kaenv3 --remove-demolishing-tag FreeBSD --env-version 3
 \end{verbatim}
 This command resets the \textit{demolishing} counter of the version \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
 
-\paragraph{Use case 7}
+\paragraph{Use case 8}
 \begin{verbatim}
 > kaenv3 --update-tarball-md5 sidx64-base
 \end{verbatim}
 This command is useful if you modify the tarball of the environment \textit{sidx64-base} without modifying the kernel or the initrd and if you do not want to record a new environment. Thus, it will update the MD5 of the tarball file. This operation is required if something change in the tarball, otherwise the environment will be unusable.
 
-\paragraph{Use case 8}
+\paragraph{Use case 9}
 \begin{verbatim}
 > kaenv3 --update-postinstalls-md5 sidx64-base
 \end{verbatim}
 This command does the same thing than the precedent one but it concerns the post-install files. This operation is required if something change in the post-install files, otherwise the environment will be unusable.
 
-\paragraph{Use case 9}
+\paragraph{Use case 10}
 \begin{verbatim}
 > kaenv3 --set-visibility-tag sidx64-base --env-version 3 -t private
 \end{verbatim}
@@ -1166,8 +1174,8 @@ A small script named \texttt{env\_migrate} has been written to ease the translat
 
 \begin{small}
 \begin{verbatim}
-> env_migrate -h
-Usage: env_migrate [options]
+> kaenv2to3 -h
+Usage: kaenv2to3 [options]
 Contact: kadeploy3-users@lists.grid5000.fr
 
 General options:
@@ -1177,7 +1185,7 @@ General options:
 \end{verbatim}
 \end{small}
 
-To use \texttt{env\_migrate}, you have to choose the kind of environment you wish to migrate and you have to choose the environment. The choice can be made in two ways:
+To use \texttt{kaenv2to3}, you have to choose the kind of environment you wish to migrate and you have to choose the environment. The choice can be made in two ways:
 \begin{itemize}
 \item choosing the environment from its name in the old version of Kadeploy (like it can be seen with the kaenvironments output) ;
 \item choosing the environment from a file that contains the description in the old format.
@@ -1186,12 +1194,12 @@ To use \texttt{env\_migrate}, you have to choose the kind of environment you wis
 Here are two examples:
 \begin{small}
 \begin{verbatim}
-> env_migrate -e envname_in_kaenvironments_db -k linux
-> env_migrate -f envfile_in_2_1_x_format.dsc -k xen
+> kaenv2to3 -e envname_in_kaenvironments_db -k linux
+> kaenv2to3 -f envfile_in_2_1_x_format.dsc -k xen
 \end{verbatim}
 \end{small}
 
-If everything went right, the output of \texttt{env\_migrate} shows the description in the new format. You can redirect this output to a file and use this file as an input for \texttt{kaenv}.
+If everything went right, the output of \texttt{kaenv2to3} shows the description in the new format. You can redirect this output to a file and use this file as an input for \texttt{kaenv}.
 
 \section{Build a custom pre-install}\label{sec:custom-preinstall}
 The goal of the pre-install in the Kadeploy workflow is to prepare the disk of the nodes before the copy of the environment. It can include:
