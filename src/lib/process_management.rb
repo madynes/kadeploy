@@ -70,10 +70,23 @@ module ProcessManagement
   class Container
     @instances = nil
     
+    # Constructor of Container
+    #
+    # Arguments
+    # * output: nothing
+    # Output
+    # * nothing
     def initialize
       @instances = Hash.new
     end
 
+    # Add a process in a container
+    #
+    # Arguments
+    # * tid: thread id of the instance that launched the process
+    # * pid: process id
+    # Output
+    # * nothing
     def add_process(tid, pid)
       if not @instances.has_key?(tid) then
         @instances[tid] = Array.new
@@ -81,12 +94,25 @@ module ProcessManagement
       @instances[tid].push(pid)
     end
 
+    # Remove a process of a container
+    #
+    # Arguments
+    # * tid: thread id of the instance that launched the process
+    # * pid: process id
+    # Output
+    # * nothing
     def remove_process(tid, pid)
       if @instances.has_key?(tid) then
         @instances[tid].delete(pid)
       end
     end
 
+    # Kill all the processes launched in the container of the given instance
+    #
+    # Arguments
+    # * tid: thread id of the instance that launched the process
+    # Output
+    # * nothing
     def killall(tid)
       if @instances.has_key?(tid) then
         @instances[tid].each { |pid|

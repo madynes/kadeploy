@@ -6,7 +6,7 @@ DEBOOTSTRAP="/usr/sbin/debootstrap"
 
 DEBOOTSTRAP_INCLUDE_PACKAGES=dhcpcd,openssh-client,openssh-server,kexec-tools,bzip2,taktuk,grub-pc,ctorrent,hdparm,parted
 
-DEBOOTSTRAP_EXCLUDE_PACKAGE=vim-common,vim-tiny,traceroute,manpages,man-db,adduser,cron,logrotate,laptop-detect,tasksel,tasksel-data,dhcp3-client,dhcp3-common,wget
+DEBOOTSTRAP_EXCLUDE_PACKAGE=vim-common,vim-tiny,traceroute,manpages,man-db,adduser,cron,logrotate,laptop-detect,tasksel,tasksel-data,dhcp3-client,dhcp3-common,wget,network-manager
 
 mkdir -p $DIR
 
@@ -18,6 +18,8 @@ chroot $DIR apt-get -y --force-yes clean 2>/dev/null
 echo "127.0.0.1       localhost" > $DIR/etc/hosts
 
 echo "localhost" >  $DIR/etc/hostname
+
+rm $DIR/etc/resolv.conf #because of network manager ...
 
 cat >> $DIR/root/.bashrc <<EOF
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin

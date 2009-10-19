@@ -4,6 +4,8 @@
 # For details on use and redistribution please refer to License.txt
 
 require 'tempfile'
+require 'net/http'
+require 'uri'
 
 module HTTP
   public
@@ -35,5 +37,20 @@ module HTTP
     etag = `grep "ETag" #{wget_output.path}|cut -f 2 -d' '`.chomp
     wget_output.unlink
     return http_response, etag
+  end
+
+  # Get a file size over HTTP
+  #
+  # Arguments
+  # * uri: URI of the file
+  # Output
+  # * return the file size
+  def HTTP::get_file_size(uri)
+    url = URI.parse(uri)
+    resp = nil
+    Net::HTTP.start(url.host, url.port) { |http|
+      resp = http.head(url.path)
+    }
+    return resp['content-length'].to_i
   end
 end

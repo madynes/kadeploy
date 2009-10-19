@@ -78,7 +78,7 @@ def load_cmdline_options
       key = File.expand_path(f)
     }
     opts.on("--max-simult NB", "Maximum number of simultaneous deployments") { |n|
-      max_simult = n
+      max_simult = n.to_i
     }
     opts.on("--env-list LIST", "Environment list (eg. lenny-x64-base,lenny-x64-big,sid-x64-base)") { |l|
       env_list = l

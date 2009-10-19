@@ -115,6 +115,20 @@ class KadeployClient
     end
   end
 
+  # Get the size of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the size of the file, or 0 if it cannot be read.
+  def get_file_size(file_name)
+    if File.readable?(file_name) then
+      return File.stat(file_name).size
+    else
+      return 0
+    end
+  end
+
   # Print the results of the deployment (RPC)
   #
   # Arguments

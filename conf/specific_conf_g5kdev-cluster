@@ -1,5 +1,5 @@
 deploy_kernel = deploy-vmlinuz-2.6.27.7
-deploy_initrd = deploy-initrd-2.6.27.7 ETH_DRV=pcnet32 ETH_DEV=eth0 DISK_DRV=ide-disk console=tty0 console=ttyS0,38400n8 ramdisk_size=160000 rw init=/linuxrc
+deploy_initrd = deploy-initrd-2.6.27.7 ETH_DRV=pcnet32 ETH_DEV=eth0 DISK_DRV=ide-disk SLEEP_TIME=3 console=tty0 console=ttyS0,38400n8 ramdisk_size=250000 rw init=/linuxrc
 block_device = /dev/hda
 prod_part = 2
 deploy_part = 3

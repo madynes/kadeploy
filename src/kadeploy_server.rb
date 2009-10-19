@@ -501,6 +501,7 @@ class KadeployServer
             end
             #Reboot on the production environment
             if (part == get_prod_part(cluster)) then
+              step.check_nodes("prod_env_booted")
               set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
               if (exec_specific.check_prod_env) then
                 step.nodes_ko.tag_demolishing_env(db) if config.common.demolishing_env_auto_tag

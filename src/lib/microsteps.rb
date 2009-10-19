@@ -382,7 +382,6 @@ module MicroStepsLibrary
             failed_microstep("The file #{file} cannot be extracted")
             return false
           end
-
           if File.symlink?("#{dest_dir}/#{file}") then
             link = File.readlink("#{dest_dir}/#{file}")
             if is_absolute_link?(link) then
@@ -463,7 +462,7 @@ module MicroStepsLibrary
         files.each { |file|
           src = tmpdir + "/" + File.basename(file)
           dst = dest_dir + "/" + prefix_in_cache + File.basename(file)
-          if not File.move(src, dst) then
+          if not system("mv #{src} #{dst}") then
             failed_microstep("Cannot move the file #{src} to #{dst}")
             return false
           end
@@ -1136,8 +1135,8 @@ module MicroStepsLibrary
             end
             Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                @config.common.tftp_images_max_size * 1024 * 1024,
-                               6,
-                               /^e\d+--.+$/)
+                               1,
+                               /^e(\d+|\-anon)--.+$/)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
               PXEOperations::set_pxe_for_chainload(@nodes_ok.make_array_of_ip,
@@ -1185,8 +1184,8 @@ module MicroStepsLibrary
               end
               Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                  @config.common.tftp_images_max_size * 1024 * 1024,
-                                 6,
-                                 /^e\d+--.+$/)
+                                 1,
+                                 /^e(\d+|\-anon)--.+$/)
             end
           end
         end
@@ -1253,13 +1252,28 @@ module MicroStepsLibrary
                                                                          @config.common.taktuk_connector,
                                                                          instance_thread)
       when "prod_env_booted"
-        #we look if the / mounted partition is the default production partition
-        return parallel_exec_command_wrapper_expecting_status_and_output("(mount | grep \\ \\/\\  | cut -f 1 -d\\ )",
-                                                                         ["0"],
-                                                                         @config.cluster_specific[@cluster].block_device + \
-                                                                         @config.cluster_specific[@cluster].prod_part,
-                                                                         @config.common.taktuk_connector,
-                                                                         instance_thread)
+        #We look if the / mounted partition is the default production partition.
+        #We don't use the Taktuk method because this would require to have the deploy
+        #private key in the production environment.
+        tid = Thread.new {
+          callback = Proc.new { |ns|
+            
+            pr = ParallelRunner::PRunner.new(@output, nil, @process_container)
+            ns.set.each { |node|
+              cmd = "#{@config.common.taktuk_connector} root@#{node.hostname} \"mount | grep \\ \\/\\  | cut -f 1 -d\\ \""
+              pr.add(cmd, node)
+            }
+            @output.verbosel(3, "  *** A bunch of check prod env tests will be performed on #{ns.to_s_fold}")
+            pr.run
+            pr.wait
+            classify_nodes(pr.get_results_expecting_output(@config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].prod_part, "Bad root partition"))
+          }
+          node_set = Nodes::NodeSet.new
+          @nodes_ok.duplicate_and_free(node_set)
+          @reboot_window.launch(node_set, &callback)
+        }
+        tid.join
+        return (not @nodes_ok.empty?)
       end
     end
 

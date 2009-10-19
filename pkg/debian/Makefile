@@ -48,6 +48,7 @@ install_kastafior:
 
 install_test:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(TEST)/automata.txt $(DEB_ROOT_COMMON)/usr/local/kadeploy3/test
 
 install_rc_script:
 	@install -m 755 $(ADDONS)/rc/debian/kadeploy3d $(DEB_ROOT_SERVER)/etc/init.d

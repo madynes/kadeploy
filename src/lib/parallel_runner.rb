@@ -111,7 +111,7 @@ module ParallelRunner
     def run
       @nodes.each_key { |node|
         @nodes[node]["cmd"].run
-        @process_container.add_process(@instance_thread, @nodes[node]["cmd"].pid)
+        @process_container.add_process(@instance_thread, @nodes[node]["cmd"].pid) if @instance_thread != nil
         @nodes[node]["stdout_fd"] = @nodes[node]["cmd"].stdout
         @nodes[node]["stderr_fd"] = @nodes[node]["cmd"].stderr
         @nodes[node]["stdout_reader"] = Thread.new { 
@@ -146,7 +146,7 @@ module ParallelRunner
     def wait
       @nodes.each_key { |node|
         @nodes[node]["cmd"].wait
-        @process_container.remove_process(@instance_thread, @nodes[node]["cmd"].pid)
+        @process_container.remove_process(@instance_thread, @nodes[node]["cmd"].pid) if @instance_thread != nil
         node.last_cmd_exit_status = @nodes[node]["cmd"].status.to_s
         @nodes[node]["stdout_reader"].join
         @nodes[node]["stderr_reader"].join
@@ -166,6 +166,36 @@ module ParallelRunner
         if (node.last_cmd_exit_status == "0") then
           good_nodes.push(node)
         else
+          bad_nodes.push(node)
+        end
+        nodeset = Nodes::NodeSet.new
+        nodeset.push(node)
+        @output.debug(@nodes[node]["cmd"].cmd, nodeset)
+        nodeset = nil
+      }
+      return [good_nodes, bad_nodes]
+    end
+
+    # Get the results of the execution and expect an output
+    #
+    # Arguments
+    # * value: expected value
+    # * error_msg: error message
+    # Output
+    # * array of two arrays ([0] contains the nodes OK and [1] contains the nodes KO)   
+    def get_results_expecting_output(value, error_msg)
+      good_nodes = Array.new
+      bad_nodes = Array.new
+      @nodes.each_key { |node|
+        if (node.last_cmd_exit_status == "0") then
+          if (node.last_cmd_stdout.split("\n")[0] == value) then
+            good_nodes.push(node)
+          else
+            node.last_cmd_stderr = error_msg
+            bad_nodes.push(node)
+          end
+        else
+          node.last_cmd_stderr = "Cannot connect to the node"
           bad_nodes.push(node)
         end
         nodeset = Nodes::NodeSet.new

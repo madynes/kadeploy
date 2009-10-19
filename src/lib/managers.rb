@@ -506,6 +506,9 @@ module Managers
     def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, async = false)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
+        Cache::clean_cache(@config.common.kadeploy_cache_dir,
+                           (@config.common.kadeploy_cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
+                           0.5, /./)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, nil)
           if (resp != "200") then
@@ -543,6 +546,9 @@ module Managers
         if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
           #We first check if the file can be reached locally
           if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
+            Cache::clean_cache(@config.common.kadeploy_cache_dir,
+                               (@config.common.kadeploy_cache_size * 1024 * 1024) -  File.stat(client_file).size,
+                               0.5, /./)
             @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
               @output.verbosel(0, "Unable to do the local copy")
@@ -553,6 +559,9 @@ module Managers
               @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
               return false
             else
+              Cache::clean_cache(@config.common.kadeploy_cache_dir,
+                                 (@config.common.kadeploy_cache_size * 1024 * 1024) - @client.get_file_size(client_file),
+                                 0.5, /./)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
               if not @client.get_file(client_file, prefix) then
                 @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
@@ -573,7 +582,7 @@ module Managers
             end
             if (File.mtime(local_file).to_i < get_mtime.call) then
               if (get_md5.call  != expected_md5) then
-                @output.verbosel(0, "Warning!!! The file #{client_file} has been modified, you should run kaenv3 to update its MD5")
+                @output.verbosel(0, "!!! Warning !!! The file #{client_file} has been modified, you should run kaenv3 to update its MD5")
               else
                 if not system("touch -m #{local_file}") then
                   @output.verbosel(0, "Unable to touch the local file")
@@ -710,7 +719,7 @@ module Managers
           }
         }
       end
-      Cache::clean_cache(@config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size * 1024 * 1024, 12, /./)
+      Cache::clean_cache(@config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size * 1024 * 1024, 0.5, /./)
       return true
     end
 

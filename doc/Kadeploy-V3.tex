@@ -4,6 +4,9 @@
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{fancyvrb}
+
+\newcommand{\version}{3.0-5}
 
 \addtolength{\hoffset}{-1.5cm}
 \addtolength{\textwidth}{3cm}
@@ -31,7 +34,7 @@ Kadeploy requires the following softwares (the Debian packages available in the 
 \end{itemize}
 
 \subsection{DHCP and TFTP}
-A DHCP server (\texttt{dhcp3-server} on Debian for instance) must be configured to provide a static IP address to the set of nodes that must be deployed.
+A DHCP server (\texttt{dhcp3-server} on Debian for instance) must be configured to provide a static IP address to the set of nodes that must be deployed. Furthermore, the DHCP response must contains the hostname of the node (see the \texttt{use-host-decl-names on;} option in \texttt{dhcpd.conf}).
 
 A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed.
 
@@ -63,9 +66,9 @@ Two ways are provided to install Kadeploy, a basic installer and packages (for D
 \subsection{Basic installation}
 First of all , you have to uncompress the Kadeploy tarball.
 \begin{small}
-\begin{verbatim}
-> tar xzf kadeploy-3.0-4.tar.gz -C DESTINATION_DIR
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> tar xzf kadeploy-\version.tar.gz -C DESTINATION_DIR
+\end{Verbatim}
 \end{small}
 
 \noindent Then, if you want to install the server part, just execute:
@@ -120,9 +123,9 @@ The following installation method works only an Debian based distribution.
 \subsubsection{Build}
 \noindent First, you have to uncompress the Kadeploy tarball. 
 \begin{small}
-\begin{verbatim}
-> tar xzf kadeploy-v3.tar.gz -C DESTINATION_DIR
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> tar xzf kadeploy-\version.tar.gz -C DESTINATION_DIR
+\end{Verbatim}
 \end{small}
 
 \noindent Then you must generate the packages. So you have to execute:
@@ -131,31 +134,31 @@ The following installation method works only an Debian based distribution.
 > make deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-3.0-4.deb}, \texttt{kadeploy-client-3.0-4.deb}, and \texttt{kadeploy-server-3.0-4.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, \texttt{kadeploy-client-\version.deb}, and \texttt{kadeploy-server-\version.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-4.deb} and \texttt{kadeploy-server-3.0-4.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-\version.deb} and \texttt{kadeploy-server-\version.deb} packages.
 \begin{small}
-\begin{verbatim}
-> dpkg -i kadeploy-common-3.0-4.deb
-> dpkg -i kadeploy-server-3.0-4.deb
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> dpkg -i kadeploy-common-\version.deb
+> dpkg -i kadeploy-server-\version.deb
+\end{Verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-4.deb} and \texttt{kadeploy-client-3.0-4.deb} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-\version.deb} and \texttt{kadeploy-client-\version.deb} packages.
 \begin{small}
-\begin{verbatim}
-> dpkg -i kadeploy-common-3.0-4.deb
-> dpkg -i kadeploy-client-3.0-4.deb
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> dpkg -i kadeploy-common-\version.deb
+> dpkg -i kadeploy-client-\version.deb
+\end{Verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
-\begin{verbatim}
-> dpkg -i kadeploy-common-3.0-4.deb
-> dpkg -i kadeploy-client-3.0-4.deb
-> dpkg -i kadeploy-server-3.0-4.deb
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> dpkg -i kadeploy-common-\version.deb
+> dpkg -i kadeploy-client-\version.deb
+> dpkg -i kadeploy-server-\version.deb
+\end{Verbatim}
 \end{small}
 
 \paragraph{Warning}
@@ -166,9 +169,9 @@ The following installation method works only an Fedora based distribution. We as
 \subsubsection{Build}
 \noindent First, you have to uncompress the Kadeploy tarball. 
 \begin{small}
-\begin{verbatim}
-> tar xzf kadeploy-v3.tar.gz -C DESTINATION_DIR
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> tar xzf kadeploy-\version.tar.gz -C DESTINATION_DIR
+\end{Verbatim}
 \end{small}
 
 \noindent Then you must generate the packages. So you have to execute with root rights:
@@ -177,31 +180,31 @@ The following installation method works only an Fedora based distribution. We as
 > make rpm
 \end{verbatim}
 \end{small}
-This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-3.0-4.noarch.rpm}, \texttt{kadeploy-server-3.0-4.noarch.rpm}, and \texttt{kadeploy-common-3.0-4.noarch.rpm}.
+This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-\version.noarch.rpm}, \texttt{kadeploy-server-\version.noarch.rpm}, and \texttt{kadeploy-common-\version.noarch.rpm}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-3.0-4.noarch.rpm} and \texttt{kadeploy-server-3.0-4.noarch.rpm} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-\version.noarch.rpm} and \texttt{kadeploy-server-\version.noarch.rpm} packages.
 \begin{small}
-\begin{verbatim}
-> rpm -i kadeploy-common-3.0-4.noarch.rpm
-> rpm -i kadeploy-server-3.0-4.noarch.rpm
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> rpm -i kadeploy-common-\version.noarch.rpm
+> rpm -i kadeploy-server-\version.noarch.rpm
+\end{Verbatim}
 \end{small}
 
-\noindent On the client side, you have to install the \texttt{kadeploy-common-3.0-4.noarch.rpm} and \texttt{kadeploy-client-3.0-4.noarch.rpm} packages.
+\noindent On the client side, you have to install the \texttt{kadeploy-common-\version.noarch.rpm} and \texttt{kadeploy-client-\version.noarch.rpm} packages.
 \begin{small}
-\begin{verbatim}
-> rpm -i kadeploy-common-3.0-4.noarch.rpm
-> rpm -i kadeploy-client-3.0-4.noarch.rpm
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> rpm -i kadeploy-common-\version.noarch.rpm
+> rpm -i kadeploy-client-\version.noarch.rpm
+\end{Verbatim}
 \end{small}
 
 \noindent In the want to use the same host for the client and the server part, just install the three packages:
 \begin{small}
-\begin{verbatim}
-> rpm -i kadeploy-common-3.0-4.noarch.rpm
-> rpm -i kadeploy-server-3.0-4.noarch.rpm
-> rpm -i kadeploy-client-3.0-4.noarch.rpm
-\end{verbatim}
+\begin{Verbatim}[commandchars=\\\{\}]
+> rpm -i kadeploy-common-\version.noarch.rpm
+> rpm -i kadeploy-server-\version.noarch.rpm
+> rpm -i kadeploy-client-\version.noarch.rpm
+\end{Verbatim}
 \end{small}
 
 
@@ -341,7 +344,7 @@ To define the specific configuration of a cluster, you must create a specific fi
 \begin{verbatim}
 deploy_kernel = http://172.24.100.1/kadeploy/deploy-vmlinuz-2.6.27.8-bt
 deploy_initrd = http://172.24.100.1/kadeploy/deploy-initrd-2.6.27.8-bt \
-                ETH_DRV=tg3 ETH_DEV=eth0 DISK_DRV=sata_svw \
+                ETH_DRV=tg3 ETH_DEV=eth0 DISK_DRV=sata_svw SLEEP_TIME=5\
                 console=tty0 console=ttyS0,38400n8 ramdisk_size=260000 rw init=/linuxrc
 block_device = /dev/sda
 prod_part = 2
@@ -373,7 +376,7 @@ macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvHardReboot:1:300
 Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
 \begin{itemize}
 \item \texttt{deploy\_kernel}: name of the kernel used by the deployment environment. It is possible to specify an http location if you use gpxelinux.
-\item \texttt{deploy\_initrd}: name of the initrd used by the deployment environment and boot arguments. It is possible to specify an http location if you use gpxelinux. According your hardware, you must set the \texttt{ETH\_DRV}, \texttt{ETH\_DEV}, and \texttt{DISK\_DRV} correctly. Furthermore, if you use a deployment kernel generated with the script provided in the Kadeploy distribution, you must set the \texttt{ramdisk\_size} value correctly and you must specify \texttt{init=/linuxrc}.
+\item \texttt{deploy\_initrd}: name of the initrd used by the deployment environment and boot arguments. It is possible to specify an http location if you use gpxelinux. According your hardware, you must set the \texttt{ETH\_DRV}, \texttt{ETH\_DEV}, \texttt{DISK\_DRV} and \texttt{SLEEP\_TIME} (for slow disks) correctly. Furthermore, if you use a deployment kernel generated with the script provided in the Kadeploy distribution, you must set the \texttt{ramdisk\_size} value correctly and you must specify \texttt{init=/linuxrc}.
 \item \texttt{block\_device}: block device of the disk used on the nodes.
 \item \texttt{prod\_part}: number of the production partition on the disk.
 \item \texttt{deploy\_part}: number of the deployment partition on the disk.
@@ -763,8 +766,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
                            BroadcastEnv|BroadcastEnvChain:2:300&
                            BootNewEnv|BootNewEnvKexec:1:150"
 \end{verbatim}
-If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration% (see the~\ref{sec:specific_config} part for the available values)
-. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
+If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
 
 \paragraph{Use case 9 - expert usage}
 \begin{verbatim}
@@ -1210,8 +1212,7 @@ The goal of the pre-install in the Kadeploy workflow is to prepare the disk of t
 \item mounting partition(s).
 \end{itemize}
 
-You can do want you want in the pre-install but you must that Kadeploy will extract the environment in the directory defined by the \texttt{environment\_extraction\_dir} field of the general configuration file% (see the part~\ref{sec:general_config})
-. Commonly, this directory is \texttt{/mnt/dest}. Thus, you have to mount all the partitions you need in this directory. If you wish to deploy the environment onto several partitions, you can use for instance the following map:
+You can do want you want in the pre-install but you must that Kadeploy will extract the environment in the directory defined by the \texttt{environment\_extraction\_dir} field of the general configuration file. Commonly, this directory is \texttt{/mnt/dest}. Thus, you have to mount all the partitions you need in this directory. If you wish to deploy the environment onto several partitions, you can use for instance the following map:
 \begin{itemize}
 \item /dev/sda3 $\mapsto$ /mnt/dest
 \item /dev/sda4 $\mapsto$ /mnt/dest/var

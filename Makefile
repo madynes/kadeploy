@@ -56,6 +56,7 @@ install_kastafior:
 
 install_test:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DESTDIR)/usr/local/kadeploy3/test
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(TEST)/automata.txt $(DESTDIR)/usr/local/kadeploy3/test
 
 install_rc_script:
 ifeq ($(DISTRIB),debian)

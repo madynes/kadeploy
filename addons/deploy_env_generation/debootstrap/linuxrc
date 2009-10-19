@@ -114,10 +114,7 @@ echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
 
 
 # configure DNS with dhcp info
-
-#useless but we never know ... a day ...
-#echo "search ${DNSDOMAIN/,/ }" > /etc/resolv.conf
-
+echo "search ${DNSDOMAIN/,/ }" > /etc/resolv.conf #maybe "," is not the separator
 for ns in ${DNSSERVERS}
 do
     echo "nameserver $ns" >> /etc/resolv.conf
