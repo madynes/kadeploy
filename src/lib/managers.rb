@@ -461,6 +461,7 @@ module Managers
                   @output.verbosel(0, set.to_s(true, "\n"))
                 }
                 @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file) if @client != nil
+                Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/) if @config.exec_specific.load_env_kind == "file"
                 @logger.dump
                 @queue_manager.send_exit_signal
                 @thread_set_deployment_environment.join
@@ -506,6 +507,7 @@ module Managers
     def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, async = false)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
+        @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
         Cache::clean_cache(@config.common.kadeploy_cache_dir,
                            (@config.common.kadeploy_cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
                            0.5, /./)
@@ -611,9 +613,12 @@ module Managers
     # Output
     # * return true if everything is successfully performed, false otherwise
     def grab_file_without_caching(client_file, local_file, file_tag, prefix, async)
-      @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
+        @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
+        Cache::clean_cache(@config.common.kadeploy_cache_dir,
+                           (@config.common.kadeploy_cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
+                           0.5, /./)
         resp,etag = HTTP::fetch_file(client_file, local_file, nil)
         if (resp != "200") then
           @output.verbosel(0, "Unable to grab the #{file_tag} file #{key}")
@@ -621,13 +626,28 @@ module Managers
         end
       #classical fetch
       else
-        if async then
-          @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
-          return false
-        else          
-          if not @client.get_file(client_file, prefix) then
-            @output.verbosel(0, "Unable to grab the file #{key}")
+        if File.readable?(client_file) then
+          Cache::clean_cache(@config.common.kadeploy_cache_dir,
+                             (@config.common.kadeploy_cache_size * 1024 * 1024) -  File.stat(client_file).size,
+                             0.5, /./)
+          @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
+          if not system("cp #{client_file} #{local_file}") then
+            @output.verbosel(0, "Unable to do the local copy")
             return false
+          end
+        else
+          if async then
+            @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
+            return false
+          else
+            @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
+            Cache::clean_cache(@config.common.kadeploy_cache_dir,
+                               (@config.common.kadeploy_cache_size * 1024 * 1024) - @client.get_file_size(client_file),
+                               0.5, /./)
+            if not @client.get_file(client_file, prefix) then
+              @output.verbosel(0, "Unable to grab the file #{key}")
+              return false
+            end
           end
         end
       end
@@ -662,11 +682,7 @@ module Managers
     # Output
     # * return true if the files have been successfully grabbed, false otherwise
     def grab_user_files(async = false)
-      if @config.exec_specific.load_env_kind == "file" then
-        env_prefix = "e-anon--"
-      else
-        env_prefix = "e-#{@config.exec_specific.environment.id}--"
-      end
+      env_prefix = @config.exec_specific.prefix_in_cache
       user_prefix = "u-#{@config.exec_specific.true_user}--"
       tarball = @config.exec_specific.environment.tarball
       local_tarball = use_local_path_dirname(tarball["file"], env_prefix)
@@ -719,7 +735,6 @@ module Managers
           }
         }
       end
-      Cache::clean_cache(@config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size * 1024 * 1024, 0.5, /./)
       return true
     end
 
@@ -771,6 +786,12 @@ module Managers
     # Output
     # * return true in case of success, false otherwise
     def manage_files(async = false)
+      #We set the prefix of the files in the cache
+      if @config.exec_specific.load_env_kind == "file" then
+        @config.exec_specific.prefix_in_cache = "e-anon-#{@config.exec_specific.true_user}-#{Time.now.to_i}--"
+      else
+        @config.exec_specific.prefix_in_cache = "e-#{@config.exec_specific.environment.id}--"
+      end
       if (@config.common.kadeploy_disable_cache || grab_user_files(async)) then
         return true
       else

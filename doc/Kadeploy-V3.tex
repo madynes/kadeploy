@@ -1155,6 +1155,52 @@ This commands prints a YAML output of the deployment state of all the nodes curr
 \end{verbatim}
 This commands prints a YAML output of the deployment state of all the nodes currently in the deployment number 78. The deployment number, or workflow id, can be obtained thanks to a Kadeploy option.
 
+\section{What you should know if you want to do kernel development on deployed nodes}
+Kernel development implies to know what Kadeploy do concerning the boot of the deployed environments.
+
+\subsection{Kadeploy 3 behavior}
+Kadeploy 3 has a different behavior depending on the kind of deployed environment. Reminder: the kind of environment is defined in the environment description.
+
+\subsubsection{Linux environments}
+On a \emph{Linux} environment, Kadeploy 3 automatically installs the Grub 2 bootloader on the deployed partition once the tarball is broadcasted. Then it modifies the PXE profile of the concerned nodes in order to ask the chainload on the deployed partition. This is performed thanks to pxelinux and the comboot chain.c32.
+
+\subsubsection{Xen environments}
+On a \emph{Xen} environment, Kadeploy 3 doesn't install the Grub 2 bootloader since Grub 2 there are some known issues when booting a Xen Dom0 with Grub 2. Thus Kadeploy 3 uses the old method that consists in booting the nodes in a pure PXE fashion. To do that, Kadeploy extracts the kernel, initrd and hypervisor files from the environment tarball and modifies the PXE profile of the concerned nodes in order to ask their in pure PXE. This is performed thanks to pxelinux and the comboot mboot.c32.
+
+\subsubsection{Other environments}
+On an \emph{Other} environment, Kadeploy 3 assumes that a bootloader is already installed on the partition since a full partition image (dd.gz image) has been copied. Thus, it only modifies the PXE profile of the concerned nodes in order to ask the chainload on the deployed partition, like in the \emph{Linux} case.
+
+\subsection{Tips to simply use your new kernel}
+If you do kernel development on the deployed nodes, you will probably want to update you kernel without recording a new image and redeploying it to save time, especially to perform small tests.
+
+\subsubsection{Linux environments}
+On a \emph{Linux} environment, after having updated your kernel/initrd, 2 cases are imaginable:
+\begin{enumerate}
+\item your kernel/initrd have the same name, so you can reboot the node without modifying anything.
+\item your kernel.initrd have a new name, so you will have to update the grub configuration file (\texttt{/boot/grub/grub.cfg}) of your node in order to allow grub to select the new kernel and then you can reboot the node.
+\end{enumerate}
+
+\subsubsection{Xen environments}
+On a \emph{Xen} environment, the things are a little bit more complicated. As far as the kernel/initrd/hypervisor are extracted by Kadeploy in a dedicated cache, changing them on the deployed nodes won't have any effect for the next reboot. So after the deployment, you have to install the Grub 1 bootloader (this one is compliant with Xen Dom0) on the deployed partition and configure it to boot the kernel/initrd/hypervisor you want. Then you have to reboot the node with Kareboot3 in order to update the PXE profile to allow the chainload of the deployed partition. For instance:
+\begin{verbatim}
+> kareboot3 -m gdx-25.orsay.grid5000.fr -r set_pxe -w ~/pxe_profile_xen
+\end{verbatim}
+Your PXE profile\texttt{~/pxe\_profile\_xen} must contains something like:
+\begin{verbatim}
+PROMPT 1
+SERIAL 0 38400
+DEFAULT bootlabel
+DISPLAY messages
+TIMEOUT 50
+
+label bootlabel
+        KERNEL chain.c32
+        APPEND hd0 3
+\end{verbatim}
+
+\subsubsection{Other environments}
+On an \emph{Other} environment, you eventually have to update your bootloader in order to boot on the new kernel.
+
 \section{Migrate your Kadeploy 2.1.x environment}
 Migrating your environments from Kadeploy 2.1.x is quite easy. Please refer to the~\ref{sec:env_desc} part to get the full information about the environment description with Kadeploy 3.
 

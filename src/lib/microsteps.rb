@@ -427,20 +427,15 @@ module MicroStepsLibrary
       must_extract = false
       archive = @config.exec_specific.environment.tarball["file"]
       dest_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
-      if (@config.exec_specific.load_env_kind != "file") then
-        prefix_in_cache = "e" + @config.exec_specific.environment.id + "--"
-      else
-        prefix_in_cache = "e-anon--"
-      end
       files.each { |file|
-        if not (File.exist?(dest_dir + "/" + prefix_in_cache + File.basename(file))) then
+        if not (File.exist?(dest_dir + "/" + @config.exec_specific.prefix_in_cache + File.basename(file))) then
           must_extract = true
         end
       }
       if not must_extract then
         files.each { |file|
           #If the archive has been modified, re-extraction required
-          if (File.mtime(archive).to_i > File.atime(dest_dir + "/" + prefix_in_cache + File.basename(file)).to_i) then
+          if (File.mtime(archive).to_i > File.atime(dest_dir + "/" + @config.exec_specific.prefix_in_cache + File.basename(file)).to_i) then
             must_extract = true
           end
         }
@@ -461,7 +456,7 @@ module MicroStepsLibrary
         files_in_archive.clear
         files.each { |file|
           src = tmpdir + "/" + File.basename(file)
-          dst = dest_dir + "/" + prefix_in_cache + File.basename(file)
+          dst = dest_dir + "/" + @config.exec_specific.prefix_in_cache + File.basename(file)
           if not system("mv #{src} #{dst}") then
             failed_microstep("Cannot move the file #{src} to #{dst}")
             return false
@@ -1069,15 +1064,10 @@ module MicroStepsLibrary
         else
           case @config.common.bootloader
           when "pure_pxe"
-            if (@config.exec_specific.load_env_kind != "file") then
-              prefix_in_cache = "e" + @config.exec_specific.environment.id + "--"
-            else
-              prefix_in_cache = "e-anon--"
-            end          
             case @config.exec_specific.environment.environment_kind
             when "linux"
-              kernel = prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
-              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
+              kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
+              initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
               if not system("touch -a #{images_dir}/#{kernel}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
@@ -1101,9 +1091,9 @@ module MicroStepsLibrary
                 return false
               end
             when "xen"
-              kernel = prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
-              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
-              hypervisor = prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
+              kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
+              initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
+              hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
               images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
               if not system("touch -a #{images_dir}/#{kernel}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
@@ -1146,14 +1136,9 @@ module MicroStepsLibrary
                                                    @config.common.tftp_cfg)
             else
               # @output.verbosel(3, "Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
-              if (@config.exec_specific.load_env_kind != "file") then
-                prefix_in_cache = "e" + @config.exec_specific.environment.id + "--"
-              else
-                prefix_in_cache = "e-anon--"
-              end
-              kernel = prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
-              initrd = prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
-              hypervisor = prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
+              kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
+              initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
+              hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
               images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
               if not system("touch -a #{images_dir}/#{kernel}") then
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")

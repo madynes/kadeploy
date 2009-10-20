@@ -143,6 +143,7 @@ module ConfigInformation
       exec_specific.nodes_state = Hash.new
       exec_specific.write_workflow_id = String.new
       exec_specific.get_version = false
+      exec_specific.prefix_in_cache = String.new
 
       if (load_kadeploy_cmdline_options(common_config.nodes_desc, exec_specific) == true) then
         if not exec_specific.get_version then

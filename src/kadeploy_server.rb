@@ -229,7 +229,7 @@ class KadeployServer
     config.common = @config.common
     config.exec_specific = exec_specific
     config.cluster_specific = Hash.new
-
+    
     #Overide the configuration if the steps are specified in the command line
     if (not exec_specific.steps.empty?) then
       exec_specific.node_list.group_by_cluster.each_key { |cluster|
