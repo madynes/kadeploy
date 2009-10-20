@@ -110,7 +110,7 @@ if config.check_config("kareboot", db) then
   part = String.new
   #The rights must be checked for each cluster if the node_list contains nodes from several clusters
   config.exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
-    if ((config.exec_specific.reboot_kind != "env_recorded") || (config.exec_specific.deploy_part == "")) then
+    if (config.exec_specific.deploy_part == "") then
       part = kadeploy_server.get_default_deploy_part(cluster)
     else
       if (config.exec_specific.block_device == "") then
