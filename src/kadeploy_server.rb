@@ -468,60 +468,77 @@ class KadeployServer
       config.common = @config.common.clone
       config.cluster_specific = @config.cluster_specific.clone
       config.exec_specific = exec_specific
+      nodes_ok = Nodes::NodeSet.new
+      nodes_ko = Nodes::NodeSet.new
+      global_nodes_mutex = Mutex.new
+      tid_array = Array.new
       exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
-        step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
-        case exec_specific.reboot_kind
-        when "env_recorded"
-          #This should be the same case than a deployed env
-          step.switch_pxe("deploy_to_deployed_env")
-        when "set_pxe"
-          step.switch_pxe("set_pxe", pxe_profile_msg)
-        when "simple_reboot"
-          #no need to change the PXE profile
-        when "deploy_env"
-          step.switch_pxe("prod_to_deploy_env")
-        else
-          raise "Invalid kind of reboot: #{@reboot_kind}"
-        end
-        step.reboot(exec_specific.reboot_level)
-        if exec_specific.wait then
-          if (exec_specific.reboot_kind == "deploy_env") then
-            step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
-            step.send_key_in_deploy_env("tree")
-            set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
+        tid_array << Thread.new {
+          step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
+          case exec_specific.reboot_kind
+          when "env_recorded"
+            #This should be the same case than a deployed env
+            step.switch_pxe("deploy_to_deployed_env")
+          when "set_pxe"
+            step.switch_pxe("set_pxe", pxe_profile_msg)
+          when "simple_reboot"
+            #no need to change the PXE profile
+          when "deploy_env"
+            step.switch_pxe("prod_to_deploy_env")
           else
-            step.wait_reboot([@config.common.ssh_port],[])
+            raise "Invalid kind of reboot: #{@reboot_kind}"
           end
-          if (exec_specific.reboot_kind == "env_recorded") then
-            part = String.new
-            if (exec_specific.block_device == "") then
-              part = get_block_device(cluster) + exec_specific.deploy_part
+          step.reboot(exec_specific.reboot_level)
+          if exec_specific.wait then
+            if (exec_specific.reboot_kind == "deploy_env") then
+              step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
+              step.send_key_in_deploy_env("tree")
+              set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
             else
-              part = exec_specific.block_device + exec_specific.deploy_part
+              step.wait_reboot([@config.common.ssh_port],[])
             end
-            #Reboot on the production environment
-            if (part == get_prod_part(cluster)) then
-              step.check_nodes("prod_env_booted")
-              set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
-              if (exec_specific.check_prod_env) then
-                step.nodes_ko.tag_demolishing_env(db) if config.common.demolishing_env_auto_tag
-                ret = 1
+            if (exec_specific.reboot_kind == "env_recorded") then
+              part = String.new
+              if (exec_specific.block_device == "") then
+                part = get_block_device(cluster) + exec_specific.deploy_part
+              else
+                part = exec_specific.block_device + exec_specific.deploy_part
               end
-            else
-              set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
+              #Reboot on the production environment
+              if (part == get_prod_part(cluster)) then
+                step.check_nodes("prod_env_booted")
+                set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
+                if (exec_specific.check_prod_env) then
+                  step.nodes_ko.tag_demolishing_env(db) if config.common.demolishing_env_auto_tag
+                  ret = 1
+                end
+              else
+                set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
+              end
+            end
+            if not step.nodes_ok.empty? then
+              output.verbosel(0, "Nodes correctly rebooted on cluster #{cluster}:")
+              output.verbosel(0, step.nodes_ok.to_s(false, "\n"))
+              global_nodes_mutex.synchronize {
+                nodes_ok.add(step.nodes_ok)
+              }
+            end
+            if not step.nodes_ko.empty? then
+              output.verbosel(0, "Nodes not correctly rebooted on cluster #{cluster}:")
+              output.verbosel(0, step.nodes_ko.to_s(true, "\n"))
+              global_nodes_mutex.synchronize {
+                nodes_ko.add(step.nodes_ko)
+              }
             end
           end
-          if not step.nodes_ok.empty? then
-            output.verbosel(0, "Nodes correctly rebooted:")
-            output.verbosel(0, step.nodes_ok.to_s(false, "\n"))
-          end
-          if not step.nodes_ko.empty? then
-            output.verbosel(0, "Nodes not correctly rebooted:")
-            output.verbosel(0, step.nodes_ko.to_s(true, "\n"))
-          end
-          client.generate_files(step.nodes_ok, config.exec_specific.nodes_ok_file, step.nodes_ko, config.exec_specific.nodes_ko_file)
-        end
+        }
       }
+      tid_array.each { |tid|
+        tid.join
+      }
+      if exec_specific.wait then
+        client.generate_files(nodes_ok, config.exec_specific.nodes_ok_file, nodes_ko, config.exec_specific.nodes_ko_file)
+      end
     end
     db.disconnect
     config = nil
