@@ -558,6 +558,8 @@ module ConfigInformation
                   @cluster_specific[cluster].prod_part = val
                 when "tmp_part"
                   @cluster_specific[cluster].tmp_part = val
+                when "swap_part"
+                  @cluster_specific[cluster].swap_part = val
                 when "workflow_steps"
                   @cluster_specific[cluster].workflow_steps = val
                 when "timeout_reboot"
@@ -2112,6 +2114,7 @@ module ConfigInformation
     attr_accessor :deploy_part
     attr_accessor :prod_part
     attr_accessor :tmp_part
+    attr_accessor :swap_part
     attr_accessor :workflow_steps   #Array of MacroStep
     attr_accessor :timeout_reboot
     attr_accessor :cmd_soft_reboot_rsh
@@ -2140,6 +2143,7 @@ module ConfigInformation
       @deploy_part = nil
       @prod_part = nil
       @tmp_part = nil
+      @swap_part = nil
       @timeout_reboot = nil
       @cmd_soft_reboot_rsh = nil
       @cmd_soft_reboot_ssh = nil
@@ -2170,6 +2174,7 @@ module ConfigInformation
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
+      dest.swap_part = @swap_part.clone if (@swap_part != nil)
       dest.timeout_reboot = @timeout_reboot
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
@@ -2201,6 +2206,7 @@ module ConfigInformation
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
+      dest.swap_part = @swap_part.clone if (@swap_part != nil)
       dest.timeout_reboot = @timeout_reboot
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone

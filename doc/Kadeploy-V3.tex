@@ -350,6 +350,7 @@ block_device = /dev/sda
 prod_part = 2
 deploy_part = 3
 tmp_part = 5
+swap_part = 1
 timeout_reboot = 220
 cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
                              -o PreferredAuthentications=publickey \
@@ -381,6 +382,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{prod\_part}: number of the production partition on the disk.
 \item \texttt{deploy\_part}: number of the deployment partition on the disk.
 \item \texttt{tmp\_part}: number of the tmp partition on the disk.
+\item \texttt{swap\_part}: number of the swap partition on the disk. If the \texttt{none} value is specified, the swap format at the deployment time will be bypassed.
 \item \texttt{timeout\_reboot}: reboot timeout.
 \item \texttt{cmd\_soft\_reboot\_ssh}: generic ssh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_soft\_reboot\_rsh}: generic rsh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.

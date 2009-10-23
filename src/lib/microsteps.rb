@@ -1351,6 +1351,24 @@ module MicroStepsLibrary
       return true
     end
 
+    # Format the swap part on the nodes
+    #
+    # Arguments
+    # * instance_thread: thread id of the current thread
+    # Output
+    # * return true if the format has been successfully performed, false otherwise
+    def ms_format_swap_part(instance_thread)
+      if (@config.cluster_specific[@cluster].swap_part != nil) && (@config.cluster_specific[@cluster].swap_part!= "none") then
+        swap_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].swap_part
+        return parallel_exec_command_wrapper("mkswap #{swap_part}",
+                                             @config.common.taktuk_connector,
+                                             instance_thread)
+      else
+        @output.verbosel(3, "  *** Bypass the format of the swap part")
+      end
+      return true
+    end
+
     # Mount the deployment part on the nodes
     #
     # Arguments

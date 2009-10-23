@@ -166,6 +166,7 @@ module SetDeploymentEnvironnment
             result = result && @step.format_deploy_part
             result = result && @step.mount_deploy_part
             result = result && @step.format_tmp_part
+            result = result && @step.format_swap_part
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -345,6 +346,7 @@ module SetDeploymentEnvironnment
             result = result && @step.format_deploy_part
             result = result && @step.mount_deploy_part
             result = result && @step.format_tmp_part
+            result = result && @step.format_swap_part
             #End of micro steps
           }
           @instances.push(instance_thread)
