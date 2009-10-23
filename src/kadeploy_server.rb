@@ -49,6 +49,8 @@ class KadeployServer
     @syslog_lock = Mutex.new
     @workflow_info_hash = Hash.new
     @workflow_info_hash_lock = Mutex.new
+    @reboot_info_hash = Hash.new
+    @reboot_info_hash_lock = Mutex.new
   end
 
   # Give the current version of Kadeploy (RPC)
@@ -80,6 +82,22 @@ class KadeployServer
   # * nothing
   def delete_workflow_info(workflow_id)
     @workflow_info_hash.delete(workflow_id)
+  end
+
+  def add_reboot_info(tid, reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      if not @reboot_info_hash.has_key?(reboot_id) then
+        @reboot_info_hash[reboot_id] = Array.new
+      end
+      @reboot_info_hash[reboot_id].push(tid)
+    }
+  end
+
+  def delete_reboot_info(reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      @reboot_info_hash[reboot_id] = nil
+      @reboot_info_hash.delete(reboot_id)
+    }
   end
 
   # Get a YAML output of the workflows (RPC)
@@ -146,15 +164,27 @@ class KadeployServer
   # * workflow_id: id of the workflow
   # Output
   # * nothing  
-  def kill(workflow_id)
+  def kill_workflow(workflow_id)
     # id == -1 means that the workflow has not been launched yet
-    @workflow_info_hash_lock.lock
-    if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
-      workflow = @workflow_info_hash[workflow_id]
-      workflow.kill()
-      delete_workflow_info(workflow_id)
-    end
-    @workflow_info_hash_lock.unlock
+    @workflow_info_hash_lock.synchronize {
+      if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
+        workflow = @workflow_info_hash[workflow_id]
+        workflow.kill()
+        delete_workflow_info(workflow_id)
+      end
+    }
+  end
+
+  def kill_reboot(reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      if @reboot_info_hash.has_key?(reboot_id) then
+        @reboot_info_hash[reboot_id].each { |tid|
+          Thread.kill(tid)
+        }
+        @reboot_info_hash[reboot_id] = nil
+        @reboot_info_hash.delete(reboot_id)
+      end
+    }
   end
 
   # Get the common configuration (RPC)
@@ -435,7 +465,7 @@ class KadeployServer
   # * pxe_profile_msg: PXE profile
   # Output
   # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if the server cannot connect to DB
-  def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg)
+  def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg, reboot_id)
     db = Database::DbFactory.create(@config.common.db_kind)
     if not db.connect(@config.common.deploy_db_host,
                       @config.common.deploy_db_login,
@@ -488,7 +518,7 @@ class KadeployServer
           else
             raise "Invalid kind of reboot: #{@reboot_kind}"
           end
-          step.reboot(exec_specific.reboot_level)
+          step.reboot(exec_specific.reboot_level, false, true)
           if exec_specific.wait then
             if (exec_specific.reboot_kind == "deploy_env") then
               step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
@@ -534,12 +564,16 @@ class KadeployServer
         }
       }
       tid_array.each { |tid|
+        add_reboot_info(tid, reboot_id)
+      }
+      tid_array.each { |tid|
         tid.join
       }
       if exec_specific.wait then
         client.generate_files(nodes_ok, config.exec_specific.nodes_ok_file, nodes_ko, config.exec_specific.nodes_ko_file)
       end
     end
+    delete_reboot_info(reboot_id)
     db.disconnect
     config = nil
     return ret

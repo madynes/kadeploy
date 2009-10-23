@@ -148,7 +148,7 @@ module BootNewEnvironment
             @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
-            result = result && @step.reboot("kexec")
+            result = result && @step.reboot("kexec", false, false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
             #End of micro steps
           }
@@ -297,7 +297,7 @@ module BootNewEnvironment
             @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
-            result = result && @step.reboot("hard", use_rsh_for_reboot)
+            result = result && @step.reboot("hard", use_rsh_for_reboot, false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
             #End of micro steps
           }

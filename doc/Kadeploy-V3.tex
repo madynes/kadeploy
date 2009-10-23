@@ -94,7 +94,7 @@ First of all , you have to uncompress the Kadeploy tarball.
 \end{verbatim}
 \end{small}
 
-\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only debian (it includes Ubuntu at least) and fedora (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
+\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and Fedora (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
 \begin{small}
 \begin{verbatim}
 > make install_all DISTRIB=fedora
@@ -688,7 +688,7 @@ The environment can be specified with the \texttt{-e|--env-name} option if you w
 
 We present now several use cases.
 
-\paragraph{Use case 1 - basic usage}
+\paragraph{Use case 1 - basic usage - deployment of a node}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
@@ -697,7 +697,16 @@ We present now several use cases.
 \end{verbatim}
 This command performs the deployment of the environment \textit{lenny-x64-nfs-1.0} on the node \textit{gdx-5.orsay.grid5000.fr} and copies the SSH public key \textit{~/.ssh/id\_rsa.pub} of the user in the deployed environment to allow a direct connection with the root account. Furthermore, the verbose level is set to 4, which means that you want the maximum verbose information.
 
-\paragraph{Use case 2 - basic usage}
+
+\paragraph{Use case 2 - basic usage - deployment of a range of nodes}
+\begin{verbatim}
+> kadeploy3 -m gdx-[45-51].orsay.grid5000.fr  \
+            -e lenny-x64-base \
+            -k
+\end{verbatim}
+This command performs the deployment of the environment \textit{lenny-x64-base} on the nodes \textit{gdx-45.orsay.grid5000.fr}, \textit{gdx-46.orsay.grid5000.fr}, ..., \textit{gdx-51.orsay.grid5000.fr}. Furthermore, it copies the entries of the \texttt{~/.ssh/authorized\_keys} user file in the \texttt{/root/.ssh/authorized\_keys} of the deployed nodes.
+
+\paragraph{Use case 3 - basic usage - deployment of a set of nodes}
 \begin{verbatim}
 > kadeploy3 -f ~/machinefile \
             -e custom_env \
@@ -706,7 +715,7 @@ This command performs the deployment of the environment \textit{lenny-x64-nfs-1.
 \end{verbatim}
 This command uses the environment \textit{custom\_env} of the user \textit{johnsmith} to deploy the nodes specified in \textit{~/machinefile}. The list of the nodes correctly deployed will be written in the file specified with the \texttt{-o|--output-ok-nodes} option. Idem for the nodes not correctly deployed with the \texttt{-o|--output-ko-nodes} option. Refer to the part~\ref{sec:kaenv} about Kaenv to know more about the environment management.
 
-\paragraph{Use case 3 - basic usage}
+\paragraph{Use case 4 - basic usage - execution of a script after deployment}
 \begin{verbatim}
 > kadeploy3 -f $OAR_NODE_FILE \
             -a ~/my-lenny.dsc \
@@ -716,25 +725,17 @@ This command uses the environment \textit{custom\_env} of the user \textit{johns
 \end{verbatim}
 This command performs the deployment of the environment described by the file \textit{~/my-lenny.dsc} (useful if you don't want to share your environment with the other users) on the nodes specified in the file pointed by \texttt{\$OAR\_NODE\_FILE} (typically a variable set by the resource manager). We specify here that we want the /tmp partition to be reformated. Furthermore, we specify that we want to deploy the environment on the 4th disk partition, instead of the default one. Finally, we ask to execute the script \textit{~/launcher.sh} at the end of the deployment.
 
-\paragraph{Use case 4 - basic usage}
-\begin{verbatim}
-> kadeploy3 -m gdx-[45-51].orsay.grid5000.fr  \
-            -e lenny-x64-base \
-            -k
-\end{verbatim}
-This command performs the deployment of the environment \textit{lenny-x64-base} on the nodes \textit{gdx-45.orsay.grid5000.fr}, \textit{gdx-46.orsay.grid5000.fr}, ..., \textit{gdx-51.orsay.grid5000.fr}. Furthermore, it copies the entries of the \texttt{~/.ssh/authorized\_keys} user file in the \texttt{/root/.ssh/authorized\_keys} of the deployed nodes.
-
-\paragraph{Use case 5 - advanced usage}
+\paragraph{Use case 5 - advanced usage - play with breakpoint}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
-            --verbose_level 4 \
+            --verbose-level 4 \
             --breakpoint BroadcastEnvChain:manage_user_post_install \
             -d
 \end{verbatim}
 This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvChain} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.
 
-\paragraph{Use case 6 - advanced usage}
+\paragraph{Use case 6 - advanced usage - specific PXE profile}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e FreeBSD \
@@ -742,7 +743,7 @@ This kind of command can be used for debug purpose. It performs a deployment wit
 \end{verbatim}
 In some specific case, you may want to use a specific PXE profil to boot your nodes. For instance, if you want to test a new Syslinux Comboot not used by default on the Kadeploy server, you can write your own PXE profil that uses this Comboot. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server.
 
-\paragraph{Use case 7 - advanced usage}
+\paragraph{Use case 7 - advanced usage - specific bootloader requirement}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e Custom_linux_env \
@@ -750,7 +751,7 @@ In some specific case, you may want to use a specific PXE profil to boot your no
 \end{verbatim}
 If you deploy a Linux based environment and if the administrator choose to boot the nodes with the \textit{chainload} fashion, Kadeploy will install automatically a bootloader on the deployment partition. In some cases, you may want to bypass this installation because you have installed at the time of a previous deployment another bootloader. This allows to avoid the overriding of the installed bootloader. However, if no bootloader is installed or if the installed bootdloader is not able to boot your environment, the won't be reachable at the end of the deployment.
 
-\paragraph{Use case 8 - advanced usage}\label{par:usecase-wid}
+\paragraph{Use case 8 - advanced usage - get a workflow id for an external deployment tracking}\label{par:usecase-wid}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e Custom_linux_env \
@@ -758,7 +759,7 @@ If you deploy a Linux based environment and if the administrator choose to boot 
 \end{verbatim}
 This command performs the deployment of the \textit{Custom\_linux\_env} environment and write the workflow id of this deployment in the file \textit{wid\_file}. The aim of getting the deployment id is to monitor the deployment from an extern tool thanks to the Kanodes tool.
 
-\paragraph{Use case 9 - expert usage}
+\paragraph{Use case 9 - expert usage - modify the deployment workflow}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e "FreeBSD 7.1" \
@@ -768,7 +769,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
 \end{verbatim}
 If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
 
-\paragraph{Use case 9 - expert usage}
+\paragraph{Use case 9 - expert usage - insert custom operations in the deployment workflow}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
@@ -875,61 +876,61 @@ General options:
 \end{small}
 
 We present now several use cases.
-\paragraph{Use case 1}
+\paragraph{Use case 1 - list the environments}
 \begin{verbatim}
 > kaenv3 -l
 \end{verbatim}
-This command lists the environment that you have previously recorded.
+This command lists the environment that you have previously recorded, and the public environments.
 
-\paragraph{Use case 2}
+\paragraph{Use case 2 - list the shared environments recorded by another user}
 \begin{verbatim}
 > kaenv3 -l -u johnsmith -s
 \end{verbatim}
 This command lists the environment of the user \textit{johnsmith}. If you use ``*'' as a user value, it lists the environments of all the users. Furthermore, the \texttt{-s|--show-all-versions} option is used to show all the versions of each environment. If this option is not specified, only the version is displayed.
 
-\paragraph{Use case 3}
+\paragraph{Use case 3 - print an environment}
 \begin{verbatim}
 > kaenv3 -p FreeBSD --env-version 3 -u johnsmith
 \end{verbatim}
 This command lists prints the version \textit{3} of the environment \textit{FreeBSD} that belongs to \textit{johnsmith}. If no version number is given, the last version of the environment is printed. To print an environment you own, there is no need to use the \texttt{-u|--user} option.
 
-\paragraph{Use case 4}
+\paragraph{Use case 4 - add an environment described in a file}
 \begin{verbatim}
 > kaenv3 -a ~/new_env.dsc
 \end{verbatim}
 This command adds the environment defined in the file \textit{~/new\_env.dsc}.
 
-\paragraph{Use case 5}
+\paragraph{Use case 5 - add an environment described in an http file}
 \begin{verbatim}
 > kaenv3 -a http://www.grid5000.fr/pub/johnsmith/env.desc
 \end{verbatim}
 This command adds the environment defined in the file \textit{http://www.grid5000.fr/pub/johnsmith/env.desc}.
 
-\paragraph{Use case 6}
+\paragraph{Use case 6 - delete an environment}
 \begin{verbatim}
 > kaenv3 -d FreeBSD --env-version 2
 \end{verbatim}
 This command deletes the version \textit{2} of the environment \textit{FreeBSD} from the environment database. If no version number is given, all the versions are deleted.
 
-\paragraph{Use case 7}
+\paragraph{Use case 7 - remove the demolishing property of an environment}
 \begin{verbatim}
 > kaenv3 --remove-demolishing-tag FreeBSD --env-version 3
 \end{verbatim}
 This command resets the \textit{demolishing} counter of the version \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
 
-\paragraph{Use case 8}
+\paragraph{Use case 8 - update the tarball of an environment}
 \begin{verbatim}
 > kaenv3 --update-tarball-md5 sidx64-base
 \end{verbatim}
 This command is useful if you modify the tarball of the environment \textit{sidx64-base} without modifying the kernel or the initrd and if you do not want to record a new environment. Thus, it will update the MD5 of the tarball file. This operation is required if something change in the tarball, otherwise the environment will be unusable.
 
-\paragraph{Use case 9}
+\paragraph{Use case 9 - update the postinstalls of an environment}
 \begin{verbatim}
 > kaenv3 --update-postinstalls-md5 sidx64-base
 \end{verbatim}
 This command does the same thing than the precedent one but it concerns the post-install files. This operation is required if something change in the post-install files, otherwise the environment will be unusable.
 
-\paragraph{Use case 10}
+\paragraph{Use case 10 - define the visibility of an environment}
 \begin{verbatim}
 > kaenv3 --set-visibility-tag sidx64-base --env-version 3 -t private
 \end{verbatim}
@@ -1004,37 +1005,37 @@ General options:
 \end{small}
 
 We present now the use cases.
-\paragraph{Use case 1}
+\paragraph{Use case 1 - give some rights to a user on a node}
 \begin{verbatim}
 > karights3 -a -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith
 \end{verbatim}
 This command gives some rights for a given user.
 
-\paragraph{Use case 1}
+\paragraph{Use case 1 - give some rights to a user on several nodes}
 \begin{verbatim}
 > karights3 -a -m gdx-[25-32].orsay.grid5000.fr -p /dev/sda3 -u johnsmith
 \end{verbatim}
 This command gives some rights for a given user on a range of nodes.
 
-\paragraph{Use case 3}
+\paragraph{Use case 3 - give all the rights to a user on all the nodes}
 \begin{verbatim}
 > karights3 -a -m "*" -p "*" -u root
 \end{verbatim}
 This command gives all the rights on all the nodes to the user \textit{root}.
 
-\paragraph{Use case 4}
+\paragraph{Use case 4 - give some rights on a node and remove existing ones}
 \begin{verbatim}
 > karights3 -a -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith -o
 \end{verbatim}
 This command gives some rights for a given user. Furthermore, if some rights (excepted those specified with *) were previously given on the node \textit{gdx-25.orsay.grid5000.fr}, they are deleted.
 
-\paragraph{Use case 5}
+\paragraph{Use case 5 - remove som rights}
 \begin{verbatim}
 > karights3 -d -m gdx-25.orsay.grid5000.fr -p /dev/sda3 -u johnsmith
 \end{verbatim}
 This command removes some rights for a given user.
 
-\paragraph{Use case 6}
+\paragraph{Use case 6 - show the rights of a user}
 \begin{verbatim}
 > karights3 -s -u johnsmith
 \end{verbatim}
@@ -1075,37 +1076,37 @@ General options:
 \end{small}
 
 We present now the use cases. Note that all the commands can be filtered with a period by using the \texttt{-x|--date-min} and \texttt{-y|--date-max} options.
-\paragraph{Use case 1}
+\paragraph{Use case 1 - get the information about the deployments performed on a node}
 \begin{verbatim}
 > kastat3 -d -m gdx-25.orsay.grid5000.fr
 \end{verbatim}
 This commands prints all the deployment performed on the node \textit{gdx-25.orsay.grid5000.fr}.
 
-\paragraph{Use case 2}
+\paragraph{Use case 2 - get the information about deployments performed on a range of node}
 \begin{verbatim}
 > kastat3 -d -m gdx-[25-130].orsay.grid5000.fr
 \end{verbatim}
 This commands prints all the deployment performed on the nodes \textit{gdx-25.orsay.grid5000.fr}, \textit{gdx-26.orsay.grid5000.fr}, ..., \textit{gdx-130.orsay.grid5000.fr}.
 
-\paragraph{Use case 3}
+\paragraph{Use case 3 - print only a subset of the information about the deployments performed}
 \begin{verbatim}
 > kastat3 -d -f hostname -f env -f success
 \end{verbatim}
 This command prints all the deployment performed. Because the \texttt{-f|--field} option is used, only the fields \textit{hostname}, \textit{env}, and \textit{success} are printed. If the option \texttt{-f|--field} is not used, all the fields are printed.
 
-\paragraph{Use case 4}
+\paragraph{Use case 4 - print the failure rate about the nodes wrt the deployments that occurs between two dates}
 \begin{verbatim}
 > kastat3 -b -x 2009:02:12:08:00:00 -y 2009:02:13:08:00:00
 \end{verbatim}
 This commands prints the failure rate of all the nodes (at least deployed one time) during the period between the 2009/02/12 - 8h00 and the 2009/02/13 - 8h00. The \texttt{-x|--date-min} and \texttt{-y|--date-max} options can be used separately or can be omitted.
 
-\paragraph{Use case 5}
+\paragraph{Use case 5 - print the information about the nodes that have at least a given failure rate}
 \begin{verbatim}
 > kastat3 -c 25 -x 2009:02:12:08:00:00
 \end{verbatim}
 This commands prints the nodes that have a failure rate of at least 25\% from the 2009/02/12 - 8h00.
 
-\paragraph{Use case 6}
+\paragraph{Use case 6 - print the information about the nodes that require several retries to deploy correctly}
 \begin{verbatim}
 > kastat3 -a 3 -s 1
 \end{verbatim}
@@ -1131,25 +1132,25 @@ General options:
 \end{small}
 
 We present now the use cases.
-\paragraph{Use case 1}
+\paragraph{Use case 1 - print the deployment state of the nodes}
 \begin{verbatim}
 > kanodes3 -d
 \end{verbatim}
 This commands prints the global state of all the nodes managed by a Kadeploy server.
 
-\paragraph{Use case 2}
+\paragraph{Use case 2 - print the deployment state of some nodes}
 \begin{verbatim}
 > kanodes3 -d -m gdx-25.orsay.grid5000.fr -m netgdx-[1-30].orsay.grid5000.fr -f machine_file
 \end{verbatim}
 This command prints the global state of the node \textit{gdx-25.orsay.grid5000.fr} the nodes \textit{netgdx-1.orsay.grid5000.fr}, \textit{netgdx-2.orsay.grid5000.fr}, ..., \textit{netgdx-30.orsay.grid5000.fr} and of the nodes listed in the file \texttt{machine\_file}.
 
-\paragraph{Use case 3}
+\paragraph{Use case 3 - get information about all the current deployment workflows}
 \begin{verbatim}
 > kanodes3 -y
 \end{verbatim}
 This commands prints a YAML output of the deployment state of all the nodes currently in deployment. On the YAML output, the nodes are sorted according to the deployment workflow they belong to.
 
-\paragraph{Use case 4}
+\paragraph{Use case 4 - get information about a specific deployment workflows}
 \begin{verbatim}
 > kanodes3 -y -w 78
 \end{verbatim}

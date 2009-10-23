@@ -401,62 +401,57 @@ module ParallelOperations
             nodes_to_test.push(node)
           end
         }
-        # We launch a thread here because a client SIGINT would corrupt the nodes check  window 
-        # management, thus even a SIGINT is received, the reboot process will finish
-        main_tid = Thread.new {
-          callback = Proc.new { |ns|
-            tg = ThreadGroup.new
-            ns.set.each { |node|
-              sub_tid = Thread.new {
-                all_ports_ok = true
-                if Ping.pingecho(node.hostname, 1, @config.common.ssh_port) then
-                  ports_up.each { |port|
+        callback = Proc.new { |ns|
+          tg = ThreadGroup.new
+          ns.set.each { |node|
+            sub_tid = Thread.new {
+              all_ports_ok = true
+              if Ping.pingecho(node.hostname, 1, @config.common.ssh_port) then
+                ports_up.each { |port|
+                  begin
+                    s = TCPsocket.open(node.hostname, port)
+                    s.close
+                  rescue Errno::ECONNREFUSED
+                    all_ports_ok = false
+                    next
+                  rescue Errno::EHOSTUNREACH
+                    all_ports_ok = false
+                    next
+                  end
+                }
+                if all_ports_ok then
+                  ports_down.each { |port|
                     begin
                       s = TCPsocket.open(node.hostname, port)
+                      all_ports_ok = false
                       s.close
                     rescue Errno::ECONNREFUSED
-                      all_ports_ok = false
                       next
                     rescue Errno::EHOSTUNREACH
                       all_ports_ok = false
                       next
                     end
                   }
-                  if all_ports_ok then
-                    ports_down.each { |port|
-                      begin
-                        s = TCPsocket.open(node.hostname, port)
-                        all_ports_ok = false
-                        s.close
-                      rescue Errno::ECONNREFUSED
-                        next
-                      rescue Errno::EHOSTUNREACH
-                        all_ports_ok = false
-                        next
-                      end
-                    }
-                  end
-                  if all_ports_ok then
-                    node.state = "OK"
-                    node.last_cmd_exit_status = "0"
-                    node.last_cmd_stderr = ""
-                    @output.verbosel(4, "  *** #{node.hostname} is here after #{Time.now.tv_sec - start}s")
-                    @config.set_node_state(node.hostname, "", "", "rebooted")
-                  else
-                    node.state = "KO"
-                  end
                 end
-              }
-              tg.add(sub_tid)
+                if all_ports_ok then
+                  node.state = "OK"
+                  node.last_cmd_exit_status = "0"
+                  node.last_cmd_stderr = ""
+                  @output.verbosel(4, "  *** #{node.hostname} is here after #{Time.now.tv_sec - start}s")
+                  @config.set_node_state(node.hostname, "", "", "rebooted")
+                else
+                  node.state = "KO"
+                end
+              end
             }
-            #let's wait everybody
-            tg.list.each { |sub_tid|
-              sub_tid.join
-            }
+            tg.add(sub_tid)
           }
-          nodes_check_window.launch(nodes_to_test, &callback)
+          #let's wait everybody
+          tg.list.each { |sub_tid|
+            sub_tid.join
+          }
         }
-        main_tid.join
+        nodes_check_window.launch(nodes_to_test, &callback)
       end
 
       @nodes.set.each { |node|

@@ -255,37 +255,32 @@ module MicroStepsLibrary
     def reboot_wrapper(kind, use_rsh_for_reboot, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      # We launch a thread here because a client SIGINT would corrupt the reboot window 
-      # management, thus even a SIGINT is received, the reboot process will finish
-      tid = Thread.new {
-        callback = Proc.new { |ns|
-          bad_nodes = Nodes::NodeSet.new
-          map = Array.new
-          map.push("soft")
-          map.push("hard")
-          map.push("very_hard")
-          index = map.index(kind)
-          finished = false
-          
-          while ((index < map.length) && (not finished))
-            bad_nodes = _reboot_wrapper(map[index], ns, use_rsh_for_reboot, instance_thread)
-            if (bad_nodes != nil) then
-              ns.free
-              index = index + 1
-              if (index < map.length) then
-                bad_nodes.duplicate_and_free(ns)
-              else
-                @nodes_ko.add(bad_nodes)
-              end
+      callback = Proc.new { |ns|
+        bad_nodes = Nodes::NodeSet.new
+        map = Array.new
+        map.push("soft")
+        map.push("hard")
+        map.push("very_hard")
+        index = map.index(kind)
+        finished = false
+        
+        while ((index < map.length) && (not finished))
+          bad_nodes = _reboot_wrapper(map[index], ns, use_rsh_for_reboot, instance_thread)
+          if (bad_nodes != nil) then
+            ns.free
+            index = index + 1
+            if (index < map.length) then
+              bad_nodes.duplicate_and_free(ns)
             else
-              finished = true
+              @nodes_ko.add(bad_nodes)
             end
+          else
+            finished = true
           end
-          map.clear
-        }
-        @reboot_window.launch(node_set, &callback)
+        end
+        map.clear
       }
-      tid.join
+      @reboot_window.launch(node_set, &callback)
       @nodes_ko.add(node_set) if @nodes_ok.empty?
     end
 
@@ -1184,12 +1179,18 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # * reboot_kind: kind of reboot (soft, hard, very_hard, kexec)
     # * use_rsh_for_reboot (opt): specify if rsh must be used for soft reboot
+    # * first_attempt (opt): specify if it is the first attempt or not 
     # Output
     # * return true (should be false sometimes :D)
-    def ms_reboot(instance_thread, reboot_kind, use_rsh_for_reboot = false)
+    def ms_reboot(instance_thread, reboot_kind, use_rsh_for_reboot = false, first_attempt = true)
       case reboot_kind
       when "soft"
-        reboot_wrapper("soft", use_rsh_for_reboot, instance_thread)
+        if first_attempt then
+          reboot_wrapper("soft", use_rsh_for_reboot, instance_thread)
+        else
+          #After the first attempt, we must not perform another soft reboot in order to avoid loop reboot on the same environment 
+          reboot_wrapper("hard", use_rsh_for_reboot, instance_thread)
+        end
       when "hard"
         reboot_wrapper("hard", use_rsh_for_reboot, instance_thread)
       when "very_hard"
@@ -1240,24 +1241,21 @@ module MicroStepsLibrary
         #We look if the / mounted partition is the default production partition.
         #We don't use the Taktuk method because this would require to have the deploy
         #private key in the production environment.
-        tid = Thread.new {
-          callback = Proc.new { |ns|
-            
-            pr = ParallelRunner::PRunner.new(@output, nil, @process_container)
-            ns.set.each { |node|
-              cmd = "#{@config.common.taktuk_connector} root@#{node.hostname} \"mount | grep \\ \\/\\  | cut -f 1 -d\\ \""
-              pr.add(cmd, node)
-            }
-            @output.verbosel(3, "  *** A bunch of check prod env tests will be performed on #{ns.to_s_fold}")
-            pr.run
-            pr.wait
-            classify_nodes(pr.get_results_expecting_output(@config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].prod_part, "Bad root partition"))
+        callback = Proc.new { |ns|
+          
+          pr = ParallelRunner::PRunner.new(@output, nil, @process_container)
+          ns.set.each { |node|
+            cmd = "#{@config.common.taktuk_connector} root@#{node.hostname} \"mount | grep \\ \\/\\  | cut -f 1 -d\\ \""
+            pr.add(cmd, node)
           }
-          node_set = Nodes::NodeSet.new
-          @nodes_ok.duplicate_and_free(node_set)
-          @reboot_window.launch(node_set, &callback)
+          @output.verbosel(3, "  *** A bunch of check prod env tests will be performed on #{ns.to_s_fold}")
+          pr.run
+          pr.wait
+          classify_nodes(pr.get_results_expecting_output(@config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].prod_part, "Bad root partition"))
         }
-        tid.join
+        node_set = Nodes::NodeSet.new
+        @nodes_ok.duplicate_and_free(node_set)
+        @reboot_window.launch(node_set, &callback)
         return (not @nodes_ok.empty?)
       end
     end

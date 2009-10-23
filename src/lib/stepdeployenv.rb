@@ -145,6 +145,7 @@ module SetDeploymentEnvironnment
         @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
         connector_port = @config.common.ssh_port
       end
+      first_attempt = true
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
         @nodes.duplicate_and_free(@nodes_ko)
@@ -158,7 +159,7 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
-            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy)
+            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
@@ -176,6 +177,7 @@ module SetDeploymentEnvironnment
             end
           end
           @remaining_retries -= 1
+          first_attempt = false
         end
         #After several retries, some nodes may still be in an incorrect state
         if (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed) then
@@ -207,6 +209,7 @@ module SetDeploymentEnvironnment
         @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
         connector_port = @config.common.ssh_port
       end
+      first_attempt = true
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
         @nodes.duplicate_and_free(@nodes_ko)
@@ -220,7 +223,7 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
-            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy)
+            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.manage_admin_pre_install("tree")
@@ -235,6 +238,7 @@ module SetDeploymentEnvironnment
             end
           end
           @remaining_retries -= 1
+          first_attempt = false
         end
         #After several retries, some nodes may still be in an incorrect state
         if (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed) then
@@ -320,6 +324,7 @@ module SetDeploymentEnvironnment
         @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
         connector_port = @config.common.ssh_port
       end
+      first_attempt = true
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
         @nodes.duplicate_and_free(@nodes_ko)
@@ -333,7 +338,7 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_nfsroot_env")
-            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy)
+            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
@@ -351,6 +356,7 @@ module SetDeploymentEnvironnment
             end
           end
           @remaining_retries -= 1
+          first_attempt = false
         end
         #After several retries, some nodes may still be in an incorrect state
         if (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed) then

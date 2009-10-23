@@ -41,6 +41,7 @@ module Managers
       @resources_used = 0
       @resources_max = max
       @sleep_time = sleep_time
+      @last_release_time = 0
     end
 
     private
@@ -77,6 +78,16 @@ module Managers
     def release(n)
       @mutex.synchronize {
         @resources_used -= n
+        @resources_used = 0 if @resources_used < 0
+        @last_release_time = Time.now.to_i
+      }
+    end
+    
+    def regenerate_lost_resources
+      @mutex.synchronize {
+        if ((Time.now.to_i - @last_release_time) > (2 * @sleep_time)) && (@resources_used != 0) then
+          @resources_used = 0
+        end
       }
     end
 
@@ -91,6 +102,7 @@ module Managers
     def launch(node_set, &callback)
       remaining = node_set.length
       while (remaining != 0)
+        regenerate_lost_resources()
         remaining, taken = acquire(remaining)
         if (taken > 0) then
           partial_set = node_set.extract(taken)
@@ -812,9 +824,10 @@ module Managers
       }
       @thread_process_finished_nodes.join
       if not @killed then
-        @deployments_table_lock.lock
-        @nodes_to_deploy_backup.set_deployment_state("deployed", nil, @db, "")
-        @deployments_table_lock.unlock
+        @deployments_table_lock.synchronize {
+          @nodes_ok.set_deployment_state("deployed", nil, @db, "")
+          @nodes_ko.set_deployment_state("deploy_failed", nil, @db, "")
+        }
       end
       @nodes_to_deploy_backup = nil
     end
@@ -840,9 +853,10 @@ module Managers
       if (@thread_process_finished_nodes.status == false) then
         if not @killed then
           if (@nodes_to_deploy_backup != nil) then #it may be called several time in async mode
-            @deployments_table_lock.lock
-            @nodes_to_deploy_backup.set_deployment_state("deployed", nil, @db, "")
-            @deployments_table_lock.unlock
+            @deployments_table_lock.synchronize {
+              @nodes_ok.set_deployment_state("deployed", nil, @db, "")
+              @nodes_ko.set_deployment_state("deploy_failed", nil, @db, "")
+            }
           end
         end
         @nodes_to_deploy_backup = nil

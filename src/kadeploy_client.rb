@@ -248,7 +248,7 @@ if (exec_specific_config != nil) then
       end
       Signal.trap("INT") do
         puts "SIGINT trapped, let's clean everything ..."
-        kadeploy_server.kill(kadeploy_client.workflow_id)
+        kadeploy_server.kill_workflow(kadeploy_client.workflow_id)
         _exit(1, db)
       end
       if (exec_specific_config.pxe_profile_file != "") then

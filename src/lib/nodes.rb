@@ -705,7 +705,12 @@ module Nodes
         @set.each { |node|
           query = "UPDATE nodes SET state=\"aborted\" WHERE hostname=\"#{node.hostname}\""
           db.run_query(query)
-        }        
+        }
+      when "deploy_failed"
+        @set.each { |node|
+          query = "UPDATE nodes SET state=\"deploy_failed\" WHERE hostname=\"#{node.hostname}\""
+          db.run_query(query)
+        }          
       else
         return false
       end

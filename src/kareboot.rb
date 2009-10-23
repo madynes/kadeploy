@@ -12,6 +12,7 @@ require 'checkrights'
 
 #Ruby libs
 require 'drb'
+require 'digest/sha1'
 
 class KarebootClient
   @kadeploy_server = nil
@@ -138,6 +139,14 @@ if config.check_config("kareboot", db) then
       puts "The URI #{DRb.uri} is not correct"
       _exit(1, db)
     end
+    
+    reboot_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + config.exec_specific.node_list.to_s)
+    
+    Signal.trap("INT") do
+      puts "SIGINT trapped, let's clean everything ..."
+      kadeploy_server.kill_reboot(reboot_id)
+      _exit(1, db)
+    end
 
     if (config.exec_specific.verbose_level != "") then
       verbose_level = config.exec_specific.verbose_level
@@ -150,7 +159,7 @@ if config.check_config("kareboot", db) then
         pxe_profile_msg.concat(l)
       }
     end
-    res = kadeploy_server.launch_reboot(config.exec_specific, client_host, client_port, verbose_level, pxe_profile_msg)
+    res = kadeploy_server.launch_reboot(config.exec_specific, client_host, client_port, verbose_level, pxe_profile_msg, reboot_id)
     _exit(res, db)
   else
     puts "You do not have the deployment rights on all the nodes"
