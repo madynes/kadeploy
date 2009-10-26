@@ -675,12 +675,34 @@ module MicroStepsLibrary
       else
         cmd = "kastafior -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
       end
-      @output.debug(cmd, nil)
       c = ParallelRunner::Command.new(cmd)
       c.run
+      std_output = String.new
+      err_output = String.new
+      std_reader = Thread.new {
+        begin
+          while line = c.stdout.gets
+            std_output += line
+          end
+        ensure
+          c.stdout.close
+        end
+      }
+      err_reader = Thread.new {
+        begin
+          while line = c.stderr.gets
+            err_output += line
+          end
+        ensure
+          c.stderr.close
+        end
+      }
       @process_container.add_process(instance_thread, c.pid)
       c.wait
+      std_reader.join
+      err_reader.join
       @process_container.remove_process(instance_thread, c.pid)
+      @output.debug_command(cmd, std_output, err_output, c.status)
       if (c.status != 0) then
         failed_microstep("Error while processing to the file broadcast with Kastafior (exited with status #{c.status})")
         return false

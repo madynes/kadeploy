@@ -114,10 +114,38 @@ module Debug
               @client.print("#{node.hostname} -- STDERR: #{line}")
             }
             node.last_cmd_exit_status.split("\n").each { |line|
-            @client.print("#{node.hostname} -- EXIT STATUS: #{line}")
+              @client.print("#{node.hostname} -- EXIT STATUS: #{line}")
             }
           }
         end
+        @client.print("-------------------------")
+      end
+    end
+
+    # Print the debug output of a command
+    #
+    # Arguments
+    # * cmd: command
+    # * stdout: standard output
+    # * stderr: standard error output
+    # * exit_status: exit status
+    # Output
+    # * nothing
+    def debug_command(cmd, stdout, stderr, exit_status)
+      if @debug then
+        @client.print("-------------------------")
+        @client.print("CMD: #{cmd}")
+        if stdout != nil then
+          stdout.split("\n").each { |line|
+            @client.print("-- STDOUT: #{line}")
+          }
+        end
+        if stderr != nil then
+          stderr.split("\n").each { |line|
+            @client.print("-- STDERR: #{line}")
+          }
+        end
+        @client.print("-- EXIT STATUS: #{exit_status}")
         @client.print("-------------------------")
       end
     end
