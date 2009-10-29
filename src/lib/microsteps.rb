@@ -1143,7 +1143,7 @@ module MicroStepsLibrary
             Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                @config.common.tftp_images_max_size * 1024 * 1024,
                                1,
-                               /^e(\d+|\-anon)--.+$/)
+                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
               PXEOperations::set_pxe_for_chainload(@nodes_ok.make_array_of_ip,
@@ -1187,7 +1187,7 @@ module MicroStepsLibrary
               Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                  @config.common.tftp_images_max_size * 1024 * 1024,
                                  1,
-                                 /^e(\d+|\-anon)--.+$/)
+                                 /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/)
             end
           end
         end
@@ -1490,7 +1490,7 @@ module MicroStepsLibrary
           when "linux"
             return install_grub2_on_nodes("linux", instance_thread)
           when "xen"
-#           return install_grub2_on_nodes("xen", instance_thread)
+            #return install_grub2_on_nodes("xen", instance_thread)
             @output.verbosel(3, "   Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
             return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
                                               @config.exec_specific.environment.initrd,

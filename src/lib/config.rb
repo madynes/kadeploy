@@ -130,6 +130,7 @@ module ConfigInformation
       exec_specific.reformat_tmp = false
       exec_specific.pxe_profile_msg = String.new
       exec_specific.pxe_profile_file = String.new
+      exec_specific.pxe_upload_files = Array.new
       exec_specific.steps = Array.new
       exec_specific.ignore_nodes_deploying = false
       exec_specific.breakpoint_on_microstep = String.new
@@ -914,6 +915,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          exec_specific.get_version = true
+        }
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
           if not File.readable?(f) then
             error("The file #{f} cannot be read")
@@ -922,8 +926,19 @@ module ConfigInformation
             exec_specific.pxe_profile_file = f
           end
         }
-        opt.on("-v", "--version", "Get the version") {
-          exec_specific.get_version = true
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp-images\" directory. Those files will be prefixed with \"custom-pxe-$username-\" ") { |l|
+          l.split(",").each { |f|
+            if (f =~ /^http[s]?:\/\//) then
+              exec_specific.pxe_upload_files.push(f) 
+            else
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.pxe_upload_files.push(f) 
+              end
+            end
+          }
         }
         opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
           if /\A\d+\Z/ =~ n then
@@ -1720,7 +1735,9 @@ module ConfigInformation
       @exec_specific.block_device = String.new
       @exec_specific.deploy_part = String.new
       @exec_specific.breakpoint_on_microstep = "none"
-      @exec_specific.pxe_profile_msg = ""
+      @exec_specific.pxe_profile_msg = String.new
+      @exec_specific.pxe_profile_file = String.new
+      @exec_specific.pxe_upload_files = Array.new
       @exec_specific.key = String.new
       @exec_specific.nodes_ok_file = String.new
       @exec_specific.nodes_ko_file = String.new
@@ -1830,6 +1847,16 @@ module ConfigInformation
         }
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
           @exec_specific.pxe_profile_file = file
+        }
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp-images\" directory. Those files will be prefixed with \"custom-pxe-$username-\" ") { |l|
+          l.split(",").each { |f|
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              @exec_specific.pxe_upload_files.push(f) 
+            end
+          }
         }
         opt.on("--env-version NUMBER", "Specify the environment version") { |v|
           if /\A\d+\Z/ =~ v then

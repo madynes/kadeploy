@@ -464,7 +464,7 @@ class KadeployServer
   # * verbose_level: level of verbosity
   # * pxe_profile_msg: PXE profile
   # Output
-  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if the server cannot connect to DB
+  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if the server cannot connect to DB, 4 if some pxe files cannot be grabbed
   def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg, reboot_id)
     db = Database::DbFactory.create(@config.common.db_kind)
     if not db.connect(@config.common.deploy_db_host,
@@ -491,7 +491,7 @@ class KadeployServer
         exec_specific.check_prod_env && 
         exec_specific.node_list.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
       output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
-      ret = 2
+      return 2
     else
       #We create a new instance of Config with a specific exec_specific part
       config = ConfigInformation::Config.new("empty")
@@ -502,6 +502,19 @@ class KadeployServer
       nodes_ko = Nodes::NodeSet.new
       global_nodes_mutex = Mutex.new
       tid_array = Array.new
+
+      if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
+        gfm = Managers::GrabFileManager.new(config, output, client)
+        exec_specific.pxe_upload_files.each { |pxe_file|
+          user_prefix = "pxe-#{config.exec_specific.true_user}-"
+          local_pxe_file = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix, false) then
+            output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
+            return 4
+          end
+        }
+      end
+
       exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
         tid_array << Thread.new {
           step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
