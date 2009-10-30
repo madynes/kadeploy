@@ -5,6 +5,7 @@
 
 require 'tempfile'
 require 'net/http'
+require 'net/https'
 require 'uri'
 
 module HTTP
@@ -44,13 +45,18 @@ module HTTP
   # Arguments
   # * uri: URI of the file
   # Output
-  # * return the file size
+  # * return the file size, or nil in case of bad URI
   def HTTP::get_file_size(uri)
     url = URI.parse(uri)
     resp = nil
-    Net::HTTP.start(url.host, url.port) { |http|
+    begin
+      http = Net::HTTP.new(url.host, url.port)
+      http.use_ssl = url.is_a?(URI::HTTPS)
+      http.start
       resp = http.head(url.path)
-    }
+    rescue
+      return nil
+    end
     return resp['content-length'].to_i
   end
 end

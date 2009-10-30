@@ -335,8 +335,13 @@ module Managers
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
+        file_size = HTTP::get_file_size(client_file)
+        if file_size == nil then
+          @output.verbosel(0, "Cannot reach the file at #{client_file}")
+          return false
+        end
         Cache::clean_cache(cache_dir,
-                           (cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
+                           (cache_size * 1024 * 1024) -  file_size,
                            0.5, /./)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, nil)
@@ -445,8 +450,13 @@ module Managers
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
+        file_size = HTTP::get_file_size(client_file)
+        if file_size == nil then
+          @output.verbosel(0, "Cannot reach the file at #{client_file}")
+          return false
+        end
         Cache::clean_cache(cache_dir,
-                           (cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
+                           (cache_size * 1024 * 1024) -  file_size,
                            0.5, /./)
         resp,etag = HTTP::fetch_file(client_file, local_file, nil)
         if (resp != "200") then
