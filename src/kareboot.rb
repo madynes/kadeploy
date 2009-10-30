@@ -13,6 +13,7 @@ require 'checkrights'
 #Ruby libs
 require 'drb'
 require 'digest/sha1'
+require 'md5'
 
 class KarebootClient
   @kadeploy_server = nil
@@ -39,6 +40,81 @@ class KarebootClient
   # * nothing
   def exit
     DRb.stop_service()
+  end
+
+  # Get a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # * prefix: prefix to add to the file_name
+  # Output
+  # * return true if the file has been successfully transfered, false otherwise
+  def get_file(file_name, prefix)
+    if (File.exist?(file_name)) then
+      if (File.readable?(file_name)) then
+        port = @kadeploy_server.create_a_socket_server(prefix + File.basename(file_name))
+        if port != -1 then
+          sock = TCPSocket.new(@kadeploy_server.dest_host, port)
+          file = File.open(file_name)
+          tcp_buffer_size = @kadeploy_server.tcp_buffer_size
+          while (buf = file.read(tcp_buffer_size))
+            sock.send(buf, 0)
+          end
+          sock.close
+          return true
+        else
+          return false
+        end
+      else
+        puts "The file #{file_name} cannot be read"
+        return false
+      end
+    else
+      puts "The file #{file_name} cannot be found"
+      return false
+    end
+  end
+  
+  # Get the mtime of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the mtime of the file, or 0 if it cannot be read.
+  def get_file_mtime(file_name)
+    if File.readable?(file_name) then
+      return File.mtime(file_name).to_i
+    else
+      return 0
+    end
+  end
+
+  # Get the MD5 of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the MD5 of the file, or 0 if it cannot be read.
+  def get_file_md5(file_name)
+    if File.readable?(file_name) then
+      return MD5::get_md5_sum(file_name)
+    else
+      return 0
+    end
+  end
+
+  # Get the size of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the size of the file, or 0 if it cannot be read.
+  def get_file_size(file_name)
+    if File.readable?(file_name) then
+      return File.stat(file_name).size
+    else
+      return 0
+    end
   end
 
   # Print the results of the deployment (RPC)

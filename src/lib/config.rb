@@ -807,7 +807,7 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
+        opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|          
           if (not (f =~ /^http[s]?:\/\//)) && (not File.readable?(f)) then
             error("The file #{f} does not exist or is not readable")
             return false
@@ -926,11 +926,12 @@ module ConfigInformation
             exec_specific.pxe_profile_file = f
           end
         }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp-images\" directory. Those files will be prefixed with \"custom-pxe-$username-\" ") { |l|
-          l.split(",").each { |f|
-            if (f =~ /^http[s]?:\/\//) then
-              exec_specific.pxe_upload_files.push(f) 
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
+          l.split(",").each { |file|
+            if (file =~ /^http[s]?:\/\//) then
+              exec_specific.pxe_upload_files.push(file) 
             else
+              f = File.expand_path(file)
               if not File.readable?(f) then
                 error("The file #{f} cannot be read")
                 return false
@@ -1848,13 +1849,18 @@ module ConfigInformation
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
           @exec_specific.pxe_profile_file = file
         }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp-images\" directory. Those files will be prefixed with \"custom-pxe-$username-\" ") { |l|
-          l.split(",").each { |f|
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
+          l.split(",").each { |file|
+            if (file =~ /^http[s]?:\/\//) then
+              exec_specific.pxe_upload_files.push(file) 
             else
-              @exec_specific.pxe_upload_files.push(f) 
+              f = File.expand_path(file)
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.pxe_upload_files.push(f) 
+              end
             end
           }
         }

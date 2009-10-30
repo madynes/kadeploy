@@ -504,11 +504,13 @@ class KadeployServer
       tid_array = Array.new
 
       if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
-        gfm = Managers::GrabFileManager.new(config, output, client)
+        gfm = Managers::GrabFileManager.new(config, output, client, db)
         exec_specific.pxe_upload_files.each { |pxe_file|
           user_prefix = "pxe-#{config.exec_specific.true_user}-"
-          local_pxe_file = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
-          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix, false) then
+          tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
+          local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
+                                               tftp_images_path, config.common.tftp_images_max_size, false) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             return 4
           end

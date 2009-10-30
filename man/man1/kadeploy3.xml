@@ -130,14 +130,7 @@
 	<listitem>
 	  <para>Specify the user.</para>
 	</listitem>
-      </varlistentry>      
-      <varlistentry>
-	<term><option>-w</option></term>
-	<term><option>--set-pxe-profile <replaceable>FILE</replaceable></option></term>
-	<listitem>
-	  <para>Set the PXE profile (use with caution).</para>
-	</listitem>
-      </varlistentry>   
+      </varlistentry>       
       <varlistentry>
 	<term><option>-v</option></term>
 	<term><option>--version</option></term>
@@ -145,6 +138,20 @@
 	  <para>Get the version.</para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>-w</option></term>
+	<term><option>--set-pxe-profile <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Set the PXE profile (use with caution).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-x</option></term>
+	<term><option>--upload-pxe-files <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Upload a list of files (file1,file2,file3) to the "tftp-images" directory. Those files will be prefixed with "pxe-$username-".</para>
+	</listitem>
+      </varlistentry>  
       <varlistentry>
 	<term><option>--env-version <replaceable>NUMBER</replaceable></option></term>
 	<listitem>

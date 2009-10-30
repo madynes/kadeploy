@@ -300,11 +300,22 @@ module Managers
     @config = nil
     @output = nil
     @client = nil
+    @db = nil
 
-    def initialize(config, output, client)
+    # Constructor of GrabFileManager
+    #
+    # Arguments
+    # * config: instance of Config
+    # * output: instance of OutputControl
+    # * client : Drb handler of the client
+    # * db: database handler
+    # Output
+    # * nothing
+    def initialize(config, output, client, db)
       @config = config
       @output = output
       @client = client
+      @db = db
     end
 
     # Grab a file from the client side or locally with recording the hash of the file
@@ -315,15 +326,17 @@ module Managers
     # * expected_md5: expected md5 for the client file
     # * file_tag: tag used to specify the kind of file to grab
     # * prefix: prefix used to store the file in the cache
+    # * cache_dir: cache directory
+    # * cache_size: cache size
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, async = false)
+    def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
-        Cache::clean_cache(@config.common.kadeploy_cache_dir,
-                           (@config.common.kadeploy_cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
+        Cache::clean_cache(cache_dir,
+                           (cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
                            0.5, /./)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, nil)
@@ -362,8 +375,8 @@ module Managers
         if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
           #We first check if the file can be reached locally
           if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
-            Cache::clean_cache(@config.common.kadeploy_cache_dir,
-                               (@config.common.kadeploy_cache_size * 1024 * 1024) -  File.stat(client_file).size,
+            Cache::clean_cache(cache_dir,
+                               (cache_size * 1024 * 1024) -  File.stat(client_file).size,
                                0.5, /./)
             @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
@@ -375,8 +388,8 @@ module Managers
               @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
               return false
             else
-              Cache::clean_cache(@config.common.kadeploy_cache_dir,
-                                 (@config.common.kadeploy_cache_size * 1024 * 1024) - @client.get_file_size(client_file),
+              Cache::clean_cache(cache_dir,
+                                 (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
                                  0.5, /./)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
               if not @client.get_file(client_file, prefix) then
@@ -423,26 +436,28 @@ module Managers
     # * local_file: path to local cached file
     # * file_tag: tag used to specify the kind of file to grab
     # * prefix: prefix used to store the file in the cache
+    # * cache_dir: cache directory
+    # * cache_size: cache size
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file_without_caching(client_file, local_file, file_tag, prefix, async)
+    def grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
-        Cache::clean_cache(@config.common.kadeploy_cache_dir,
-                           (@config.common.kadeploy_cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
+        Cache::clean_cache(cache_dir,
+                           (cache_size * 1024 * 1024) -  HTTP::get_file_size(client_file),
                            0.5, /./)
         resp,etag = HTTP::fetch_file(client_file, local_file, nil)
         if (resp != "200") then
-          @output.verbosel(0, "Unable to grab the #{file_tag} file #{key}")
+          @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
           return false
         end
       #classical fetch
       else
         if File.readable?(client_file) then
-          Cache::clean_cache(@config.common.kadeploy_cache_dir,
-                             (@config.common.kadeploy_cache_size * 1024 * 1024) -  File.stat(client_file).size,
+          Cache::clean_cache(cache_dir,
+                             (cache_size * 1024 * 1024) -  File.stat(client_file).size,
                              0.5, /./)
           @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
           if not system("cp #{client_file} #{local_file}") then
@@ -455,11 +470,11 @@ module Managers
             return false
           else
             @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
-            Cache::clean_cache(@config.common.kadeploy_cache_dir,
-                               (@config.common.kadeploy_cache_size * 1024 * 1024) - @client.get_file_size(client_file),
+            Cache::clean_cache(cache_dir,
+                               (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
                                0.5, /./)
             if not @client.get_file(client_file, prefix) then
-              @output.verbosel(0, "Unable to grab the file #{key}")
+              @output.verbosel(0, "Unable to grab the file #{client_file}")
               return false
             end
           end
@@ -476,16 +491,18 @@ module Managers
     # * expected_md5: expected md5 for the client file
     # * file_tag: tag used to specify the kind of file to grab
     # * prefix: prefix used to store the file in the cache
+    # * cache_dir: cache directory
+    # * cache_size: cache size
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, async = false)
+    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false)
       #anonymous environment
       if (@config.exec_specific.load_env_kind == "file") then
-        return grab_file_without_caching(client_file, local_file, file_tag, prefix, async)
+        return grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async)
       #recorded environement
       else
-        return grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, async)
+        return grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async)
       end
     end
   end
@@ -712,9 +729,10 @@ module Managers
       tarball = @config.exec_specific.environment.tarball
       local_tarball = use_local_cache_filename(tarball["file"], env_prefix)
       
-      gfm = GrabFileManager.new(@config, @output, @client)
+      gfm = GrabFileManager.new(@config, @output, @client, @db)
 
-      if not gfm.grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, async) then 
+      if not gfm.grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, 
+                           @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
         return false
       end
       tarball["file"] = local_tarball
@@ -722,7 +740,8 @@ module Managers
       if @config.exec_specific.key != "" then
         key = @config.exec_specific.key
         local_key = use_local_cache_filename(key, user_prefix)
-        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, async) then
+        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, @config.common.kadeploy_cache_dir, 
+                                             @config.common.kadeploy_cache_size, async) then
           return false
         end
         @config.exec_specific.key = local_key
@@ -731,7 +750,8 @@ module Managers
       if (@config.exec_specific.environment.preinstall != nil) then
         preinstall = @config.exec_specific.environment.preinstall
         local_preinstall =  use_local_cache_filename(preinstall["file"], env_prefix)
-        if not gfm.grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, async) then 
+        if not gfm.grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, 
+                             @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
           return false
         end
         preinstall["file"] = local_preinstall
@@ -740,7 +760,8 @@ module Managers
       if (@config.exec_specific.environment.postinstall != nil) then
         @config.exec_specific.environment.postinstall.each { |postinstall|
           local_postinstall = use_local_cache_filename(postinstall["file"], env_prefix)
-          if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, async) then 
+          if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
+                               @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
             return false
           end
           postinstall["file"] = local_postinstall
@@ -754,7 +775,9 @@ module Managers
               if (entry[0] == "send") then
                 custom_file = entry[1]
                 local_custom_file = use_local_cache_filename(custom_file, user_prefix)
-                if not gfm.grab_file_without_caching(custom_file, local_custom_file, "custom_file", user_prefix, async) then
+                if not gfm.grab_file_without_caching(custom_file, local_custom_file, "custom_file", 
+                                                     user_prefix, @config.common.kadeploy_cache_dir, 
+                                                     @config.common.kadeploy_cache_size, async) then
                   return false
                 end
                 entry[1] = local_custom_file
@@ -768,8 +791,11 @@ module Managers
         if not @config.exec_specific.pxe_upload_files.empty? then
           @config.exec_specific.pxe_upload_files.each { |pxe_file|
             user_prefix = "pxe-#{@config.exec_specific.true_user}-"
-            local_pxe_file = "#{@config.common.tftp_repository}/#{@config.common.tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
-            if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix, async) then
+            tftp_images_path = "#{@config.common.tftp_repository}/#{@config.common.tftp_images_path}"
+            local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+            if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",
+                                                 user_prefix, tftp_images_path, 
+                                                 @config.common.tftp_images_max_size, async) then
               return false
             end
           }

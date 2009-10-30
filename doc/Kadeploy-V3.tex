@@ -661,7 +661,10 @@ General options:
                                    (ext[234] are allowed)
   -s, --script FILE                Execute a script at the end of the deployment
   -u, --user USERNAME              Specify the user
+  -v, --version                    Get the version
   -w, --set-pxe-profile FILE       Set the PXE profile (use with caution)
+  -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
+                                   directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER         Number of version of the environment to deploy
       --verbose-level VALUE        Verbose level between 0 to 4
 Advanced options:
@@ -740,10 +743,23 @@ This kind of command can be used for debug purpose. It performs a deployment wit
 \paragraph{Use case 6 - advanced usage - specific PXE profile}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
-            -e FreeBSD \
-            -w ~/pxe_profile
+            -e lenny-x64-nfs-1.0 \
+            -w ~/pxe_profile -x "~/custom-kernel,~/custom-initrd"
 \end{verbatim}
-In some specific case, you may want to use a specific PXE profil to boot your nodes. For instance, if you want to test a new Syslinux Comboot not used by default on the Kadeploy server, you can write your own PXE profil that uses this Comboot. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server.
+In some specific case, you may want to use a specific PXE profile to boot your nodes. To do this, you have to provide a PXE profile. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server. So Kadeploy offers a feature to stage some files in an area where the files can be read by the TFTP server. This can be achieved with the \texttt{-x|--upload-pxe-files} option. You must know that such uploaded files will be copied in the \texttt{tftp\_images\_path}, and will be prefixed with \texttt{pxe-username-}.
+
+Here is an example of PXE profile that uses uploaded files:
+\begin{verbatim}
+PROMPT 1
+SERIAL 0 38400
+DEFAULT bootlabel
+DISPLAY messages
+TIMEOUT 50
+
+label bootlabel
+        KERNEL kernels/pxe-ejeanvoine-custom-kernel
+        APPEND initrd=kernels/pxe-ejeanvoine-custom-initrd root=/dev/sda3
+\end{verbatim}
 
 \paragraph{Use case 7 - advanced usage - specific bootloader requirement}
 \begin{verbatim}
@@ -811,8 +827,11 @@ General options:
   -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot, 
                                  deploy_env, env_recorded)
   -u, --user USERNAME            Specify the user
-      --env-version NUMBER       Specify the environment version
+  -v, --version                  Get the version
   -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
+  -x, --upload-pxe-files FILES   Upload a list of files (file1,file2,file3) to the "tftp_images_path"
+                                 directory. Those files will be prefixed with "pxe-$username-" 
+      --env-version NUMBER       Specify the environment version
       --no-wait                  Do not wait the end of the reboot
       --verbose-level VALUE      Verbose level between 0 to 4
 \end{verbatim}
@@ -833,7 +852,8 @@ Here are some basic examples:
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot -o reboot_ok.txt \
                                                         -n reboot_ko.txt
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
-> kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile -l hard
+> kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile -l hard \
+                                -x "~/custom_kernel,~/custom_initrd"
 > kareboot3 -f nodes -r deploy_env -k .ssh/id_rsa
 > kareboot3 -r env_recorded -e production_environment \
             -p 2 -u root -m gdx-5.orsay.grid5000.fr
@@ -1003,6 +1023,7 @@ General options:
   -p, --part PARTNAME          Include the partition in the operation
   -s, --show-rights            Show the rights for a given user
   -u, --user USERNAME          Specify the user
+  -v, --version                Get the version
 \end{verbatim}
 \end{small}
 
@@ -1072,6 +1093,7 @@ General options:
                                                            env,md5,success,error)
   -m, --machine MACHINE            Only print information about the given machines
   -s, --step STEP                  Applies the retry filter on the given steps (1, 2 or 3)
+  -v, --version                    Get the version
   -x, --date-min DATE              Get the stats from this date (yyyy:mm:dd:hh:mm:ss)
   -y, --date-max DATE              Get the stats to this date
 \end{verbatim}
@@ -1126,6 +1148,7 @@ General options:
   -d, --get-deploy-state       Get the deploy state of the nodes
   -f, --file MACHINELIST       Only print information about the given machines
   -m, --machine MACHINE        Only print information about the given machines
+  -v, --version                Get the version
   -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 
                                operation. If no wid is specified, the information of all
                                the running worklfows will be dumped
@@ -1184,22 +1207,11 @@ On a \emph{Linux} environment, after having updated your kernel/initrd, 2 cases 
 \end{enumerate}
 
 \subsubsection{Xen environments}
-On a \emph{Xen} environment, the things are a little bit more complicated. As far as the kernel/initrd/hypervisor are extracted by Kadeploy in a dedicated cache, changing them on the deployed nodes won't have any effect for the next reboot. So after the deployment, you have to install the Grub 1 bootloader (this one is compliant with Xen Dom0) on the deployed partition and configure it to boot the kernel/initrd/hypervisor you want. Then you have to reboot the node with Kareboot3 in order to update the PXE profile to allow the chainload of the deployed partition. For instance:
+On a \emph{Xen} environment, the things are a little bit more complicated. As far as the kernel/initrd/hypervisor are extracted by Kadeploy in a dedicated cache, changing them on the deployed nodes won't have any effect for the next reboot. So you have to use a feature of Kareboot that allows to reboot a node after having changed the PXE profile of the node. For instance:
 \begin{verbatim}
-> kareboot3 -m gdx-25.orsay.grid5000.fr -r set_pxe -w ~/pxe_profile_xen
+> kareboot3 -m gdx-25.orsay.grid5000.fr -r set_pxe -w ~/pxe_profile_xen -x "~/custom_kernel,~/custom_initrd,~/custom_hypervisor"
 \end{verbatim}
-Your PXE profile\texttt{~/pxe\_profile\_xen} must contains something like:
-\begin{verbatim}
-PROMPT 1
-SERIAL 0 38400
-DEFAULT bootlabel
-DISPLAY messages
-TIMEOUT 50
-
-label bootlabel
-        KERNEL chain.c32
-        APPEND hd0 3
-\end{verbatim}
+Kadeploy has the same feature, so please refer to the use case about \textit{specific PXE profile} for more information.
 
 \subsubsection{Other environments}
 On an \emph{Other} environment, you eventually have to update your bootloader in order to boot on the new kernel.
