@@ -958,8 +958,8 @@ module MicroStepsLibrary
       end
       if (instance_thread.status != false) then
         @output.verbosel(3, "Timeout before the end of the step on cluster #{@cluster}, let's kill the instance")
-        @process_container.killall(instance_thread)
         Thread.kill(instance_thread)
+        @process_container.killall(instance_thread)
         @nodes_ok.free
         instance_node_set.duplicate_and_free(@nodes_ko)
         @nodes_ko.set_error_msg("Timeout in the #{step_name} step")
@@ -1490,7 +1490,7 @@ module MicroStepsLibrary
           when "linux"
             return install_grub2_on_nodes("linux", instance_thread)
           when "xen"
-            #return install_grub2_on_nodes("xen", instance_thread)
+#            return install_grub2_on_nodes("xen", instance_thread)
             @output.verbosel(3, "   Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
             return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
                                               @config.exec_specific.environment.initrd,

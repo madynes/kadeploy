@@ -45,7 +45,7 @@ module ParallelRunner
         STDOUT.reopen(@mystdout)
         STDERR.reopen(@mystderr)
         begin
-          exec @cmd
+          exec(@cmd)
         rescue
           exit!(1)
         end

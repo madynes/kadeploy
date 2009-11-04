@@ -42,6 +42,7 @@ module ProcessManagement
           ProcessManagement::kill_tree(pid)
           begin
             Process.kill(9, pid)
+            Process.waitpid(pid, Process::WUNTRACED)
           rescue
           end
         }
@@ -63,6 +64,7 @@ module ProcessManagement
     ProcessManagement::kill_tree(pid)
     begin
       Process.kill(9, pid)
+      Process.waitpid(pid, Process::WUNTRACED)
     rescue
     end
   end
