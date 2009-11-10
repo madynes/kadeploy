@@ -30,7 +30,7 @@ start() {
 	echo ${PID} > ${pidfile}
         RETVAL=$?
         echo
-	sleep 1; ( [ $PID ] && [ -x /proc/${PID} ] ) || (echo ""; echo "Daemon not launched, probably a problem in the configuration" ; rm ${pidfile} ; return 1)
+	sleep 5; ( [ $PID ] && [ -x /proc/${PID} ] ) || (echo ""; echo "Daemon not launched, probably a problem in the configuration" ; rm ${pidfile} ; return 1)
 	[ $RETVAL = 0 ] && touch ${lockfile}
         return $RETVAL
 }

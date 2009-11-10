@@ -1262,7 +1262,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1430,7 +1430,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1559,7 +1559,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1691,7 +1691,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1888,7 +1888,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -2018,7 +2018,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true

@@ -589,7 +589,7 @@ The \texttt{make\_kernel.sh} script prompts the user the following things:
 \begin{itemize}
 \item the size of the uncompressed initrd in KB;
 \item the kernel version;
-\item the path to a kernel config file;
+\item the absolute path to a kernel config file;
 \item the use of automatic configuration for the new fields in kernel configuration.
 \end{itemize}
 
@@ -735,7 +735,7 @@ This command performs the deployment of the environment described by the file \t
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
             --verbose-level 4 \
-            --breakpoint BroadcastEnvChain:manage_user_post_install \
+            --breakpoint BroadcastEnvKastafior:manage_user_post_install \
             -d
 \end{verbatim}
 This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvChain} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.

@@ -10,7 +10,7 @@ DEBOOTSTRAP_EXCLUDE_PACKAGE=vim-common,vim-tiny,traceroute,manpages,man-db,addus
 
 mkdir -p $DIR
 
-$DEBOOTSTRAP --include=$DEBOOTSTRAP_INCLUDE_PACKAGES --exclude=$DEBOOTSTRAP_EXCLUDE_PACKAGE lenny $DIR
+$DEBOOTSTRAP --include=$DEBOOTSTRAP_INCLUDE_PACKAGES --exclude=$DEBOOTSTRAP_EXCLUDE_PACKAGE lenny $DIR http://ftp.fr.debian.org/debian
 
 chroot $DIR apt-get -y --force-yes install ash 2>/dev/null
 chroot $DIR apt-get -y --force-yes clean 2>/dev/null
