@@ -1,0 +1,148 @@
+#!/usr/bin/ruby
+
+# Kadeploy 3.0
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# CECILL License V2 - http://www.cecill.info
+# For details on use and redistribution please refer to License.txt
+
+require 'optparse'
+require 'ostruct'
+require 'tempfile'
+
+def method_missing(method_sym, *args)
+  puts "Wrong method: #{method_sym}!!!"
+  exit(1)
+end
+
+def error_parsing(msg)
+  puts "#{msg}. Use the -h option to get help."
+end
+
+def parse_opts
+  env_name = String.new
+  env_file = String.new
+  env_kind = String.new
+  opts = OptionParser::new do |opts|
+    opts.summary_indent = "  "
+    opts.summary_width = 28
+    opts.banner = "Usage: kaenv2to3 [options]"
+    opts.separator "Contact: kadeploy3-users@lists.grid5000.fr"
+    opts.separator ""
+    opts.separator "General options:"
+    opts.on("-e", "--env-name NAME", "Environment name") { |e|
+      env_name = e
+    }
+    opts.on("-f", "--env-file FILE", "Environment file") { |f|
+      if File.readable?(f) then
+        env_file = f
+      else
+        puts "The file #{f} is not readable"
+        return nil
+      end
+    }    
+    opts.on("-k", "--env-kind KIND", "Environment kind (linux|xen|other)") { |k|
+      if k =~ /\A(linux|xen|other)\Z/ then
+        env_kind = k
+      else
+        error_parsing("Invalid environment kind")
+        return nil
+      end
+    }
+  end
+  begin
+    opts.parse!(ARGV)
+  rescue
+    error_parsing("Parsing error")
+    return nil
+  end
+  if ((env_name == "") && (env_file == "")) || (env_kind == "") then
+    error_parsing("Both environment name (or file) and environment kind must be defined")
+    return nil
+  end
+  return [env_name,env_file,env_kind]
+end
+
+def read_fields(file, fields)
+  IO.readlines(file).each { |line|
+    if not (/^#/ =~ line) then #we ignore commented lines
+      if /(.+)\ = (.+)/ =~ line then
+        content = Regexp.last_match
+        key = content[1]
+        val = content[2]
+        fields[key] = val
+      end
+    end
+  }
+end
+
+def guess_extension(filename)
+  extension = filename.split(".")[filename.split(".").length - 1]
+  if (extension == "gz") then
+    if (filename.split(".")[filename.split(".").length - 2] == "tar") then
+      return "tgz"
+    end
+    if (filename.split(".")[filename.split(".").length - 2] == "dd") then
+      return "ddgz"
+    end
+  end
+  if (extension == "bz2") then
+    if (filename.split(".")[filename.split(".").length - 2] == "tar") then
+      return "tbz2"
+    end
+    if (filename.split(".")[filename.split(".").length - 2] == "dd") then
+      return "ddbz2"
+    end
+  end
+  if (extension == "tgz") || (extension == "tbz2") then
+    return extension
+  end
+  return "cannot_guess_extension"
+end
+
+def dump_new_env(fields, env_kind)
+  puts "name : #{fields["name"]}"
+  puts "version : #{fields["version"]}"
+  puts "description : #{fields["description"]}"
+  puts "author : #{fields["author"]}"
+  puts "tarball : #{fields["filebase"].gsub('file://','')}|#{guess_extension(fields["filebase"])}"
+  if (fields["filesite"] != nil) then
+    puts "postinstall : #{fields["filesite"].gsub('file://','')}|#{guess_extension(fields["filesite"])}|traitement.ash /rambin"
+  end
+  if (env_kind == "linux") || (env_kind == "other") then
+    puts "kernel : #{fields["kernelpath"]}"
+    puts "kernel_params : #{fields["kernelparam"]}"
+    puts "initrd : #{fields["initrdpath"]}"
+  elsif (env_kind == "xen") then
+    kernel_tab = fields["initrdpath"].split(' --- ')
+    tmp = kernel_tab[0].split(' ')
+    hypervisor_kernel = tmp[0]
+    tmp.shift
+    hypervisor_params = tmp.join(' ')
+    puts "kernel : #{kernel_tab[1]}"
+    puts "kernel_params : #{fields["kernelparam"]}"
+    puts "initrd : #{kernel_tab[2]}"
+    puts "hypervisor : #{hypervisor_kernel}"
+    puts "hypervisor_params : #{hypervisor_params}"
+  end
+  puts "fdisktype : #{fields["fdisktype"]}"
+  puts "filesystem : #{fields["filesystem"]}"
+  puts "environment_kind : #{env_kind}"
+  puts "demolishing_env : 0"
+end
+
+tab = parse_opts
+if tab != nil then
+  env_name = tab[0]
+  env_file = tab[1]
+  env_kind = tab[2]
+  temp = Tempfile.new("kaenvironment_clean_output")
+  if (env_name != "") then
+    system("kaenvironments -e #{env_name} 2>/dev/null | grep \"=\" > #{temp.path}")
+  else
+    system("cat #{env_file} | grep \"=\" > #{temp.path}")
+  end
+  fields = Hash.new
+  read_fields(temp.path, fields)
+  dump_new_env(fields, env_kind)
+  temp.close(true)
+end

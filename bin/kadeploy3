@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Kadeploy 3.0
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# CECILL License V2 - http://www.cecill.info
+# For details on use and redistribution please refer to License.txt
+
+if [ -x /etc/kadeploy3/load_kadeploy_env ]
+then
+    KADEPLOY_CONFIG_DIR=/etc/kadeploy3
+    export KADEPLOY_CONFIG_DIR
+elif [ ! -x $KADEPLOY_CONFIG_DIR/load_kadeploy_env ]
+then
+    echo "The Kadeploy environment cannot be loaded, please check your configuration"
+    exit 1
+fi
+
+source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
+ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_client.rb "$@"

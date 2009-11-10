@@ -1,0 +1,6 @@
+#!/bin/bash
+
+KADEPLOY_INSTALL_DIR=/usr/local/kadeploy3
+export KADEPLOY_INSTALL_DIR
+export RUBYLIB=$RUBYLIB:$KADEPLOY_INSTALL_DIR/src/lib:$KADEPLOY_INSTALL_DIR/src/contrib
+

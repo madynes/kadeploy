@@ -1,0 +1,5 @@
+#!/bin/sh
+
+sleep 1
+echo "u" > /proc/sysrq-trigger
+/sbin/kexec -e

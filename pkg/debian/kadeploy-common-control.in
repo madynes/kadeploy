@@ -1,0 +1,8 @@
+Package: kadeploy-common
+Version: MAJOR_VERSION-MINOR_VERSION
+Section: base
+Priority: optional
+Architecture: all
+Depends: libmysql-ruby1.8,ruby1.8
+Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Description: Kadeploy: the cluster deployment tool - common part
