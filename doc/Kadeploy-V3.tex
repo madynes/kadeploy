@@ -1209,7 +1209,8 @@ On a \emph{Linux} environment, after having updated your kernel/initrd, 2 cases 
 \subsubsection{Xen environments}
 On a \emph{Xen} environment, the things are a little bit more complicated. As far as the kernel/initrd/hypervisor are extracted by Kadeploy in a dedicated cache, changing them on the deployed nodes won't have any effect for the next reboot. So you have to use a feature of Kareboot that allows to reboot a node after having changed the PXE profile of the node. For instance:
 \begin{verbatim}
-> kareboot3 -m gdx-25.orsay.grid5000.fr -r set_pxe -w ~/pxe_profile_xen -x "~/custom_kernel,~/custom_initrd,~/custom_hypervisor"
+> kareboot3 -m gdx-25.orsay.grid5000.fr -r set_pxe -w ~/pxe_profile_xen \
+            -x "~/custom_kernel,~/custom_initrd,~/custom_hypervisor"
 \end{verbatim}
 Kadeploy has the same feature, so please refer to the use case about \textit{specific PXE profile} for more information.
 
