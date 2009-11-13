@@ -16,7 +16,7 @@ in Grid5000, allowing the users to deploy their own OS on their reserved nodes.
 
 %package common
 Summary:        Common part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql
+Requires:       ruby, ruby-mysql, ruby-libs
 Group:          System/Cluster
 %description common
 This package provide the common part of the Kadeploy deployment tool.
