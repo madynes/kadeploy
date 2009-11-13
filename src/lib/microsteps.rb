@@ -961,6 +961,7 @@ module MicroStepsLibrary
         Thread.kill(instance_thread)
         @process_container.killall(instance_thread)
         @nodes_ok.free
+        @nodes_ko.free
         instance_node_set.duplicate_and_free(@nodes_ko)
         @nodes_ko.set_error_msg("Timeout in the #{step_name} step")
         return true
