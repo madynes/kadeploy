@@ -209,7 +209,7 @@ module MicroStepsLibrary
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
       po = ParallelOperations::ParallelOps.new(node_set, @config, nil, @output, instance_thread, @process_container)
-      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window))
+      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, @macro_step))
       return (not @nodes_ok.empty?)
     end
 
@@ -961,9 +961,8 @@ module MicroStepsLibrary
         Thread.kill(instance_thread)
         @process_container.killall(instance_thread)
         @nodes_ok.free
-        @nodes_ko.free
-        instance_node_set.duplicate_and_free(@nodes_ko)
-        @nodes_ko.set_error_msg("Timeout in the #{step_name} step")
+        instance_node_set.set_error_msg("Timeout in the #{step_name} step")
+        instance_node_set.add_diff_and_free(@nodes_ko)
         return true
       else
         instance_node_set.free()

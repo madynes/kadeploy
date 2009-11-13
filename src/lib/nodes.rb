@@ -430,6 +430,19 @@ module Nodes
       free
     end
 
+    # Add the diff of a NodeSet and free it
+    #
+    # Arguments
+    # * dest: destination NodeSet
+    # Output
+    # * nothing
+    def add_diff_and_free(dest)
+      @set.each { |node|
+        dest.push(node.clone) if (dest.get_node_by_host(node.hostname) == nil)
+      }
+      free
+    end
+
     # Add a NodeSet to an existing one
     #
     # Arguments

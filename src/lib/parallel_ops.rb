@@ -150,19 +150,19 @@ module ParallelOperations
     def init_nodes_state_before_exec_command
       @nodes.set.each { |node|
         node.last_cmd_exit_status = "256"
-        node.last_cmd_stderr = "The node #{node.hostname} is unreachable"
+        node.last_cmd_stderr = "Unreachable"
       }
     end
 
     # Init a the state of a NodeSet before a reboot command
     #
     # Arguments
-    # * nothing
+    # * macro_step: name if the current macro step
     # Output
     # * nothing
-    def init_nodes_state_before_wait_nodes_after_reboot_command
+    def init_nodes_state_before_wait_nodes_after_reboot_command(macro_step)
       @nodes.set.each { |node|
-        node.last_cmd_stderr = "The node #{node.hostname} is unreachable after the reboot"
+        node.last_cmd_stderr = "Unreachable after the reboot during the #{macro_step} step"
         node.state = "KO"
       }
     end
@@ -381,13 +381,14 @@ module ParallelOperations
     # * ports_up: array of ports that must be up on the rebooted nodes to test
     # * ports_down: array of ports that must be down on the rebooted nodes to test
     # * nodes_check_window: instance of WindowManager
+    # * macro_step: name if the current macro step
     # Output
     # * returns an array that contains two arrays ([0] is the nodes OK and [1] is the nodes KO)    
-    def wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window)
+    def wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, macro_step)
       start = Time.now.tv_sec
       good_nodes = Array.new
       bad_nodes = Array.new
-      init_nodes_state_before_wait_nodes_after_reboot_command
+      init_nodes_state_before_wait_nodes_after_reboot_command(macro_step)
       @nodes.set.each { |node|
         @config.set_node_state(node.hostname, "", "", "reboot_in_progress")
       }
