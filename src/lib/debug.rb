@@ -244,6 +244,7 @@ module Debug
     # * nothing      
     def error(node_set)
       node_set.make_array_of_hostname.each { |n|
+        node_set.get_node_by_host(n).last_cmd_stderr = "#{@config.exec_specific.nodes_state[n][0]["macro-step"]}-#{@config.exec_specific.nodes_state[n][1]["micro-step"]}: #{node_set.get_node_by_host(n).last_cmd_stderr}"
         @nodes[n]["error"] = node_set.get_node_by_host(n).last_cmd_stderr
       }
     end
@@ -329,7 +330,7 @@ module Debug
                                 \"#{node_infos["start"].to_i}\", \
                                 \"#{node_infos["step1_duration"]}\", \"#{node_infos["step2_duration"]}\", \"#{node_infos["step3_duration"]}\", \
                                 \"#{node_infos["env"]}\", \"#{node_infos["anonymous_env"].to_s}\", \"#{node_infos["md5"]}\", \
-                                \"#{node_infos["success"]}\", \"#{node_infos["error"]}\")"
+                                \"#{node_infos["success"]}\", \"#{node_infos["error"].gsub(/"/, "\\\"")}\")"
         res = @db.run_query(query)
       }
     end

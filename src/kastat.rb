@@ -66,13 +66,14 @@ def select_fields(row, config, default_fields)
   fields = Array.new  
   if (not config.exec_specific.fields.empty?) then
     config.exec_specific.fields.each{ |f|
-      fields.push(row[f].gsub("\n", "\\n"))
+      fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
     }
   else
     default_fields.each { |f|
-      fields.push(row[f].gsub("\n", "\\n"))
+      fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
     }
   end
+
   return fields.join(",")
 end
 

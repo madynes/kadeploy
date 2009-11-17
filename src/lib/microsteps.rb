@@ -57,8 +57,8 @@ module MicroStepsLibrary
 
     def failed_microstep(msg)
       @output.verbosel(0, msg)
+      @nodes_ok.set_error_msg(msg)
       @nodes_ok.duplicate_and_free(@nodes_ko)
-      @nodes_ko.set_error_msg(msg)
     end
 
 
@@ -209,7 +209,7 @@ module MicroStepsLibrary
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
       po = ParallelOperations::ParallelOps.new(node_set, @config, nil, @output, instance_thread, @process_container)
-      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, @macro_step))
+      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window))
       return (not @nodes_ok.empty?)
     end
 
