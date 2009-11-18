@@ -57,8 +57,8 @@ module MicroStepsLibrary
 
     def failed_microstep(msg)
       @output.verbosel(0, msg)
+      @nodes_ok.set_error_msg(msg)
       @nodes_ok.duplicate_and_free(@nodes_ko)
-      @nodes_ko.set_error_msg(msg)
     end
 
 
@@ -961,8 +961,8 @@ module MicroStepsLibrary
         Thread.kill(instance_thread)
         @process_container.killall(instance_thread)
         @nodes_ok.free
-        instance_node_set.duplicate_and_free(@nodes_ko)
-        @nodes_ko.set_error_msg("Timeout in the #{step_name} step")
+        instance_node_set.set_error_msg("Timeout in the #{step_name} step")
+        instance_node_set.add_diff_and_free(@nodes_ko)
         return true
       else
         instance_node_set.free()

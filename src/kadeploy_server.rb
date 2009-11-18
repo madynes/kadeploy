@@ -704,11 +704,11 @@ class KadeployServer
     fields = Array.new  
     if (not exec_specific.fields.empty?) then
       exec_specific.fields.each{ |f|
-        fields.push(row[f].gsub("\n", "\\n"))
+        fields.push(row[f].gsub(/n/, "\\n").gsub(/\r/, "\\r"))
       }
     else
       default_fields.each { |f|
-        fields.push(row[f].gsub("\n", "\\n"))
+        fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
       }
     end
     return fields.join(",")
@@ -1460,7 +1460,7 @@ class KadeployServer
                                       WHERE name=\"#{env_name}\" \
                                       AND user=\"#{env_user}\" \
                                       AND version=\"#{version}\""
-        db.run_query(quer y2)
+        db.run_query(query2)
         if (db.get_nb_affected_rows == 0) then
           Debug::distant_client_print("No update has been performed", client)
         end

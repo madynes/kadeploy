@@ -150,19 +150,19 @@ module ParallelOperations
     def init_nodes_state_before_exec_command
       @nodes.set.each { |node|
         node.last_cmd_exit_status = "256"
-        node.last_cmd_stderr = "The node #{node.hostname} is unreachable"
+        node.last_cmd_stderr = "Unreachable"
       }
     end
 
     # Init a the state of a NodeSet before a reboot command
     #
     # Arguments
-    # * nothing
+    # * macro_step: name if the current macro step
     # Output
     # * nothing
     def init_nodes_state_before_wait_nodes_after_reboot_command
       @nodes.set.each { |node|
-        node.last_cmd_stderr = "The node #{node.hostname} is unreachable after the reboot"
+        node.last_cmd_stderr = "Unreachable after the reboot"
         node.state = "KO"
       }
     end
@@ -182,8 +182,8 @@ module ParallelOperations
       tree['hosts'].each_value { |h|
         h['commands'].each_value { |x|
           @nodes.get_node_by_host(h['host_name']).last_cmd_exit_status = x['status']
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
         }
       }
     end
@@ -221,8 +221,8 @@ module ParallelOperations
       tree['hosts'].each_value { |h|
         h['commands'].each_value { |x|
           @nodes.get_node_by_host(h['host_name']).last_cmd_exit_status = x['status']
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
         }
       }
     end

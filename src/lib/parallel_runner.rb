@@ -163,6 +163,8 @@ module ParallelRunner
       good_nodes = Array.new
       bad_nodes = Array.new
       @nodes.each_key { |node|
+        node.last_cmd_stdout = node.last_cmd_stdout.chomp.gsub(/\n/,"\\n")
+        node.last_cmd_stderr = node.last_cmd_stderr.chomp.gsub(/\n/,"\\n")
         if (node.last_cmd_exit_status == "0") then
           good_nodes.push(node)
         else

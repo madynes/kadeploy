@@ -385,8 +385,13 @@ module Managers
                                0.5, /./)
             @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
-              @output.verbosel(0, "Unable to do the local copy")
+              @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
               return false
+            else
+              if not system("chmod 640 #{local_file}") then
+                @output.verbosel(0, "Unable to change the rights on #{local_file}")
+                return false
+              end
             end
           else
             if async then
@@ -471,8 +476,13 @@ module Managers
                              0.5, /./)
           @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
           if not system("cp #{client_file} #{local_file}") then
-            @output.verbosel(0, "Unable to do the local copy")
+            @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
             return false
+          else
+            if not system("chmod 640 #{local_file}") then
+              @output.verbosel(0, "Unable to change the rights on #{local_file}")
+              return false
+            end
           end
         else
           if async then
@@ -577,7 +587,7 @@ module Managers
       end
       @nodes_ok = Nodes::NodeSet.new
       @nodes_ko = Nodes::NodeSet.new
-      @nodeset = @config.exec_specific.node_set
+      @nodeset = @config.exec_specific.node_list
       @queue_manager = QueueManager.new(@config, @nodes_ok, @nodes_ko)
       @reboot_window = reboot_window
       @nodes_check_window = nodes_check_window
