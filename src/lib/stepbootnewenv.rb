@@ -100,6 +100,9 @@ module BootNewEnvironment
     # * nothing
     def kill
       @instances.each { |tid|
+        #first, we clean all the pending processes
+        @step.process_container.killall(tid)
+        #then, we kill the thread
         Thread.kill(tid)
       }
     end
@@ -142,10 +145,10 @@ module BootNewEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
-            result = result && @step.reboot("kexec")
+            result = result && @step.reboot("kexec", false, false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
             #End of micro steps
           }
@@ -191,7 +194,7 @@ module BootNewEnvironment
           instance_thread = Thread.new {
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvPivotRoot step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvPivotRoot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
             @output.verbosel(0, "BootNewEnvPivotRoot is not yet implemented")
@@ -240,7 +243,7 @@ module BootNewEnvironment
             use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
             result = result && @step.umount_deploy_part
@@ -291,10 +294,10 @@ module BootNewEnvironment
             use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s}")
+            @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
-            result = result && @step.reboot("hard")
+            result = result && @step.reboot("hard", use_rsh_for_reboot, false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
             #End of micro steps
           }

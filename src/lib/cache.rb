@@ -56,10 +56,33 @@ module Cache
         end
       }
       if (lru != "") then
-        File.delete(lru)
+        begin
+          File.delete(lru)
+        rescue
+          puts "Cannot delete the file #{dir}/#{f}: #{$!}"
+        end
       else
         no_change = true
       end
     end
+  end
+  
+  # Remove some files in a cache
+  #
+  # Arguments
+  # * dir: cache directory
+  # * pattern: pattern of the files that must be deleted
+  # Output
+  # * nothing
+  def Cache::remove_files(dir, pattern)
+    Dir.foreach(dir) { |f|
+      if ((f =~ pattern) == 0) && (f != "..") && (f != ".") then
+        begin
+          File.delete("#{dir}/#{f}")
+        rescue
+          puts "Cannot delete the file #{dir}/#{f}: #{$!}"
+        end
+      end
+    }
   end
 end

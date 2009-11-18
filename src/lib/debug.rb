@@ -114,10 +114,38 @@ module Debug
               @client.print("#{node.hostname} -- STDERR: #{line}")
             }
             node.last_cmd_exit_status.split("\n").each { |line|
-            @client.print("#{node.hostname} -- EXIT STATUS: #{line}")
+              @client.print("#{node.hostname} -- EXIT STATUS: #{line}")
             }
           }
         end
+        @client.print("-------------------------")
+      end
+    end
+
+    # Print the debug output of a command
+    #
+    # Arguments
+    # * cmd: command
+    # * stdout: standard output
+    # * stderr: standard error output
+    # * exit_status: exit status
+    # Output
+    # * nothing
+    def debug_command(cmd, stdout, stderr, exit_status)
+      if @debug then
+        @client.print("-------------------------")
+        @client.print("CMD: #{cmd}")
+        if stdout != nil then
+          stdout.split("\n").each { |line|
+            @client.print("-- STDOUT: #{line}")
+          }
+        end
+        if stderr != nil then
+          stderr.split("\n").each { |line|
+            @client.print("-- STDERR: #{line}")
+          }
+        end
+        @client.print("-- EXIT STATUS: #{exit_status}")
         @client.print("-------------------------")
       end
     end
@@ -216,6 +244,7 @@ module Debug
     # * nothing      
     def error(node_set)
       node_set.make_array_of_hostname.each { |n|
+        node_set.get_node_by_host(n).last_cmd_stderr = "#{@config.exec_specific.nodes_state[n][0]["macro-step"]}-#{@config.exec_specific.nodes_state[n][1]["micro-step"]}: #{node_set.get_node_by_host(n).last_cmd_stderr}"
         @nodes[n]["error"] = node_set.get_node_by_host(n).last_cmd_stderr
       }
     end
@@ -264,7 +293,7 @@ module Debug
       end
       sl = Syslog.open("Kadeploy-log")
       @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"]
+        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
         str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
         str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
         str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
@@ -301,7 +330,7 @@ module Debug
                                 \"#{node_infos["start"].to_i}\", \
                                 \"#{node_infos["step1_duration"]}\", \"#{node_infos["step2_duration"]}\", \"#{node_infos["step3_duration"]}\", \
                                 \"#{node_infos["env"]}\", \"#{node_infos["anonymous_env"].to_s}\", \"#{node_infos["md5"]}\", \
-                                \"#{node_infos["success"]}\", \"#{node_infos["error"]}\")"
+                                \"#{node_infos["success"]}\", \"#{node_infos["error"].gsub(/"/, "\\\"")}\")"
         res = @db.run_query(query)
       }
     end
@@ -316,7 +345,7 @@ module Debug
       fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
       fd.flock(File::LOCK_EX)
       @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"]
+        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
         str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
         str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
         str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","

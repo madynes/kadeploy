@@ -12,6 +12,8 @@ require 'checkrights'
 
 #Ruby libs
 require 'drb'
+require 'digest/sha1'
+require 'md5'
 
 class KarebootClient
   @kadeploy_server = nil
@@ -38,6 +40,81 @@ class KarebootClient
   # * nothing
   def exit
     DRb.stop_service()
+  end
+
+  # Get a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # * prefix: prefix to add to the file_name
+  # Output
+  # * return true if the file has been successfully transfered, false otherwise
+  def get_file(file_name, prefix)
+    if (File.exist?(file_name)) then
+      if (File.readable?(file_name)) then
+        port = @kadeploy_server.create_a_socket_server(prefix + File.basename(file_name))
+        if port != -1 then
+          sock = TCPSocket.new(@kadeploy_server.dest_host, port)
+          file = File.open(file_name)
+          tcp_buffer_size = @kadeploy_server.tcp_buffer_size
+          while (buf = file.read(tcp_buffer_size))
+            sock.send(buf, 0)
+          end
+          sock.close
+          return true
+        else
+          return false
+        end
+      else
+        puts "The file #{file_name} cannot be read"
+        return false
+      end
+    else
+      puts "The file #{file_name} cannot be found"
+      return false
+    end
+  end
+  
+  # Get the mtime of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the mtime of the file, or 0 if it cannot be read.
+  def get_file_mtime(file_name)
+    if File.readable?(file_name) then
+      return File.mtime(file_name).to_i
+    else
+      return 0
+    end
+  end
+
+  # Get the MD5 of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the MD5 of the file, or 0 if it cannot be read.
+  def get_file_md5(file_name)
+    if File.readable?(file_name) then
+      return MD5::get_md5_sum(file_name)
+    else
+      return 0
+    end
+  end
+
+  # Get the size of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the size of the file, or 0 if it cannot be read.
+  def get_file_size(file_name)
+    if File.readable?(file_name) then
+      return File.stat(file_name).size
+    else
+      return 0
+    end
   end
 
   # Print the results of the deployment (RPC)
@@ -101,12 +178,16 @@ db.connect(config.common.deploy_db_host,
            config.common.deploy_db_passwd,
            config.common.deploy_db_name)
 if config.check_config("kareboot", db) then
+  if config.exec_specific.get_version then
+    puts "Kareboot version: #{kadeploy_server.get_version()}"
+    _exit(0, db)
+  end
   #Rights check
   allowed_to_deploy = true
   part = String.new
   #The rights must be checked for each cluster if the node_list contains nodes from several clusters
   config.exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
-    if ((config.exec_specific.reboot_kind != "env_recorded") || (config.exec_specific.deploy_part == "")) then
+    if (config.exec_specific.deploy_part == "") then
       part = kadeploy_server.get_default_deploy_part(cluster)
     else
       if (config.exec_specific.block_device == "") then
@@ -126,12 +207,20 @@ if config.check_config("kareboot", db) then
     #Launch the listener on the client
     kareboot_client = KarebootClient.new(kadeploy_server)
     DRb.start_service(nil, kareboot_client)
-    if /druby:\/\/([\w+.+]+):(\w+)/ =~ DRb.uri
+    if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
       content = Regexp.last_match
       client_host = content[1]
       client_port= content[2]
     else
       puts "The URI #{DRb.uri} is not correct"
+      _exit(1, db)
+    end
+    
+    reboot_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + config.exec_specific.node_list.to_s)
+    
+    Signal.trap("INT") do
+      puts "SIGINT trapped, let's clean everything ..."
+      kadeploy_server.kill_reboot(reboot_id)
       _exit(1, db)
     end
 
@@ -146,7 +235,7 @@ if config.check_config("kareboot", db) then
         pxe_profile_msg.concat(l)
       }
     end
-    res = kadeploy_server.launch_reboot(config.exec_specific, client_host, client_port, verbose_level, pxe_profile_msg)
+    res = kadeploy_server.launch_reboot(config.exec_specific, client_host, client_port, verbose_level, pxe_profile_msg, reboot_id)
     _exit(res, db)
   else
     puts "You do not have the deployment rights on all the nodes"

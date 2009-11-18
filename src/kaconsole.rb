@@ -39,6 +39,10 @@ end
 config.common = common_config
 
 if (config.check_config("kaconsole") == true) then
+  if config.exec_specific.get_version then
+    puts "Kaconsole version: #{kadeploy_server.get_version()}"
+    _exit(0, nil)
+  end
   db = Database::DbFactory.create(config.common.db_kind)
   db.connect(config.common.deploy_db_host,
              config.common.deploy_db_login,

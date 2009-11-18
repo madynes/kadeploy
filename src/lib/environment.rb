@@ -3,9 +3,13 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+#Ruby libs
+require 'tempfile'
+
 #Kadeploy libs
 require 'db'
 require 'md5'
+require 'http'
 
 module EnvironmentManagement
   class Environment
@@ -37,143 +41,191 @@ module EnvironmentManagement
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
     def load_from_file(file, almighty_env_users)
+      temp_env_file = Tempfile.new("env_file")
+      if (file =~ /^http[s]?:\/\//) then
+        http_response, etag = HTTP::fetch_file(file, temp_env_file.path, nil)
+        if http_response != "200" then
+          puts "The file #{file} cannot be fetched: http_response #{http_response}"
+          return false
+        else
+          file = temp_env_file.path
+        end
+      end
       if not File.exist?(file)
-        put "The file \"#{file}\" does not exist"
+        puts "The file \"#{file}\" does not exist"
         return false
-      else
-        @preinstall = nil
-        @postinstall = nil
-        @demolishing_env = "0"
-        @kernel_params = nil
-        @visibility = "shared"
-        @user = `id -nu`.chomp
-        IO::read(file).split("\n").each { |line|
-          if /\A(\w+)\ :\ (.+)\Z/ =~ line then
-            content = Regexp.last_match
-            attr = content[1]
-            val = content[2]
-            case attr
-            when "name"
-              @name = val
-            when "version"
-              if val =~ /\A\d+\Z/ then
-                @version = val
+      end
+      @preinstall = nil
+      @postinstall = nil
+      @demolishing_env = "0"
+      @author = "no author"
+      @description = "no description"
+      @kernel = nil
+      @kernel_params = nil
+      @initrd = nil
+      @hypervisor = nil
+      @hypervisor_params = nil
+      @fdisk_type = nil
+      @filesystem = nil
+      @visibility = "shared"
+      @user = `id -nu`.chomp
+      @version = 0
+      @id = -1
+      IO::read(file).split("\n").each { |line|
+        if /\A(\w+)\ :\ (.+)\Z/ =~ line then
+          content = Regexp.last_match
+          attr = content[1]
+          val = content[2]
+          case attr
+          when "name"
+            @name = val
+          when "version"
+            if val =~ /\A\d+\Z/ then
+              @version = val
+            else
+              puts "The environment version must be a number"
+              return false
+            end
+          when "description"
+            @description = val
+          when "author"
+            @author = val
+          when "tarball"
+            #filename|tgz
+            if val =~ /\A.+\|(tgz|tbz2|ddgz|ddbz2)\Z/ then
+              @tarball = Hash.new
+              tmp = val.split("|")
+              @tarball["file"] = tmp[0]
+              @tarball["kind"] = tmp[1]
+              if @tarball["file"] =~ /^http[s]?:\/\// then
+                puts "#{@tarball["file"]} is an HTTP file, let's bypass the md5sum"
+                @tarball["md5"] = ""
               else
-                puts "The environment version must be a number"
-                return false
-              end
-            when "description"
-              @description = val
-            when "author"
-              @author = val
-            when "tarball"
-              #filename|tgz
-              if val =~ /\A.+\|(tgz|tbz2|ddgz|ddbz2)\Z/ then
-                @tarball = Hash.new
-                tmp = val.split("|")
-                @tarball["file"] = tmp[0]
                 if not File.readable?(@tarball["file"]) then
                   puts "The tarball file #{@tarball["file"]} cannot be read"
                   return false
                 end
-                @tarball["kind"] = tmp[1]
                 puts "Computing the md5sum for #{@tarball["file"]}"
                 @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
-              else
-                puts "The environment tarball must be described like filename|kind|md5sum where kind is tgz, tbz2, ddgz, or ddbz2"
-                return false
               end
-            when "preinstall"
-              if val =~ /\A.+\|(tgz|tbz2)\|.+\Z/ then
-                entry = val.split("|")
-                @preinstall = Hash.new
-                @preinstall["file"] = entry[0]
-                @preinstall["kind"] = entry[1]
-                @preinstall["script"] = entry[2]
+            else
+              puts "The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2"
+              return false
+            end
+          when "preinstall"
+            if val =~ /\A.+\|(tgz|tbz2)\|.+\Z/ then
+              entry = val.split("|")
+              @preinstall = Hash.new
+              @preinstall["file"] = entry[0]
+              @preinstall["kind"] = entry[1]
+              @preinstall["script"] = entry[2]
+              if @preinstall["file"] =~ /^http[s]?:\/\// then
+                puts "#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum"
+                @preinstall["md5"] = ""
+              else
                 if not File.readable?(@preinstall["file"]) then
                   puts "The pre-install file #{@preinstall["file"]} cannot be read"
                   return false
                 end
                 puts "Computing the md5sum for #{@preinstall["file"]}"
                 @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
-              else
-                puts "The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2"
-                return false
               end
-            when "postinstall"
-              #filename|tgz|script,filename|tgz|script...
-              if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-                @postinstall = Array.new
-                val.split(",").each { |tmp|
-                  tmp2 = tmp.split("|")
-                  entry = Hash.new
-                  entry["file"] = tmp2[0]
+            else
+              puts "The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2"
+              return false
+            end
+          when "postinstall"
+            #filename|tgz|script,filename|tgz|script...
+            if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
+              @postinstall = Array.new
+              val.split(",").each { |tmp|
+                tmp2 = tmp.split("|")
+                entry = Hash.new
+                entry["file"] = tmp2[0]
+                entry["kind"] = tmp2[1]
+                entry["script"] = tmp2[2]
+                if entry["file"] =~ /^http[s]?:\/\// then
+                  puts "#{entry["file"]} is an HTTP file, let's bypass the md5sum"
+                  entry["md5"] = ""
+                else
                   if not File.readable?(entry["file"]) then
                     puts "The post-install file #{entry["file"]} cannot be read"
                     return false
                   end
-                  entry["kind"] = tmp2[1]
                   puts "Computing the md5sum for #{entry["file"]}"
                   entry["md5"] = MD5::get_md5_sum(entry["file"])
-                  entry["script"] = tmp2[2]
-                  @postinstall.push(entry)
-                }
-              else
-                puts "The environment postinstall must be described like filename1|kind1|script1,filename2|kind2|script2,...  where kind is tgz or tbz2"
-                return false
-              end
-            when "kernel"
-              @kernel = val
-            when "kernel_params"
-              @kernel_params = val
-            when "initrd"
-              @initrd = val
-            when "hypervisor"
-              @hypervisor = val
-            when "hypervisor_params"
-              @hypervisor_params = val
-            when "fdisktype"
-              @fdisk_type = val
-            when "filesystem"
-              @filesystem = val
-            when "environment_kind"
-              if val =~ /\A(linux|xen|other)\Z/ then
-                @environment_kind = val
-              else
-                puts "The environment kind must be linux, xen or other"
-                return false
-              end
-            when "visibility"
-              if val =~ /\A(private|shared|public)\Z/ then
-                @visibility = val
-                if (@visibility == "public") && (not almighty_env_users.include?(@user)) then
-                  puts "Only the environment administrators can set the \"public\" tag"
-                  return false
                 end
-              else
-                puts "The environment visibility must be private, shared or public"
-                return false
-              end
-            when "demolishing_env"
-              if val =~ /\A\d+\Z/ then
-                @demolishing_env = val
-              else
-                puts "The environment demolishing_env must be a number"
+                @postinstall.push(entry)
+              }
+            else
+              puts "The environment postinstall must be described like filename1|kind1|script1,filename2|kind2|script2,...  where kind is tgz or tbz2"
+              return false
+            end
+          when "kernel"
+            @kernel = val
+          when "kernel_params"
+            @kernel_params = val
+          when "initrd"
+            @initrd = val
+          when "hypervisor"
+            @hypervisor = val
+          when "hypervisor_params"
+            @hypervisor_params = val
+          when "fdisktype"
+            @fdisk_type = val
+          when "filesystem"
+            @filesystem = val
+          when "environment_kind"
+            if val =~ /\A(linux|xen|other)\Z/ then
+              @environment_kind = val
+            else
+              puts "The environment kind must be linux, xen or other"
+              return false
+            end
+          when "visibility"
+            if val =~ /\A(private|shared|public)\Z/ then
+              @visibility = val
+              if (@visibility == "public") && (not almighty_env_users.include?(@user)) then
+                puts "Only the environment administrators can set the \"public\" tag"
                 return false
               end
             else
-              puts "#{attr} is an invalid attribute"
+              puts "The environment visibility must be private, shared or public"
               return false
             end
+          when "demolishing_env"
+            if val =~ /\A\d+\Z/ then
+              @demolishing_env = val
+            else
+              puts "The environment demolishing_env must be a number"
+              return false
+            end
+          else
+            puts "#{attr} is an invalid attribute"
+            return false
           end
-        }
+        end
+      }
+      case @environment_kind
+      when "linux"
+        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
+          puts "The name, tarball, kernel, fdisktype, filesystem, and environment_kind fields are mandatory"
+          return false
+        end
+      when "xen"
+        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) || (@hypervisor == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
+          puts "The name, tarball, kernel, hypervisor, fdisktype, filesystem, and environment_kind fields are mandatory"
+          return false
+        end
+      when "other"
+        if ((@name == nil) || (@tarball == nil) ||(@fdisk_type == nil)) then
+          puts "The name, tarball, fdisktype, and environment_kind fields are mandatory"
+          return false
+        end        
+      when nil
+        puts "The environment_kind field is mandatory"
+        return false       
       end
-      if ((@name == nil) || (@version == nil) || (@tarball == nil) || (@kernel == nil) ||
-          (@initrd == nil) || (@fdisk_type == nil) || (@filesystem == nil) || (@environment_kind == nil)) then
-        puts "The name, version, tarball, kernel, initrd, fdisktype, filesystem and environment_kind fileds are mandatory"
-        return false
-      end
-      
       return true
     end
 
@@ -294,13 +346,21 @@ module EnvironmentManagement
       else
         @postinstall = nil
       end
-      @kernel = hash["kernel"]
+      if (hash["kernel"] != "") then
+        @kernel = hash["kernel"]
+      else
+        @kernel = nil
+      end
       if (hash["kernel_params"] != "") then
         @kernel_params = hash["kernel_params"]
       else
         @kernel_params = nil
       end
-      @initrd = hash["initrd"]
+      if (hash["initrd"] != "") then
+        @initrd = hash["initrd"]
+      else
+        @initrd = nil
+      end
       if (hash["hypervisor"] != "") then
         @hypervisor = hash["hypervisor"] 
       else
@@ -312,7 +372,11 @@ module EnvironmentManagement
         @hypervisor_params = nil 
       end
       @fdisk_type = hash["fdisk_type"]
-      @filesystem = hash["filesystem"]
+      if (hash["filesystem"] != "") then
+        @filesystem = hash["filesystem"]
+      else
+        @filesystem = nil
+      end
       @user = hash["user"]
       @environment_kind = hash["environment_kind"]
       @visibility = hash["visibility"]
@@ -378,13 +442,13 @@ module EnvironmentManagement
       puts "tarball : #{flatten_tarball()}"
       puts "preinstall : #{flatten_pre_install()}" if (@preinstall != nil)
       puts "postinstall : #{flatten_post_install()}" if (@postinstall != nil)
-      puts "kernel : #{@kernel}"
+      puts "kernel : #{@kernel}" if (@kernel != nil)
       puts "kernel_params : #{@kernel_params}" if (@kernel_params != nil)
-      puts "initrd : #{@initrd}"
+      puts "initrd : #{@initrd}" if (@initrd != nil)
       puts "hypervisor : #{@hypervisor}" if (@hypervisor != nil)
       puts "hypervisor_params : #{@hypervisor_params}" if (@hypervisor_params != nil)
       puts "fdisktype : #{@fdisk_type}"
-      puts "filesystem : #{@filesystem}"
+      puts "filesystem : #{@filesystem}" if (@filesystem != nil)
       puts "environment_kind : #{@environment_kind}"
       puts "visibility : #{@visibility}"
       puts "demolishing_env : #{@demolishing_env}"
@@ -464,6 +528,38 @@ module EnvironmentManagement
         }
       end
       return out.join(",")
+    end
+
+    # Set the md5 value of a file in an environment
+    # Arguments
+    # * kind: kind of file (tarball, preinstall or postinstall)
+    # * file: filename
+    # * hash: hash value
+    # * dbh: database handler
+    # Output
+    # * return true
+    def set_md5(kind, file, hash, dbh)
+      query = String.new
+      case kind
+      when "tarball"
+        tarball = "#{@tarball["file"]}|#{@tarball["kind"]}|#{hash}"
+        query = "UPDATE environments SET tarball=\"#{tarball}\" WHERE id=\"#{@id}\""
+      when "presinstall"
+        preinstall = "#{@preinstall["file"]}|#{@preinstall["kind"]}|#{hash}"
+        query = "UPDATE environments SET presinstall=\"#{preinstall}\" WHERE id=\"#{@id}\""
+      when "postinstall"
+        postinstall_array = Array.new
+        @postinstall.each { |p|
+          if (file == p["file"]) then
+            postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{hash}|#{p["script"]}")
+          else
+            postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{p["md5"]}|#{p["script"]}")
+          end
+        }
+        query = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" WHERE id=\"#{@id}\""
+      end
+      dbh.run_query(query)
+      return true
     end
   end
 end

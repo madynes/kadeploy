@@ -9,9 +9,11 @@ CONF=$(KADEPLOY_ROOT)/conf
 ADDONS=$(KADEPLOY_ROOT)/addons
 TEST=$(KADEPLOY_ROOT)/test
 PKG=$(KADEPLOY_ROOT)/pkg
+MAN=$(KADEPLOY_ROOT)/man
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
 DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-$(MAJOR_VERSION)
+
 
 api: cleanapi
 	@echo "Generating API"
@@ -33,12 +35,12 @@ install_conf_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DESTDIR)/etc/kadeploy3
 
 install_conf_server:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/conf $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/clusters $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/specific_conf* $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/nodes $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/cmd $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 600 $(CONF)/partition_file_* $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/conf $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/clusters $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/specific_conf* $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/nodes $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/partition_file_* $(DESTDIR)/etc/kadeploy3
 
 install_conf_common:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
@@ -54,6 +56,7 @@ install_kastafior:
 
 install_test:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TEST)/blackbox_tests.rb $(DESTDIR)/usr/local/kadeploy3/test
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(TEST)/automata.txt $(DESTDIR)/usr/local/kadeploy3/test
 
 install_rc_script:
 ifeq ($(DISTRIB),debian)
@@ -67,9 +70,16 @@ install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy $(DESTDIR)/etc/kadeploy3/keys
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DESTDIR)/etc/kadeploy3/keys
 
+install_version:
+	@echo "$(MAJOR_VERSION)-$(MINOR_VERSION)" > $(DESTDIR)/etc/kadeploy3/version
+	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DESTDIR)/etc/kadeploy3/version
+
+install_man:
+	@(cd $(MAN); sh generate.sh $(DESTDIR)/usr/local/man)
+
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
-
+	@mkdir -p $(DESTDIR)/
 tree_server:
 	@mkdir -p $(DESTDIR)/usr/sbin
 	@mkdir -p $(DESTDIR)/etc/init.d
@@ -85,11 +95,11 @@ tree_common:
 	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 
-install_common: tree_common install_conf_common install_src install_test install_db
+install_common: tree_common install_conf_common install_src install_test install_db install_man
 
 install_client: tree_client install_conf_client install_bin
 
-install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior
+install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version
 
 install_all: install_common install_client install_server
 

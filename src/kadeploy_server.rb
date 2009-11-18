@@ -15,6 +15,7 @@ require 'process_management'
 require 'drb'
 require 'socket'
 require 'yaml'
+require 'digest/sha1'
 
 class KadeployServer
   @config = nil
@@ -23,7 +24,6 @@ class KadeployServer
   attr_reader :tcp_buffer_size
   attr_reader :dest_host
   attr_reader :dest_port
-  @db = nil
   @reboot_window = nil
   @nodes_check_window = nil
   @syslog_lock = nil
@@ -37,67 +37,84 @@ class KadeployServer
   # * config: instance of Config
   # * reboot_window: instance of WindowManager to manage the reboot window
   # * nodes_check_window: instance of WindowManager to manage the check of the nodes
-  # * db: database handler
   # Output
   # * raises an exception if the file server can not open a socket
-  def initialize(config, reboot_window, nodes_check_window, db)
+  def initialize(config, reboot_window, nodes_check_window)
     @config = config
     @dest_host = @config.common.kadeploy_server
     @tcp_buffer_size = @config.common.kadeploy_tcp_buffer_size
     @reboot_window = reboot_window
     @nodes_check_window = nodes_check_window
-    puts "Launching the Kadeploy file server"
     @deployments_table_lock = Mutex.new
     @syslog_lock = Mutex.new
-    @db = db
     @workflow_info_hash = Hash.new
     @workflow_info_hash_lock = Mutex.new
-    @workflow_info_hash_index = 0
+    @reboot_info_hash = Hash.new
+    @reboot_info_hash_lock = Mutex.new
+  end
+
+  # Give the current version of Kadeploy (RPC)
+  #
+  # Arguments
+  # * nothing
+  # Output
+  # * nothing
+  def get_version
+    return @config.common.version
   end
 
   # Record a Managers::WorkflowManager pointer
   #
   # Arguments
   # * workflow_ptr: reference toward a Managers::WorkflowManager
+  # * workflow_id: workflow_id
   # Output
-  # * return an id that allows to find the right Managers::WorkflowManager reference
-  def add_workflow_info(workflow_ptr)
-    @workflow_info_hash_lock.lock
-    id = @workflow_info_hash_index
-    @workflow_info_hash[id] = workflow_ptr
-    @workflow_info_hash_index += 1
-    @workflow_info_hash_lock.unlock
-    return id
+  # * nothing
+  def add_workflow_info(workflow_ptr, workflow_id)
+    @workflow_info_hash[workflow_id] = workflow_ptr
   end
 
   # Delete the information of a workflow
   #
   # Arguments
-  # * id: workflow id
+  # * workflow_id: workflow id
   # Output
   # * nothing
-  def delete_workflow_info(id)
-    @workflow_info_hash_lock.lock
-    @workflow_info_hash.delete(id)
-    @workflow_info_hash_lock.unlock
+  def delete_workflow_info(workflow_id)
+    @workflow_info_hash.delete(workflow_id)
+  end
+
+  def add_reboot_info(tid, reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      if not @reboot_info_hash.has_key?(reboot_id) then
+        @reboot_info_hash[reboot_id] = Array.new
+      end
+      @reboot_info_hash[reboot_id].push(tid)
+    }
+  end
+
+  def delete_reboot_info(reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      @reboot_info_hash[reboot_id] = nil
+      @reboot_info_hash.delete(reboot_id)
+    }
   end
 
   # Get a YAML output of the workflows (RPC)
   #
   # Arguments
-  # * wid: workflow id
+  # * workflow_id (opt): workflow id
   # Output
   # * return a string containing the YAML output
-  def get_workflow_state(wid = "")
+  def get_workflow_state(workflow_id = "")
     str = String.new
-    id = wid.to_i if (wid != "")
     @workflow_info_hash_lock.lock
-    if (@workflow_info_hash.has_key?(id)) then
+    if (@workflow_info_hash.has_key?(workflow_id)) then
       hash = Hash.new
-      hash[id] = @workflow_info_hash[id].get_state
+      hash[workflow_id] = @workflow_info_hash[workflow_id].get_state
       str = hash.to_yaml
       hash = nil
-    elsif (wid == "") then
+    elsif (workflow_id == "") then
       hash = Hash.new
       @workflow_info_hash.each_pair { |key,workflow_info_hash|
         hash[key] = workflow_info_hash.get_state
@@ -144,16 +161,30 @@ class KadeployServer
   # Kill a workflow (RPC)
   #
   # Arguments
-  # * id: id of the workflow
+  # * workflow_id: id of the workflow
   # Output
   # * nothing  
-  def kill(id)
+  def kill_workflow(workflow_id)
     # id == -1 means that the workflow has not been launched yet
-    if (id != -1) then
-      workflow = @workflow_info_hash[id]
-      workflow.kill()
-      delete_workflow_info(id)
-    end
+    @workflow_info_hash_lock.synchronize {
+      if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
+        workflow = @workflow_info_hash[workflow_id]
+        workflow.kill()
+        delete_workflow_info(workflow_id)
+      end
+    }
+  end
+
+  def kill_reboot(reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      if @reboot_info_hash.has_key?(reboot_id) then
+        @reboot_info_hash[reboot_id].each { |tid|
+          Thread.kill(tid)
+        }
+        @reboot_info_hash[reboot_id] = nil
+        @reboot_info_hash.delete(reboot_id)
+      end
+    }
   end
 
   # Get the common configuration (RPC)
@@ -164,6 +195,10 @@ class KadeployServer
   # * return a CommonConfig instance
   def get_common_config
     return @config.common
+  end
+
+  def get_cluster_config(cluster)
+    return @config.cluster_specific[cluster]
   end
 
   # Get the default deployment partition (RPC)
@@ -204,9 +239,17 @@ class KadeployServer
   # * port: port on which the client listen to Drb
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * nothing
+  # * return false if cannot connect to DB, true otherwise
   def launch_workflow(host, port, exec_specific)
-    puts "Let's launch an instance of Kadeploy"
+    db = Database::DbFactory.create(@config.common.db_kind)
+    if not db.connect(@config.common.deploy_db_host,
+                      @config.common.deploy_db_login,
+                      @config.common.deploy_db_passwd,
+                      @config.common.deploy_db_name) then
+      puts "Kadeploy server cannot connect to DB"
+      return false
+    end
+
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
     client = DRbObject.new(nil, uri)
@@ -216,7 +259,7 @@ class KadeployServer
     config.common = @config.common
     config.exec_specific = exec_specific
     config.cluster_specific = Hash.new
-
+    
     #Overide the configuration if the steps are specified in the command line
     if (not exec_specific.steps.empty?) then
       exec_specific.node_list.group_by_cluster.each_key { |cluster|
@@ -235,11 +278,16 @@ class KadeployServer
         config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
       }
     else
-      config.cluster_specific = @config.cluster_specific
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
+      }
     end
-
-    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock)
-    workflow_id = add_workflow_info(workflow)
+    @workflow_info_hash_lock.lock
+    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
+    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
+    add_workflow_info(workflow, workflow_id)
+    @workflow_info_hash_lock.unlock
     client.set_workflow_id(workflow_id)
     client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
     finished = false
@@ -256,19 +304,26 @@ class KadeployServer
         sleep(1)
       end
     }
-    if (workflow.prepare() && workflow.manage_files()) then
+    if (workflow.prepare() && workflow.manage_files(false)) then
       workflow.run_sync()
+    else
+      workflow.output.verbosel(0, "Cannot run the deployment")
     end
     finished = true
     #let's free memory at the end of the workflow
+    db.disconnect
     tid = nil
+    @workflow_info_hash_lock.lock
     delete_workflow_info(workflow_id)
+    @workflow_info_hash_lock.unlock
     workflow.finalize
     workflow = nil
     exec_specific = nil
     client = nil
+    config = nil
     DRb.stop_service()
     GC.start
+    return true
   end
 
 
@@ -277,9 +332,18 @@ class KadeployServer
   # Arguments
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return a workflow id
+  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed, 3: server cannot connect to DB)
   def launch_workflow_async(exec_specific)
-    puts "Let's launch an instance of Kadeploy"
+    db = Database::DbFactory.create(@config.common.db_kind)
+    if not db.connect(@config.common.deploy_db_host,
+                      @config.common.deploy_db_login,
+                      @config.common.deploy_db_passwd,
+                      @config.common.deploy_db_name) then
+      puts "Kadeploy server cannot connect to DB"
+      return nil, 3
+    end
+
+    puts "Let's launch an instance of Kadeploy (async)"
 
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new("empty")
@@ -305,38 +369,64 @@ class KadeployServer
         config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
       }
     else
-      config.cluster_specific = @config.cluster_specific
+      exec_specific.node_list.group_by_cluster.each_key { |cluster|
+        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
+        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
+      }
     end
-
-    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, @db, @deployments_table_lock, @syslog_lock)
-    workflow_id = add_workflow_info(workflow)
-    if (workflow.prepare()) then
-      workflow.run_async()
+    @workflow_info_hash_lock.lock
+    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_list.to_s)
+    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
+    add_workflow_info(workflow, workflow_id)
+    @workflow_info_hash_lock.unlock
+    if workflow.prepare() then
+      if workflow.manage_files(true) then
+        workflow.run_async()
+        return workflow_id, 0
+      else
+        free(workflow_id)
+        return nil, 2 # some files cannot be grabbed
+      end
+    else
+      free(workflow_id)
+      return nil, 1 # all the nodes are involved in another deployment
     end
-
-    return workflow_id
   end
 
   # Test if the workflow has reached the end (RPC: only for async execution)
   #
   # Arguments
-  # * id: worklfow id
+  # * workflow_id: worklfow id
   # Output
-  # * return true if the workflow has reached the end, false otherwise
-  def ended?(id)
-    workflow = @workflow_info_hash[id]
-    return workflow.ended?
+  # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
+  def ended?(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.ended?
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
   end
 
   # Get the results of a workflow (RPC: only for async execution)
   #
   # Arguments
-  # * id: worklfow id
+  # * workflow_id: worklfow id
   # Output
-  # * return a hastable containing the state of all the nodes involved in the deployment
-  def get_results(id)
-    workflow = @workflow_info_hash[id]
-    return workflow.get_results
+  # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
+  def get_results(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.get_results
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
   end
 
   # Clean the stuff related to the deployment (RPC: only for async execution)
@@ -345,16 +435,24 @@ class KadeployServer
   # * id: worklfow id
   # Output
   # * nothing
-  def free(id)
-    workflow = @workflow_info_hash[id]
-    #let's free memory at the end of the workflow
-    tid = nil
-    delete_workflow_info(id)
-    workflow.finalize
-    workflow = nil
-    exec_specific = nil
-    DRb.stop_service()
-    GC.start
+  def free(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      workflow.db.disconnect
+      delete_workflow_info(workflow_id)
+      #let's free memory at the end of the workflow
+      tid = nil
+      workflow.finalize
+      workflow = nil
+      exec_specific = nil
+      GC.start
+      ret = true
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
   end
 
   # Reboot a set of nodes from the client side (RPC)
@@ -366,8 +464,17 @@ class KadeployServer
   # * verbose_level: level of verbosity
   # * pxe_profile_msg: PXE profile
   # Output
-  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched
-  def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg)
+  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if the server cannot connect to DB, 4 if some pxe files cannot be grabbed
+  def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg, reboot_id)
+    db = Database::DbFactory.create(@config.common.db_kind)
+    if not db.connect(@config.common.deploy_db_host,
+                      @config.common.deploy_db_login,
+                      @config.common.deploy_db_passwd,
+                      @config.common.deploy_db_name) then
+      puts "Kadeploy server cannot connect to DB"
+      return 3
+    end
+
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
     client = DRbObject.new(nil, uri)
@@ -382,107 +489,145 @@ class KadeployServer
                                       @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
     if (exec_specific.reboot_kind == "env_recorded") && 
         exec_specific.check_prod_env && 
-        exec_specific.node_list.check_demolishing_env(@db, @config.common.demolishing_env_threshold) then
+        exec_specific.node_list.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
       output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
-      ret = 2
+      return 2
     else
       #We create a new instance of Config with a specific exec_specific part
       config = ConfigInformation::Config.new("empty")
       config.common = @config.common.clone
       config.cluster_specific = @config.cluster_specific.clone
       config.exec_specific = exec_specific
+      nodes_ok = Nodes::NodeSet.new
+      nodes_ko = Nodes::NodeSet.new
+      global_nodes_mutex = Mutex.new
+      tid_array = Array.new
+
+      if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
+        gfm = Managers::GrabFileManager.new(config, output, client, db)
+        exec_specific.pxe_upload_files.each { |pxe_file|
+          user_prefix = "pxe-#{config.exec_specific.true_user}-"
+          tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
+          local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
+                                               tftp_images_path, config.common.tftp_images_max_size, false) then
+            output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
+            return 4
+          end
+        }
+      end
+
       exec_specific.node_list.group_by_cluster.each_pair { |cluster, set|
-        step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
-        case exec_specific.reboot_kind
-        when "env_recorded"
-          #This should be the same case than a deployed env
-          step.switch_pxe("deploy_to_deployed_env")
-        when "set_pxe"
-          step.switch_pxe("set_pxe", pxe_profile_msg)
-        when "simple_reboot"
-          #no need to change the PXE profile
-        when "deploy_env"
-          step.switch_pxe("prod_to_deploy_env")
-        else
-          raise "Invalid kind of reboot: #{@reboot_kind}"
-        end
-        step.reboot(exec_specific.reboot_level)
-        if exec_specific.wait then
-          if (exec_specific.reboot_kind == "deploy_env") then
-            step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
-            step.send_key_in_deploy_env("tree")
-            set.set_deployment_state("deploy_env", nil, @db, exec_specific.true_user)
+        tid_array << Thread.new {
+          step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
+          case exec_specific.reboot_kind
+          when "env_recorded"
+            #This should be the same case than a deployed env
+            step.switch_pxe("deploy_to_deployed_env")
+          when "set_pxe"
+            step.switch_pxe("set_pxe", pxe_profile_msg)
+          when "simple_reboot"
+            #no need to change the PXE profile
+          when "deploy_env"
+            step.switch_pxe("prod_to_deploy_env")
           else
-            step.wait_reboot([@config.common.ssh_port],[])
+            raise "Invalid kind of reboot: #{@reboot_kind}"
           end
-          if (exec_specific.reboot_kind == "env_recorded") then
-            part = String.new
-            if (exec_specific.block_device == "") then
-              part = get_block_device(cluster) + exec_specific.deploy_part
+          step.reboot(exec_specific.reboot_level, false, true)
+          if exec_specific.wait then
+            if (exec_specific.reboot_kind == "deploy_env") then
+              step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
+              step.send_key_in_deploy_env("tree")
+              set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
             else
-              part = exec_specific.block_device + exec_specific.deploy_part
+              step.wait_reboot([@config.common.ssh_port],[])
             end
-            #Reboot on the production environment
-            if (part == get_prod_part(cluster)) then
-              set.set_deployment_state("prod_env", nil, @db, exec_specific.true_user)
-              step.check_nodes("prod_env_booted")
-              if (exec_specific.check_prod_env) then
-                step.nodes_ko.tag_demolishing_env(@db)
-                ret = 1
+            if (exec_specific.reboot_kind == "env_recorded") then
+              part = String.new
+              if (exec_specific.block_device == "") then
+                part = get_block_device(cluster) + exec_specific.deploy_part
+              else
+                part = exec_specific.block_device + exec_specific.deploy_part
               end
-            else
-              set.set_deployment_state("recorded_env", nil, @db, exec_specific.true_user)
+              #Reboot on the production environment
+              if (part == get_prod_part(cluster)) then
+                step.check_nodes("prod_env_booted")
+                set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
+                if (exec_specific.check_prod_env) then
+                  step.nodes_ko.tag_demolishing_env(db) if config.common.demolishing_env_auto_tag
+                  ret = 1
+                end
+              else
+                set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
+              end
+            end
+            if not step.nodes_ok.empty? then
+              output.verbosel(0, "Nodes correctly rebooted on cluster #{cluster}:")
+              output.verbosel(0, step.nodes_ok.to_s(false, "\n"))
+              global_nodes_mutex.synchronize {
+                nodes_ok.add(step.nodes_ok)
+              }
+            end
+            if not step.nodes_ko.empty? then
+              output.verbosel(0, "Nodes not correctly rebooted on cluster #{cluster}:")
+              output.verbosel(0, step.nodes_ko.to_s(true, "\n"))
+              global_nodes_mutex.synchronize {
+                nodes_ko.add(step.nodes_ko)
+              }
             end
           end
-          if not step.nodes_ok.empty? then
-            output.verbosel(0, "Nodes correctly rebooted:")
-            output.verbosel(0, step.nodes_ok.to_s(false, "\n"))
-          end
-          if not step.nodes_ko.empty? then
-            output.verbosel(0, "Nodes not correctly rebooted:")
-            output.verbosel(0, step.nodes_ko.to_s(true, "\n"))
-          end
-          client.generate_files(step.nodes_ok, config.exec_specific.nodes_ok_file, step.nodes_ko, config.exec_specific.nodes_ko_file)
-        end
+        }
       }
+      tid_array.each { |tid|
+        add_reboot_info(tid, reboot_id)
+      }
+      tid_array.each { |tid|
+        tid.join
+      }
+      if exec_specific.wait then
+        client.generate_files(nodes_ok, config.exec_specific.nodes_ok_file, nodes_ko, config.exec_specific.nodes_ko_file)
+      end
     end
+    delete_reboot_info(reboot_id)
+    db.disconnect
     config = nil
     return ret
   end
 end
 
 
-
 begin
   config = ConfigInformation::Config.new("kadeploy")
 rescue
-  puts "Bad configuration"
+  puts "Bad configuration: #{$!}"
   exit(1)
 end
 if (config.check_config("kadeploy") == true)
   db = Database::DbFactory.create(config.common.db_kind)
   Signal.trap("TERM") do
     puts "TERM trapped, let's clean everything ..."
-    db.disconnect
     exit(1)
   end
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
-    db.disconnect
     exit(1)
   end
-  db.connect(config.common.deploy_db_host,
-             config.common.deploy_db_login,
-             config.common.deploy_db_passwd,
-             config.common.deploy_db_name)
-  kadeployServer = KadeployServer.new(config, 
-                                      Managers::WindowManager.new(config.common.reboot_window, config.common.reboot_window_sleep_time),
-                                      Managers::WindowManager.new(config.common.nodes_check_window, 1),
-                                      db)
-  puts "Launching the Kadeploy RPC server"
-  uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
-  DRb.start_service(uri, kadeployServer)
-  DRb.thread.join
+  if not db.connect(config.common.deploy_db_host,
+                    config.common.deploy_db_login,
+                    config.common.deploy_db_passwd,
+                    config.common.deploy_db_name)
+    puts "Cannot connect to the database"
+    exit(1)
+  else
+    db.disconnect
+    kadeployServer = KadeployServer.new(config, 
+                                        Managers::WindowManager.new(config.common.reboot_window, config.common.reboot_window_sleep_time),
+                                        Managers::WindowManager.new(config.common.nodes_check_window, 1))
+    puts "Launching the Kadeploy RPC server"
+    uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
+    DRb.start_service(uri, kadeployServer)
+    DRb.thread.join
+  end
 else
   puts "Bad configuration"
 end

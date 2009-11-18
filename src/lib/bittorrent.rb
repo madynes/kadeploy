@@ -120,7 +120,7 @@ module Bittorrent
   def Bittorrent::launch_seed(torrent, kadeploy_cache)
 #    cmd = "cd #{kadeploy_cache} ; btdownloadheadless #{torrent} 2>&1 >/dev/null"
     cmd = "cd #{kadeploy_cache} ; ctorrent #{torrent} 2>&1 >/dev/null"
-    pid = fork {
+    pid = Process.fork {
       exec(cmd)
     }
     if (pid == nil) then

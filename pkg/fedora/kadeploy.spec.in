@@ -16,7 +16,7 @@ in Grid5000, allowing the users to deploy their own OS on their reserved nodes.
 
 %package common
 Summary:        Common part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql
+Requires:       ruby, ruby-mysql, ruby-libs
 Group:          System/Cluster
 %description common
 This package provide the common part of the Kadeploy deployment tool.
@@ -55,6 +55,13 @@ rm -rf $RPM_BUILD_ROOT
 /usr/local/kadeploy3
 %dir /etc/kadeploy3
 /etc/kadeploy3/load_kadeploy_env
+%doc %attr(0444,root,root) /usr/local/man/man1/kadeploy3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kareboot3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kaenv3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kastat3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/karights3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kanodes3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kaconsole3.1
 
 %files server
 %defattr(-,deploy,deploy,-)
@@ -65,6 +72,7 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) /etc/kadeploy3/partition_file_g5kdev-cluster
 %config(noreplace) /etc/kadeploy3/cmd
 %config(noreplace) /etc/kadeploy3/conf
+/etc/kadeploy3/version
 /etc/kadeploy3/keys/id_deploy
 /etc/kadeploy3/keys/id_deploy.pub
 
@@ -81,3 +89,15 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/kadeploy3
 /usr/bin/kaenv3
 /usr/bin/kareboot3
+
+%pre common
+if ! getent passwd deploy >/dev/null 2>&1 ; then
+  /usr/sbin/useradd -d /home/deploy deploy >/dev/null 2>&1 || exit 1
+fi
+
+%post server
+chkconfig --add kadeploy3d
+
+%preun server
+chkconfig --del kadeploy3d
+

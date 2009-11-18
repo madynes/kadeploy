@@ -1,7 +1,7 @@
 require 'thread'
 
 class TaktukWrapper
-  attr_reader :argv, :command_line, :hosts, :errors, :connectors, :infos
+  attr_reader :argv, :command_line, :hosts, :errors, :connectors, :infos, :pid
   attr_accessor :at_output_blocks, :at_status_blocks, :at_taktuk_blocks, :at_connector_blocks, :at_error_blocks, :at_info_blocks
 
 
@@ -175,6 +175,9 @@ class TaktukWrapper
     @at_exit_blocks.each { |b|
       b.call
     }
+  end
+
+  def wait
     Process.waitpid(@pid)
   end
 

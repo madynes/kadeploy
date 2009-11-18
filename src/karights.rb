@@ -55,9 +55,16 @@ def add_rights(config, db)
   nodes_to_remove = Array.new
   hosts = Array.new
   config.exec_specific.node_list.each { |node|
-    if (node != "*") then
-      hosts.push("node=\"#{node}\"")
+    if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
+      nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+    else
+      nodes = [node]
     end
+    nodes.each{ |n|
+      if (node != "*") then
+        hosts.push("node=\"#{n}\"")
+      end
+    }
   }
   if not hosts.empty? then
     query = "SELECT DISTINCT node FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
@@ -85,14 +92,21 @@ def add_rights(config, db)
   values_to_insert = Array.new
   config.exec_specific.node_list.each { |node|
     config.exec_specific.part_list.each { |part|
-      if ((node == "*") || (part == "*")) then
-        #check if the rights are already inserted
-        query = "SELECT * FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
-        res = db.run_query(query)
-        values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{node}\", \"#{part}\")") if (res.num_rows == 0)
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
+        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
       else
-        values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{node}\", \"#{part}\")")
+        nodes = [node]
       end
+      nodes.each{ |n|
+        if ((node == "*") || (part == "*")) then
+          #check if the rights are already inserted
+          query = "SELECT * FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
+          res = db.run_query(query)
+          values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{n}\", \"#{part}\")") if (res.num_rows == 0)
+        else
+          values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{n}\", \"#{part}\")")
+        end
+      }
     }
   }
   #add the rights
@@ -116,9 +130,19 @@ end
 def delete_rights(config, db)
   config.exec_specific.node_list.each { |node|
     config.exec_specific.part_list.each { |part|
-      query = "DELETE FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
-      db.run_query(query)
-      puts "No rights have been removed" if (db.dbh.affected_rows == 0)
+#      query = "DELETE FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
+#      db.run_query(query)
+#      puts "No rights have been removed" if (db.dbh.affected_rows == 0)
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+      else
+        nodes = [node]
+      end
+      nodes.each{ |n|
+        query = "DELETE FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
+        db.run_query(query)
+        puts "No rights have been removed" if (db.dbh.affected_rows == 0)
+      }
     }
   }
 end
@@ -141,6 +165,10 @@ kadeploy_server = DRbObject.new(nil, uri)
 config.common = kadeploy_server.get_common_config
 
 if (config.check_config("karights") == true)
+  if config.exec_specific.get_version then
+    puts "Karights version: #{kadeploy_server.get_version()}"
+    _exit(0, nil)
+  end
   db = Database::DbFactory.create(config.common.db_kind)
   db.connect(config.common.deploy_db_host,
              config.common.deploy_db_login,

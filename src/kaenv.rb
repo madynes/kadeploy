@@ -152,8 +152,8 @@ def add_environment(config, db)
                                        fdisk_type, \
                                        filesystem, \
                                        user, \
-                                       environment_kind,
-                                       visibility,
+                                       environment_kind, \
+                                       visibility, \
                                        demolishing_env) \
                                VALUES (\"#{env.name}\", \
                                        \"#{env.version}\", \
@@ -531,6 +531,11 @@ kadeploy_server = DRbObject.new(nil, uri)
 config.common = kadeploy_server.get_common_config
 
 if (config.check_config("kaenv") == true)
+  if config.exec_specific.get_version then
+    puts "Kaenv version: #{kadeploy_server.get_version()}"
+    _exit(0, nil)
+  end
+
   db = Database::DbFactory.create(config.common.db_kind)
   db.connect(config.common.deploy_db_host,
              config.common.deploy_db_login,

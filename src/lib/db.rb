@@ -88,12 +88,19 @@ module Database
     # * passwd: user's password
     # * base: database name
     # Output
+    # * return true if the connection has been established, false otherwise
     # * print an error if the connection can not be performed, otherwhise assigns a database handler to @dhb
     def connect(host, user, passwd, base)
-      @dbh = Mysql.real_connect(host, user, passwd, base)
-    rescue Mysql::Error => e
-      puts "Error code: #{e.errno}"
-      puts "Error message: #{e.error}"
+      begin
+        @dbh = Mysql.real_connect(host, user, passwd, base)
+        @dbh.reconnect = true
+        ret = true
+      rescue Mysql::Error => e
+        puts "Error code: #{e.errno}"
+        puts "Error message: #{e.error}"
+        ret = false
+      end
+      return ret
     end
 
     # Disconnect from the MySQL database
@@ -103,7 +110,7 @@ module Database
     # Output
     # * nothing
     def disconnect
-      @dbh.close
+      @dbh.close if (@dbh != nil)
     end
 
     # Run a query

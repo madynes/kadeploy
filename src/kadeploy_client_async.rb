@@ -62,7 +62,7 @@ if (exec_specific_config != nil) then
       workflow_id = -1
       Signal.trap("INT") do
         puts "SIGINT trapped, let's clean everything ..."
-        kadeploy_server.kill(workflow_id)
+        kadeploy_server.kill_workflow(workflow_id)
         _exit(1, db)
       end
       if (exec_specific_config.pxe_profile_file != "") then
@@ -70,13 +70,22 @@ if (exec_specific_config != nil) then
           exec_specific_config.pxe_profile_msg.concat(l)
         }
       end
-      workflow_id = kadeploy_server.launch_workflow_async(exec_specific_config)
-
-      while (not kadeploy_server.ended?(workflow_id)) do
-        sleep(10)        
+      workflow_id, error = kadeploy_server.launch_workflow_async(exec_specific_config)
+      
+      if (workflow_id != nil) then
+        while (not kadeploy_server.ended?(workflow_id)) do
+          sleep(10)        
+        end
+        puts kadeploy_server.get_results(workflow_id)
+        kadeploy_server.free(workflow_id)
+      else
+        case error
+        when 1
+          puts "All the nodes have been discarded"
+        when 2
+          puts "Some files cannot be grabbed"
+        end
       end
-      puts kadeploy_server.get_results(workflow_id)
-      kadeploy_server.free(workflow_id)
       exec_specific_config = nil
     else
       puts "You do not have the deployment rights on all the nodes"

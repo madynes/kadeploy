@@ -14,7 +14,7 @@ require 'db'
 require 'thread'
 require 'drb'
 require 'socket'
-
+require 'md5'
 
 class KadeployClient
   @kadeploy_server = nil
@@ -86,7 +86,48 @@ class KadeployClient
       return false
     end
   end
+  
+  # Get the mtime of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the mtime of the file, or 0 if it cannot be read.
+  def get_file_mtime(file_name)
+    if File.readable?(file_name) then
+      return File.mtime(file_name).to_i
+    else
+      return 0
+    end
+  end
 
+  # Get the MD5 of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the MD5 of the file, or 0 if it cannot be read.
+  def get_file_md5(file_name)
+    if File.readable?(file_name) then
+      return MD5::get_md5_sum(file_name)
+    else
+      return 0
+    end
+  end
+
+  # Get the size of a file from the client (RPC)
+  #
+  # Arguments
+  # * file_name: name of the file on the client side
+  # Output
+  # * return the size of the file, or 0 if it cannot be read.
+  def get_file_size(file_name)
+    if File.readable?(file_name) then
+      return File.stat(file_name).size
+    else
+      return 0
+    end
+  end
 
   # Print the results of the deployment (RPC)
   #
@@ -169,6 +210,11 @@ db.connect(common_config.deploy_db_host,
 
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific(common_config, db)
 if (exec_specific_config != nil) then
+  if exec_specific_config.get_version then
+    puts "Kadeploy version: #{kadeploy_server.get_version()}"
+    _exit(0, db)
+  end
+
   if ((exec_specific_config.environment.environment_kind != "other") || (common_config.bootloader != "pure_pxe")) then
     #Rights check
     allowed_to_deploy = true
@@ -192,7 +238,7 @@ if (exec_specific_config != nil) then
       #Launch the listener on the client
       kadeploy_client = KadeployClient.new(kadeploy_server)
       DRb.start_service(nil, kadeploy_client)
-      if /druby:\/\/([\w\.\-]+):(\d+)/ =~ DRb.uri
+      if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
         content = Regexp.last_match
         client_host = content[1]
         client_port = content[2]
@@ -202,7 +248,7 @@ if (exec_specific_config != nil) then
       end
       Signal.trap("INT") do
         puts "SIGINT trapped, let's clean everything ..."
-        kadeploy_server.kill(kadeploy_client.workflow_id)
+        kadeploy_server.kill_workflow(kadeploy_client.workflow_id)
         _exit(1, db)
       end
       if (exec_specific_config.pxe_profile_file != "") then

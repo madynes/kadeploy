@@ -26,7 +26,14 @@ def append_generic_where_clause(config)
   date_max = String.new
   if (not config.exec_specific.node_list.empty?) then
     config.exec_specific.node_list.each { |node|
-      hosts.push("hostname=\"#{node}\"")
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+      else
+        nodes = [node]
+      end     
+      nodes.each{ |n|
+        hosts.push("hostname=\"#{n}\"")
+      }
     }
     node_list = "(#{hosts.join(" OR ")})"
   end
@@ -59,13 +66,14 @@ def select_fields(row, config, default_fields)
   fields = Array.new  
   if (not config.exec_specific.fields.empty?) then
     config.exec_specific.fields.each{ |f|
-      fields.push(row[f].gsub("\n", "\\n"))
+      fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
     }
   else
     default_fields.each { |f|
-      fields.push(row[f].gsub("\n", "\\n"))
+      fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
     }
   end
+
   return fields.join(",")
 end
 
@@ -203,6 +211,10 @@ kadeploy_server = DRbObject.new(nil, uri)
 config.common = kadeploy_server.get_common_config
 
 if (config.check_config("kastat") == true) then
+  if config.exec_specific.get_version then
+    puts "Kastat version: #{kadeploy_server.get_version()}"
+    _exit(0, nil)
+  end
   db = Database::DbFactory.create(config.common.db_kind)
   db.connect(config.common.deploy_db_host,
              config.common.deploy_db_login,

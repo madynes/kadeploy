@@ -39,6 +39,7 @@ purge_deployment_timer = 900
 rambin_path = /rambin
 mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index
 demolishing_env_threshold = 2
+demolishing_env_auto_tag = false
 bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
 almighty_env_users = root,ejeanvoine

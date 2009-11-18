@@ -31,9 +31,15 @@ def get_deploy_state(config, db)
   else
     hosts = Array.new
     config.exec_specific.node_list.each { |node|
-      hosts.push("nodes.hostname=\"#{node}\"")
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+      else
+        nodes = [node]
+      end
+      nodes.each { |n|
+        hosts.push("nodes.hostname=\"#{n}\"")
+      }
     }
-
     query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
              FROM nodes \
              LEFT JOIN environments ON nodes.env_id = environments.id \
@@ -80,6 +86,10 @@ kadeploy_server = DRbObject.new(nil, uri)
 config.common = kadeploy_server.get_common_config
 
 if (config.check_config("kanodes") == true) then
+  if config.exec_specific.get_version then
+    puts "Kanodes version: #{kadeploy_server.get_version()}"
+    _exit(0, nil)
+  end
   db = Database::DbFactory.create(config.common.db_kind)
   db.connect(config.common.deploy_db_host,
              config.common.deploy_db_login,

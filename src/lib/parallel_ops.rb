@@ -19,6 +19,8 @@ module ParallelOperations
     @taktuk_auto_propagate = nil
     @output = nil
     @config = nil
+    @instance_thread = nil
+    @process_container = nil
 
     # Constructor of ParallelOps
     #
@@ -29,13 +31,15 @@ module ParallelOperations
     # * output: OutputControl instance
     # Output
     # * nothing
-    def initialize(nodes, config, taktuk_connector, output)
+    def initialize(nodes, config, taktuk_connector, output, instance_thread, process_container)
       @nodes = nodes
       @config = config
       @taktuk_connector = taktuk_connector
       @taktuk_tree_arity = config.common.taktuk_tree_arity
       @taktuk_auto_propagate = config.common.taktuk_auto_propagate
       @output = output
+      @instance_thread = instance_thread
+      @process_container = process_container
     end
 
     # Generate the header of a Taktuk command
@@ -146,19 +150,19 @@ module ParallelOperations
     def init_nodes_state_before_exec_command
       @nodes.set.each { |node|
         node.last_cmd_exit_status = "256"
-        node.last_cmd_stderr = "The node #{node.hostname} is unreachable"
+        node.last_cmd_stderr = "Unreachable"
       }
     end
 
     # Init a the state of a NodeSet before a reboot command
     #
     # Arguments
-    # * nothing
+    # * macro_step: name if the current macro step
     # Output
     # * nothing
     def init_nodes_state_before_wait_nodes_after_reboot_command
       @nodes.set.each { |node|
-        node.last_cmd_stderr = "The node #{node.hostname} is unreachable after the reboot"
+        node.last_cmd_stderr = "Unreachable after the reboot"
         node.state = "KO"
       }
     end
@@ -178,8 +182,8 @@ module ParallelOperations
       tree['hosts'].each_value { |h|
         h['commands'].each_value { |x|
           @nodes.get_node_by_host(h['host_name']).last_cmd_exit_status = x['status']
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
         }
       }
     end
@@ -217,8 +221,8 @@ module ParallelOperations
       tree['hosts'].each_value { |h|
         h['commands'].each_value { |x|
           @nodes.get_node_by_host(h['host_name']).last_cmd_exit_status = x['status']
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
+          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
         }
       }
     end
@@ -233,6 +237,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd(cmd)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -259,6 +266,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd(cmd)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -286,6 +296,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd(cmd)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -314,6 +327,9 @@ module ParallelOperations
       command_array = make_taktuk_send_file_cmd(file, dest_dir, scattering_kind)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_send_file_command_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -341,6 +357,9 @@ module ParallelOperations
       command_array = make_taktuk_exec_cmd_with_input_file(file, cmd, scattering_kind)
       tw = TaktukWrapper::new(command_array)
       tw.run
+      @process_container.add_process(@instance_thread, tw.pid)
+      tw.wait
+      @process_container.remove_process(@instance_thread, tw.pid)
       get_taktuk_exec_cmd_with_input_file_infos(tw)
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -382,60 +401,57 @@ module ParallelOperations
             nodes_to_test.push(node)
           end
         }
-        # We launch a thread here because a client SIGINT would corrupt the nodes check  window 
-        # management, thus even a SIGINT is received, the reboot process will finish
-        main_tid = Thread.new {
-          callback = Proc.new { |ns|
-            tg = ThreadGroup.new
-            ns.set.each { |node|
-              sub_tid = Thread.new {
-                all_ports_ok = true
-                if Ping.pingecho(node.hostname, 1, @config.common.ssh_port) then
-                  ports_up.each { |port|
+        callback = Proc.new { |ns|
+          tg = ThreadGroup.new
+          ns.set.each { |node|
+            sub_tid = Thread.new {
+              all_ports_ok = true
+              if Ping.pingecho(node.hostname, 1, @config.common.ssh_port) then
+                ports_up.each { |port|
+                  begin
+                    s = TCPsocket.open(node.hostname, port)
+                    s.close
+                  rescue Errno::ECONNREFUSED
+                    all_ports_ok = false
+                    next
+                  rescue Errno::EHOSTUNREACH
+                    all_ports_ok = false
+                    next
+                  end
+                }
+                if all_ports_ok then
+                  ports_down.each { |port|
                     begin
                       s = TCPsocket.open(node.hostname, port)
+                      all_ports_ok = false
                       s.close
                     rescue Errno::ECONNREFUSED
-                      all_ports_ok = false
                       next
                     rescue Errno::EHOSTUNREACH
                       all_ports_ok = false
                       next
                     end
                   }
-                  if all_ports_ok then
-                    ports_down.each { |port|
-                      begin
-                        s = TCPsocket.open(node.hostname, port)
-                        all_ports_ok = false
-                        s.close
-                      rescue Errno::ECONNREFUSED
-                        next
-                      rescue Errno::EHOSTUNREACH
-                        all_ports_ok = false
-                        next
-                      end
-                    }
-                  end
-                  if all_ports_ok then
-                    node.state = "OK"
-                    @output.verbosel(4, "  *** #{node.hostname} is here after #{Time.now.tv_sec - start}s")
-                    @config.set_node_state(node.hostname, "", "", "rebooted")
-                  else
-                    node.state = "KO"
-                  end
                 end
-              }
-              tg.add(sub_tid)
+                if all_ports_ok then
+                  node.state = "OK"
+                  node.last_cmd_exit_status = "0"
+                  node.last_cmd_stderr = ""
+                  @output.verbosel(4, "  *** #{node.hostname} is here after #{Time.now.tv_sec - start}s")
+                  @config.set_node_state(node.hostname, "", "", "rebooted")
+                else
+                  node.state = "KO"
+                end
+              end
             }
-            #let's wait everybody
-            tg.list.each { |sub_tid|
-              sub_tid.join
-            }
+            tg.add(sub_tid)
           }
-          nodes_check_window.launch(nodes_to_test, &callback)
+          #let's wait everybody
+          tg.list.each { |sub_tid|
+            sub_tid.join
+          }
         }
-        main_tid.join
+        nodes_check_window.launch(nodes_to_test, &callback)
       end
 
       @nodes.set.each { |node|

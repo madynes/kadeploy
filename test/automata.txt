@@ -1,0 +1,7 @@
+#
+#kind(dummy|simple|simult) name step1:retry1:timeout1,step2:retry2:timeout2,step3:retry3:timeout3
+#
+dummy Dummy SetDeploymentEnvDummy:1:10,BroadcastEnvDummy:1:10,BootNewEnvDummy:1:10
+simple UntrustedEnv-KastafiorBroadcast-KexecReboot SetDeploymentEnvUntrusted:1:500,BroadcastEnvKastafior:1:400,BootNewEnvKexec:1:400
+simple UntrustedEnv-KastafiorBroadcast-ClassicalReboot SetDeploymentEnvUntrusted:1:500,BroadcastEnvKastafior:1:400,BootNewEnvClassical:1:500
+simult UntrustedEnv-KastafiorBroadcast-ClassicalReboot SetDeploymentEnvUntrusted:1:500,BroadcastEnvKastafior:1:400,BootNewEnvClassical:1:500

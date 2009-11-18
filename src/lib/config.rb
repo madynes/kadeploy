@@ -16,6 +16,7 @@ module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
   COMMANDS_FILE = "cmd"
   NODES_FILE = "nodes"
+  VERSION_FILE = "version"
   COMMON_CONFIGURATION_FILE = "conf"
   CLUSTER_CONFIGURATION_FILE = "clusters"
   CLIENT_CONFIGURATION_FILE = "client_conf"
@@ -49,6 +50,7 @@ module ConfigInformation
           res = res && load_cluster_specific_config_files
           res = res && load_nodes_config_file
           res = res && load_commands
+          res = res && load_version
           puts "Problem in configuration" if not res
         when "kaenv"
           res = load_kaenv_exec_specific
@@ -128,6 +130,7 @@ module ConfigInformation
       exec_specific.reformat_tmp = false
       exec_specific.pxe_profile_msg = String.new
       exec_specific.pxe_profile_file = String.new
+      exec_specific.pxe_upload_files = Array.new
       exec_specific.steps = Array.new
       exec_specific.ignore_nodes_deploying = false
       exec_specific.breakpoint_on_microstep = String.new
@@ -140,28 +143,34 @@ module ConfigInformation
       exec_specific.nodes_ko_file = String.new
       exec_specific.nodes_state = Hash.new
       exec_specific.write_workflow_id = String.new
+      exec_specific.get_version = false
+      exec_specific.prefix_in_cache = String.new
 
       if (load_kadeploy_cmdline_options(common_config.nodes_desc, exec_specific) == true) then
-        case exec_specific.load_env_kind
-        when "file"
-          if (exec_specific.environment.load_from_file(exec_specific.load_env_arg, common_config.almighty_env_users) == false) then
+        if not exec_specific.get_version then
+          case exec_specific.load_env_kind
+          when "file"
+            if (exec_specific.environment.load_from_file(exec_specific.load_env_arg, common_config.almighty_env_users) == false) then
+              return nil
+            end
+          when "db"
+            if (exec_specific.environment.load_from_db(exec_specific.load_env_arg,
+                                                       exec_specific.env_version,
+                                                       exec_specific.user,
+                                                       db) == false) then
+              return nil
+            end
+          when ""
+            error("You must choose an environment")
             return nil
+          else
+            puts "Invalid method for environment loading"
+            raise
           end
-        when "db"
-          if (exec_specific.environment.load_from_db(exec_specific.load_env_arg,
-                                                     exec_specific.env_version,
-                                                     exec_specific.user,
-                                                     db) == false) then
-            return nil
-          end
-        when ""
-          error("You must choose an environment")
-          return nil
+          return exec_specific
         else
-          puts "Invalid method for environment loading"
-          raise
+          return exec_specific
         end
-        return exec_specific
       else
         return nil
       end
@@ -232,6 +241,10 @@ module ConfigInformation
         #configuration node file
         if not File.readable?(CONFIGURATION_FOLDER + "/" + NODES_FILE) then
           puts "The #{CONFIGURATION_FOLDER + "/" + NODES_FILE} file cannot be read"
+          return false
+        end
+        if not File.readable?(CONFIGURATION_FOLDER + "/" + VERSION_FILE) then
+          puts "The #{CONFIGURATION_FOLDER + "/" + VERSION_FILE} file cannot be read"
           return false
         end
       when "kaenv"
@@ -447,6 +460,13 @@ module ConfigInformation
                 puts "Invalid value for the demolishing_env_threshold field"
                 return false
               end
+            when "demolishing_env_auto_tag"
+              if val =~ /\A(true|false)\Z/ then
+                @common.demolishing_env_auto_tag = (val == "true")
+              else
+                puts "Invalid value for the demolishing_env_auto_tag field"
+                return false
+              end
             when "bt_tracker_ip"
               if val =~ /\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/ then
                 @common.bt_tracker_ip = val
@@ -539,6 +559,8 @@ module ConfigInformation
                   @cluster_specific[cluster].prod_part = val
                 when "tmp_part"
                   @cluster_specific[cluster].tmp_part = val
+                when "swap_part"
+                  @cluster_specific[cluster].swap_part = val
                 when "workflow_steps"
                   @cluster_specific[cluster].workflow_steps = val
                 when "timeout_reboot"
@@ -639,12 +661,31 @@ module ConfigInformation
     # * return true in case of success, false otherwise
     def load_nodes_config_file
       IO.readlines(CONFIGURATION_FOLDER + "/" + NODES_FILE).each { |line|
-        if /\A([A-Za-z0-9\.\-]+)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([A-Za-z0-9\.\-]+)\Z/ =~ line
+        if /\A([a-zA-Z]+[-\w.]*)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([\w.-]+)\Z/ =~ line then
           content = Regexp.last_match
           host = content[1]
           ip = content[2]
           cluster = content[3]
           @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+        end
+        if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
+          content = Regexp.last_match
+          hostnames = content[1]
+          ips = content[2]
+          cluster = content[3]
+          hostnames_list = Nodes::NodeSet::nodes_list_expand(hostnames)
+          ips_list = Nodes::NodeSet::nodes_list_expand(ips)
+          if (hostnames_list.to_a.length == ips_list.to_a.length) then
+            for i in (0 ... hostnames_list.to_a.length)
+              host = hostnames_list[i] 
+              ip = ips_list[i] 
+              @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+            end
+          else
+            puts line
+            puts "The number of hostnames and IP addresses are incoherent in the #{NODES_FILE} file"
+            return false
+          end
         end
       }
       if @common.nodes_desc.empty? then
@@ -692,6 +733,17 @@ module ConfigInformation
         }
       end
       return true
+    end
+
+    # Load the version of Kadeploy
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def load_version
+      line = IO.readlines(CONFIGURATION_FOLDER + "/" + VERSION_FILE)
+      @common.version = line[0].chomp
     end
 
     # Replace the substrings HOSTNAME_FQDN and HOSTNAME_SHORT in a string by a value
@@ -755,14 +807,13 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-a", "--env-file ENVFILE", "File containing the envrionement description") { |f|
-          if not File.readable?(f) then
+        opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|          
+          if (not (f =~ /^http[s]?:\/\//)) && (not File.readable?(f)) then
             error("The file #{f} does not exist or is not readable")
             return false
-          else
-            exec_specific.load_env_kind = "file"
-            exec_specific.load_env_arg = f
           end
+          exec_specific.load_env_kind = "file"
+          exec_specific.load_env_arg = f
         }
         opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
           if /\A[\w\/]+\Z/ =~ b then
@@ -785,7 +836,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -797,11 +848,15 @@ module ConfigInformation
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
+            if (f =~ /^http[s]?:\/\//) then
+              exec_specific.key = f
             else
-              exec_specific.key = File.expand_path(f)
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.key = File.expand_path(f)
+              end
             end
           else
             authorized_keys = File.expand_path("~/.ssh/authorized_keys")
@@ -814,7 +869,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then 
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false
           end
@@ -831,8 +886,13 @@ module ConfigInformation
         opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
             exec_specific.deploy_part = p
         }
-        opt.on("-r", "--reformat-tmp", "Reformat the /tmp partition") {
+        opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (ext[234] are allowed)") { |t|
+          if not (/\A(ext2|ext3|ext4)\Z/ =~ t) then
+            error("Invalid FSTYPE, only ext2, ext3 and ext4 are allowed")
+            return false
+          end
           exec_specific.reformat_tmp = true
+          exec_specific.reformat_tmp_fstype = t
         }
         opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
           if not File.readable?(f) then
@@ -855,7 +915,33 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-v", "--env-version NUMVERSION", "Number of version of the environment to deploy") { |n|
+        opt.on("-v", "--version", "Get the version") {
+          exec_specific.get_version = true
+        }
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+          if not File.readable?(f) then
+            error("The file #{f} cannot be read")
+            return false
+          else
+            exec_specific.pxe_profile_file = f
+          end
+        }
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
+          l.split(",").each { |file|
+            if (file =~ /^http[s]?:\/\//) then
+              exec_specific.pxe_upload_files.push(file) 
+            else
+              f = File.expand_path(file)
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.pxe_upload_files.push(f) 
+              end
+            end
+          }
+        }
+        opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
           if /\A\d+\Z/ =~ n then
             exec_specific.env_version = n
           else
@@ -869,14 +955,6 @@ module ConfigInformation
           else
             error("Invalid verbose level")
             return false
-          end
-        }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            exec_specific.pxe_profile_file = f
           end
         }
         opt.separator "Advanced options:"
@@ -943,19 +1021,19 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
-      if exec_specific.node_list.empty? then
-        error("You must specify some nodes to deploy")
-        return false
+      if not exec_specific.get_version then
+        if exec_specific.node_list.empty? then
+          error("You must specify some nodes to deploy")
+          return false
+        end
+        if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
+          error("The files used for the output of the OK and the KO nodes must not be the same")
+          return false
+        end
       end
-
-      if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
-        error("The files used for the output of the OK and the KO nodes must not be the same")
-        return false
-      end
-
       return true
     end
 
@@ -968,16 +1046,23 @@ module ConfigInformation
     # Output
     # * return true if the node exists in the Kadeploy configuration, false otherwise
     def Config.add_to_node_list(hostname, nodes_desc, exec_specific)
-      n = nodes_desc.get_node_by_host(hostname)
-      if (n != nil) then
-        exec_specific.node_list.push(n)
-        return true
+      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ hostname
+        hostnames = Nodes::NodeSet::nodes_list_expand("#{hostname}") 
       else
-        error("The node #{hostname} does not exist in the Kadeploy configuration")
-        return false
+        hostnames = [hostname]
       end
+      hostnames.each{|hostname|
+        n = nodes_desc.get_node_by_host(hostname)
+        if (n != nil) then
+          exec_specific.node_list.push(n)
+        else
+          Debug::client_error("The node #{hostname} does not exist in the Kadeploy configuration")
+          return false
+        end
+      }
+      return true
     end
-
+    
     # Check the whole configuration of the kadeploy execution
     #
     # Arguments
@@ -1070,6 +1155,7 @@ module ConfigInformation
       @exec_specific.show_all_version = false
       @exec_specific.version = String.new
       @exec_specific.files_to_move = Array.new
+      @exec_specific.get_version = false
       return load_kaenv_cmdline_options()
     end
 
@@ -1087,16 +1173,21 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-e", "--environment ENVNAME", "Environment name") { |n|
-          @exec_specific.env_name = n
-        }        
-        opt.on("-f", "--file FILE", "Environment file") { |f|
-          if not File.readable?(f) then
+        opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
+          if (not (f =~ /^http[s]?:\/\//)) && (not File.readable?(f)) then
             error("The file #{f} cannot be read")
             return false
           else
             @exec_specific.file = f
           end
+          @exec_specific.operation = "add"
+        }
+        opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "delete"
+        }  
+        opt.on("-l", "--list", "List environments") {
+          @exec_specific.operation = "list"
         }
         opt.on("-m", "--files-to-move FILES", "Files to move (src1:dst1,src2:dst2,...)") { |f|
           if /\A.+:.+(,.+:.+)*\Z/ =~f then
@@ -1108,13 +1199,10 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-o", "--operation OPERATION", "Kind of operation (add, delete, list, print, remove-demolishing-tag, set-visibility-tag, update-tarball-md5, update-preinstall-md5, update-postinstalls-md5, move-files)") { |op|
-          if /\A(add|delete|list|print|remove-demolishing-tag|set-visibility-tag|update-tarball-md5|update-preinstall-md5|update-postinstalls-md5|move-files)\Z/ =~ op then
-            @exec_specific.operation = op
-          else
-            error("Invalid operation")
-          end
-        }
+        opt.on("-p", "--print ENVNAME", "Print an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "print"
+        }        
         opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
           @exec_specific.show_all_version = true
         }
@@ -1133,7 +1221,10 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-v", "--version NUMBER", "Specify the version") { |v|
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
+        opt.on("--env-version NUMBER", "Specify the version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.version = v
           else
@@ -1141,12 +1232,37 @@ module ConfigInformation
             return false
           end
         }
+        opt.separator "Advanced options:"
+        opt.on("--remove-demolishing-tag ENVNAME", "Remove demolishing tag on an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "remove-demolishing-tag"
+        }
+        opt.on("--set-visibility-tag ENVNAME", "Set the visibility tag on an environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "set-visibility-tag"
+        }
+        opt.on("--update-tarball-md5 ENVNAME", "Update the MD5 of the environment tarball") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "update-tarball-md5"
+        }
+        opt.on("--update-preinstall-md5 ENVNAME", "Update the MD5 of the environment preinstall") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "update-preinstall-md5"
+        }
+        opt.on("--update-postinstalls-md5 ENVNAME", "Update the MD5 of the environment postinstalls") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "update-postinstalls-md5"
+        }
+        opt.on("--move-files ENVNAME", "Move the files of the environment") { |n|
+          @exec_specific.env_name = n
+          @exec_specific.operation = "move-files"
+        }
       end
       @opts = opts
       begin
         opts.parse!(ARGV)
       rescue
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1161,6 +1277,9 @@ module ConfigInformation
     # Fixme
     # * should add more tests
     def check_kaenv_config
+      if @exec_specific.get_version then
+        return true
+      end
       case @exec_specific.operation 
       when "add"
         if (@exec_specific.file == "") then
@@ -1241,6 +1360,7 @@ module ConfigInformation
       @exec_specific.part_list = Array.new
       @exec_specific.node_list = Array.new
       @exec_specific.overwrite_existing_rights = false
+      @exec_specific.get_version = false
       return load_karights_cmdline_options()
     end
 
@@ -1270,7 +1390,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -1279,7 +1399,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
-          if (not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m)) and (m != "*") then
+          if (not (/\A[A-Za-z0-9\[\]\.\-]+\Z/ =~ m)) and (m != "*") then
             error("Invalid hostname: #{m}")
             return false
           end
@@ -1302,12 +1422,15 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
       end
       @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1320,6 +1443,9 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_karights_config
+      if @exec_specific.get_version then
+        return true
+      end
       if (@exec_specific.user == "") then
         error("You must choose a user")
         return false
@@ -1364,6 +1490,7 @@ module ConfigInformation
       @exec_specific.node_list = Array.new
       @exec_specific.steps = Array.new
       @exec_specific.fields = Array.new
+      @exec_specific.get_version = false
       return load_kastat_cmdline_options()
     end
 
@@ -1409,14 +1536,17 @@ module ConfigInformation
           @exec_specific.fields.push(f)
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ m) then
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ m) then
             error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
         }
-        opt.on("-s", "--step STEP", "Applies the retry filter on the given steps (1, 2 or 3)") { |s|
+        opt.on("-s", "--step STEP", "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
           @exec_specific.steps.push(s) 
+        }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
         }
         opt.on("-x", "--date-min DATE", "Get the stats from this date (yyyy:mm:dd:hh:mm:ss)") { |d|
           @exec_specific.date_min = d
@@ -1429,7 +1559,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1442,6 +1572,9 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kastat_config
+      if @exec_specific.get_version then
+        return true
+      end
       if (@exec_specific.operation == "") then
         error("You must choose an operation")
         return false
@@ -1502,6 +1635,7 @@ module ConfigInformation
       @exec_specific.operation = String.new
       @exec_specific.node_list = Array.new
       @exec_specific.wid = String.new
+      @exec_specific.get_version = false
       return load_kanodes_cmdline_options()
     end
 
@@ -1519,13 +1653,16 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
+        opt.on("-d", "--get-deploy-state", "Get the deploy state of the nodes") {
+          @exec_specific.operation = "get_deploy_state"
+        }
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
           if not File.readable?(f) then
             error("The file #{f} cannot be read")
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -1534,28 +1671,27 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~m) then
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ m) then
             error("Invalid hostname: #{m}")
             return false
           end
           @exec_specific.node_list.push(m)
         }
-        opt.on("-o", "--operation OPERATION", "Choose the operation (get_deploy_state or get_yaml_dump)") { |o|
-          if not  (/\A(get_deploy_state|get_yaml_dump)\Z/ =~ o) then
-            error("Invalid operation: #{o}")
-            return false
-          end
-          @exec_specific.operation = o
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
         }
         opt.on("-w", "--workflow-id WID", "Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped") { |w|
           @exec_specific.wid = w
+        }
+        opt.on("-y", "--get-yaml-dump", "Get the yaml dump") {
+          @exec_specific.operation = "get_yaml_dump"
         }
       end
       @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1568,7 +1704,7 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kanodes_config
-      if (exec_specific.operation == "") then
+      if ((exec_specific.operation == "") && (not @exec_specific.get_version)) then
         error("You must choose an operation")
         return false
       end
@@ -1600,12 +1736,15 @@ module ConfigInformation
       @exec_specific.block_device = String.new
       @exec_specific.deploy_part = String.new
       @exec_specific.breakpoint_on_microstep = "none"
-      @exec_specific.pxe_profile_msg = ""
+      @exec_specific.pxe_profile_msg = String.new
+      @exec_specific.pxe_profile_file = String.new
+      @exec_specific.pxe_upload_files = Array.new
       @exec_specific.key = String.new
       @exec_specific.nodes_ok_file = String.new
       @exec_specific.nodes_ko_file = String.new
       @exec_specific.reboot_level = "soft"
       @exec_specific.wait = true
+      @exec_specific.get_version = false
       return load_kareboot_cmdline_options(nodes_desc)
     end
 
@@ -1643,7 +1782,7 @@ module ConfigInformation
             return false
           else
             IO.readlines(f).sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               end
@@ -1678,7 +1817,7 @@ module ConfigInformation
           end
         }   
         opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false
           end
@@ -1704,16 +1843,34 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-v", "--version NUMBER", "Specify the environment version") { |v|
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
+          @exec_specific.pxe_profile_file = file
+        }
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
+          l.split(",").each { |file|
+            if (file =~ /^http[s]?:\/\//) then
+              exec_specific.pxe_upload_files.push(file) 
+            else
+              f = File.expand_path(file)
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.pxe_upload_files.push(f) 
+              end
+            end
+          }
+        }
+        opt.on("--env-version NUMBER", "Specify the environment version") { |v|
           if /\A\d+\Z/ =~ v then
             @exec_specific.env_version = v
           else
             error("Invalid version number")
             return false
           end
-        }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
-          @exec_specific.pxe_profile_file = file
         }
         opt.on("--no-wait", "Do not wait the end of the reboot") {
           @exec_specific.wait = false
@@ -1731,7 +1888,7 @@ module ConfigInformation
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1744,6 +1901,9 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kareboot_config(db)
+      if @exec_specific.get_version then
+        return true
+      end
       if @exec_specific.node_list.empty? then
         error("No node is chosen")
         return false
@@ -1819,6 +1979,7 @@ module ConfigInformation
     def load_kaconsole_exec_specific(nodes_desc)
       @exec_specific = OpenStruct.new
       @exec_specific.node = nil
+      @exec_specific.get_version = false
       return load_kaconsole_cmdline_options(nodes_desc)
     end
 
@@ -1836,7 +1997,7 @@ module ConfigInformation
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
         opt.separator "General options:"
-        opt.on("-m", "--machine MACHINE", "Obtain a console on the given machines") { |hostname|
+        opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |hostname|
           if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false
@@ -1849,12 +2010,15 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("-v", "--version", "Get the version") {
+          @exec_specific.get_version = true
+        }        
       end
       @opts = opts
       begin
         opts.parse!(ARGV)
       rescue 
-        error("Option parsing error")
+        error("Option parsing error: #{$!}")
         return false
       end
       return true
@@ -1867,7 +2031,10 @@ module ConfigInformation
     # Output
     # * return true if the options used are correct, false otherwise
     def check_kaconsole_config
-      if (@exec_specific.node == nil) then
+      if @exec_specific.get_version then
+        return true
+      end
+      if (@exec_specific.node == nil)then
         error("You must choose one node")
         return false
       end
@@ -1920,9 +2087,11 @@ module ConfigInformation
     attr_accessor :rambin_path
     attr_accessor :mkfs_options
     attr_accessor :demolishing_env_threshold
+    attr_accessor :demolishing_env_auto_tag
     attr_accessor :bt_tracker_ip
     attr_accessor :bt_download_timeout
     attr_accessor :almighty_env_users
+    attr_accessor :version
 
     # Constructor of CommonConfig
     #
@@ -1933,6 +2102,7 @@ module ConfigInformation
     def initialize
       @nodes_desc = Nodes::NodeSet.new
       @kadeploy_disable_cache = false
+      @demolishing_env_auto_tag = false
     end
 
     # Check if all the fields of the common configuration file are filled
@@ -1977,6 +2147,7 @@ module ConfigInformation
     attr_accessor :deploy_part
     attr_accessor :prod_part
     attr_accessor :tmp_part
+    attr_accessor :swap_part
     attr_accessor :workflow_steps   #Array of MacroStep
     attr_accessor :timeout_reboot
     attr_accessor :cmd_soft_reboot_rsh
@@ -2005,6 +2176,7 @@ module ConfigInformation
       @deploy_part = nil
       @prod_part = nil
       @tmp_part = nil
+      @swap_part = nil
       @timeout_reboot = nil
       @cmd_soft_reboot_rsh = nil
       @cmd_soft_reboot_ssh = nil
@@ -2035,6 +2207,7 @@ module ConfigInformation
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
+      dest.swap_part = @swap_part.clone if (@swap_part != nil)
       dest.timeout_reboot = @timeout_reboot
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
@@ -2056,13 +2229,17 @@ module ConfigInformation
     # Output
     # * nothing      
     def duplicate_all(dest)
-      dest.workflow_steps = @workflow_steps.clone
+      dest.workflow_steps = Array.new
+      @workflow_steps.each_index { |i|
+        dest.workflow_steps[i] = @workflow_steps[i].clone
+      }
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_initrd = @deploy_initrd.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
+      dest.swap_part = @swap_part.clone if (@swap_part != nil)
       dest.timeout_reboot = @timeout_reboot
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
@@ -2169,8 +2346,8 @@ module ConfigInformation
     # * nothing
     # Output
     # * return an array: [0] is the name of the instance, 
-    #                     [1] is the number of retries available for the instance
-    #                     [2] is the timeout for the instance
+    #                    [1] is the number of retries available for the instance
+    #                    [2] is the timeout for the instance
     def get_instance
       return @array_of_instances[@current]
     end
