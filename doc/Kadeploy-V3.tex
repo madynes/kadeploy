@@ -368,7 +368,7 @@ admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
 
 #Automata description
 macrostep = SetDeploymentEnv|SetDeploymentEnvProd:1:200,SetDeploymentEnvUntrusted:1:400
-macrostep = BroadcastEnv|BroadcastEnvChain:2:500
+macrostep = BroadcastEnv|BroadcastEnvKastafior:2:500
 macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvHardReboot:1:300
 \end{verbatim}
 \end{small}
@@ -738,7 +738,7 @@ This command performs the deployment of the environment described by the file \t
             --breakpoint BroadcastEnvKastafior:manage_user_post_install \
             -d
 \end{verbatim}
-This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvChain} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.
+This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvKastafior} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.
 
 \paragraph{Use case 6 - advanced usage - specific PXE profile}
 \begin{verbatim}
@@ -782,7 +782,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e "FreeBSD 7.1" \
             --force-steps "SetDeploymentEnv|SetDeploymentEnvProd:2:100&
-                           BroadcastEnv|BroadcastEnvChain:2:300&
+                           BroadcastEnv|BroadcastEnvKastafior:2:300&
                            BootNewEnv|BootNewEnvKexec:1:150"
 \end{verbatim}
 If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
@@ -1203,7 +1203,7 @@ If you do kernel development on the deployed nodes, you will probably want to up
 On a \emph{Linux} environment, after having updated your kernel/initrd, 2 cases are imaginable:
 \begin{enumerate}
 \item your kernel/initrd have the same name, so you can reboot the node without modifying anything.
-\item your kernel.initrd have a new name, so you will have to update the grub configuration file (\texttt{/boot/grub/grub.cfg}) of your node in order to allow grub to select the new kernel and then you can reboot the node.
+\item your kernel/initrd have a new name, so you will have to update the grub configuration file (\texttt{/boot/grub/grub.cfg}) of your node in order to allow grub to select the new kernel and then you can reboot the node.
 \end{enumerate}
 
 \subsubsection{Xen environments}

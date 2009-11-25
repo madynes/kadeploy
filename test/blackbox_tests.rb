@@ -12,7 +12,7 @@ RESULTS=Array.new
 
 def count_lines(filename)
   count = `(wc -l #{filename} 2>/dev/null || echo 0) | cut -f 1 -d" "`
-  return count
+  return count.to_i
 end
 
 def add_result(kind, env, testname, result, time, ok, ko)
@@ -92,22 +92,26 @@ def load_cmdline_options
 end
   
 
-def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_simult, ok = "nodes_ok", ko = "nodes_ko")
+def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_simult)
   puts "# Launching test #{test_name} with #{env} env"
-  File.delete(ok) if File.exist?(ok)
-  File.delete(ko) if File.exist?(ko)
+  
+  ok_file = Tempfile.new("blackboxtests-ok")
+  ok = ok_file.path
+  ko_file = Tempfile.new("blackboxtests-ko")
+  ko = ko_file.path
+
   node_list = String.new
   nodes.each { |node|
     node_list += " -m #{node}"
   }
   cmd = "#{kadeploy} #{node_list} -e \"#{env}\" --verbose-level 0 -k #{key} --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko}"
   system(cmd)
-  if File.exist?(ko) then
+  if (count_lines(ko) > 0) then
     IO.readlines(ko).each { |node|
       puts "The node #{node.chomp} has not been correctly deployed"
     }
   end
-  if File.exist?(ok) then
+  if (count_lines(ok) > 0) then
     deployed_nodes = Array.new
     IO.readlines(ok).each { |node|
       deployed_nodes.push(node.chomp)
@@ -163,7 +167,7 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
     tid_hash_result = Hash.new
     (0...simult).to_a.each { |n|
       tid = Thread.new {
-        r, o, k = _test_deploy(nodes_hash[n], step1, step2, step3, test_name, key, env, kadeploy, max_simult, "nodes_ok_#{n}", "nodes_ko_#{n}")
+        r, o, k = _test_deploy(nodes_hash[n], step1, step2, step3, test_name, key, env, kadeploy, max_simult)
         tid_hash_result[tid] = [r, o, k]
       }
       tid_array << tid
@@ -191,10 +195,12 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
   end
 end
 
-def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_simult, ok = "nodes_ok", ko = "nodes_ko")
+def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_simult)
   puts "# Launching test #{test_name}"
-  File.delete(ok) if File.exist?(ok)
-  File.delete(ko) if File.exist?(ko)
+  ok_file = Tempfile.new("blackboxtests-ok")
+  ok = ok_file.path
+  ko_file = Tempfile.new("blackboxtests-ko")
+  ko = ko_file.path
   node_list = String.new
   nodes.each { |node|
     node_list += " -m #{node}"
@@ -203,7 +209,7 @@ def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_si
   start = Time.now.to_i
   system(cmd)
   time = Time.now.to_i - start
-  if File.exist?(ko) then
+  if (count_lines(ko) > 0) then
     add_result("seq", "dummy", test_name, "ko", time, count_lines(ok), count_lines(ko))
     puts "[ ERROR ] (#{time}s)"
   else
