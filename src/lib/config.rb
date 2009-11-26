@@ -199,9 +199,12 @@ module ConfigInformation
     end
 
     def check_kaconsole_config(exec_specific_config, db, client)
-      if (@common.nodes_desc.get_node_by_host(exec_specific_config.node) == nil) then
+      node = @common.nodes_desc.get_node_by_host(exec_specific_config.node)
+      if (node == nil) then
         Debug::distant_client_error("The node #{exec_specific_config.node} does not exist", client)
         return false
+      else
+        exec_specific_config.node = node
       end
       return true
     end
@@ -252,6 +255,10 @@ module ConfigInformation
       exec_specific.write_workflow_id = String.new
       exec_specific.get_version = false
       exec_specific.prefix_in_cache = String.new
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
 
       if Config.load_kadeploy_cmdline_options(exec_specific) then
         return exec_specific
@@ -599,25 +606,21 @@ module ConfigInformation
     # Arguments
     # * nothing
     # Output
-    # * return an open struct that contains some stuffs usefull for client
+    # * return an Hash that contains the servers info
     def Config.load_client_config_file
-      client_config = OpenStruct.new
+      servers = Hash.new
       IO.readlines(CONFIGURATION_FOLDER + "/" + CLIENT_CONFIGURATION_FILE).each { |line|
         if not (/^#/ =~ line) then #we ignore commented lines
-          if /(.+)\ \=\ (.+)/ =~ line then
+          if /\A(\w+)\ \=\ ([\w.-]+):(\d+)\Z/ =~ line then
             content = Regexp.last_match
-            attr = content[1]
-            val = content[2].strip
-            case attr
-            when "kadeploy_server"
-              client_config.kadeploy_server = val
-            when "kadeploy_server_port"
-              client_config.kadeploy_server_port = val.to_i
-            end
+            shortcut = content[1]
+            host = content[2]
+            port = content[3]
+            servers[shortcut] = [host, port]
           end
         end
       }
-      return client_config
+      return servers
     end
 
     # Load the specific configuration files
@@ -1082,6 +1085,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        } 
         opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             exec_specific.verbose_level = d.to_i
@@ -1134,7 +1140,7 @@ module ConfigInformation
               end
             }
           end
-        }
+        }       
         opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
           s.split("&").each { |macrostep|
             macrostep_name = macrostep.split("|")[0]
@@ -1155,6 +1161,13 @@ module ConfigInformation
         opts.parse!(ARGV)
       rescue 
         error("Option parsing error: #{$!}")
+        return false
+      end
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
         return false
       end
       if not exec_specific.get_version then
@@ -1206,7 +1219,7 @@ module ConfigInformation
     # * nothing
     # Output
     # * return true in case of success, false otherwise
-    def Config.load_kaenv_exec_specific
+    def Config.load_kaenv_exec_specific()
       exec_specific = OpenStruct.new
       exec_specific.environment = EnvironmentManagement::Environment.new
       exec_specific.operation = String.new
@@ -1220,6 +1233,10 @@ module ConfigInformation
       exec_specific.version = String.new
       exec_specific.files_to_move = Array.new
       exec_specific.get_version = false
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
 
       if Config.load_kaenv_cmdline_options(exec_specific) then
         return exec_specific
@@ -1304,6 +1321,9 @@ module ConfigInformation
             return false
           end
         }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        } 
         opt.separator "Advanced options:"
         opt.on("--remove-demolishing-tag ENVNAME", "Remove demolishing tag on an environment") { |n|
           exec_specific.env_name = n
@@ -1338,6 +1358,13 @@ module ConfigInformation
         return false
       end
 
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
+        return false
+      end
       return true if exec_specific.get_version
       case exec_specific.operation 
       when "add"
@@ -1413,7 +1440,7 @@ module ConfigInformation
     # * nothing
     # Output
     # * return true in case of success, false otherwise
-    def Config.load_karights_exec_specific
+    def Config.load_karights_exec_specific()
       exec_specific = OpenStruct.new
       exec_specific.operation = String.new
       exec_specific.user = String.new
@@ -1421,7 +1448,11 @@ module ConfigInformation
       exec_specific.node_list = Array.new
       exec_specific.true_user = USER
       exec_specific.overwrite_existing_rights = false
-      exec_specific.get_version = false
+      exec_specific.get_version = fals
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
 
       if Config.load_karights_cmdline_options(exec_specific) then
         return exec_specific
@@ -1491,6 +1522,9 @@ module ConfigInformation
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
         }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        }
       end
       @opts = opts
       begin
@@ -1500,6 +1534,13 @@ module ConfigInformation
         return false
       end
 
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
+        return false
+      end
       return true if exec_specific.get_version
       if (exec_specific.user == "") then
         error("You must choose a user")
@@ -1535,7 +1576,7 @@ module ConfigInformation
     # * nothing
     # Output
     # * return true in case of success, false otherwise
-    def Config.load_kastat_exec_specific
+    def Config.load_kastat_exec_specific()
       exec_specific = OpenStruct.new
       exec_specific.operation = String.new
       exec_specific.date_min = 0
@@ -1546,6 +1587,10 @@ module ConfigInformation
       exec_specific.steps = Array.new
       exec_specific.fields = Array.new
       exec_specific.get_version = false
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
 
       if Config.load_kastat_cmdline_options(exec_specific) then
         return exec_specific
@@ -1614,6 +1659,9 @@ module ConfigInformation
         opt.on("-y", "--date-max DATE", "Get the stats to this date") { |d|
           exec_specific.date_max = d
         }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        }
       end
       @opts = opts
       begin
@@ -1623,6 +1671,13 @@ module ConfigInformation
         return false
       end
 
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
+        return false
+      end
       return true if exec_specific.get_version
       if (exec_specific.operation == "") then
         error("You must choose an operation")
@@ -1686,7 +1741,11 @@ module ConfigInformation
       exec_specific.node_list = Array.new
       exec_specific.wid = String.new
       exec_specific.get_version = false
-      
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
+
       if Config.load_kanodes_cmdline_options(exec_specific) then
         return exec_specific
       else
@@ -1741,6 +1800,9 @@ module ConfigInformation
         opt.on("-y", "--get-yaml-dump", "Get the yaml dump") {
           exec_specific.operation = "get_yaml_dump"
         }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        }
       end
       @opts = opts
       begin
@@ -1750,6 +1812,13 @@ module ConfigInformation
         return false
       end
 
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
+        return false
+      end
       if ((exec_specific.operation == "") && (not exec_specific.get_version)) then
         error("You must choose an operation")
         return false
@@ -1792,6 +1861,10 @@ module ConfigInformation
       exec_specific.wait = true
       exec_specific.get_version = false
       exec_specific.reboot_id = String.new
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
 
       if Config.load_kareboot_cmdline_options(exec_specific) then
         return exec_specific
@@ -1929,6 +2002,9 @@ module ConfigInformation
         opt.on("--no-wait", "Do not wait the end of the reboot") {
           exec_specific.wait = false
         }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        } 
         opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             exec_specific.verbose_level = d.to_i
@@ -1946,6 +2022,13 @@ module ConfigInformation
         return false
       end
 
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
+        return false
+      end
       return true if exec_specific.get_version
 
       if exec_specific.node_array.empty? then
@@ -2018,6 +2101,11 @@ module ConfigInformation
       exec_specific = OpenStruct.new
       exec_specific.node = nil
       exec_specific.get_version = false
+      exec_specific.true_user = USER
+      exec_specific.chosen_server = "default"
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
 
       if Config.load_kaconsole_cmdline_options(exec_specific) then
         return exec_specific
@@ -2049,7 +2137,10 @@ module ConfigInformation
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
-        }        
+        }
+        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+          exec_specific.chosen_server = s
+        }
       end
       @opts = opts
       begin
@@ -2058,7 +2149,14 @@ module ConfigInformation
         error("Option parsing error: #{$!}")
         return false
       end
-
+  
+      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
+        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      else
+        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
+        return false
+      end
       return true if exec_specific.get_version
       if (exec_specific.node == nil)then
         error("You must choose one node")

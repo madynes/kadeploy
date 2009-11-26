@@ -587,7 +587,7 @@ module Managers
       end
       @nodes_ok = Nodes::NodeSet.new
       @nodes_ko = Nodes::NodeSet.new
-      @nodeset = @config.exec_specific.node_list
+      @nodeset = @config.exec_specific.node_set
       @queue_manager = QueueManager.new(@config, @nodes_ok, @nodes_ko)
       @reboot_window = reboot_window
       @nodes_check_window = nodes_check_window

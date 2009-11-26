@@ -7,76 +7,62 @@
 
 #Kadeploy libs
 require 'config'
-require 'db'
-require 'nodes'
-require 'checkrights'
 
 #Ruby libs
 require 'drb'
 
-CHECK_RIGHTS_INTERVAL=60
+class KaconsoleClient
+  @console_pid = nil
 
-
-def _exit(exit_code, dbh)
-  dbh.disconnect if (dbh != nil)
-  exit(exit_code)
-end
-
-
-
-#Connect to the Kadeploy server to get the common configuration
-client_config = ConfigInformation::Config.load_client_config_file
-DRb.start_service()
-uri = "druby://#{client_config.kadeploy_server}:#{client_config.kadeploy_server_port}"
-kadeploy_server = DRbObject.new(nil, uri)
-
-common_config = kadeploy_server.get_common_config
-begin
-  config = ConfigInformation::Config.new("kaconsole", common_config.nodes_desc)
-rescue
-  _exit(1, nil)
-end
-config.common = common_config
-
-if (config.check_config("kaconsole") == true) then
-  if config.exec_specific.get_version then
-    puts "Kaconsole version: #{kadeploy_server.get_version()}"
-    _exit(0, nil)
+  # Print a message (RPC)
+  #
+  # Arguments
+  # * msg: string to print
+  # Output
+  # * prints a message
+  def print(msg)
+    puts msg
   end
-  db = Database::DbFactory.create(config.common.db_kind)
-  db.connect(config.common.deploy_db_host,
-             config.common.deploy_db_login,
-             config.common.deploy_db_passwd,
-             config.common.deploy_db_name)
   
-  part = kadeploy_server.get_default_deploy_part(config.exec_specific.node.cluster)
-  set = Nodes::NodeSet.new
-  set.push(config.exec_specific.node)
-  if (CheckRights::CheckRightsFactory.create(common_config.rights_kind, set, db, part).granted?) then
-    pid = Process.fork {
-      exec(config.exec_specific.node.cmd.console)
+  def connect_console(server, port)
+    @console_pid = fork {
+      exec("nc #{server} #{port}")
+      #exec("socat - tcp:#{server}:#{port}")
     }
-    state = "running"
-    while ((CheckRights::CheckRightsFactory.create(common_config.rights_kind, set, db, part).granted?) &&
-           (state == "running"))
-      CHECK_RIGHTS_INTERVAL.times {
-        if (Process.waitpid(pid, Process::WNOHANG) == pid) then
-          state = "reaped"
-          break
-        else
-          sleep(1)
-        end
-      }
-    end
-    if (state == "running") then
-      Process.kill("SIGKILL", pid)
-      system("reset")
-      puts "Console killed"
-    end
-  else
-    _exit(1, db)
   end
-  _exit(0, db)
+
+  def kill_console
+    Process.kill("SIGKILL", @console_pid)
+  end
+end
+
+exec_specific_config = ConfigInformation::Config.load_kaconsole_exec_specific()
+
+if exec_specific_config != nil then
+  #Connect to the server
+  DRb.start_service()
+  uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
+  kadeploy_server = DRbObject.new(nil, uri)
+
+  if exec_specific_config.get_version then
+    puts "Kaconsole version: #{kadeploy_server.get_version()}"
+    exit(0)
+  end
+
+  kaconsole_client = KaconsoleClient.new()
+  DRb.start_service(nil, kaconsole_client)
+  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+    content = Regexp.last_match
+    client_host = content[1]
+    client_port = content[2]
+  else
+    puts "The URI #{DRb.uri} is not correct"
+    exit(1)
+  end
+
+  kadeploy_server.run("kaconsole", exec_specific_config, client_host, client_port)
+  
+  exit(0)
 else
-  _exit(1, db)
+  exit(1)
 end

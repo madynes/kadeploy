@@ -13,7 +13,7 @@ module Debug
   # * msg: error message
   # Output
   # * nothing
-  def Debug::client_error(msg, usage_handler = nil)
+  def Debug::local_client_error(msg, usage_handler = nil)
     puts "ERROR: #{msg}."
     puts "---"
     if (usage_handler == nil) then
@@ -21,6 +21,17 @@ module Debug
     else
       usage_handler.call
     end
+  end
+
+  # Print a message
+  #
+  # Arguments
+  # * msg: message
+  # * client: DRb client handler
+  # Output
+  # * nothing
+  def Debug::distant_client_print(msg, client)
+    client.print(msg)
   end
 
   class OutputControl

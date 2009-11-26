@@ -112,7 +112,7 @@ module CheckRights
           end
         end
         if (node_found == false) then
-          Debug::distant_client_error("You do not have the rights to deploy on the node #{host}:#{@part}", @client)
+          Debug::distant_client_print("You do not have the rights to deploy on the node #{host}:#{@part}", @client)
           return false
         end
       }

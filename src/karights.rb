@@ -23,15 +23,14 @@ class KarightsClient
   end
 end
 
-
-#Connect to the Kadeploy server to get the common configuration
-client_config = ConfigInformation::Config.load_client_config_file
-DRb.start_service()
-uri = "druby://#{client_config.kadeploy_server}:#{client_config.kadeploy_server_port}"
-kadeploy_server = DRbObject.new(nil, uri)
-
 exec_specific_config = ConfigInformation::Config.load_karights_exec_specific()
+
 if (exec_specific_config != nil) then
+  #Connect to the server
+  DRb.start_service()
+  uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
+  kadeploy_server = DRbObject.new(nil, uri)
+
   if exec_specific_config.get_version then
     puts "Karights version: #{kadeploy_server.get_version()}"
     exit(0)

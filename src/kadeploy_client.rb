@@ -185,16 +185,14 @@ class KadeployClient
   end
 end
 
-client_config = ConfigInformation::Config.load_client_config_file
-
-#Connect to the server
-DRb.start_service()
-uri = "druby://#{client_config.kadeploy_server}:#{client_config.kadeploy_server_port}"
-kadeploy_server = DRbObject.new(nil, uri)
-
-
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
+
 if (exec_specific_config != nil) then
+  #Connect to the server
+  DRb.start_service()
+  uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
+  kadeploy_server = DRbObject.new(nil, uri)
+
   if exec_specific_config.get_version then
     puts "Kadeploy version: #{kadeploy_server.get_version()}"
     exit(0)
@@ -229,7 +227,7 @@ if (exec_specific_config != nil) then
       system(exec_specific_config.script)
     end
     exec_specific_config = nil
-    exit(°)
+    exit(0)
   else
     puts "Only linux and xen environments can be deployed with the pure PXE configuration"
     exit(1)

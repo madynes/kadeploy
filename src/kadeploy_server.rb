@@ -590,10 +590,51 @@ class KadeployServer
   ##################################
   
   def run_kaconsole(db, client, exec_specific)
+    #Try do find a free port to bind
+    sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
+    sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
+    begin
+      sock.bind(sockaddr)
+    rescue
+      Debug::distant_client_print("Cannot bind: #{$!}", client)
+      return false
+    end
+    port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
+
+    set = Nodes::NodeSet.new
+    set.push(exec_specific.node)
+    part = @config.cluster_specific[exec_specific.node.cluster].block_device + @config.cluster_specific[exec_specific.node.cluster].deploy_part
+    if (CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) then
+      sock.close
+      pid = Process.fork {
+        exec("nc -l -p #{port} -c \"#{exec_specific.node.cmd.console}\"")
+        #exec("socat tcp-l:#{port},reuseaddr exec:\"#{exec_specific.node.cmd.console}\",nofork")
+      }
+      sleep(2)
+      client.connect_console(@config.common.kadeploy_server, port)
+      state = "running"
+      while ((CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) &&
+             (state == "running"))
+        60.times {
+          if (Process.waitpid(pid, Process::WNOHANG) == pid) then
+            state = "reaped"
+            break
+          else
+            sleep(1)
+          end
+        }
+      end
+      if (state == "running") then
+        client.kill_console()
+        Debug::distant_client_print("Console killed", client)
+        ProcessManagement::killall(pid)
+      end
+    else
+      return false
+    end
+    return true
   end
-
-
-
+  
 
 
 
