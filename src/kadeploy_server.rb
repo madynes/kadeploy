@@ -115,6 +115,12 @@ class KadeployServer
   end
 
 
+
+
+
+
+  private
+
   ##################################
   #      Public Kadeploy Sync      #
   ##################################
@@ -243,6 +249,32 @@ class KadeployServer
       end
     }
   end
+
+  # Record a Managers::WorkflowManager pointer
+  #
+  # Arguments
+  # * workflow_ptr: reference toward a Managers::WorkflowManager
+  # * workflow_id: workflow_id
+  # Output
+  # * nothing
+  def kadeploy_add_workflow_info(workflow_ptr, workflow_id)
+    @workflow_info_hash[workflow_id] = workflow_ptr
+  end
+
+  # Delete the information of a workflow
+  #
+  # Arguments
+  # * workflow_id: workflow id
+  # Output
+  # * nothing
+  def kadeploy_delete_workflow_info(workflow_id)
+    @workflow_info_hash.delete(workflow_id)
+  end
+
+
+
+
+
 
   ##################################
   #    Public Kadeploy Async       #
@@ -506,6 +538,26 @@ class KadeployServer
     }
   end
 
+  def kareboot_add_reboot_info(tid, reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      if not @reboot_info_hash.has_key?(reboot_id) then
+        @reboot_info_hash[reboot_id] = Array.new
+      end
+      @reboot_info_hash[reboot_id].push(tid)
+    }
+  end
+
+  def kareboot_delete_reboot_info(reboot_id)
+    @reboot_info_hash_lock.synchronize {
+      @reboot_info_hash[reboot_id] = nil
+      @reboot_info_hash.delete(reboot_id)
+    }
+  end
+
+
+
+
+
 
   ##################################
   #        Public Kastat           #
@@ -524,173 +576,6 @@ class KadeployServer
     end
   end
 
-
-  ##################################
-  #        Public Kanodes          #
-  ##################################
-
-  def run_kanodes(db, client, exec_specific)
-    case exec_specific.operation
-    when "get_deploy_state"
-      return kanodes_get_deploy_state(exec_specific, client, db)
-    when "get_yaml_dump"
-      return kanodes_get_yaml_dump(exec_specific, db)
-    end
-  end
-  
-
-  ##################################
-  #       Public Karights          #
-  ##################################
-
-  def run_karights(db, client, exec_specific)
-    case exec_specific.operation  
-    when "add"
-      karights_add_rights(exec_specific, client, db)
-    when "delete"
-      karights_delete_rights(exec_specific, client, db)
-    when "show"
-      karights_show_rights(exec_specific, client, db)
-    end
-  end
-
-
-  ##################################
-  #        Public Kaenv            #
-  ##################################
-
-  def run_kaenv(db, client, exec_specific)
-    case exec_specific.operation
-    when "list"
-      kaenv_list_environments(exec_specific, client, db)
-    when "add"
-      kaenv_add_environment(exec_specific, client, db)
-    when "delete"
-      kaenv_delete_environment(exec_specific, client, db)
-    when "print"
-      kaenv_print_environment(exec_specific, client, db)
-    when "update-tarball-md5"
-      kaenv_update_tarball_md5(exec_specific, client, db)
-    when "update-preinstall-md5"
-      kaenv_update_preinstall_md5(exec_specific, client, db)
-    when "update-postinstalls-md5"
-      kaenv_update_postinstall_md5(exec_specific, client, db)
-    when "remove-demolishing-tag"
-      kaenv_remove_demolishing_tag(exec_specific, client, db)
-    when "set-visibility-tag"
-      kaenv_set_visibility_tag(exec_specific, client, db)
-    when "move-files"
-      kaenv_move_files(exec_specific, client, db)
-    end
-  end
-
-
-  ##################################
-  #       Public Kaconsole         #
-  ##################################
-  
-  def run_kaconsole(db, client, exec_specific)
-    #Try do find a free port to bind
-    sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
-    sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
-    begin
-      sock.bind(sockaddr)
-    rescue
-      Debug::distant_client_print("Cannot bind: #{$!}", client)
-      return false
-    end
-    port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
-
-    set = Nodes::NodeSet.new
-    set.push(exec_specific.node)
-    part = @config.cluster_specific[exec_specific.node.cluster].block_device + @config.cluster_specific[exec_specific.node.cluster].deploy_part
-    if (CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) then
-      sock.close
-      pid = Process.fork {
-        exec("nc -l -p #{port} -c \"#{exec_specific.node.cmd.console}\"")
-        #exec("socat tcp-l:#{port},reuseaddr exec:\"#{exec_specific.node.cmd.console}\",nofork")
-      }
-      sleep(2)
-      client.connect_console(@config.common.kadeploy_server, port)
-      state = "running"
-      while ((CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) &&
-             (state == "running"))
-        60.times {
-          if (Process.waitpid(pid, Process::WNOHANG) == pid) then
-            state = "reaped"
-            break
-          else
-            sleep(1)
-          end
-        }
-      end
-      if (state == "running") then
-        client.kill_console()
-        Debug::distant_client_print("Console killed", client)
-        ProcessManagement::killall(pid)
-      end
-    else
-      return false
-    end
-    return true
-  end
-  
-
-
-
-
-
-  private
-  ##################################
-  #   Private Kadeploy Sync/Async  #
-  ##################################
-
-  # Record a Managers::WorkflowManager pointer
-  #
-  # Arguments
-  # * workflow_ptr: reference toward a Managers::WorkflowManager
-  # * workflow_id: workflow_id
-  # Output
-  # * nothing
-  def kadeploy_add_workflow_info(workflow_ptr, workflow_id)
-    @workflow_info_hash[workflow_id] = workflow_ptr
-  end
-
-  # Delete the information of a workflow
-  #
-  # Arguments
-  # * workflow_id: workflow id
-  # Output
-  # * nothing
-  def kadeploy_delete_workflow_info(workflow_id)
-    @workflow_info_hash.delete(workflow_id)
-  end
-
-
-  ##################################
-  #       Private Kareboot         #
-  ##################################
-
-  def kareboot_add_reboot_info(tid, reboot_id)
-    @reboot_info_hash_lock.synchronize {
-      if not @reboot_info_hash.has_key?(reboot_id) then
-        @reboot_info_hash[reboot_id] = Array.new
-      end
-      @reboot_info_hash[reboot_id].push(tid)
-    }
-  end
-
-  def kareboot_delete_reboot_info(reboot_id)
-    @reboot_info_hash_lock.synchronize {
-      @reboot_info_hash[reboot_id] = nil
-      @reboot_info_hash.delete(reboot_id)
-    }
-  end
-
-
-  ##################################
-  #       Private Kastat           #
-  ##################################
   # Generate some filters for the output according the options
   #
   # Arguments
@@ -799,7 +684,6 @@ class KadeployServer
     end
   end
 
-
   # List the information about the nodes that have at least a given failure rate
   #
   # Arguments
@@ -873,11 +757,24 @@ class KadeployServer
     end
   end
 
-  ##################################
-  #       Private Kanodes          #
-  ##################################
 
 
+
+
+
+  ##################################
+  #        Public Kanodes          #
+  ##################################
+
+  def run_kanodes(db, client, exec_specific)
+    case exec_specific.operation
+    when "get_deploy_state"
+      return kanodes_get_deploy_state(exec_specific, client, db)
+    when "get_yaml_dump"
+      return kanodes_get_yaml_dump(exec_specific, db)
+    end
+  end
+  
   # List the deploy information about the nodes
   #
   # Arguments
@@ -960,9 +857,25 @@ class KadeployServer
     return str
   end
 
+
+
+
+
+
   ##################################
-  #       Private Karights         #
+  #       Public Karights          #
   ##################################
+
+  def run_karights(db, client, exec_specific)
+    case exec_specific.operation  
+    when "add"
+      karights_add_rights(exec_specific, client, db)
+    when "delete"
+      karights_delete_rights(exec_specific, client, db)
+    when "show"
+      karights_show_rights(exec_specific, client, db)
+    end
+  end
 
   # Show the rights of a user defined in exec_specific.user
   #
@@ -1096,13 +1009,39 @@ class KadeployServer
     }
   end
 
-  ##################################
-  #       Private Kaconsole        #
-  ##################################
+
+
+
+
 
   ##################################
-  #       Private Kaenv            #
+  #        Public Kaenv            #
   ##################################
+
+  def run_kaenv(db, client, exec_specific)
+    case exec_specific.operation
+    when "list"
+      kaenv_list_environments(exec_specific, client, db)
+    when "add"
+      kaenv_add_environment(exec_specific, client, db)
+    when "delete"
+      kaenv_delete_environment(exec_specific, client, db)
+    when "print"
+      kaenv_print_environment(exec_specific, client, db)
+    when "update-tarball-md5"
+      kaenv_update_tarball_md5(exec_specific, client, db)
+    when "update-preinstall-md5"
+      kaenv_update_preinstall_md5(exec_specific, client, db)
+    when "update-postinstalls-md5"
+      kaenv_update_postinstall_md5(exec_specific, client, db)
+    when "remove-demolishing-tag"
+      kaenv_remove_demolishing_tag(exec_specific, client, db)
+    when "set-visibility-tag"
+      kaenv_set_visibility_tag(exec_specific, client, db)
+    when "move-files"
+      kaenv_move_files(exec_specific, client, db)
+    end
+  end
 
   # List the environments of a user defined in exec_specific.user
   #
@@ -1602,6 +1541,58 @@ class KadeployServer
         Debug::distant_client_print("There is no recorded environment", client)
       end
     end
+  end
+
+
+
+
+
+
+  ##################################
+  #       Public Kaconsole         #
+  ##################################
+  
+  def run_kaconsole(db, client, exec_specific)
+    #Try do find a free port to bind
+    sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
+    sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
+    begin
+      sock.bind(sockaddr)
+    rescue
+      Debug::distant_client_print("Cannot bind: #{$!}", client)
+      return false
+    end
+    port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
+
+    set = Nodes::NodeSet.new
+    set.push(exec_specific.node)
+    part = @config.cluster_specific[exec_specific.node.cluster].block_device + @config.cluster_specific[exec_specific.node.cluster].deploy_part
+    if (CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) then
+      sock.close
+      pid = fork {
+        client.connect_console(exec_specific.node.cmd.console)
+      }
+      state = "running"
+      while ((CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) &&
+             (state == "running"))
+        20.times {
+          if (Process.waitpid(pid, Process::WNOHANG) == pid) then
+            state = "reaped"
+            break
+          else
+            sleep(1)
+          end
+        }
+      end
+      if (state == "running") then
+        client.kill_console()
+        Debug::distant_client_print("Console killed", client)
+        ProcessManagement::killall(pid)
+      end
+    else
+      return false
+    end
+    return true
   end
 end
 

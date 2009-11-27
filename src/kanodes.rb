@@ -7,12 +7,9 @@
 
 #Kadeploy libs
 require 'config'
-require 'db'
 
 #Ruby libs
 require 'drb'
-
-
 
 
 class KanodesClient

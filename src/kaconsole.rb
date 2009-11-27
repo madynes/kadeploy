@@ -12,7 +12,7 @@ require 'config'
 require 'drb'
 
 class KaconsoleClient
-  @console_pid = nil
+  @killed = nil
 
   # Print a message (RPC)
   #
@@ -24,15 +24,24 @@ class KaconsoleClient
     puts msg
   end
   
-  def connect_console(server, port)
-    @console_pid = fork {
-      exec("nc #{server} #{port}")
-      #exec("socat - tcp:#{server}:#{port}")
+  def connect_console(cmd)
+    @killed = false
+    ret_wait = 0
+    pid = fork {
+      exec(cmd)
     }
+    while (not @killed) 
+      ret_wait = Process.waitpid(pid, Process::WNOHANG)
+      @killed = true if ret_wait == pid
+      sleep(1)
+    end
+    if (ret_wait != pid) then
+      Process.kill("SIGKILL", pid)
+    end
   end
 
   def kill_console
-    Process.kill("SIGKILL", @console_pid)
+    @killed = true
   end
 end
 
