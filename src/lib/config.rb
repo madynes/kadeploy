@@ -1214,7 +1214,7 @@ module ConfigInformation
           end
         }
         opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A(\w+)|\*\Z/ =~ u then
+          if /\A(\w+|\*)\Z/ =~ u then
             @exec_specific.user = u
           else
             error("Invalid user name")
@@ -1836,7 +1836,7 @@ module ConfigInformation
           @exec_specific.reboot_kind = k
         }
         opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A(\w+)|\*\Z/ =~ u then
+          if /\A\w+\Z/ =~ u then
             @exec_specific.user = u
           else
             error("Invalid user name")
