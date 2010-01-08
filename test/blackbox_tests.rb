@@ -7,6 +7,7 @@
 
 require 'optparse'
 require 'yaml'
+require 'tempfile'
 
 RESULTS=Array.new
 
