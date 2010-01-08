@@ -12,6 +12,7 @@ cmd_hard_reboot = vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT
 cmd_very_hard_reboot = vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx start hard
 cmd_console = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/console.sh HOSTNAME_SHORT
 #drivers = ata_piix,ata_generic
+pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
 kernel_params = console=tty0 console=ttyS0,38400n8
 admin_pre_install = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_pre_install_g5kdev.tgz|tgz|launch_admin_pre_install.sh
 admin_post_install = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_post_install_g5kdev.tgz|tgz|launch_admin_post_install.sh

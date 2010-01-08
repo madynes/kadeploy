@@ -362,6 +362,7 @@ cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
 cmd_console = /usr/local/kadeploy/bin/console HOSTNAME_SHORT
 drivers = ata_piix,ata_generic
 kernel_params = console=tty0 console=ttyS1,38400n8
+pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
 partition_creation_kind = fdisk
 admin_pre_install = /g5k/admin_pre_install.tgz|tgz|launch.sh
 admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
@@ -390,6 +391,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{cmd\_very\_hard\_reboot}: generic very hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{drivers}: list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
 \item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
+\item \texttt{pxe\_header}: default PXE header (must be defined in one line).
 \item \texttt{partition\_creation\_kind}: tool used to create the partition table. The expected values are \texttt{fdisk} or \texttt{parted}.
 \item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
 \item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.

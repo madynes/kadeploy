@@ -282,6 +282,7 @@ module MicroStepsLibrary
       }
       @reboot_window.launch(node_set, &callback)
       @nodes_ko.add(node_set) if @nodes_ok.empty?
+      node_set = nil
     end
 
     # Test if the given symlink is an absolute link
@@ -1047,7 +1048,8 @@ module MicroStepsLibrary
                                                 "",
                                                 @config.common.tftp_repository,
                                                 @config.common.tftp_images_path,
-                                                @config.common.tftp_cfg) then
+                                                @config.common.tftp_cfg,
+                                                @config.cluster_specific[@cluster].pxe_header) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
           return false
         end
@@ -1057,7 +1059,8 @@ module MicroStepsLibrary
                                                   @config.common.nfs_server,
                                                   @config.common.tftp_repository,
                                                   @config.common.tftp_images_path,
-                                                  @config.common.tftp_cfg) then
+                                                  @config.common.tftp_cfg,
+                                                  @config.cluster_specific[@cluster].pxe_header) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_nfsroot operation")
           return false
         end
@@ -1103,7 +1106,8 @@ module MicroStepsLibrary
                                                       get_deploy_part_str(),
                                                       @config.common.tftp_repository,
                                                       @config.common.tftp_images_path,
-                                                      @config.common.tftp_cfg) then
+                                                      @config.common.tftp_cfg,
+                                                      @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
                 return false
               end
@@ -1135,7 +1139,8 @@ module MicroStepsLibrary
                                                     get_deploy_part_str(),
                                                     @config.common.tftp_repository,
                                                     @config.common.tftp_images_path,
-                                                    @config.common.tftp_cfg) then
+                                                    @config.common.tftp_cfg,
+                                                    @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end
@@ -1150,7 +1155,8 @@ module MicroStepsLibrary
                                                    get_deploy_part_num(),
                                                    @config.common.tftp_repository,
                                                    @config.common.tftp_images_path,
-                                                   @config.common.tftp_cfg)
+                                                   @config.common.tftp_cfg,
+                                                   @config.cluster_specific[@cluster].pxe_header)
             else
               # @output.verbosel(3, "Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
@@ -1180,7 +1186,8 @@ module MicroStepsLibrary
                                                     get_deploy_part_str(),
                                                     @config.common.tftp_repository,
                                                     @config.common.tftp_images_path,
-                                                    @config.common.tftp_cfg) then
+                                                    @config.common.tftp_cfg,
+                                                    @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end
