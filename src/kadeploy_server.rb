@@ -31,6 +31,9 @@ class KadeployServer
   @workflow_hash_lock = nil
   @workflow_hash_index = nil
   
+  undef :instance_eval
+  undef :eval
+
   # Constructor of KadeployServer
   #
   # Arguments
@@ -82,22 +85,6 @@ class KadeployServer
   # * nothing
   def delete_workflow_info(workflow_id)
     @workflow_info_hash.delete(workflow_id)
-  end
-
-  def add_reboot_info(tid, reboot_id)
-    @reboot_info_hash_lock.synchronize {
-      if not @reboot_info_hash.has_key?(reboot_id) then
-        @reboot_info_hash[reboot_id] = Array.new
-      end
-      @reboot_info_hash[reboot_id].push(tid)
-    }
-  end
-
-  def delete_reboot_info(reboot_id)
-    @reboot_info_hash_lock.synchronize {
-      @reboot_info_hash[reboot_id] = nil
-      @reboot_info_hash.delete(reboot_id)
-    }
   end
 
   # Get a YAML output of the workflows (RPC)
@@ -175,17 +162,6 @@ class KadeployServer
     }
   end
 
-  def kill_reboot(reboot_id)
-    @reboot_info_hash_lock.synchronize {
-      if @reboot_info_hash.has_key?(reboot_id) then
-        @reboot_info_hash[reboot_id].each { |tid|
-          Thread.kill(tid)
-        }
-        @reboot_info_hash[reboot_id] = nil
-        @reboot_info_hash.delete(reboot_id)
-      end
-    }
-  end
 
   # Get the common configuration (RPC)
   #
@@ -291,7 +267,7 @@ class KadeployServer
     client.set_workflow_id(workflow_id)
     client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
     finished = false
-    tid = Thread.new {
+    Thread.new {
       while (not finished) do
         begin
           client.test()
@@ -312,11 +288,10 @@ class KadeployServer
     finished = true
     #let's free memory at the end of the workflow
     db.disconnect
-    tid = nil
     @workflow_info_hash_lock.lock
     delete_workflow_info(workflow_id)
     @workflow_info_hash_lock.unlock
-    workflow.finalize
+    workflow.finalize()
     workflow = nil
     exec_specific = nil
     client = nil
@@ -443,7 +418,7 @@ class KadeployServer
       delete_workflow_info(workflow_id)
       #let's free memory at the end of the workflow
       tid = nil
-      workflow.finalize
+      workflow.finalize()
       workflow = nil
       exec_specific = nil
       GC.start
@@ -466,6 +441,8 @@ class KadeployServer
   # Output
   # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if the server cannot connect to DB, 4 if some pxe files cannot be grabbed
   def launch_reboot(exec_specific, host, port, verbose_level, pxe_profile_msg, reboot_id)
+    client_disconnected = false
+
     db = Database::DbFactory.create(@config.common.db_kind)
     if not db.connect(@config.common.deploy_db_host,
                       @config.common.deploy_db_login,
@@ -478,6 +455,9 @@ class KadeployServer
     DRb.start_service()
     uri = "druby://#{host}:#{port}"
     client = DRbObject.new(nil, uri)
+
+    finished = false
+
     ret = 0
     if (verbose_level != nil) then
       vl = verbose_level
@@ -578,19 +558,37 @@ class KadeployServer
           end
         }
       }
-      tid_array.each { |tid|
-        add_reboot_info(tid, reboot_id)
+      Thread.new {
+        while (not finished) do
+          begin
+            client.test()
+          rescue DRb::DRbConnError
+            output.disable_client_output()
+            output.verbosel(3, "Client disconnection")
+            client_disconnected = true
+            tid_array.each { |tid|
+              output.verbosel(3, " *** Kill a reboot thread")
+              Thread.kill(tid)
+            }
+            finished = true
+          end
+          sleep(1)
+        end
       }
       tid_array.each { |tid|
         tid.join
       }
-      if exec_specific.wait then
+      if (exec_specific.wait && (not client_disconnected)) then
         client.generate_files(nodes_ok, config.exec_specific.nodes_ok_file, nodes_ko, config.exec_specific.nodes_ko_file)
       end
     end
-    delete_reboot_info(reboot_id)
+    finished = true
+    nodes_ok.free()
+    nodes_ko.free()
     db.disconnect
     config = nil
+    DRb.stop_service()
+    GC.start
     return ret
   end
 end

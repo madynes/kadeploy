@@ -35,16 +35,6 @@ class KadeployClient
     puts msg
   end
 
-  # Stop the DRB service and to release the client (RPC)
-  #
-  # Arguments
-  # * nothing
-  # Output
-  # * nothing
-  def exit
-    DRb.stop_service()
-  end
-
   # Test method to check that the client is still there (RPC)
   #
   # Arguments
@@ -248,7 +238,6 @@ if (exec_specific_config != nil) then
       end
       Signal.trap("INT") do
         puts "SIGINT trapped, let's clean everything ..."
-        kadeploy_server.kill_workflow(kadeploy_client.workflow_id)
         _exit(1, db)
       end
       if (exec_specific_config.pxe_profile_file != "") then

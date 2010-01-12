@@ -691,7 +691,7 @@ module Managers
             if @mutex.try_lock then
               tid = Thread.new {
                 while ((not @queue_manager.one_last_active_thread?) || (not @queue_manager.empty?))
-                  sleep 1
+                  sleep(1)
                 end
                 @logger.set("success", true, @nodes_ok)
                 @nodes_ok.group_by_cluster.each_pair { |cluster, set|
@@ -774,6 +774,11 @@ module Managers
                              @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
           return false
         end
+        if (File.size(local_preinstall) / (1024.0 * 1024.0)) > @config.common.max_preinstall_size then
+          @output.verbosel(0, "The preinstall file #{preinstall["file"]} is too big (#{@config.common.max_preinstall_size} MB is the maximum size allowed)")
+          File.delete(local_preinstall)
+          return false
+        end
         preinstall["file"] = local_preinstall
       end
       
@@ -782,6 +787,11 @@ module Managers
           local_postinstall = use_local_cache_filename(postinstall["file"], env_prefix)
           if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
                                @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+            return false
+          end
+          if (File.size(local_postinstall) / (1024.0 * 1024.0)) > @config.common.max_postinstall_size then
+            @output.verbosel(0, "The postinstall file #{postinstall["file"]} is too big (#{@config.common.max_postinstall_size} MB is the maximum size allowed)")
+            File.delete(local_postinstall)
             return false
           end
           postinstall["file"] = local_postinstall
@@ -981,6 +991,8 @@ module Managers
       @config = nil
       @client = nil
       @output = nil
+      @nodes_ok.free()
+      @nodes_ko.free()
       @nodes_ok = nil
       @nodes_ko = nil
       @nodeset = nil

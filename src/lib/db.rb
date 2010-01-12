@@ -91,15 +91,16 @@ module Database
     # * return true if the connection has been established, false otherwise
     # * print an error if the connection can not be performed, otherwhise assigns a database handler to @dhb
     def connect(host, user, passwd, base)
+      ret = true
       begin
         @dbh = Mysql.real_connect(host, user, passwd, base)
         @dbh.reconnect = true
-        ret = true
       rescue Mysql::Error => e
         puts "Error code: #{e.errno}"
         puts "Error message: #{e.error}"
         ret = false
       end
+
       return ret
     end
 

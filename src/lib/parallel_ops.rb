@@ -452,6 +452,7 @@ module ParallelOperations
           }
         }
         nodes_check_window.launch(nodes_to_test, &callback)
+        nodes_to_test = nil
       end
 
       @nodes.set.each { |node|

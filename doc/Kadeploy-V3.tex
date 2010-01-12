@@ -259,7 +259,9 @@ kadeploy_server = fgdx2.orsay.grid5000.fr
 kadeploy_server_port = 25300
 kadeploy_tcp_buffer_size = 8192
 kadeploy_cache_dir = /tmp/kadeploy_cache
-kadeploy_cache_size = 500000
+kadeploy_cache_size = 20000
+max_preinstall_size = 30
+max_postinstall_size = 30
 ssh_port = 22
 rsh_port = 514
 test_deploy_env_port = 25300
@@ -312,6 +314,8 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{kadeploy\_tcp\_buffer\_size}: TCP buffer size for the Kadeploy file server.
 \item \texttt{kadeploy\_cache\_dir}: absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment. It is possible to disable the use of a cache by setting \textit{no\_cache} to this field.
 \item \texttt{kadeploy\_cache\_size}: size in MB of the Kadeploy cache.
+\item \texttt{max\_preinstall\_size}: maximum size in MB of the preinstall files.
+\item \texttt{max\_postinstall\_size}: maximum size in MB of the postinstall files.
 \item \texttt{ssh\_port}: port used by SSH
 \item \texttt{rsh\_port}: port used by RSH
 \item \texttt{test\_deploy\_env\_port}: port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted.

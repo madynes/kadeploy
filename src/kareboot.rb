@@ -32,14 +32,13 @@ class KarebootClient
     puts msg
   end
 
-  # Stops the DRB service and to release the client (RPC)
+  # Test method to check that the client is still there (RPC)
   #
   # Arguments
   # * nothing
   # Output
   # * nothing
-  def exit
-    DRb.stop_service()
+  def test
   end
 
   # Get a file from the client (RPC)
@@ -220,7 +219,6 @@ if config.check_config("kareboot", db) then
     
     Signal.trap("INT") do
       puts "SIGINT trapped, let's clean everything ..."
-      kadeploy_server.kill_reboot(reboot_id)
       _exit(1, db)
     end
 

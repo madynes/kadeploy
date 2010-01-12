@@ -11,6 +11,14 @@ module Nodes
     attr_accessor :reboot_hard
     attr_accessor :reboot_very_hard
     attr_accessor :console
+
+    def free
+      @reboot_soft_rsh = nil
+      @reboot_soft_ssh = nil
+      @reboot_hard = nil
+      @reboot_very_hard = nil
+      @console  = nil
+    end
   end
 
   class Node
@@ -39,8 +47,51 @@ module Nodes
       @cluster = cluster
       @state="OK"
       @cmd = cmd
+      @current_step = nil
+      @last_cmd_exit_status = nil
+      @last_cmd_stdout = nil
+      @last_cmd_stderr = nil
     end
     
+    # Free the memory used by an instance of Node
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def free
+      @hostname = nil
+      @ip = nil
+      @cluster = nil
+      @state = nil
+      @current_step = nil
+      @last_cmd_exit_status = nil
+      @last_cmd_stdout = nil
+      @last_cmd_stderr = nil
+      @cmd.free()
+      @cmd = nil
+    end
+    
+    # Duplicate an instance of Node
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return a duplicated instance of Node
+    def dup
+      n = Node.new(nil, nil, nil, nil)
+      n.hostname = @hostname.clone if @hostname != nil
+      n.ip = @ip.clone if @ip != nil
+      n.cluster = @cluster.clone if @cluster != nil
+      n.state = @state.clone if @state != nil
+      n.current_step = @current_step.clone if @current_step != nil
+      n.last_cmd_exit_status = @last_cmd_exit_status.clone if @last_cmd_exit_status != nil
+      n.last_cmd_stdout = @last_cmd_stdout.clone if @last_cmd_stdout != nil
+      n.last_cmd_stderr = @last_cmd_stderr.clone if @last_cmd_stderr != nil
+      n.cmd = @cmd.clone if @cmd != nil
+      return n
+    end
+
     # Make a string with the characteristics of a node
     #
     # Arguments
@@ -395,6 +446,16 @@ module Nodes
       @set.push(node)
     end
 
+    # Copy a node to the set
+    #
+    # Arguments
+    # * node: instance of Node
+    # Output
+    # * nothing
+    def copy(node)
+      @set.push(node.dup)
+    end
+
     # Test if the node set is empty
     #
     # Arguments
@@ -413,7 +474,7 @@ module Nodes
     # * nothing
     def duplicate(dest)
       @set.each { |node|
-        dest.push(node.clone)
+        dest.push(node.dup)
       }
     end
 
@@ -424,10 +485,11 @@ module Nodes
     # Output
     # * nothing
     def duplicate_and_free(dest)
+      #duplicate(dest)
       @set.each { |node|
-        dest.push(node.clone)
+        dest.push(node.dup)
       }
-      free
+      free()
     end
 
     # Add the diff of a NodeSet and free it
@@ -438,9 +500,9 @@ module Nodes
     # * nothing
     def add_diff_and_free(dest)
       @set.each { |node|
-        dest.push(node.clone) if (dest.get_node_by_host(node.hostname) == nil)
+        dest.push(node.dup) if (dest.get_node_by_host(node.hostname) == nil)
       }
-      free
+      free()
     end
 
     # Add a NodeSet to an existing one
@@ -497,7 +559,8 @@ module Nodes
     # Output
     # * nothing
     def free
-      @set.delete_if { |node| true }
+      @set.each { |node| node.free }
+      @set.delete_if { true }
     end
 
     # Create an array from the IP of the nodes in a NodeSet
@@ -590,7 +653,7 @@ module Nodes
       ht = Hash.new
       @set.each { |node| 
         ht[node.cluster] = NodeSet.new if ht[node.cluster].nil?
-        ht[node.cluster].push(node.clone)
+        ht[node.cluster].push(node.dup)
       }
       return ht
     end
@@ -640,7 +703,7 @@ module Nodes
       dest = NodeSet.new
       @set.each { |node|
         if (sub.get_node_by_host(node.hostname) == nil) then
-          dest.push(node.clone)
+          dest.push(node.dup)
         end
       }
       return dest
@@ -663,7 +726,7 @@ module Nodes
       res = db.run_query(query)
       if (res != nil) then
         while (row = res.fetch_row) do
-          bad_nodes.push(get_node_by_host(row[0]).clone)
+          bad_nodes.push(get_node_by_host(row[0]).dup)
         end
       end
       good_nodes = diff(bad_nodes)

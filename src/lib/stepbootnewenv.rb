@@ -92,6 +92,22 @@ module BootNewEnvironment
       @step = MicroStepsLibrary::MicroSteps.new(@nodes_ok, @nodes_ko, @reboot_window, @nodes_check_window, @config, cluster, output, get_instance_name)
     end
     
+    def finalize
+      @queue_manager = nil
+      @config = nil
+      @reboot_window = nil
+      @nodes_check_window = nil
+      @output = nil
+      @nodes_ok = nil
+      @nodes_ko = nil
+      @cluster = nil
+      @logger = nil
+      @instances.delete_if { |i| true }
+      @instances = nil
+      @start = nil
+      @step = nil
+    end
+
     # Kill all the running threads
     #
     # Arguments
@@ -99,12 +115,14 @@ module BootNewEnvironment
     # Output
     # * nothing
     def kill
-      @instances.each { |tid|
-        #first, we clean all the pending processes
-        @step.process_container.killall(tid)
-        #then, we kill the thread
-        Thread.kill(tid)
-      }
+      if (@instances != nil) then
+        @instances.each { |tid|
+          #first, we clean all the pending processes
+          @step.process_container.killall(tid)
+          #then, we kill the thread
+          Thread.kill(tid)
+        }
+      end
     end
 
     # Get the name of the current macro step
@@ -172,6 +190,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -220,6 +239,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -271,6 +291,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -321,6 +342,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -338,6 +360,7 @@ module BootNewEnvironment
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads
+        finalize()
       }
       return tid
     end

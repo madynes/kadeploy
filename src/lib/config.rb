@@ -328,6 +328,10 @@ module ConfigInformation
               end
             when "kadeploy_cache_size"
               @common.kadeploy_cache_size = val.to_i
+            when "max_preinstall_size"
+              @common.max_preinstall_size = val.to_i
+            when "max_postinstall_size"
+              @common.max_postinstall_size = val.to_i
             when "ssh_port"
               if val =~ /\A\d+\Z/ then
                 @common.ssh_port = val
@@ -585,6 +589,8 @@ module ConfigInformation
                     @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
                     @cluster_specific[cluster].drivers.push(driver)
                   }
+                when "pxe_header"
+                  @cluster_specific[cluster].pxe_header = val.gsub("\\n","\n")
                 when "kernel_params"
                   @cluster_specific[cluster].kernel_params = val
                 when "admin_pre_install"
@@ -2066,6 +2072,8 @@ module ConfigInformation
     attr_accessor :kadeploy_tcp_buffer_size
     attr_accessor :kadeploy_cache_dir
     attr_accessor :kadeploy_cache_size
+    attr_accessor :max_preinstall_size
+    attr_accessor :max_postinstall_size
     attr_accessor :kadeploy_disable_cache
     attr_accessor :ssh_port
     attr_accessor :rsh_port
@@ -2123,6 +2131,7 @@ module ConfigInformation
           (@taktuk_ssh_connector == nil) || (@taktuk_rsh_connector == nil) ||
           (@taktuk_tree_arity == nil) || (@taktuk_auto_propagate == nil) || (@tarball_dest_dir == nil) ||
           (@kadeploy_server == nil) || (@kadeploy_server_port == nil) ||
+          (@max_preinstall_size == nil) || (@max_postinstall_size == nil) ||
           (@kadeploy_tcp_buffer_size == nil) || (@kadeploy_cache_dir == nil) || (@kadeploy_cache_size == nil) ||
           (@ssh_port == nil) || (@rsh_port == nil) || (@test_deploy_env_port == nil) || (@use_rsh_to_deploy == nil) ||
           (@environment_extraction_dir == nil) || (@log_to_file == nil) || (@log_to_syslog == nil) || (@log_to_db == nil) ||
@@ -2158,6 +2167,7 @@ module ConfigInformation
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
     attr_accessor :drivers
+    attr_accessor :pxe_header
     attr_accessor :kernel_params
     attr_accessor :admin_pre_install
     attr_accessor :admin_post_install
@@ -2184,6 +2194,7 @@ module ConfigInformation
       @cmd_very_hard_reboot = nil
       @cmd_console = nil
       @drivers = nil
+      @pxe_header = nil
       @kernel_params = nil
       @admin_pre_install = nil
       @admin_post_install = nil
@@ -2215,6 +2226,7 @@ module ConfigInformation
       dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone
       dest.cmd_console = @cmd_console.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
+      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
@@ -2247,6 +2259,7 @@ module ConfigInformation
       dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone
       dest.cmd_console = @cmd_console.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
+      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
@@ -2267,7 +2280,7 @@ module ConfigInformation
         puts "Warning: " + i + err_msg if (a == nil)
       }
       if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
-          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) ||
+          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) || (@pxe_header == nil)
           (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
           #(@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
