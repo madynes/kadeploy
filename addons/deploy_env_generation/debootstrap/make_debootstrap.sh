@@ -1,5 +1,6 @@
 #!/bin/bash
-DIR=debootstrap
+
+DIR=bootstrap-dir
 SCRIPTS_DIR=scripts
 
 DEBOOTSTRAP="/usr/sbin/debootstrap"
@@ -58,7 +59,8 @@ head -n 1 $DIR/etc/passwd |sed -e 's/root/deploy/1' -e 's/root/deploy/1'>> $DIR/
 head -n 1 $DIR/etc/shadow |sed 's/root/deploy/' >> $DIR/etc/shadow
 head -n 1 $DIR/etc/shadow- |sed 's/root/deploy/' >> $DIR/etc/shadow-
 
-cp linuxrc $DIR/
+cp linuxrc-debian $DIR/linuxrc
+
 cp mkdev $DIR/dev
 
 cp $SCRIPTS_DIR/* $DIR/usr/local/bin

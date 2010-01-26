@@ -39,7 +39,7 @@ RD_MOUNT="$TMP_ROOTDIR/__mountrd"
 RD_FILE="$TMP_ROOTDIR/initrd.build"
 TMP_KERNELDIR="$TMP_ROOTDIR/__buildkernel"
 
-DEBOOTSTRAP=debootstrap
+DEBOOTSTRAP=bootstrap-dir
 
 Die()
 {

@@ -1,0 +1,145 @@
+#!/bin/bash
+
+(cd /dev ; ./mkdev 2>/dev/null)
+
+export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+
+# global vars
+CMD_PARAM=
+
+# functions
+
+get_param() {
+        CMD_PARAM=$(grep $1 /proc/cmdline | sed s/^.*$1=// | sed s/\ .*//)
+}
+
+boot_failed() {
+    reboot -f
+}
+
+
+mount -t tmpfs -o size=100m tmpfs /rambin
+ln -s /rambin /mnt/rambin
+
+# parameters and their default values
+TTY=/dev/ttyS0
+ETH_DRV=
+ETH_DEV=eth0
+NETMASK=255.255.255.0
+IPADDR=
+BROADCAST=255.255.255.255
+
+## what should be done as soon as possible
+# mount proc
+mount -t proc proc /proc
+echo "0x100" > /proc/sys/kernel/real-root-dev
+
+/sbin/depmod -a
+
+# get parameters values
+get_param TTY
+if [ $CMD_PARAM ]; then
+        TTY=$CMD_PARAM
+fi
+CMD_PARAM=
+
+get_param ETH_DEV
+ETH_DEV=$CMD_PARAM
+CMD_PARAM=
+
+
+get_param ETH_DRV
+ETH_DRV=$CMD_PARAM
+CMD_PARAM=
+
+get_param IPADDR
+IPADDR=$CMD_PARAM
+CMD_PARAM=
+
+get_param ETH_DRV_OPTIONS
+ETH_DRV_OPTIONS=$CMD_PARAM
+CMD_PARAM=
+
+get_param SLEEP_TIME
+SLEEP_TIME=$CMD_PARAM
+CMD_PARAM=
+
+if [ $ETH_DRV ]; then
+    if [ $ETH_DRV_OPTIONS ]; then
+        echo "Loading specified ethernet driver $ETH_DRV with options $ETH_DRV_OPTIONS..." > ${TTY}
+        modprobe $ETH_DRV $ETH_DRV_OPTIONS
+    else
+        echo "Loading specified ethernet driver $ETH_DRV..." > ${TTY}
+        modprobe $ETH_DRV
+    fi
+    if [ "$?" != "0" ] ; then
+        echo "Failed to load driver... $ETH_DRV" > ${TTY}
+        boot_failed
+    fi
+fi
+
+
+# configure network
+if [ $IPADDR ]; then
+        echo "Configuring network with address ${IPADDR} on ${ETH_DEV}" > ${TTY}
+        ifconfig ${ETH_DEV} ${IPADDR} netmask ${NETMASK} broadcast ${BROADCAST}
+else
+        DHCPFILE=/var/lib/dhclient/dhclient.leases
+
+        echo "Using DHCP for device ${ETH_DEV}" > ${TTY}
+        dhclient -q ${ETH_DEV} 2>&1 >/dev/null
+        if [ -r $DHCPFILE ]; then
+            HOSTNAME=$(grep host-name $DHCPFILE | cut -d '"' -f2)
+            DNSDOMAIN=$(grep "domain-name " $DHCPFILE | cut -d '"' -f2)
+            IPADDR=$(grep fixed-address $DHCPFILE | cut -d ' ' -f4 | cut -d ';' -f1)
+            DNSSERVERS=$(grep domain-name-servers $DHCPFILE | cut -d ' ' -f5 | cut -d ';' -f1)
+
+            echo "DHCP OK" > ${TTY}
+        else
+            echo "DHCP ERROR !" > ${TTY}
+        fi
+fi
+
+# set hostname and its resolution
+sed -i "s/HOSTNAME=localhost/HOSTNAME=${HOSTNAME}/" /etc/sysconfig/network
+sed -i "s/DOMAINNAME=localdomain/DOMAINNAME=${DNSDOMAIN}/" /etc/sysconfig/network
+echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
+hostname ${HOSTNAME}
+
+# configure DNS with dhcp info
+echo "search ${DNSDOMAIN/,/ }" > /etc/resolv.conf #maybe "," is not the separator
+for ns in ${DNSSERVERS}
+do
+    echo "nameserver $ns" >> /etc/resolv.conf
+done
+
+## load disk driver
+get_param DISK_DRV
+DISK_DRV=$CMD_PARAM
+CMD_PARAM=
+
+if [ $DISK_DRV ]; then
+   # for SCSI drives
+   modprobe sd_mod
+   # for ide drives
+   echo "Loading specified disk driver: $DISK_DRV"
+   modprobe $DISK_DRV
+   # order is important for ide drivers in 2.6.pbmatics kernels
+   modprobe ide-disk
+   modprobe ide-generic
+fi
+
+#we wait slow disks ...
+if [ $SLEEP_TIME ]; then
+    sleep $SLEEP_TIME
+fi
+
+# start ssh daemon
+/usr/sbin/sshd
+
+# start netcat (-p option is unknown on the rpm version)
+(while true; do nc -l 25300; done) &
+
+# switch to a init runlevel to have reboot/shutdown/halt command
+# behaving correctly
+exec /sbin/init S
