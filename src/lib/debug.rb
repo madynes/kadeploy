@@ -94,6 +94,27 @@ module Debug
       end
     end
 
+    # Print a message on the server side
+    #
+    # Arguments
+    # * msg: message
+    # Output
+    # * prints the message on the server and on the client
+    def debug_server(msg)
+      server_str = "#{@deploy_id}|#{@user} -> #{msg}"
+      puts server_str
+      if @syslog then
+        @syslog_lock.lock
+        while Syslog.opened?
+          sleep 0.2
+        end
+        sl = Syslog.open("Kadeploy-dbg")
+        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
+        sl.close
+        @syslog_lock.unlock
+      end
+    end
+
     # Print the debug output of a command
     #
     # Arguments

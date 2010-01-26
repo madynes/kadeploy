@@ -1148,7 +1148,8 @@ module MicroStepsLibrary
             Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                @config.common.tftp_images_max_size * 1024 * 1024,
                                1,
-                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/)
+                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
+                               @output)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
               PXEOperations::set_pxe_for_chainload(@nodes_ok.make_array_of_ip,
@@ -1194,7 +1195,8 @@ module MicroStepsLibrary
               Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                  @config.common.tftp_images_max_size * 1024 * 1024,
                                  1,
-                                 /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/)
+                                 /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
+                                 @output)
             end
           end
         end

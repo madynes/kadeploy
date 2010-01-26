@@ -342,7 +342,8 @@ module Managers
         end
         Cache::clean_cache(cache_dir,
                            (cache_size * 1024 * 1024) -  file_size,
-                           0.5, /./)
+                           0.5, /./,
+                           @output)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, nil)
           if (resp != "200") then
@@ -382,7 +383,8 @@ module Managers
           if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
             Cache::clean_cache(cache_dir,
                                (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                               0.5, /./)
+                               0.5, /./,
+                               @output)
             @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
               @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
@@ -400,7 +402,8 @@ module Managers
             else
               Cache::clean_cache(cache_dir,
                                  (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                                 0.5, /./)
+                                 0.5, /./,
+                                 @output)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
               if not @client.get_file(client_file, prefix) then
                 @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
@@ -462,7 +465,8 @@ module Managers
         end
         Cache::clean_cache(cache_dir,
                            (cache_size * 1024 * 1024) -  file_size,
-                           0.5, /./)
+                           0.5, /./,
+                           @output)
         resp,etag = HTTP::fetch_file(client_file, local_file, nil)
         if (resp != "200") then
           @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
@@ -473,7 +477,8 @@ module Managers
         if File.readable?(client_file) then
           Cache::clean_cache(cache_dir,
                              (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                             0.5, /./)
+                             0.5, /./,
+                             @output)
           @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
           if not system("cp #{client_file} #{local_file}") then
             @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
@@ -492,7 +497,8 @@ module Managers
             @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
             Cache::clean_cache(cache_dir,
                                (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                               0.5, /./)
+                               0.5, /./,
+                               @output)
             if not @client.get_file(client_file, prefix) then
               @output.verbosel(0, "Unable to grab the file #{client_file}")
               return false
@@ -705,7 +711,7 @@ module Managers
                   @output.verbosel(0, set.to_s(true, "\n"))
                 }
                 @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file) if @client != nil
-                Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/) if @config.exec_specific.load_env_kind == "file"
+                Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/, @output) if @config.exec_specific.load_env_kind == "file"
                 @logger.dump
                 @queue_manager.send_exit_signal
                 @thread_set_deployment_environment.join

@@ -672,7 +672,11 @@ module ConfigInformation
           host = content[1]
           ip = content[2]
           cluster = content[3]
-          @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+          if @cluster_specific.has_key?(cluster) then
+            @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+          else
+            puts "The cluster #{cluster} has not been defined in #{CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE}"
+          end
         end
         if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
           content = Regexp.last_match
@@ -1091,6 +1095,11 @@ module ConfigInformation
         res = Dir.mkdir(@common.kadeploy_cache_dir, 0700) rescue false
         if res.kind_of? FalseClass then
           puts "The directory cannot be created"
+          return false
+        end
+      else
+        if (not File.stat(@common.kadeploy_cache_dir).writable?) then
+          puts "The #{@common.kadeploy_cache_dir} directory is not writable"
           return false
         end
       end
