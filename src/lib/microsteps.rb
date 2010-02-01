@@ -1001,7 +1001,10 @@ module MicroStepsLibrary
           else
             @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)")
             @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}")
-            send(real_method, Thread.current, *args)
+            start = Time.now.to_i
+            ret = send(real_method, Thread.current, *args)
+            @output.verbosel(4, "  Time in #{@macro_step}-#{method_sym.to_s}: #{Time.now.to_i - start}s")
+            return ret
           end
         else
           @output.verbosel(0, "Wrong method: #{method_sym} #{real_method}!!!")
