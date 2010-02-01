@@ -681,18 +681,22 @@ module MicroStepsLibrary
       std_output = String.new
       err_output = String.new
       std_reader = Thread.new {
+        std_output_full = false
         begin
-          while line = c.stdout.gets
+          while (line = c.stdout.gets) && (not std_output_full)
             std_output += line
+            std_output_full = true if std_output.length > 1000
           end
         ensure
           c.stdout.close
         end
       }
       err_reader = Thread.new {
+        err_output_full = false
         begin
-          while line = c.stderr.gets
+          while (line = c.stderr.gets) && (not err_output_full)
             err_output += line
+            err_output_full = true if err_output.length > 1000
           end
         ensure
           c.stderr.close
