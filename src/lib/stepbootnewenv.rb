@@ -167,7 +167,8 @@ module BootNewEnvironment
             result = true
             #Here are the micro steps
             result = result && @step.reboot("kexec", false, false)
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
+            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_kexec)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -268,7 +269,8 @@ module BootNewEnvironment
             #Here are the micro steps 
             result = result && @step.umount_deploy_part
             result = result && @step.reboot_from_deploy_env
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
+            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -319,7 +321,8 @@ module BootNewEnvironment
             result = true
             #Here are the micro steps 
             result = result && @step.reboot("hard", use_rsh_for_reboot, false)
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
+            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             #End of micro steps
           }
           @instances.push(instance_thread)

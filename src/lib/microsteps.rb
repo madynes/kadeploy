@@ -1459,11 +1459,12 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # * ports_up: up ports used to perform a reach test on the nodes
     # * ports_down: down ports used to perform a reach test on the nodes
+    # * timeout: reboot timeout
     # Output
     # * return true if some nodes are here, false otherwise
-    def ms_wait_reboot(instance_thread, ports_up, ports_down)
-      return parallel_wait_nodes_after_reboot_wrapper(@config.cluster_specific[@cluster].timeout_reboot, 
-                                                      ports_up, 
+    def ms_wait_reboot(instance_thread, ports_up, ports_down, timeout)
+      return parallel_wait_nodes_after_reboot_wrapper(timeout, 
+                                                      ports_up,
                                                       ports_down,
                                                       @nodes_check_window,
                                                       instance_thread)

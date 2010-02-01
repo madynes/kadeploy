@@ -178,7 +178,8 @@ module SetDeploymentEnvironnment
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
             result = result && @step.format_deploy_part
@@ -244,7 +245,8 @@ module SetDeploymentEnvironnment
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.manage_admin_pre_install("tree")
             #End of micro steps
@@ -361,7 +363,8 @@ module SetDeploymentEnvironnment
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_nfsroot_env")
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
             result = result && @step.format_deploy_part

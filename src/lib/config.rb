@@ -567,11 +567,18 @@ module ConfigInformation
                   @cluster_specific[cluster].swap_part = val
                 when "workflow_steps"
                   @cluster_specific[cluster].workflow_steps = val
-                when "timeout_reboot"
+                when "timeout_reboot_classical"
                   if val =~ /\A\d+\Z/ then
-                    @cluster_specific[cluster].timeout_reboot = val.to_i
+                    @cluster_specific[cluster].timeout_reboot_classical = val.to_i
                   else
-                    puts "Invalid value for the timeout_reboot field in the #{cluster} config file"
+                    puts "Invalid value for the timeout_reboot_classical field in the #{cluster} config file"
+                    return false
+                  end
+                when "timeout_reboot_kexec"
+                  if val =~ /\A\d+\Z/ then
+                    @cluster_specific[cluster].timeout_reboot_kexec = val.to_i
+                  else
+                    puts "Invalid value for the timeout_reboot_kexec field in the #{cluster} config file"
                     return false
                   end
                 when "cmd_soft_reboot_rsh"
@@ -2167,7 +2174,8 @@ module ConfigInformation
     attr_accessor :tmp_part
     attr_accessor :swap_part
     attr_accessor :workflow_steps   #Array of MacroStep
-    attr_accessor :timeout_reboot
+    attr_accessor :timeout_reboot_classical
+    attr_accessor :timeout_reboot_kexec
     attr_accessor :cmd_soft_reboot_rsh
     attr_accessor :cmd_soft_reboot_ssh
     attr_accessor :cmd_hard_reboot
@@ -2196,7 +2204,8 @@ module ConfigInformation
       @prod_part = nil
       @tmp_part = nil
       @swap_part = nil
-      @timeout_reboot = nil
+      @timeout_reboot_classical = nil
+      @timeout_reboot_kexec = nil
       @cmd_soft_reboot_rsh = nil
       @cmd_soft_reboot_ssh = nil
       @cmd_hard_reboot = nil
@@ -2228,7 +2237,8 @@ module ConfigInformation
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
       dest.swap_part = @swap_part.clone if (@swap_part != nil)
-      dest.timeout_reboot = @timeout_reboot
+      dest.timeout_reboot_classical = @timeout_reboot_classical
+      dest.timeout_reboot_kexec = @timeout_reboot_kexec
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
       dest.cmd_hard_reboot = @cmd_hard_reboot.clone
@@ -2261,7 +2271,8 @@ module ConfigInformation
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
       dest.swap_part = @swap_part.clone if (@swap_part != nil)
-      dest.timeout_reboot = @timeout_reboot
+      dest.timeout_reboot_classical = @timeout_reboot_classical
+      dest.timeout_reboot_kexec = @timeout_reboot_kexec
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
       dest.cmd_hard_reboot = @cmd_hard_reboot.clone
@@ -2289,8 +2300,8 @@ module ConfigInformation
         puts "Warning: " + i + err_msg if (a == nil)
       }
       if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
-          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) || (@pxe_header == nil)
-          (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
+          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot_classical == nil) || (@timeout_reboot_kexec == nil) ||
+          (@pxe_header == nil) || (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
           #(@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
         puts "Some mandatory fields are missing in the specific configuration file for #{cluster}"
