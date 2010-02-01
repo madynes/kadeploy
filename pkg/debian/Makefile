@@ -40,8 +40,11 @@ install_conf_common:
 install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/* $(DEB_ROOT_CLIENT)/usr/bin
 
-install_sbin:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/* $(DEB_ROOT_SERVER)/usr/sbin
+install_sbin_server:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/kadeploy3d $(DEB_ROOT_SERVER)/usr/sbin
+
+install_sbin_client:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/karights3 $(DEB_ROOT_SERVER)/usr/sbin
 
 install_kastafior:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DEB_ROOT_SERVER)/usr/bin
@@ -69,6 +72,7 @@ install_man:
 
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
+	@mkdir -p $(DEB_ROOT_SERVER)/usr/sbin
 	@mkdir -p $(DEB_ROOT_CLIENT)/etc/kadeploy3
 
 tree_server:
@@ -88,10 +92,10 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/etc/kadeploy3
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/man
 
-package_client: tree_client install_conf_client install_bin
+package_client: tree_client install_conf_client install_bin install_sbin_client
 	@sh set_version.sh kadeploy-client-control.in > $(DEB_ROOT_CLIENT)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_CLIENT) kadeploy-client-$(VERSION).deb
-package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version
+package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version
 	@sh set_version.sh kadeploy-server-control.in > $(DEB_ROOT_SERVER)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_SERVER) kadeploy-server-$(VERSION).deb	
 package_common: tree_common install_conf_common install_src install_test install_db_script install_man

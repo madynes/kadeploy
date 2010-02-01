@@ -48,8 +48,11 @@ install_conf_common:
 install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/* $(DESTDIR)/usr/bin
 
-install_sbin:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/* $(DESTDIR)/usr/sbin
+install_sbin_server:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/kadeploy3d $(DESTDIR)/usr/sbin
+
+install_sbin_client:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/karights3 $(DESTDIR)/usr/sbin
 
 install_kastafior:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DESTDIR)/usr/bin
@@ -97,9 +100,9 @@ tree_common:
 
 install_common: tree_common install_conf_common install_src install_test install_db install_man
 
-install_client: tree_client install_conf_client install_bin
+install_client: tree_client install_conf_client install_bin install_sbin_client
 
-install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version
+install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version
 
 install_all: install_common install_client install_server
 
