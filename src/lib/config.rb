@@ -1110,7 +1110,7 @@ module ConfigInformation
         opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
           exec_specific.chosen_server = s
         } 
-        opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
+        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             exec_specific.verbose_level = d.to_i
           else
@@ -1630,7 +1630,7 @@ module ConfigInformation
     def Config.load_kastat_cmdline_options(exec_specific)
       opts = OptionParser::new do |opt|
         opt.summary_indent = "  "
-        opt.summary_width = 28
+        opt.summary_width = 32
         opt.banner = "Usage: kastat3 [options]"
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
@@ -2026,7 +2026,7 @@ module ConfigInformation
         opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
           exec_specific.chosen_server = s
         } 
-        opt.on("--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
+        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
           if d =~ /\A[0-4]\Z/ then
             exec_specific.verbose_level = d.to_i
           else

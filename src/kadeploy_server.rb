@@ -472,11 +472,13 @@ class KadeployServer
           step.reboot(exec_specific.reboot_level, false, true)
           if exec_specific.wait then
             if (exec_specific.reboot_kind == "deploy_env") then
-              step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[])
+              step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
+                               @config.cluster_specific[cluster].timeout_reboot_classical)
               step.send_key_in_deploy_env("tree")
               set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
             else
-              step.wait_reboot([@config.common.ssh_port],[])
+              step.wait_reboot([@config.common.ssh_port],[],
+                               @config.cluster_specific[cluster].timeout_reboot_classical)
             end
             if (exec_specific.reboot_kind == "env_recorded") then
               part = String.new
@@ -758,7 +760,7 @@ class KadeployServer
     when "get_deploy_state"
       return kanodes_get_deploy_state(exec_specific, client, db)
     when "get_yaml_dump"
-      return kanodes_get_yaml_dump(exec_specific, db)
+      return kanodes_get_yaml_dump(exec_specific, client)
     end
   end
   
