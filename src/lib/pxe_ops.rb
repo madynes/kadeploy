@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -53,14 +53,6 @@ module PXEOperations
     }
     return true
   end
-  
-  def PXEOperations::get_pxe_header()
-    prompt = 1
-    display = "messages"
-    timeout = 50
-    baudrate = 38400
-    return "PROMPT #{prompt}\nSERIAL 0 #{baudrate}\nDEFAULT bootlabel\nDISPLAY #{display}\nTIMEOUT #{timeout}\n\nlabel bootlabel\n";
-  end
 
   public
   # Modify the PXE configuration for a Linux boot
@@ -74,9 +66,10 @@ module PXEOperations
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_img: relative path to the TFTP image repository
   # * tftp_cfg: relative path to the TFTP configuration repository
+  # * pxe_header: header of the pxe profile
   # Output
   # * returns the value of write_pxe
-  def PXEOperations::set_pxe_for_linux(ips, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg)
+  def PXEOperations::set_pxe_for_linux(ips, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg, pxe_header)
     if /\Ahttp[s]?:\/\/.+/ =~ kernel then
       kernel_line = "\tKERNEL " + kernel + "\n" #gpxelinux
     else
@@ -92,7 +85,7 @@ module PXEOperations
     append_line += " root=" + boot_part if (boot_part != "")
     append_line += " " + kernel_params if (kernel_params != "")
     append_line += "\n"
-    msg = get_pxe_header() + kernel_line + append_line
+    msg = pxe_header + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
   end
 
@@ -109,9 +102,10 @@ module PXEOperations
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_img: relative path to the TFTP image repository
   # * tftp_cfg: relative path to the TFTP configuration repository
+  # * pxe_header: header of the pxe profile
   # Output
   # * returns the value of write_pxe
-  def PXEOperations::set_pxe_for_xen(ips, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg)
+  def PXEOperations::set_pxe_for_xen(ips, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, tftp_repository, tftp_img, tftp_cfg, pxe_header)
     kernel_line = "\tKERNEL " + "mboot.c32\n"
     append_line = "\tAPPEND " + tftp_img + "/" + hypervisor
     append_line +=  " " + hypervisor_params if (hypervisor_params != nil)
@@ -120,7 +114,7 @@ module PXEOperations
     append_line += " root=" + boot_part if (boot_part != "")
     append_line += " --- " + tftp_img + "/" + initrd if (initrd != nil)
     append_line += "\n"
-    msg = get_pxe_header() + kernel_line + append_line
+    msg = pxe_header + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
   end
 
@@ -133,16 +127,17 @@ module PXEOperations
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_img: relative path to the TFTP image repository
   # * tftp_cfg: relative path to the TFTP configuration repository
+  # * pxe_header: header of the pxe profile
   # Output
   # * returns the value of write_pxe
-  def PXEOperations::set_pxe_for_nfsroot(ips, kernel, nfs_server, tftp_repository, tftp_img, tftp_cfg)
+  def PXEOperations::set_pxe_for_nfsroot(ips, kernel, nfs_server, tftp_repository, tftp_img, tftp_cfg, pxe_header)
     if /\Ahttp[s]?:\/\/.+/ =~ kernel then
       kernel_line = "\tKERNEL " + kernel + "\n" #gpxelinux 
     else
       kernel_line = "\tKERNEL " + tftp_img + "/" + kernel + "\n" #pxelinux
     end
     append_line = "\tAPPEND rw console=ttyS0,115200n81 console=tty0 root=/dev/nfs ip=dhcp nfsroot=#{nfs_server}:#{nfs_root_path}\n"
-    msg = get_pxe_header() + kernel_line + append_line
+    msg = pxe_header + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
   end
 
@@ -154,12 +149,13 @@ module PXEOperations
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_img: relative path to the TFTP image repository
   # * tftp_cfg: relative path to the TFTP configuration repository
+  # * pxe_header: header of the pxe profile
   # Output
   # * returns the value of write_pxe
-  def PXEOperations::set_pxe_for_chainload(ips, boot_part, tftp_repository, tftp_img, tftp_cfg)
+  def PXEOperations::set_pxe_for_chainload(ips, boot_part, tftp_repository, tftp_img, tftp_cfg, pxe_header)
     kernel_line = "\tKERNEL " + "chain.c32\n"
     append_line = "\tAPPEND hd0 #{boot_part}\n"
-    msg = get_pxe_header() + kernel_line + append_line
+    msg = pxe_header + kernel_line + append_line
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
   end
 

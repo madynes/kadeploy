@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -342,7 +342,8 @@ module Managers
         end
         Cache::clean_cache(cache_dir,
                            (cache_size * 1024 * 1024) -  file_size,
-                           0.5, /./)
+                           0.5, /./,
+                           @output)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, nil)
           if (resp != "200") then
@@ -382,7 +383,8 @@ module Managers
           if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
             Cache::clean_cache(cache_dir,
                                (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                               0.5, /./)
+                               0.5, /./,
+                               @output)
             @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
               @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
@@ -400,7 +402,8 @@ module Managers
             else
               Cache::clean_cache(cache_dir,
                                  (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                                 0.5, /./)
+                                 0.5, /./,
+                                 @output)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
               if not @client.get_file(client_file, prefix) then
                 @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
@@ -462,7 +465,8 @@ module Managers
         end
         Cache::clean_cache(cache_dir,
                            (cache_size * 1024 * 1024) -  file_size,
-                           0.5, /./)
+                           0.5, /./,
+                           @output)
         resp,etag = HTTP::fetch_file(client_file, local_file, nil)
         if (resp != "200") then
           @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
@@ -473,7 +477,8 @@ module Managers
         if File.readable?(client_file) then
           Cache::clean_cache(cache_dir,
                              (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                             0.5, /./)
+                             0.5, /./,
+                             @output)
           @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
           if not system("cp #{client_file} #{local_file}") then
             @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
@@ -492,7 +497,8 @@ module Managers
             @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
             Cache::clean_cache(cache_dir,
                                (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                               0.5, /./)
+                               0.5, /./,
+                               @output)
             if not @client.get_file(client_file, prefix) then
               @output.verbosel(0, "Unable to grab the file #{client_file}")
               return false
@@ -691,7 +697,7 @@ module Managers
             if @mutex.try_lock then
               tid = Thread.new {
                 while ((not @queue_manager.one_last_active_thread?) || (not @queue_manager.empty?))
-                  sleep 1
+                  sleep(1)
                 end
                 @logger.set("success", true, @nodes_ok)
                 @nodes_ok.group_by_cluster.each_pair { |cluster, set|
@@ -705,7 +711,7 @@ module Managers
                   @output.verbosel(0, set.to_s(true, "\n"))
                 }
                 @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file) if @client != nil
-                Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/) if @config.exec_specific.load_env_kind == "file"
+                Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/, @output) if @config.exec_specific.load_env_kind == "file"
                 @logger.dump
                 @queue_manager.send_exit_signal
                 @thread_set_deployment_environment.join
@@ -774,6 +780,11 @@ module Managers
                              @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
           return false
         end
+        if (File.size(local_preinstall) / (1024.0 * 1024.0)) > @config.common.max_preinstall_size then
+          @output.verbosel(0, "The preinstall file #{preinstall["file"]} is too big (#{@config.common.max_preinstall_size} MB is the maximum size allowed)")
+          File.delete(local_preinstall)
+          return false
+        end
         preinstall["file"] = local_preinstall
       end
       
@@ -782,6 +793,11 @@ module Managers
           local_postinstall = use_local_cache_filename(postinstall["file"], env_prefix)
           if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
                                @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+            return false
+          end
+          if (File.size(local_postinstall) / (1024.0 * 1024.0)) > @config.common.max_postinstall_size then
+            @output.verbosel(0, "The postinstall file #{postinstall["file"]} is too big (#{@config.common.max_postinstall_size} MB is the maximum size allowed)")
+            File.delete(local_postinstall)
             return false
           end
           postinstall["file"] = local_postinstall
@@ -981,6 +997,8 @@ module Managers
       @config = nil
       @client = nil
       @output = nil
+      @nodes_ok.free()
+      @nodes_ko.free()
       @nodes_ok = nil
       @nodes_ko = nil
       @nodeset = nil

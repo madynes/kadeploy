@@ -1,7 +1,7 @@
 #!/usr/bin/ruby -w
 
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -30,14 +30,13 @@ class KarebootClient
     puts msg
   end
 
-  # Stops the DRB service and to release the client (RPC)
+  # Test method to check that the client is still there (RPC)
   #
   # Arguments
   # * nothing
   # Output
   # * nothing
-  def exit
-    DRb.stop_service()
+  def test
   end
 
   # Get a file from the client (RPC)
@@ -175,11 +174,8 @@ if exec_specific_config != nil then
     exit(1)
   end
   
-  exec_specific_config.reboot_id = Digest::SHA1.hexdigest(exec_specific_config.true_user + Time.now.to_s + exec_specific_config.node_list.to_s)
-  
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
-    kadeploy_server.kareboot_kill_reboot(exec_specific_config.reboot_id)
     exit(1)
   end
   

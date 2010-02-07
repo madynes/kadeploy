@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -91,10 +91,10 @@ module Database
     # * return true if the connection has been established, false otherwise
     # * print an error if the connection can not be performed, otherwhise assigns a database handler to @dhb
     def connect(host, user, passwd, base)
+      ret = true
       begin
         @dbh = Mysql.real_connect(host, user, passwd, base)
         @dbh.reconnect = true
-        ret = true
       rescue Mysql::Error => e
         puts "Error code: #{e.errno}"
         puts "Error message: #{e.error}"

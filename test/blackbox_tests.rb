@@ -1,12 +1,13 @@
 #!/usr/bin/ruby -w
 
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
 require 'optparse'
 require 'yaml'
+require 'tempfile'
 
 RESULTS=Array.new
 

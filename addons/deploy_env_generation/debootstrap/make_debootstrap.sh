@@ -1,5 +1,6 @@
 #!/bin/bash
-DIR=debootstrap
+
+DIR=bootstrap-dir
 SCRIPTS_DIR=scripts
 
 DEBOOTSTRAP="/usr/sbin/debootstrap"
@@ -10,7 +11,7 @@ DEBOOTSTRAP_EXCLUDE_PACKAGE=vim-common,vim-tiny,traceroute,manpages,man-db,addus
 
 mkdir -p $DIR
 
-$DEBOOTSTRAP --include=$DEBOOTSTRAP_INCLUDE_PACKAGES --exclude=$DEBOOTSTRAP_EXCLUDE_PACKAGE sid $DIR http://ftp.fr.debian.org/debian
+$DEBOOTSTRAP --include=$DEBOOTSTRAP_INCLUDE_PACKAGES --exclude=$DEBOOTSTRAP_EXCLUDE_PACKAGE lenny $DIR http://ftp.fr.debian.org/debian
 
 chroot $DIR apt-get -y --force-yes install ash 2>/dev/null
 chroot $DIR apt-get -y --force-yes clean 2>/dev/null
@@ -58,7 +59,8 @@ head -n 1 $DIR/etc/passwd |sed -e 's/root/deploy/1' -e 's/root/deploy/1'>> $DIR/
 head -n 1 $DIR/etc/shadow |sed 's/root/deploy/' >> $DIR/etc/shadow
 head -n 1 $DIR/etc/shadow- |sed 's/root/deploy/' >> $DIR/etc/shadow-
 
-cp linuxrc $DIR/
+cp linuxrc-debian $DIR/linuxrc
+
 cp mkdev $DIR/dev
 
 cp $SCRIPTS_DIR/* $DIR/usr/local/bin

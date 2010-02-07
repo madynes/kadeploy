@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -130,6 +130,27 @@ module Debug
           }
         end
         @client.print("-------------------------")
+      end
+    end
+
+    # Print a message on the server side
+    #
+    # Arguments
+    # * msg: message
+    # Output
+    # * prints the message on the server and on the client
+    def debug_server(msg)
+      server_str = "#{@deploy_id}|#{@user} -> #{msg}"
+      puts server_str
+      if @syslog then
+        @syslog_lock.lock
+        while Syslog.opened?
+          sleep 0.2
+        end
+        sl = Syslog.open("Kadeploy-dbg")
+        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
+        sl.close
+        @syslog_lock.unlock
       end
     end
 

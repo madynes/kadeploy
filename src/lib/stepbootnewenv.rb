@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -92,6 +92,22 @@ module BootNewEnvironment
       @step = MicroStepsLibrary::MicroSteps.new(@nodes_ok, @nodes_ko, @reboot_window, @nodes_check_window, @config, cluster, output, get_instance_name)
     end
     
+    def finalize
+      @queue_manager = nil
+      @config = nil
+      @reboot_window = nil
+      @nodes_check_window = nil
+      @output = nil
+      @nodes_ok = nil
+      @nodes_ko = nil
+      @cluster = nil
+      @logger = nil
+      @instances.delete_if { |i| true }
+      @instances = nil
+      @start = nil
+      @step = nil
+    end
+
     # Kill all the running threads
     #
     # Arguments
@@ -99,12 +115,14 @@ module BootNewEnvironment
     # Output
     # * nothing
     def kill
-      @instances.each { |tid|
-        #first, we clean all the pending processes
-        @step.process_container.killall(tid)
-        #then, we kill the thread
-        Thread.kill(tid)
-      }
+      if (@instances != nil) then
+        @instances.each { |tid|
+          #first, we clean all the pending processes
+          @step.process_container.killall(tid)
+          #then, we kill the thread
+          Thread.kill(tid)
+        }
+      end
     end
 
     # Get the name of the current macro step
@@ -149,7 +167,8 @@ module BootNewEnvironment
             result = true
             #Here are the micro steps
             result = result && @step.reboot("kexec", false, false)
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
+            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_kexec)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -172,6 +191,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -220,6 +240,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -248,7 +269,8 @@ module BootNewEnvironment
             #Here are the micro steps 
             result = result && @step.umount_deploy_part
             result = result && @step.reboot_from_deploy_env
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
+            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -271,6 +293,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -298,7 +321,8 @@ module BootNewEnvironment
             result = true
             #Here are the micro steps 
             result = result && @step.reboot("hard", use_rsh_for_reboot, false)
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port])
+            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -321,6 +345,7 @@ module BootNewEnvironment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -338,6 +363,7 @@ module BootNewEnvironment
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads
+        finalize()
       }
       return tid
     end

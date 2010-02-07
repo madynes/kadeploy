@@ -75,10 +75,9 @@ rm -rf $RPM_BUILD_ROOT
 /etc/kadeploy3/version
 /etc/kadeploy3/keys/id_deploy
 /etc/kadeploy3/keys/id_deploy.pub
-
 /usr/bin/kastafior
 /usr/sbin/kadeploy3d
-/usr/sbin/karights3
+
 
 %files client
 %defattr(-,deploy,deploy,-)
@@ -89,6 +88,7 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/kadeploy3
 /usr/bin/kaenv3
 /usr/bin/kareboot3
+/usr/sbin/karights3
 
 %pre common
 if ! getent passwd deploy >/dev/null 2>&1 ; then
@@ -100,4 +100,3 @@ chkconfig --add kadeploy3d
 
 %preun server
 chkconfig --del kadeploy3d
-

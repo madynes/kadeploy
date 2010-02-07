@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -411,6 +411,10 @@ module ConfigInformation
               end
             when "kadeploy_cache_size"
               @common.kadeploy_cache_size = val.to_i
+            when "max_preinstall_size"
+              @common.max_preinstall_size = val.to_i
+            when "max_postinstall_size"
+              @common.max_postinstall_size = val.to_i 
             when "ssh_port"
               if val =~ /\A\d+\Z/ then
                 @common.ssh_port = val
@@ -587,6 +591,11 @@ module ConfigInformation
           puts "The directory cannot be created"
           return false
         end
+      else
+        if (not File.stat(@common.kadeploy_cache_dir).writable?) then
+          puts "The #{@common.kadeploy_cache_dir} directory is not writable"
+          return false
+        end
       end
       #tftp image directory
       if not File.exist?(@common.tftp_repository + "/" + @common.tftp_images_path) then
@@ -668,11 +677,18 @@ module ConfigInformation
                   @cluster_specific[cluster].swap_part = val
                 when "workflow_steps"
                   @cluster_specific[cluster].workflow_steps = val
-                when "timeout_reboot"
+                when "timeout_reboot_classical"
                   if val =~ /\A\d+\Z/ then
-                    @cluster_specific[cluster].timeout_reboot = val.to_i
+                    @cluster_specific[cluster].timeout_reboot_classical = val.to_i
                   else
-                    puts "Invalid value for the timeout_reboot field in the #{cluster} config file"
+                    puts "Invalid value for the timeout_reboot_classical field in the #{cluster} config file"
+                    return false
+                  end
+                when "timeout_reboot_kexec"
+                  if val =~ /\A\d+\Z/ then
+                    @cluster_specific[cluster].timeout_reboot_kexec = val.to_i
+                  else
+                    puts "Invalid value for the timeout_reboot_kexec field in the #{cluster} config file"
                     return false
                   end
                 when "cmd_soft_reboot_rsh"
@@ -690,6 +706,8 @@ module ConfigInformation
                     @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
                     @cluster_specific[cluster].drivers.push(driver)
                   }
+                when "pxe_header"
+                  @cluster_specific[cluster].pxe_header = val.gsub("\\n","\n")
                 when "kernel_params"
                   @cluster_specific[cluster].kernel_params = val
                 when "admin_pre_install"
@@ -799,7 +817,11 @@ module ConfigInformation
           host = content[1]
           ip = content[2]
           cluster = content[3]
-          @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+          if @cluster_specific.has_key?(cluster) then
+            @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
+          else
+            puts "The cluster #{cluster} has not been defined in #{CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE}"
+          end
         end
         if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
           content = Regexp.last_match
@@ -1303,7 +1325,7 @@ module ConfigInformation
           end
         }
         opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A(\w+)|\*\Z/ =~ u then
+          if /\A(\w+|\*)\Z/ =~ u then
             exec_specific.user = u
           else
             error("Invalid user name")
@@ -1860,7 +1882,6 @@ module ConfigInformation
       exec_specific.reboot_level = "soft"
       exec_specific.wait = true
       exec_specific.get_version = false
-      exec_specific.reboot_id = String.new
       exec_specific.chosen_server = "default"
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
@@ -1963,7 +1984,7 @@ module ConfigInformation
           exec_specific.reboot_kind = k
         }
         opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A(\w+)|\*\Z/ =~ u then
+          if /\A\w+\Z/ =~ u then
             exec_specific.user = u
           else
             error("Invalid user name")
@@ -2190,6 +2211,8 @@ module ConfigInformation
     attr_accessor :kadeploy_tcp_buffer_size
     attr_accessor :kadeploy_cache_dir
     attr_accessor :kadeploy_cache_size
+    attr_accessor :max_preinstall_size
+    attr_accessor :max_postinstall_size
     attr_accessor :kadeploy_disable_cache
     attr_accessor :ssh_port
     attr_accessor :rsh_port
@@ -2247,6 +2270,7 @@ module ConfigInformation
           (@taktuk_ssh_connector == nil) || (@taktuk_rsh_connector == nil) ||
           (@taktuk_tree_arity == nil) || (@taktuk_auto_propagate == nil) || (@tarball_dest_dir == nil) ||
           (@kadeploy_server == nil) || (@kadeploy_server_port == nil) ||
+          (@max_preinstall_size == nil) || (@max_postinstall_size == nil) ||
           (@kadeploy_tcp_buffer_size == nil) || (@kadeploy_cache_dir == nil) || (@kadeploy_cache_size == nil) ||
           (@ssh_port == nil) || (@rsh_port == nil) || (@test_deploy_env_port == nil) || (@use_rsh_to_deploy == nil) ||
           (@environment_extraction_dir == nil) || (@log_to_file == nil) || (@log_to_syslog == nil) || (@log_to_db == nil) ||
@@ -2273,7 +2297,8 @@ module ConfigInformation
     attr_accessor :tmp_part
     attr_accessor :swap_part
     attr_accessor :workflow_steps   #Array of MacroStep
-    attr_accessor :timeout_reboot
+    attr_accessor :timeout_reboot_classical
+    attr_accessor :timeout_reboot_kexec
     attr_accessor :cmd_soft_reboot_rsh
     attr_accessor :cmd_soft_reboot_ssh
     attr_accessor :cmd_hard_reboot
@@ -2282,6 +2307,7 @@ module ConfigInformation
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
     attr_accessor :drivers
+    attr_accessor :pxe_header
     attr_accessor :kernel_params
     attr_accessor :admin_pre_install
     attr_accessor :admin_post_install
@@ -2301,13 +2327,15 @@ module ConfigInformation
       @prod_part = nil
       @tmp_part = nil
       @swap_part = nil
-      @timeout_reboot = nil
+      @timeout_reboot_classical = nil
+      @timeout_reboot_kexec = nil
       @cmd_soft_reboot_rsh = nil
       @cmd_soft_reboot_ssh = nil
       @cmd_hard_reboot = nil
       @cmd_very_hard_reboot = nil
       @cmd_console = nil
       @drivers = nil
+      @pxe_header = nil
       @kernel_params = nil
       @admin_pre_install = nil
       @admin_post_install = nil
@@ -2332,13 +2360,15 @@ module ConfigInformation
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
       dest.swap_part = @swap_part.clone if (@swap_part != nil)
-      dest.timeout_reboot = @timeout_reboot
+      dest.timeout_reboot_classical = @timeout_reboot_classical
+      dest.timeout_reboot_kexec = @timeout_reboot_kexec
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
       dest.cmd_hard_reboot = @cmd_hard_reboot.clone
       dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone
       dest.cmd_console = @cmd_console.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
+      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
@@ -2364,13 +2394,15 @@ module ConfigInformation
       dest.prod_part = @prod_part.clone
       dest.tmp_part = @tmp_part.clone
       dest.swap_part = @swap_part.clone if (@swap_part != nil)
-      dest.timeout_reboot = @timeout_reboot
+      dest.timeout_reboot_classical = @timeout_reboot_classical
+      dest.timeout_reboot_kexec = @timeout_reboot_kexec
       dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
       dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
       dest.cmd_hard_reboot = @cmd_hard_reboot.clone
       dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone
       dest.cmd_console = @cmd_console.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
+      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
@@ -2391,8 +2423,8 @@ module ConfigInformation
         puts "Warning: " + i + err_msg if (a == nil)
       }
       if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
-          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot == nil) ||
-          (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
+          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot_classical == nil) || (@timeout_reboot_kexec == nil) ||
+          (@pxe_header == nil) || (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
           #(@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
         puts "Some mandatory fields are missing in the specific configuration file for #{cluster}"

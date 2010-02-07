@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -94,6 +94,22 @@ module SetDeploymentEnvironnment
       @step = MicroStepsLibrary::MicroSteps.new(@nodes_ok, @nodes_ko, @reboot_window, @nodes_check_window, @config, cluster, output, get_instance_name)
     end
 
+    def finalize
+      @queue_manager = nil
+      @config = nil
+      @reboot_window = nil
+      @nodes_check_window = nil
+      @output = nil
+      @nodes_ok = nil
+      @nodes_ko = nil
+      @cluster = nil
+      @logger = nil
+      @instances.delete_if { |i| true }
+      @instances = nil
+      @start = nil
+      @step = nil
+    end
+
     # Kill all the running threads
     #
     # Arguments
@@ -101,12 +117,14 @@ module SetDeploymentEnvironnment
     # Output
     # * nothing
     def kill
-      @instances.each { |tid|
-        #first, we clean all the pending processes
-        @step.process_container.killall(tid)
-        #then, we kill the thread
-        Thread.kill(tid)
-      }
+      if (@instances != nil) then
+        @instances.each { |tid|
+          #first, we clean all the pending processes
+          @step.process_container.killall(tid)
+          #then, we kill the thread
+          Thread.kill(tid)
+        }
+      end
     end
 
     # Get the name of the current macro step
@@ -160,7 +178,8 @@ module SetDeploymentEnvironnment
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
             result = result && @step.format_deploy_part
@@ -190,6 +209,7 @@ module SetDeploymentEnvironnment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -225,7 +245,8 @@ module SetDeploymentEnvironnment
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.manage_admin_pre_install("tree")
             #End of micro steps
@@ -251,6 +272,7 @@ module SetDeploymentEnvironnment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -303,7 +325,8 @@ module SetDeploymentEnvironnment
           end
         else
           @queue_manager.decrement_active_threads
-        end    
+        end
+        finalize()
       }
       return tid
     end
@@ -340,7 +363,8 @@ module SetDeploymentEnvironnment
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_nfsroot_env")
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[])
+            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
             result = result && @step.format_deploy_part
@@ -370,6 +394,7 @@ module SetDeploymentEnvironnment
         else
           @queue_manager.decrement_active_threads
         end
+        finalize()
       }
       return tid
     end
@@ -387,6 +412,7 @@ module SetDeploymentEnvironnment
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads
+        finalize()
       }
       return tid
     end

@@ -1,5 +1,5 @@
-# Kadeploy 3.0
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008, 2009
+# Kadeploy 3.1
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -282,6 +282,7 @@ module MicroStepsLibrary
       }
       @reboot_window.launch(node_set, &callback)
       @nodes_ko.add(node_set) if @nodes_ok.empty?
+      node_set = nil
     end
 
     # Test if the given symlink is an absolute link
@@ -680,18 +681,22 @@ module MicroStepsLibrary
       std_output = String.new
       err_output = String.new
       std_reader = Thread.new {
+        std_output_full = false
         begin
-          while line = c.stdout.gets
+          while (line = c.stdout.gets) && (not std_output_full)
             std_output += line
+            std_output_full = true if std_output.length > 1000
           end
         ensure
           c.stdout.close
         end
       }
       err_reader = Thread.new {
+        err_output_full = false
         begin
-          while line = c.stderr.gets
+          while (line = c.stderr.gets) && (not err_output_full)
             err_output += line
+            err_output_full = true if err_output.length > 1000
           end
         ensure
           c.stderr.close
@@ -1000,7 +1005,10 @@ module MicroStepsLibrary
           else
             @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)")
             @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}")
-            send(real_method, Thread.current, *args)
+            start = Time.now.to_i
+            ret = send(real_method, Thread.current, *args)
+            @output.verbosel(4, "  Time in #{@macro_step}-#{method_sym.to_s}: #{Time.now.to_i - start}s")
+            return ret
           end
         else
           @output.verbosel(0, "Wrong method: #{method_sym} #{real_method}!!!")
@@ -1047,7 +1055,8 @@ module MicroStepsLibrary
                                                 "",
                                                 @config.common.tftp_repository,
                                                 @config.common.tftp_images_path,
-                                                @config.common.tftp_cfg) then
+                                                @config.common.tftp_cfg,
+                                                @config.cluster_specific[@cluster].pxe_header) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
           return false
         end
@@ -1057,7 +1066,8 @@ module MicroStepsLibrary
                                                   @config.common.nfs_server,
                                                   @config.common.tftp_repository,
                                                   @config.common.tftp_images_path,
-                                                  @config.common.tftp_cfg) then
+                                                  @config.common.tftp_cfg,
+                                                  @config.cluster_specific[@cluster].pxe_header) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_nfsroot operation")
           return false
         end
@@ -1103,7 +1113,8 @@ module MicroStepsLibrary
                                                       get_deploy_part_str(),
                                                       @config.common.tftp_repository,
                                                       @config.common.tftp_images_path,
-                                                      @config.common.tftp_cfg) then
+                                                      @config.common.tftp_cfg,
+                                                      @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
                 return false
               end
@@ -1135,7 +1146,8 @@ module MicroStepsLibrary
                                                     get_deploy_part_str(),
                                                     @config.common.tftp_repository,
                                                     @config.common.tftp_images_path,
-                                                    @config.common.tftp_cfg) then
+                                                    @config.common.tftp_cfg,
+                                                    @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end
@@ -1143,14 +1155,16 @@ module MicroStepsLibrary
             Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                @config.common.tftp_images_max_size * 1024 * 1024,
                                1,
-                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/)
+                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
+                               @output)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
               PXEOperations::set_pxe_for_chainload(@nodes_ok.make_array_of_ip,
                                                    get_deploy_part_num(),
                                                    @config.common.tftp_repository,
                                                    @config.common.tftp_images_path,
-                                                   @config.common.tftp_cfg)
+                                                   @config.common.tftp_cfg,
+                                                   @config.cluster_specific[@cluster].pxe_header)
             else
               # @output.verbosel(3, "Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
@@ -1187,7 +1201,8 @@ module MicroStepsLibrary
               Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
                                  @config.common.tftp_images_max_size * 1024 * 1024,
                                  1,
-                                 /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/)
+                                 /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
+                                 @output)
             end
           end
         end
@@ -1450,10 +1465,11 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # * ports_up: up ports used to perform a reach test on the nodes
     # * ports_down: down ports used to perform a reach test on the nodes
+    # * timeout: reboot timeout
     # Output
     # * return true if some nodes are here, false otherwise
-    def ms_wait_reboot(instance_thread, ports_up, ports_down)
-      return parallel_wait_nodes_after_reboot_wrapper(@config.cluster_specific[@cluster].timeout_reboot, 
+    def ms_wait_reboot(instance_thread, ports_up, ports_down, timeout)
+      return parallel_wait_nodes_after_reboot_wrapper(timeout, 
                                                       ports_up, 
                                                       ports_down,
                                                       @nodes_check_window,

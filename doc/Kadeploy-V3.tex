@@ -16,7 +16,7 @@
 \maketitle
 
 \vspace*{18cm}
-\noindent Copyright \copyright by INRIA, Emmanuel Jeanvoine, emmanuel.jeanvoine@inria.fr 2008-2009\\
+\noindent Copyright \copyright by INRIA, Emmanuel Jeanvoine, emmanuel.jeanvoine@inria.fr 2008-2010\\
 KADEPLOY 3.0, CECILL 2.0 license, All rights reserved.
 
 \tableofcontents
@@ -259,7 +259,9 @@ kadeploy_server = fgdx2.orsay.grid5000.fr
 kadeploy_server_port = 25300
 kadeploy_tcp_buffer_size = 8192
 kadeploy_cache_dir = /tmp/kadeploy_cache
-kadeploy_cache_size = 500000
+kadeploy_cache_size = 20000
+max_preinstall_size = 30
+max_postinstall_size = 30
 ssh_port = 22
 rsh_port = 514
 test_deploy_env_port = 25300
@@ -312,6 +314,8 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{kadeploy\_tcp\_buffer\_size}: TCP buffer size for the Kadeploy file server.
 \item \texttt{kadeploy\_cache\_dir}: absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment. It is possible to disable the use of a cache by setting \textit{no\_cache} to this field.
 \item \texttt{kadeploy\_cache\_size}: size in MB of the Kadeploy cache.
+\item \texttt{max\_preinstall\_size}: maximum size in MB of the preinstall files.
+\item \texttt{max\_postinstall\_size}: maximum size in MB of the postinstall files.
 \item \texttt{ssh\_port}: port used by SSH
 \item \texttt{rsh\_port}: port used by RSH
 \item \texttt{test\_deploy\_env\_port}: port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted.
@@ -351,7 +355,8 @@ prod_part = 2
 deploy_part = 3
 tmp_part = 5
 swap_part = 1
-timeout_reboot = 220
+timeout_reboot_classical = 200
+timeout_reboot_kexec = 60
 cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
                              -o PreferredAuthentications=publickey \
                              -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
@@ -362,13 +367,14 @@ cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
 cmd_console = /usr/local/kadeploy/bin/console HOSTNAME_SHORT
 drivers = ata_piix,ata_generic
 kernel_params = console=tty0 console=ttyS1,38400n8
+pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
 partition_creation_kind = fdisk
 admin_pre_install = /g5k/admin_pre_install.tgz|tgz|launch.sh
 admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
 
 #Automata description
 macrostep = SetDeploymentEnv|SetDeploymentEnvProd:1:200,SetDeploymentEnvUntrusted:1:400
-macrostep = BroadcastEnv|BroadcastEnvChain:2:500
+macrostep = BroadcastEnv|BroadcastEnvKastafior:2:500
 macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvHardReboot:1:300
 \end{verbatim}
 \end{small}
@@ -383,13 +389,15 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{deploy\_part}: number of the deployment partition on the disk.
 \item \texttt{tmp\_part}: number of the tmp partition on the disk.
 \item \texttt{swap\_part}: number of the swap partition on the disk. If the \texttt{none} value is specified, the swap format at the deployment time will be bypassed.
-\item \texttt{timeout\_reboot}: reboot timeout.
+\item \texttt{timeout\_reboot\_classical}: classical reboot timeout.
+\item \texttt{timeout\_reboot\_kexec}: kexec reboot timeout.
 \item \texttt{cmd\_soft\_reboot\_ssh}: generic ssh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_soft\_reboot\_rsh}: generic rsh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_hard\_reboot}: generic hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_very\_hard\_reboot}: generic very hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{drivers}: list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
 \item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
+\item \texttt{pxe\_header}: default PXE header (must be defined in one line).
 \item \texttt{partition\_creation\_kind}: tool used to create the partition table. The expected values are \texttt{fdisk} or \texttt{parted}.
 \item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
 \item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
@@ -738,7 +746,7 @@ This command performs the deployment of the environment described by the file \t
             --breakpoint BroadcastEnvKastafior:manage_user_post_install \
             -d
 \end{verbatim}
-This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvChain} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.
+This kind of command can be used for debug purpose. It performs a deployment with the maximum verbose level and it asks to stop the deployment workflow just before executing the \textit{manage\_user\_post\_install} micro-step of the \textit{BroadcastEnvKastafior} macro-step. Thus you will be able to connect in the deployment environment and to debug what you want. Furthermore, the full output of the distant commands performed is shown.
 
 \paragraph{Use case 6 - advanced usage - specific PXE profile}
 \begin{verbatim}
@@ -782,7 +790,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e "FreeBSD 7.1" \
             --force-steps "SetDeploymentEnv|SetDeploymentEnvProd:2:100&
-                           BroadcastEnv|BroadcastEnvChain:2:300&
+                           BroadcastEnv|BroadcastEnvKastafior:2:300&
                            BootNewEnv|BootNewEnvKexec:1:150"
 \end{verbatim}
 If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
@@ -989,8 +997,8 @@ Explanation of the fields used in the environment description:
 \item \texttt{version}: version of the environment.
 \item \texttt{author}: author of the environment.
 \item \texttt{tarball}: disk image of the environment. The syntax is: \texttt{file|kind}. The allowed kinds are \texttt{tgz}, \texttt{tbz2}, \texttt{ddgz} and \texttt{ddbz2}.
-\item \texttt{preinstall (opt)}: pre-install file.\\ The syntax is: \texttt{file|kind|script}. The allowed kinds of files are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
-\item \texttt{postinstall}: post-install files.\\ The syntax is: \texttt{file1|kind|script1,file2|kind|script2, ...}. The allowed kinds of files for post-installs are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
+\item \texttt{preinstall (opt)}: pre-install file. The syntax is: \texttt{file|kind|script [params]}. The allowed kinds of files are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
+\item \texttt{postinstall}: post-install files. The syntax is: \texttt{file1|kind|script1 [params],file2|kind|script2 [params], ...}. The allowed kinds of files for post-installs are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
 \item \texttt{kernel}: path of the kernel in the tarball.
 \item \texttt{kernel\_params}: set of parameters that must be applied to the kernel for a correct boot.
 \item \texttt{initrd}: path of the initrd in the tarball.
@@ -1203,7 +1211,7 @@ If you do kernel development on the deployed nodes, you will probably want to up
 On a \emph{Linux} environment, after having updated your kernel/initrd, 2 cases are imaginable:
 \begin{enumerate}
 \item your kernel/initrd have the same name, so you can reboot the node without modifying anything.
-\item your kernel.initrd have a new name, so you will have to update the grub configuration file (\texttt{/boot/grub/grub.cfg}) of your node in order to allow grub to select the new kernel and then you can reboot the node.
+\item your kernel/initrd have a new name, so you will have to update the grub configuration file (\texttt{/boot/grub/grub.cfg}) of your node in order to allow grub to select the new kernel and then you can reboot the node.
 \end{enumerate}
 
 \subsubsection{Xen environments}
