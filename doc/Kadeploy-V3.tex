@@ -674,7 +674,8 @@ General options:
   -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
                                    directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER         Number of version of the environment to deploy
-      --verbose-level VALUE        Verbose level between 0 to 4
+      --server STRING              Specify the Kadeploy server to use
+  -V, --verbose-level VALUE        Verbose level between 0 to 4
 Advanced options:
       --write-workflow-id FILE     Write the workflow id in a file
       --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying" 
@@ -841,7 +842,8 @@ General options:
                                  directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER       Specify the environment version
       --no-wait                  Do not wait the end of the reboot
-      --verbose-level VALUE      Verbose level between 0 to 4
+      --server STRING            Specify the Kadeploy server to use
+  -V, --verbose-level VALUE      Verbose level between 0 to 4
 \end{verbatim}
 \end{small}
 
@@ -895,13 +897,14 @@ General options:
   -t, --visibility-tag TAG              Set the visibility tag (private, shared, public)
   -u, --user USERNAME                   Specify the user
       --env-version NUMBER              Specify the version
+      --server STRING                   Specify the Kadeploy server to use
+Advanced options:
       --remove-demolishing-tag ENVNAME  Remove demolishing tag on an environment
       --set-visibility-tag ENVNAME      Set the visibility tag on an environment
       --update-tarball-md5 ENVNAME      Update the MD5 of the environment tarball
       --update-preinstall-md5 ENVNAME   Update the MD5 of the environment preinstall
       --update-postinstalls-md5 ENVNAME Update the MD5 of the environment postinstalls
       --move-files ENVNAME              Move the files of the environment
-
 \end{verbatim}
 \end{small}
 
@@ -1032,6 +1035,7 @@ General options:
   -s, --show-rights            Show the rights for a given user
   -u, --user USERNAME          Specify the user
   -v, --version                Get the version
+      --server STRING          Specify the Kadeploy server to use
 \end{verbatim}
 \end{small}
 
@@ -1104,6 +1108,7 @@ General options:
   -v, --version                    Get the version
   -x, --date-min DATE              Get the stats from this date (yyyy:mm:dd:hh:mm:ss)
   -y, --date-max DATE              Get the stats to this date
+      --server STRING              Specify the Kadeploy server to use
 \end{verbatim}
 \end{small}
 
@@ -1161,6 +1166,7 @@ General options:
                                operation. If no wid is specified, the information of all
                                the running worklfows will be dumped
   -y, --get-yaml-dump          Get the yaml dump
+      --server STRING          Specify the Kadeploy server to use
 \end{verbatim}
 \end{small}
 

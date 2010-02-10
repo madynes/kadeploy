@@ -2159,9 +2159,6 @@ module ConfigInformation
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
-          exec_specific.chosen_server = s
-        }
       end
       @opts = opts
       begin
