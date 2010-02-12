@@ -257,6 +257,7 @@ module ConfigInformation
       exec_specific.prefix_in_cache = String.new
       exec_specific.chosen_server = "default"
       exec_specific.servers = Config.load_client_config_file
+      exec_specific.multi_server = false
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
 
@@ -1035,6 +1036,9 @@ module ConfigInformation
             exec_specific.node_array.push(hostname.chomp)
           end
         }
+        opt.on("--multi-server", "Activate the multi-server mode") {
+          exec_specific.multi_server = true
+        }
         opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
           exec_specific.nodes_ko_file = f
         }
@@ -1107,7 +1111,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         } 
         opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
@@ -1162,7 +1166,7 @@ module ConfigInformation
               end
             }
           end
-        }       
+        }
         opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
           s.split("&").each { |macrostep|
             macrostep_name = macrostep.split("|")[0]
@@ -1343,7 +1347,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         } 
         opt.separator "Advanced options:"
@@ -1544,7 +1548,7 @@ module ConfigInformation
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         }
       end
@@ -1681,7 +1685,7 @@ module ConfigInformation
         opt.on("-y", "--date-max DATE", "Get the stats to this date") { |d|
           exec_specific.date_max = d
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         }
       end
@@ -1822,7 +1826,7 @@ module ConfigInformation
         opt.on("-y", "--get-yaml-dump", "Get the yaml dump") {
           exec_specific.operation = "get_yaml_dump"
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         }
       end
@@ -2023,7 +2027,7 @@ module ConfigInformation
         opt.on("--no-wait", "Do not wait the end of the reboot") {
           exec_specific.wait = false
         }
-        opt.on("--server STRING", "Specify the Kadeploy Server to use") { |s|
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         } 
         opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|

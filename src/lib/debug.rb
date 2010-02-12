@@ -7,10 +7,11 @@
 require 'syslog'
 
 module Debug
-  # Print an error message
+  # Print an error message on a local client
   #
   # Arguments
   # * msg: error message
+  # * usage_handler(opt): usage handler
   # Output
   # * nothing
   def Debug::local_client_error(msg, usage_handler = nil)
@@ -21,6 +22,17 @@ module Debug
     else
       usage_handler.call
     end
+  end
+
+  # Print an error message on a distant client
+  #
+  # Arguments
+  # * msg: error message
+  # * client: DRb client handler
+  # Output
+  # * nothing
+  def Debug::distant_client_error(msg, client)
+    client.print("ERROR: #{msg}")
   end
 
   # Print a message

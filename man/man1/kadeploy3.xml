@@ -90,6 +90,12 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>--multi-server</option></term>
+	<listitem>
+	  <para>Activate the multi-server mode.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-n</option></term>
 	<term><option>--output-ko-nodes <replaceable>FILENAME</replaceable></option></term>
 	<listitem>

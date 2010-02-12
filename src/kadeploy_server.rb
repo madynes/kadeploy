@@ -69,6 +69,64 @@ class KadeployServer
     return @config.common.bootloader
   end
 
+  # Check if the server knows a set of nodes (RPC)
+  #
+  # Arguments
+  # * nodes: array of hostnames
+  # Output
+  # * returns an array with known nodes and another one with unknown nodes
+  def check_known_nodes(nodes)
+    node_list = Array.new
+    nodes_ok = Array.new
+    nodes_ko = Array.new
+    nodes.each { |n|
+      if (/\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ n) then
+         node_list = node_list + Nodes::NodeSet::nodes_list_expand("#{n}")
+      else
+        node_list.push(n)
+      end
+    }
+    node_list.each { |n|
+      if (@config.common.nodes_desc.get_node_by_host(n) != nil) then
+          nodes_ok.push(n)
+      else
+        nodes_ko.push(n)
+      end
+    }
+    return [nodes_ok,nodes_ko]
+  end
+
+  # Create a socket server designed to copy a file from to client to the server cache (RPC)
+  #
+  # Arguments
+  # * filename: name of the destination file
+  # Output
+  # * return the port allocated to the socket server
+  def create_a_socket_server(filename)
+    sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
+    sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
+    begin
+      sock.bind(sockaddr)
+    rescue
+      return -1
+    end
+    port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
+    Thread.new {
+      sock.listen(10)
+      begin
+        session = sock.accept
+        file = File.new(@config.common.kadeploy_cache_dir + "/" + filename, "w")
+        while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
+          file.write(buf)
+        end
+        file.close
+        session[0].close
+      rescue
+        puts "The client has been probably disconnected..."
+      end
+    }
+    return port
+  end
 
   def run(kind, exec_specific_config, host, port)
     db = Database::DbFactory.create(@config.common.db_kind)
@@ -199,38 +257,6 @@ class KadeployServer
     workflow = nil
     config = nil
     return true
-  end
-
-  # Create a socket server designed to copy a file from to client to the server cache (RPC)
-  #
-  # Arguments
-  # * filename: name of the destination file
-  # Output
-  # * return the port allocated to the socket server
-  def kadeploy_sync_create_a_socket_server(filename)
-    sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
-    sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
-    begin
-      sock.bind(sockaddr)
-    rescue
-      return -1
-    end
-    port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
-    Thread.new {
-      sock.listen(10)
-      begin
-        session = sock.accept
-        file = File.new(@config.common.kadeploy_cache_dir + "/" + filename, "w")
-        while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
-          file.write(buf)
-        end
-        file.close
-        session[0].close
-      rescue
-        puts "The client has been probably disconnected..."
-      end
-    }
-    return port
   end
 
   # Kill a workflow (RPC)
