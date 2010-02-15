@@ -40,9 +40,10 @@ module EnvironmentManagement
     # * file: filename
     # * almighty_env_users: array that contains almighty users
     # * client: DRb handler to client
+    # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(file, file_content, almighty_env_users, user, client)
+    def load_from_file(file, file_content, almighty_env_users, user, client, record_in_db)
       temp_env_file = Tempfile.new("env_file")
       if (file =~ /^http[s]?:\/\//) then
         http_response, etag = HTTP::fetch_file(file, temp_env_file.path, nil)
@@ -59,6 +60,7 @@ module EnvironmentManagement
       file = temp_env_file.path
       @preinstall = nil
       @postinstall = nil
+      @environment_kind = nil
       @demolishing_env = "0"
       @author = "no author"
       @description = "no description"
@@ -103,12 +105,14 @@ module EnvironmentManagement
                 Debug::distant_client_print("#{@tarball["file"]} is an HTTP file, let's bypass the md5sum", client)
                 @tarball["md5"] = ""
               else
-                if not File.readable?(@tarball["file"]) then
-                  Debug::distant_client_error("The tarball file #{@tarball["file"]} cannot be read", client)
-                  return false
+                if (record_in_db) then
+                  if (not File.readable?(@tarball["file"])) then
+                    Debug::distant_client_error("The tarball file #{@tarball["file"]} cannot be read", client)
+                    return false
+                  end
+                  Debug::distant_client_print("Computing the md5sum for #{@tarball["file"]}", client)
+                  @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
                 end
-                Debug::distant_client_print("Computing the md5sum for #{@tarball["file"]}", client)
-                @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
               end
             else
               Debug::distant_client_error("The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2", client)
@@ -125,12 +129,14 @@ module EnvironmentManagement
                 Debug::distant_client_print("#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum", client)
                 @preinstall["md5"] = ""
               else
-                if not File.readable?(@preinstall["file"]) then
-                  Debug::distant_client_error("The pre-install file #{@preinstall["file"]} cannot be read", client)
-                  return false
+                if (record_in_db) then
+                  if (not File.readable?(@preinstall["file"])) then
+                    Debug::distant_client_error("The pre-install file #{@preinstall["file"]} cannot be read", client)
+                    return false
+                  end
+                  Debug::distant_client_print("Computing the md5sum for #{@preinstall["file"]}", client)
+                  @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
                 end
-                Debug::distant_client_print("Computing the md5sum for #{@preinstall["file"]}", client)
-                @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
               end
             else
               Debug::distant_client_error("The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2", client)
@@ -150,12 +156,14 @@ module EnvironmentManagement
                   Debug::distant_client_print("#{entry["file"]} is an HTTP file, let's bypass the md5sum", client)
                   entry["md5"] = ""
                 else
-                  if not File.readable?(entry["file"]) then
-                    Debug::distant_client_error("The post-install file #{entry["file"]} cannot be read", client)
-                    return false
+                  if (record_in_db) then
+                    if (not File.readable?(entry["file"])) then
+                      Debug::distant_client_error("The post-install file #{entry["file"]} cannot be read", client)
+                      return false
+                    end
+                    Debug::distant_client_print("Computing the md5sum for #{entry["file"]}", client)
+                    entry["md5"] = MD5::get_md5_sum(entry["file"])
                   end
-                  Debug::distant_client_print("Computing the md5sum for #{entry["file"]}", client)
-                  entry["md5"] = MD5::get_md5_sum(entry["file"])
                 end
                 @postinstall.push(entry)
               }

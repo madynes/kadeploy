@@ -15,9 +15,15 @@ require 'md5'
 
 class KarebootClient
   @kadeploy_server = nil
+  @site = nil
+  @files_ok_nodes = nil
+  @files_ko_nodes = nil
 
-  def initialize(kadeploy_server)
+  def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
     @kadeploy_server = kadeploy_server
+    @site = site
+    @files_ok_nodes = files_ok_nodes
+    @files_ko_nodes = files_ko_nodes
   end
   
   # Print a message (RPC)
@@ -27,7 +33,11 @@ class KarebootClient
   # Output
   # * prints a message
   def print(msg)
-    puts msg
+    if (@site == nil) then
+      puts msg
+    else
+      puts "#{@site} server: #{msg}"
+    end
   end
 
   # Test method to check that the client is still there (RPC)
@@ -49,7 +59,7 @@ class KarebootClient
   def get_file(file_name, prefix)
     if (File.exist?(file_name)) then
       if (File.readable?(file_name)) then
-        port = @kadeploy_server.kadeploy_sync_create_a_socket_server(prefix + File.basename(file_name))
+        port = @kadeploy_server.create_a_socket_server(prefix + File.basename(file_name))
         if port != -1 then
           sock = TCPSocket.new(@kadeploy_server.dest_host, port)
           file = File.open(file_name)
@@ -118,78 +128,133 @@ class KarebootClient
   #
   # Arguments
   # * nodes_ok: instance of NodeSet that contains the nodes correctly deployed
-  # * file_ok: destination filename to store the nodes correctly deployed
   # * nodes_ko: instance of NodeSet that contains the nodes not correctly deployed
-  # * file_ko: destination filename to store the nodes not correctly deployed
   # Output
   # * nothing    
-  def generate_files(nodes_ok, file_ok, nodes_ko, file_ko)
-    if (file_ok != "") then
-      File.delete(file_ok) if File.exist?(file_ok)
-      t = nodes_ok.make_array_of_hostname
-      if (not t.empty?) then
-        file = File.new(file_ok, "w")
-        t.each { |n|
-          file.write("#{n}\n")
-        }
-        file.close
-      end
+  def generate_files(nodes_ok, nodes_ko)
+    t = nodes_ok.make_array_of_hostname
+    if (not t.empty?) then
+      file_ok = Tempfile.new("kadeploy_nodes_ok")
+      @files_ok_nodes.push(file_ok)     
+      t.each { |n|
+        file_ok.write("#{n}\n")
+      }
+      file_ok.close
     end
-    if (file_ko != "") then
-      File.delete(file_ko) if File.exist?(file_ko)
-      t = nodes_ko.make_array_of_hostname
-      if (not t.empty?) then
-        file = File.new(file_ko, "w")
-        t.each { |n|
-          file.write("#{n}\n")
-        }
-        file.close
-      end
+
+    t = nodes_ko.make_array_of_hostname
+    if (not t.empty?) then
+      file_ko = Tempfile.new("kadeploy_nodes_ko")
+      @files_ko_nodes.push(file_ko)      
+      t.each { |n|
+        file_ko.write("#{n}\n")
+      }
+      file_ko.close
     end
   end
 end
 
+
+
 exec_specific_config = ConfigInformation::Config.load_kareboot_exec_specific()
+files_ok_nodes = Array.new
+files_ko_nodes = Array.new
 
-if exec_specific_config != nil then
-  #Connect to the server
-  DRb.start_service()
-  uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
-  kadeploy_server = DRbObject.new(nil, uri)
+if (exec_specific_config != nil) then
+  nodes_by_server = Hash.new
+  remaining_nodes = exec_specific_config.node_array.clone
 
-  if exec_specific_config.get_version then
-    puts "Kareboot version: #{kadeploy_server.get_version()}"
-    exit(0)
-  end
-
-  #Launch the listener on the client
-  kareboot_client = KarebootClient.new(kadeploy_server)
-  DRb.start_service(nil, kareboot_client)
-  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
-    content = Regexp.last_match
-    client_host = content[1]
-    client_port = content[2]
+  if (exec_specific_config.multi_server) then
+    exec_specific_config.servers.each_pair { |server,info|
+      if (server != "default") then
+        DRb.start_service()
+        uri = "druby://#{info[0]}:#{info[1]}"
+        kadeploy_server = DRbObject.new(nil, uri)
+        nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
+        if (nodes_known.length > 0) then
+          nodes_by_server[server] = nodes_known
+        end
+        DRb.stop_service()
+        break if (remaining_nodes.length == 0)
+      end
+    }
+    if (not remaining_nodes.empty?) then
+      puts "The nodes #{remaining_nodes.join(", ")} does not belongs to any server"
+      exit(1)
+    end
   else
-    puts "The URI #{DRb.uri} is not correct"
-    exit(1)
+    nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
   end
   
+  tid_array = Array.new
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
+  files_ok_nodes = Array.new
+  files_ko_nodes = Array.new
+  nodes_by_server.each_key { |server|
+    tid_array << Thread.new {
+      #Connect to the server
+      DRb.start_service()
+      uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
+      kadeploy_server = DRbObject.new(nil, uri)
+
+      if exec_specific_config.get_version then
+        puts "server #{server}: Kareboot version: #{kadeploy_server.get_version()}"
+      else
+        #Launch the listener on the client
+        if (exec_specific_config.multi_server) then
+          kareboot_client = KarebootClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
+        else
+          kareboot_client = KarebootClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
+        end
+        DRb.start_service(nil, kareboot_client)
+        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+          content = Regexp.last_match
+          client_host = content[1]
+          client_port = content[2]
+        else
+          puts "The URI #{DRb.uri} is not correct"
+          exit(1)
+        end
   
-  if (exec_specific_config.verbose_level != "") then
-    verbose_level = exec_specific_config.verbose_level
-  else
-    verbose_level = nil
-    end
-  if (exec_specific_config.pxe_profile_file != "") then
-    IO.readlines(exec_specific_config.pxe_profile_file).each { |l|
-      exec_specific_config.pxe_profile_msg.concat(l)
+        if (exec_specific_config.verbose_level != "") then
+          verbose_level = exec_specific_config.verbose_level
+        else
+          verbose_level = nil
+        end
+        if (exec_specific_config.pxe_profile_file != "") then
+          IO.readlines(exec_specific_config.pxe_profile_file).each { |l|
+            exec_specific_config.pxe_profile_msg.concat(l)
+          }
+        end
+        cloned_config = exec_specific_config.clone
+        cloned_config.node_array = nodes_by_server[server]
+        kadeploy_server.run("kareboot", cloned_config, client_host, client_port)
+      end
     }
+  }
+  tid_array.each { |tid|
+    tid.join
+  }
+  
+  #We merge the files
+  if (exec_specific_config.nodes_ok_file != "") then
+    File.delete(exec_specific_config.nodes_ok_file) if File.exist?(exec_specific_config.nodes_ok_file)
+    if (not files_ok_nodes.empty?) then
+      files_ok_nodes.each { |file|
+        system("cat #{file.path} >> #{exec_specific_config.nodes_ok_file}")
+      }
+    end
+    File.delete(exec_specific_config.nodes_ko_file) if File.exist?(exec_specific_config.nodes_ko_file)
+    if (not files_ko_nodes.empty?) then
+      files_ko_nodes.each { |file|
+        system("cat #{file.path} >> #{exec_specific_config.nodes_ko_file}")
+      }
+    end
   end
-  kadeploy_server.run("kareboot", exec_specific_config, client_host, client_port)
+
   exit(0)
 else
   exit(1)

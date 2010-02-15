@@ -13,16 +13,21 @@ require 'thread'
 require 'drb'
 require 'socket'
 require 'md5'
+require 'tempfile'
 
 class KadeployClient
   @kadeploy_server = nil
   @site = nil
   attr_accessor :workflow_id
+  @files_ok_nodes = nil
+  @files_ko_nodes = nil
   
-  def initialize(kadeploy_server, site)
+  def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
     @kadeploy_server = kadeploy_server
     @site = site
     @workflow_id = -1
+    @files_ok_nodes = files_ok_nodes
+    @files_ko_nodes = files_ko_nodes
   end
   
   # Print a message (RPC)
@@ -127,35 +132,28 @@ class KadeployClient
   #
   # Arguments
   # * nodes_ok: instance of NodeSet that contains the nodes correctly deployed
-  # * file_ok: destination filename to store the nodes correctly deployed
   # * nodes_ko: instance of NodeSet that contains the nodes not correctly deployed
-  # * file_ko: destination filename to store the nodes not correctly deployed
   # Output
   # * nothing    
-  def generate_files(nodes_ok, file_ok, nodes_ko, file_ko)
-    if (file_ok != "") then
-      file_ok = "#{file_ok}_#{@site}" if (@site != nil)
-      File.delete(file_ok) if File.exist?(file_ok)
-      t = nodes_ok.make_array_of_hostname
-      if (not t.empty?) then
-        file = File.new(file_ok, "w")
-        t.each { |n|
-          file.write("#{n}\n")
-        }
-        file.close
-      end
+  def generate_files(nodes_ok, nodes_ko)
+    t = nodes_ok.make_array_of_hostname
+    if (not t.empty?) then
+      file_ok = Tempfile.new("kadeploy_nodes_ok")
+      @files_ok_nodes.push(file_ok)     
+      t.each { |n|
+        file_ok.write("#{n}\n")
+      }
+      file_ok.close
     end
-    if (file_ko != "") then
-      file_ko = "#{file_ko}_#{@site}" if (@site != nil)
-      File.delete(file_ko) if File.exist?(file_ko)
-      t = nodes_ko.make_array_of_hostname
-      if (not t.empty?) then
-        file = File.new(file_ko, "w")
-        t.each { |n|
-          file.write("#{n}\n")
-        }
-        file.close
-      end
+
+    t = nodes_ko.make_array_of_hostname
+    if (not t.empty?) then
+      file_ko = Tempfile.new("kadeploy_nodes_ko")
+      @files_ko_nodes.push(file_ko)      
+      t.each { |n|
+        file_ko.write("#{n}\n")
+      }
+      file_ko.close
     end
   end
   
@@ -192,23 +190,24 @@ if (exec_specific_config != nil) then
 
   if (exec_specific_config.multi_server) then
     exec_specific_config.servers.each_pair { |server,info|
-      DRb.start_service()
-      uri = "druby://#{info[0]}:#{info[1]}"
-      kadeploy_server = DRbObject.new(nil, uri)
-      nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
-      if (nodes_known.length > 0) then
-        nodes_by_server[server] = nodes_known
+      if (server != "default") then
+        DRb.start_service()
+        uri = "druby://#{info[0]}:#{info[1]}"
+        kadeploy_server = DRbObject.new(nil, uri)
+        nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
+        if (nodes_known.length > 0) then
+          nodes_by_server[server] = nodes_known
+        end
+        DRb.stop_service()
+        break if (remaining_nodes.length == 0)
       end
-      DRb.stop_service()
-      break if (remaining_nodes.length == 0)
     }
-  else
-    if exec_specific_config.servers.has_key?(exec_specific_config.chosen_server) then
-      nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
-    else
-      error("The #{exec_specific_config.chosen_server} server is not defined in the configuration: #{exec_specific_config.servers.keys.join(", ")} values are allowed")
+    if (not remaining_nodes.empty?) then
+      puts "The nodes #{remaining_nodes.join(", ")} does not belongs to any server"
       exit(1)
     end
+  else
+    nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
   end
   
   tid_array = Array.new
@@ -216,6 +215,8 @@ if (exec_specific_config != nil) then
     puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
+  files_ok_nodes = Array.new
+  files_ko_nodes = Array.new
   nodes_by_server.each_key { |server|
     tid_array << Thread.new {
       #Connect to the server
@@ -229,9 +230,9 @@ if (exec_specific_config != nil) then
         if ((exec_specific_config.environment.environment_kind != "other") || (kadeploy_server.get_bootloader != "pure_pxe")) then
           #Launch the listener on the client
           if (exec_specific_config.multi_server) then
-            kadeploy_client = KadeployClient.new(kadeploy_server, server)
+            kadeploy_client = KadeployClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
           else
-            kadeploy_client = KadeployClient.new(kadeploy_server, nil)
+            kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
           end
           DRb.start_service(nil, kadeploy_client)
           if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
@@ -259,6 +260,23 @@ if (exec_specific_config != nil) then
   tid_array.each { |tid|
     tid.join
   }
+
+  #We merge the files
+  if (exec_specific_config.nodes_ok_file != "") then
+    File.delete(exec_specific_config.nodes_ok_file) if File.exist?(exec_specific_config.nodes_ok_file)
+    if (not files_ok_nodes.empty?) then
+      files_ok_nodes.each { |file|
+        system("cat #{file.path} >> #{exec_specific_config.nodes_ok_file}")
+      }
+    end
+    File.delete(exec_specific_config.nodes_ko_file) if File.exist?(exec_specific_config.nodes_ko_file)
+    if (not files_ko_nodes.empty?) then
+      files_ko_nodes.each { |file|
+        system("cat #{file.path} >> #{exec_specific_config.nodes_ko_file}")
+      }
+    end
+  end
+
   #We execute a script at the end of the deployment if required
   if (exec_specific_config.script != "") then
     system(exec_specific_config.script)

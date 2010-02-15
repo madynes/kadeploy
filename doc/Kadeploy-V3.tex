@@ -613,9 +613,9 @@ TODO
 In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastafior} macro-step), the server must be able to perform an ssh connection on itself. Thus, you must add the deploy key installed in the \texttt{/etc/kadeploy3/keys/id\_deploy.pub} in the \texttt{.ssh/authorized\_keys} file of the \texttt{deploy} user. This step is optional if you do not plan to use the \texttt{BroadcastEnvKastafior} macro-step.
 
 \chapter{Client side configuration}
-On the client side, you only have to configure the file named \texttt{client\_conf}. This file defines one Kadeploy server per line. For instance:
+On the client side, you only have to configure the file named \texttt{client\_conf}. This file defines one Kadeploy server per line and a default server. For instance:
 \begin{verbatim}
-default = localhost:25300
+default = rennes
 rennes = rennes.grid5000.fr:25300
 toulouse = toulouse.grid5000.fr:25300
 \end{verbatim}
@@ -836,6 +836,7 @@ General options:
                                  if no argument is specified, use the authorized_keys
   -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
   -m, --machine MACHINE          Reboot the given machines
+      --multi-server             Activate the multi-server mode
   -n, --output-ko-nodes FILENAME File that will contain the nodes not correctly rebooted
   -o, --output-ok-nodes FILENAME File that will contain the nodes correctly rebooted
   -p, --partition-number NUMBER  Specify the partition number to use

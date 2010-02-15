@@ -122,7 +122,8 @@ module ConfigInformation
                                                             exec_specific_config.load_env_content,
                                                             @common.almighty_env_users,
                                                             exec_specific_config.true_user,
-                                                            client) == false) then
+                                                            client,
+                                                            false) == false) then
           return false
         end
       when "db"
@@ -255,7 +256,7 @@ module ConfigInformation
       exec_specific.write_workflow_id = String.new
       exec_specific.get_version = false
       exec_specific.prefix_in_cache = String.new
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.multi_server = false
       exec_specific.kadeploy_server = String.new
@@ -621,6 +622,11 @@ module ConfigInformation
       servers = Hash.new
       IO.readlines(CONFIGURATION_FOLDER + "/" + CLIENT_CONFIGURATION_FILE).each { |line|
         if not (/^#/ =~ line) then #we ignore commented lines
+          if /\A(default)\ \=\ (\w+)\Z/ =~ line then
+            content = Regexp.last_match
+            shortcut = content[2]
+            servers["default"] = shortcut
+          end
           if /\A(\w+)\ \=\ ([\w.-]+):(\d+)\Z/ =~ line then
             content = Regexp.last_match
             shortcut = content[1]
@@ -1189,13 +1195,18 @@ module ConfigInformation
         error("Option parsing error: #{$!}")
         return false
       end
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       if not exec_specific.get_version then
         if exec_specific.node_array.empty? then
           error("You must specify some nodes to deploy")
@@ -1259,7 +1270,7 @@ module ConfigInformation
       exec_specific.version = String.new
       exec_specific.files_to_move = Array.new
       exec_specific.get_version = false
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
@@ -1384,13 +1395,17 @@ module ConfigInformation
         return false
       end
 
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       return true if exec_specific.get_version
       case exec_specific.operation 
       when "add"
@@ -1475,7 +1490,7 @@ module ConfigInformation
       exec_specific.true_user = USER
       exec_specific.overwrite_existing_rights = false
       exec_specific.get_version = fals
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
@@ -1560,13 +1575,17 @@ module ConfigInformation
         return false
       end
 
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       return true if exec_specific.get_version
       if (exec_specific.user == "") then
         error("You must choose a user")
@@ -1613,7 +1632,7 @@ module ConfigInformation
       exec_specific.steps = Array.new
       exec_specific.fields = Array.new
       exec_specific.get_version = false
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
@@ -1697,13 +1716,17 @@ module ConfigInformation
         return false
       end
 
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       return true if exec_specific.get_version
       if (exec_specific.operation == "") then
         error("You must choose an operation")
@@ -1767,7 +1790,7 @@ module ConfigInformation
       exec_specific.node_list = Array.new
       exec_specific.wid = String.new
       exec_specific.get_version = false
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
@@ -1838,13 +1861,17 @@ module ConfigInformation
         return false
       end
 
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       if ((exec_specific.operation == "") && (not exec_specific.get_version)) then
         error("You must choose an operation")
         return false
@@ -1886,10 +1913,11 @@ module ConfigInformation
       exec_specific.reboot_level = "soft"
       exec_specific.wait = true
       exec_specific.get_version = false
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
+      exec_specific.multi_server = false
 
       if Config.load_kareboot_cmdline_options(exec_specific) then
         return exec_specific
@@ -1975,6 +2003,9 @@ module ConfigInformation
             exec_specific.node_array.push(hostname)
           end
         }
+        opt.on("--multi-server", "Activate the multi-server mode") {
+          exec_specific.multi_server = true
+        }
         opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly rebooted")  { |f|
           exec_specific.nodes_ko_file = f
         }
@@ -2047,13 +2078,17 @@ module ConfigInformation
         return false
       end
 
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       return true if exec_specific.get_version
 
       if exec_specific.node_array.empty? then
@@ -2127,7 +2162,7 @@ module ConfigInformation
       exec_specific.node = nil
       exec_specific.get_version = false
       exec_specific.true_user = USER
-      exec_specific.chosen_server = "default"
+      exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
@@ -2172,13 +2207,17 @@ module ConfigInformation
         return false
       end
   
-      if exec_specific.servers.has_key?(exec_specific.chosen_server) then
-        exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-        exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
       else
-        error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{exec_specific.servers.keys.join(", ")} values are allowed")
-        return false
+        exec_specific.chosen_server = exec_specific.servers["default"]
       end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
       return true if exec_specific.get_version
       if (exec_specific.node == nil)then
         error("You must choose one node")

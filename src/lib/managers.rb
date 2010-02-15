@@ -710,7 +710,7 @@ module Managers
                   @output.verbosel(0, "Nodes not correctly deployed on cluster #{cluster}")
                   @output.verbosel(0, set.to_s(true, "\n"))
                 }
-                @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file) if @client != nil
+                @client.generate_files(@nodes_ok, @nodes_ko) if @client != nil
                 Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/, @output) if @config.exec_specific.load_env_kind == "file"
                 @logger.dump
                 @queue_manager.send_exit_signal
