@@ -137,51 +137,114 @@ class KadeployServer
       puts "Kadeploy server cannot connect to DB"
       return false
     end
-    if ((host == nil) || (port == nil)) then
-      client = nil
+
+    if (kind == "kadeploy_async") then
+      if (not @config.check_client_config(kind, exec_specific_config, db, nil)) then
+        return nil,3
+      else
+        return run_kadeploy_async(db, exec_specific_config)
+      end
     else
       DRb.start_service("druby://localhost:0")
       uri = "druby://#{host}:#{port}"
       client = DRbObject.new(nil, uri)
-    end
-    res = @config.check_client_config(kind, exec_specific_config, db, client)
-    case kind
-    when "kadeploy_sync"
-      res = res && run_kadeploy_sync(db, client, exec_specific_config)
-    when "kadeploy_async"
-      res = res && run_kadeploy_async(db, exec_specific_config)
-    when "kareboot"
-      res = res && run_kareboot(db, client, exec_specific_config)
-    when "kastat"
-      res = res && run_kastat(db, client, exec_specific_config)
-    when "kanodes"
-      res = res && run_kanodes(db, client, exec_specific_config)
-    when "karights"
-      res = res && run_karights(db, client, exec_specific_config)
-    when "kaenv"
-      res = res && run_kaenv(db, client, exec_specific_config)
-    when "kaconsole"
-      res = res && run_kaconsole(db, client, exec_specific_config)
-    end
+      
+      res = @config.check_client_config(kind, exec_specific_config, db, client)
+      case kind
+      when "kadeploy_sync"
+        res = res && run_kadeploy_sync(db, client, exec_specific_config)
+      when "kareboot"
+        res = res && run_kareboot(db, client, exec_specific_config)
+      when "kastat"
+        res = res && run_kastat(db, client, exec_specific_config)
+      when "kanodes"
+        res = res && run_kanodes(db, client, exec_specific_config)
+      when "karights"
+        res = res && run_karights(db, client, exec_specific_config)
+      when "kaenv"
+        res = res && run_kaenv(db, client, exec_specific_config)
+      when "kaconsole"
+        res = res && run_kaconsole(db, client, exec_specific_config)
+      end
 
-    db.disconnect
-    client = nil
-    exec_specific = nil
-    DRb.stop_service()
-    GC.start
-
-    return res
+      db.disconnect
+      client = nil
+      exec_specific_config = nil
+      DRb.stop_service()
+      GC.start
+      return res
+    end
   end
 
 
+  # Test if the workflow has reached the end (RPC: only for async execution)
+  #
+  # Arguments
+  # * workflow_id: worklfow id
+  # Output
+  # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
+  def async_deploy_ended?(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.ended?
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
+  end
 
+  # Get the results of a workflow (RPC: only for async execution)
+  #
+  # Arguments
+  # * workflow_id: worklfow id
+  # Output
+  # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
+  def async_deploy_get_results(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.get_results
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
+  end
+
+  # Clean the stuff related to the deployment (RPC: only for async execution)
+  #
+  # Arguments
+  # * id: worklfow id
+  # Output
+  # * nothing
+  def async_deploy_free(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      workflow.db.disconnect
+      kadeploy_delete_workflow_info(workflow_id)
+      #let's free memory at the end of the workflow
+      tid = nil
+      workflow.finalize()
+      workflow = nil
+      exec_specific = nil
+      GC.start
+      ret = true
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
+  end
 
 
 
   private
 
   ##################################
-  #      Public Kadeploy Sync      #
+  #         Kadeploy Sync          #
   ##################################
 
   # Launch the Kadeploy workflow from the client side (RPC)
@@ -303,7 +366,7 @@ class KadeployServer
 
 
   ##################################
-  #    Public Kadeploy Async       #
+  #        Kadeploy Async          #
   ##################################
 
   # Launch the workflow in an asynchronous way (RPC)
@@ -312,21 +375,20 @@ class KadeployServer
   # * db: database handler
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return a workflow id(, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed, 3: server cannot connect to DB)
+  # * return a workflow (id, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed, 3: server cannot connect to DB)
   def run_kadeploy_async(db, exec_specific)
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new("empty")
     config.common = @config.common
     config.exec_specific = exec_specific
     config.cluster_specific = Hash.new
-
     #Overide the configuration if the steps are specified in the command line
     if (not exec_specific.steps.empty?) then
       exec_specific.node_set.group_by_cluster.each_key { |cluster|
         config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
         @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
       }
-      #If the environment specifies a preinstall, we override the automata to use specific preinstall
+    #If the environment specifies a preinstall, we override the automata to use specific preinstall
     elsif (exec_specific.environment.preinstall != nil) then
       exec_specific.node_set.group_by_cluster.each_key { |cluster|
         config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
@@ -345,8 +407,9 @@ class KadeployServer
     @workflow_info_hash_lock.lock
     workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
     workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
-    kadeploy.add_workflow_info(workflow, workflow_id)
+    kadeploy_add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
+    puts "workflow #{workflow_id}"
     if workflow.prepare() then
       if workflow.manage_files(true) then
         workflow.run_async()
@@ -361,71 +424,11 @@ class KadeployServer
     end
   end
 
-  # Test if the workflow has reached the end (RPC: only for async execution)
-  #
-  # Arguments
-  # * workflow_id: worklfow id
-  # Output
-  # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
-  def kadeploy_async_ended?(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      ret = workflow.ended?
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
-  end
 
-  # Get the results of a workflow (RPC: only for async execution)
-  #
-  # Arguments
-  # * workflow_id: worklfow id
-  # Output
-  # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
-  def kadeploy_async_get_results(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      ret = workflow.get_results
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
-  end
-
-  # Clean the stuff related to the deployment (RPC: only for async execution)
-  #
-  # Arguments
-  # * id: worklfow id
-  # Output
-  # * nothing
-  def kadeploy_async_free(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      workflow.db.disconnect
-      kadeploy_delete_workflow_info(workflow_id)
-      #let's free memory at the end of the workflow
-      tid = nil
-      workflow.finalize()
-      workflow = nil
-      exec_specific = nil
-      GC.start
-      ret = true
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
-  end
 
 
   ##################################
-  #       Public Kareboot          #
+  #            Kareboot            #
   ##################################
 
   # Reboot a set of nodes from the client side (RPC)
@@ -575,7 +578,7 @@ class KadeployServer
 
 
   ##################################
-  #        Public Kastat           #
+  #             Kastat             #
   ##################################
   
   def run_kastat(db, client, exec_specific)
@@ -778,7 +781,7 @@ class KadeployServer
 
 
   ##################################
-  #        Public Kanodes          #
+  #            Kanodes             #
   ##################################
 
   def run_kanodes(db, client, exec_specific)
@@ -878,7 +881,7 @@ class KadeployServer
 
 
   ##################################
-  #       Public Karights          #
+  #            Karights            #
   ##################################
 
   def run_karights(db, client, exec_specific)
@@ -1030,7 +1033,7 @@ class KadeployServer
 
 
   ##################################
-  #        Public Kaenv            #
+  #             Kaenv              #
   ##################################
 
   def run_kaenv(db, client, exec_specific)
@@ -1564,7 +1567,7 @@ class KadeployServer
 
 
   ##################################
-  #       Public Kaconsole         #
+  #           Kaconsole            #
   ##################################
   
   def run_kaconsole(db, client, exec_specific)

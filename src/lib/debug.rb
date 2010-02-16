@@ -32,7 +32,7 @@ module Debug
   # Output
   # * nothing
   def Debug::distant_client_error(msg, client)
-    client.print("ERROR: #{msg}")
+    client.print("ERROR: #{msg}") if client != nil
   end
 
   # Print a message
@@ -43,7 +43,7 @@ module Debug
   # Output
   # * nothing
   def Debug::distant_client_print(msg, client)
-    client.print(msg)
+    client.print(msg) if client != nil
   end
 
   class OutputControl
