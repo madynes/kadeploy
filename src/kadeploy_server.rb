@@ -450,7 +450,7 @@ class KadeployServer
       vl = @config.common.verbose_level
     end
     @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
-    output = Debug::OutputControl.new(vl, false, client, exec_specific.true_user, -1, 
+    output = Debug::OutputControl.new(vl, exec_specific.debug, client, exec_specific.true_user, -1, 
                                       @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
     if (exec_specific.reboot_kind == "env_recorded") && 
         exec_specific.check_prod_env && 

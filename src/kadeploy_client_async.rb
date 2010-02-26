@@ -21,40 +21,30 @@ if (exec_specific_config != nil) then
   uri = "druby://#{exec_specific_config.servers[exec_specific_config.chosen_server][0]}:#{exec_specific_config.servers[exec_specific_config.chosen_server][1]}"
   kadeploy_server = DRbObject.new(nil, uri)
   
-  if ((exec_specific_config.environment.environment_kind != "other") || (common_config.bootloader != "pure_pxe")) then
-    workflow_id = -1
-    Signal.trap("INT") do
-      puts "SIGINT trapped, let's clean everything ..."
-      exit(1)
-    end
-    
-    if (exec_specific_config.pxe_profile_file != "") then
-      IO.readlines(exec_specific_config.pxe_profile_file).each { |l|
-        exec_specific_config.pxe_profile_msg.concat(l)
-      }
-    end
-    
-    workflow_id, error = kadeploy_server.run("kadeploy_async", exec_specific_config, nil, nil)
-    if (workflow_id != nil) then
-      while (not kadeploy_server.async_deploy_ended?(workflow_id)) do
-        sleep(10)        
-      end
-      puts kadeploy_server.async_deploy_get_results(workflow_id)
-      kadeploy_server.async_deploy_free(workflow_id)
-    else
-      case error
-      when 1
-        puts "All the nodes have been discarded"
-      when 2
-        puts "Some files cannot be grabbed"
-      when 3
-        puts "Invalid options or invalid rights on nodes"
-      end
-    end
-  else
-    puts "Only linux and xen environments can be deployed with the pure PXE configuration"
+  workflow_id = -1
+  Signal.trap("INT") do
+    puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
+
+  workflow_id, error = kadeploy_server.run("kadeploy_async", exec_specific_config, nil, nil)
+  if (workflow_id != nil) then
+    while (not kadeploy_server.async_deploy_ended?(workflow_id)) do
+      sleep(10)        
+    end
+    puts kadeploy_server.async_deploy_get_results(workflow_id)
+    kadeploy_server.async_deploy_free(workflow_id)
+  else
+    case error
+    when 1
+      puts "All the nodes have been discarded"
+    when 2
+      puts "Some files cannot be grabbed"
+    when 3
+      puts "Invalid options or invalid rights on nodes"
+    end
+  end
+
   DRb.stop_service()
   exec_specific_config = nil
   exit(0)

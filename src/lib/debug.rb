@@ -386,21 +386,25 @@ module Debug
     # Output
     # * nothing
     def dump_to_file
-      fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
-      fd.flock(File::LOCK_EX)
-      @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
-        str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
-        str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
-        str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
-        str += node_infos["start"].to_i.to_s + ","
-        str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
-        str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"] + ","
-        str += node_infos["success"].to_s + "," + node_infos["error"].to_s
-        fd.write("#{Time.now.to_i}: #{str}\n")
-      }
-      fd.flock(File::LOCK_UN)
-      fd.close
+      begin
+        fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
+        fd.flock(File::LOCK_EX)
+        @nodes.each_pair { |hostname, node_infos|
+          str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
+          str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
+          str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
+          str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
+          str += node_infos["start"].to_i.to_s + ","
+          str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
+          str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"] + ","
+          str += node_infos["success"].to_s + "," + node_infos["error"].to_s
+          fd.write("#{Time.now.to_i}: #{str}\n")
+        }
+        fd.flock(File::LOCK_UN)
+        fd.close
+      rescue
+        puts "Cannot write in the log file #{@config.common.log_to_file}"
+      end
     end
   end
 end

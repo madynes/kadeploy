@@ -227,32 +227,22 @@ if (exec_specific_config != nil) then
       if exec_specific_config.get_version then
         puts "#{server} server: Kadeploy version: #{kadeploy_server.get_version()}"
       else
-        if ((exec_specific_config.environment.environment_kind != "other") || (kadeploy_server.get_bootloader != "pure_pxe")) then
-          #Launch the listener on the client
-          if (exec_specific_config.multi_server) then
-            kadeploy_client = KadeployClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
-          else
-            kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
-          end
-          DRb.start_service(nil, kadeploy_client)
-          if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
-            content = Regexp.last_match
-            client_host = content[1]
-            client_port = content[2]
-
-            if (exec_specific_config.pxe_profile_file != "") then
-              IO.readlines(exec_specific_config.pxe_profile_file).each { |l|
-                exec_specific_config.pxe_profile_msg.concat(l)
-              }
-            end
-            cloned_config = exec_specific_config.clone
-            cloned_config.node_array = nodes_by_server[server]
-            kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
-          else
-            puts "#{server} server:The URI #{DRb.uri} is not correct"
-          end
+        #Launch the listener on the client
+        if (exec_specific_config.multi_server) then
+          kadeploy_client = KadeployClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
         else
-          puts "#{server} server: only linux and xen environments can be deployed with the pure PXE configuration"
+          kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
+        end
+        DRb.start_service(nil, kadeploy_client)
+        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+          content = Regexp.last_match
+          client_host = content[1]
+          client_port = content[2]
+          cloned_config = exec_specific_config.clone
+          cloned_config.node_array = nodes_by_server[server]
+          kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
+        else
+          puts "#{server} server:The URI #{DRb.uri} is not correct"
         end
       end
     }

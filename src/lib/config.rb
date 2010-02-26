@@ -12,6 +12,7 @@ require 'checkrights'
 #Ruby libs
 require 'optparse'
 require 'ostruct'
+require "fileutils"
 
 module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
@@ -359,7 +360,7 @@ module ConfigInformation
               if val =~ /\A[0-4]\Z/ then
                 @common.verbose_level = val.to_i
               else
-                puts "Invalid debug level"
+                puts "Invalid verbose level"
                 return false
               end
             when "tftp_repository"
@@ -458,6 +459,13 @@ module ConfigInformation
                     puts "The log file #{@common.log_to_file} is not writable"
                     return false
                   end
+                end
+              else
+                begin
+                  FileUtils.touch(@common.log_to_file)
+                rescue
+                  puts "Cannot write the log file: #{@common.log_to_file}"
+                  return false
                 end
               end
             when "log_to_syslog"
@@ -1092,6 +1100,9 @@ module ConfigInformation
             return false
           else
             exec_specific.pxe_profile_file = f
+            IO.readlines(exec_specific.pxe_profile_file).each { |l|
+              exec_specific.pxe_profile_msg.concat(l)
+            }
           end
         }
         opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
@@ -1918,7 +1929,8 @@ module ConfigInformation
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
       exec_specific.multi_server = false
-
+      exec_specific.debug = false
+      
       if Config.load_kareboot_cmdline_options(exec_specific) then
         return exec_specific
       else
@@ -1950,6 +1962,9 @@ module ConfigInformation
         }
         opt.on("-c", "--check-prod-env", "Check if the production environment has been detroyed") {
           exec_specific.check_prod_env = true
+        }
+        opt.on("-d", "--debug-mode", "Activate the debug mode") {
+          exec_specific.debug = true
         }
         opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |e|
           exec_specific.env_arg = e
@@ -2096,7 +2111,7 @@ module ConfigInformation
         return false
       end    
       if (exec_specific.verbose_level != "") && ((exec_specific.verbose_level > 4) || (exec_specific.verbose_level < 0)) then
-        error("Invalid debug level")
+        error("Invalid verbose level")
         return false
       end
       authorized_ops = ["set_pxe", "simple_reboot", "deploy_env", "env_recorded"]
@@ -2290,6 +2305,7 @@ module ConfigInformation
       @nodes_desc = Nodes::NodeSet.new
       @kadeploy_disable_cache = false
       @demolishing_env_auto_tag = false
+      @log_to_file = ""
     end
 
     # Check if all the fields of the common configuration file are filled
@@ -2313,7 +2329,7 @@ module ConfigInformation
           (@max_preinstall_size == nil) || (@max_postinstall_size == nil) ||
           (@kadeploy_tcp_buffer_size == nil) || (@kadeploy_cache_dir == nil) || (@kadeploy_cache_size == nil) ||
           (@ssh_port == nil) || (@rsh_port == nil) || (@test_deploy_env_port == nil) || (@use_rsh_to_deploy == nil) ||
-          (@environment_extraction_dir == nil) || (@log_to_file == nil) || (@log_to_syslog == nil) || (@log_to_db == nil) ||
+          (@environment_extraction_dir == nil) || (@log_to_syslog == nil) || (@log_to_db == nil) ||
           (@dbg_to_syslog == nil) || (@dbg_to_syslog_level == nil) || (@reboot_window == nil) || 
           (@reboot_window_sleep_time == nil) || (@nodes_check_window == nil) || (@nfsroot_kernel == nil) ||
           (@nfs_server == nil) || (@bootloader == nil) || (@purge_deployment_timer == nil) || (@rambin_path == nil) ||
