@@ -127,7 +127,17 @@ class KadeployServer
     }
     return port
   end
-
+  
+  # Run a command on the server (RPC)
+  #
+  # Arguments
+  # * kind: kind of command (kadeploy_async, kadeploy_sync, kareboot, kastat, kanodes, karights, kaenv, kaconsole)
+  # * exec_specific_config: instance of Config.exec_specific
+  # * host: hostname of the client
+  # * post: port of the client
+  # Output
+  # * kadeploy_async kind: return a couple of value (workflow_id,error_code) workflow_id is nil in case of problem
+  # * other kinds: return true if the command has been correctly performed, false otherwise
   def run(kind, exec_specific_config, host, port)
     db = Database::DbFactory.create(@config.common.db_kind)
     if not db.connect(@config.common.deploy_db_host,
@@ -581,6 +591,14 @@ class KadeployServer
   #             Kastat             #
   ##################################
   
+  # Run a Kastat command
+  #
+  # Arguments
+  # * db: database handler
+  # * client: DRb handler of the Kadeploy client
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return true if everything is ok, false otherwise
   def run_kastat(db, client, exec_specific)
     case exec_specific.operation
     when "list_all"
@@ -597,7 +615,7 @@ class KadeployServer
   # Generate some filters for the output according the options
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
   # Output
   # * return a string that contains the where clause corresponding to the filters required
   def kastat_append_generic_where_clause(exec_specific)
@@ -640,7 +658,7 @@ class KadeployServer
   #
   # Arguments
   # * row: hashtable that contains a line of information fetched in the database
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
   # * default_fields: array of fields used to produce the output if no fields are given in the command line
   # Output
   # * string that contains the selected fields in a result line
@@ -661,7 +679,8 @@ class KadeployServer
   # List the information about the nodes that require a given number of retries to be deployed
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * print the filtred information about the nodes that require a given number of retries to be deployed
@@ -705,9 +724,9 @@ class KadeployServer
   # List the information about the nodes that have at least a given failure rate
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
-  # * min(opt): minimum failure rate
   # Output
   # * print the filtred information about the nodes that have at least a given failure rate
   def kastat_list_failure_rate(exec_specific, client, db)
@@ -746,7 +765,8 @@ class KadeployServer
   # List the information about all the nodes
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * print the information about all the nodes
@@ -784,6 +804,14 @@ class KadeployServer
   #            Kanodes             #
   ##################################
 
+  # Run a Kanodes command
+  #
+  # Arguments
+  # * db: database handler
+  # * client: DRb handler of the Kadeploy client
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return true if everything is ok, false otherwise
   def run_kanodes(db, client, exec_specific)
     case exec_specific.operation
     when "get_deploy_state"
@@ -796,7 +824,8 @@ class KadeployServer
   # List the deploy information about the nodes
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * prints the information about the nodes in a CSV format
@@ -840,8 +869,8 @@ class KadeployServer
   # Get a YAML output of the current deployments
   #
   # Arguments
-  # * kadeploy_server: pointer to the Kadeploy server (DRbObject)
-  # * wid: workflow id
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # Output
   # * prints the YAML output of the current deployments
   def kanodes_get_yaml_dump(exec_specific, client)
@@ -884,6 +913,14 @@ class KadeployServer
   #            Karights            #
   ##################################
 
+  # Run a Karights command
+  #
+  # Arguments
+  # * db: database handler
+  # * client: DRb handler of the Kadeploy client
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return true if everything is ok, false otherwise
   def run_karights(db, client, exec_specific)
     case exec_specific.operation  
     when "add"
@@ -898,10 +935,11 @@ class KadeployServer
   # Show the rights of a user defined in exec_specific.user
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
-  # * prints the rights of a specific user
+  # * print the rights of a specific user
   def karights_show_rights(exec_specific, client, db)
     hash = Hash.new
     query = "SELECT * FROM rights WHERE user=\"#{exec_specific.user}\""
@@ -929,7 +967,8 @@ class KadeployServer
   # user defined in exec_specific.user
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
@@ -1006,7 +1045,8 @@ class KadeployServer
   # user defined in exec_specific.user
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
@@ -1036,6 +1076,14 @@ class KadeployServer
   #             Kaenv              #
   ##################################
 
+  # Run a Kaenv command
+  #
+  # Arguments
+  # * db: database handler
+  # * client: DRb handler of the Kadeploy client
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return true if everything is ok, false otherwise
   def run_kaenv(db, client, exec_specific)
     case exec_specific.operation
     when "list"
@@ -1064,7 +1112,8 @@ class KadeployServer
   # List the environments of a user defined in exec_specific.user
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * print the environments of a given user
@@ -1161,7 +1210,8 @@ class KadeployServer
   # Add an environment described in the file exec_specific.file
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
@@ -1227,7 +1277,8 @@ class KadeployServer
   # Delete the environment specified in exec_specific.env_name
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
@@ -1251,7 +1302,8 @@ class KadeployServer
   # Print the environment designed by exec_specific.env_name and that belongs to the user specified in exec_specific.user
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * print the specified environment that belongs to the specified user
@@ -1334,6 +1386,14 @@ class KadeployServer
     end
   end
 
+  def _allowed_to_update_env?(env_user, true_user, client)
+    if ((env_user != true_user) && (not @config.common.almighty_env_users.include?(true_user))) then
+      Debug::distant_client_error("You are only allowed to modify your owned environments", client)
+      return false
+    else
+      return true
+    end
+  end
 
   # Update the md5sum of the tarball
   # Sub function of update_preinstall_md5
@@ -1342,6 +1402,8 @@ class KadeployServer
   # * env_name: environment name
   # * env_version: environment version
   # * env_user: environment user
+  # * true_user: true user
+  # * client: DRb handler of the Kadeploy client
   # Output
   # * nothing
   def _update_tarball_md5(db, env_name, env_version, env_user, true_user, client)
@@ -1354,29 +1416,38 @@ class KadeployServer
                                         AND user=\"#{env_user}\" \
                                         AND version=\"#{version}\""
     res = db.run_query(query)
-    res.each_hash  { |row|
-      env = EnvironmentManagement::Environment.new
-      env.load_from_hash(row)
-      tarball = "#{env.tarball["file"]}|#{env.tarball["kind"]}|#{MD5::get_md5_sum(env.tarball["file"])}"
-      
-      query2 = "UPDATE environments SET tarball=\"#{tarball}\" WHERE name=\"#{env_name}\" \
-                                                               AND user=\"#{env_user}\" \
-                                                               AND version=\"#{version}\""
-      db.run_query(query2)
-      if (db.get_nb_affected_rows == 0) then
-        Debug::distant_client_print("No update has been performed", client)
-      end
-    }
+    if (res.num_rows > 0) then
+      res.each_hash  { |row|
+        env = EnvironmentManagement::Environment.new
+        env.load_from_hash(row)
+        md5 = MD5::get_md5_sum(env.tarball["file"])
+        if (md5 != "") then
+          tarball = "#{env.tarball["file"]}|#{env.tarball["kind"]}|#{md5}"         
+          query2 = "UPDATE environments SET tarball=\"#{tarball}\" WHERE name=\"#{env_name}\" \
+                                                                   AND user=\"#{env_user}\" \
+                                                                   AND version=\"#{version}\""
+          db.run_query(query2)
+          if (db.get_nb_affected_rows == 0) then
+            Debug::distant_client_print("No update has been performed", client)
+          end
+        else
+          Debug::distant_client_error("The md5 of the file #{env.tarball["file"]} cannot be obtained", client)
+        end
+      }
+    else
+      Debug::distant_client_error("The environment specified does not exist", client)
+    end
   end
 
   # Update the md5sum of the tarball
   #
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
   def kaenv_update_tarball_md5(exec_specific, client, db)
-    _update_tarball_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client)
+    _update_tarball_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client) if _allowed_to_update_env?(exec_specific.user, exec_specific.true_user, client)
   end
 
   # Update the md5sum of the preinstall
@@ -1385,7 +1456,9 @@ class KadeployServer
   # * db: database handler
   # * env_name: environment name
   # * env_version: environment version
-  # * env_user: environment user
+  # * env_user: environment use
+  # * true_user: true user
+  # * client: DRb handler of the Kadeploy client
   # Output
   # * nothing
   def _update_preinstall_md5(db, env_name, env_version, env_user, true_user, client)
@@ -1398,33 +1471,42 @@ class KadeployServer
                                         AND user=\"#{env_user}\" \
                                         AND version=\"#{version}\""
     res = db.run_query(query)
-    res.each_hash  { |row|
-      env = EnvironmentManagement::Environment.new
-      env.load_from_hash(row)
-      if (env.preinstall != nil) then
-        tarball = "#{env.preinstall["file"]}|#{env.preinstall["kind"]}|#{MD5::get_md5_sum(env.preinstall["file"])}|#{env.preinstall["script"]}"
-        
-        query2 = "UPDATE environments SET preinstall=\"#{tarball}\" WHERE name=\"#{env_name}\" \
-                                                                    AND user=\"#{env_user}\" \
-                                                                    AND version=\"#{version}\""
-        db.run_query(query2)
-        if (db.get_nb_affected_rows == 0) then
-          Debug::distant_client_print("No update has been performed", client)
+    if (res.num_rows > 0) then
+      res.each_hash  { |row|
+        env = EnvironmentManagement::Environment.new
+        env.load_from_hash(row)
+        if (env.preinstall != nil) then
+          md5 = MD5::get_md5_sum(env.preinstall["file"])
+          if (md5 != "" ) then
+            tarball = "#{env.preinstall["file"]}|#{env.preinstall["kind"]}|#{md5}|#{env.preinstall["script"]}"
+            query2 = "UPDATE environments SET preinstall=\"#{tarball}\" WHERE name=\"#{env_name}\" \
+                                                                        AND user=\"#{env_user}\" \
+                                                                        AND version=\"#{version}\""
+            db.run_query(query2)
+            if (db.get_nb_affected_rows == 0) then
+              Debug::distant_client_print("No update has been performed", client)
+            end
+          else
+            Debug::distant_client_error("The md5 of the file #{env.preinstall["file"]} cannot be obtained", client)
+          end
+        else
+          Debug::distant_client_print("No preinstall to update", client)
         end
-      else
-        Debug::distant_client_print("No preinstall to update", client)
-      end
-    }
+      }
+    else
+      Debug::distant_client_error("The environment specified does not exist", client)
+    end
   end
 
   # Update the md5sum of the preinstall
   #
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
-  # * config: instance of Config
   # Output
   # * nothing
   def kaenv_update_preinstall_md5(exec_specific, client, db)
-    _update_preinstall_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client)
+    _update_preinstall_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client) if _allowed_to_update_env?(exec_specific.user, exec_specific.true_user, client)
   end
 
   # Update the md5sum of the postinstall files
@@ -1434,6 +1516,8 @@ class KadeployServer
   # * env_name: environment name
   # * env_version: environment version
   # * env_user: environment user
+  # * true_user: true user
+  # * client: DRb handler of the Kadeploy client
   # Output
   # * nothing
   def _update_postinstall_md5(db, env_name, env_version, env_user, true_user, client)
@@ -1446,42 +1530,58 @@ class KadeployServer
                                         AND user=\"#{env_user}\" \
                                         AND version=\"#{version}\""
     res = db.run_query(query)
-    res.each_hash  { |row|
-      env = EnvironmentManagement::Environment.new
-      env.load_from_hash(row)
-      if (env.postinstall != nil) then
-        postinstall_array = Array.new
-        env.postinstall.each { |p|
-          postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{MD5::get_md5_sum(p["file"])}|#{p["script"]}")
-        }
-        query2 = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" \
-                                      WHERE name=\"#{env_name}\" \
-                                      AND user=\"#{env_user}\" \
-                                      AND version=\"#{version}\""
-        db.run_query(query2)
-        if (db.get_nb_affected_rows == 0) then
-          Debug::distant_client_print("No update has been performed", client)
+    if (res.num_rows > 0) then
+      res.each_hash  { |row|
+        env = EnvironmentManagement::Environment.new
+        env.load_from_hash(row)
+        if (env.postinstall != nil) then
+          postinstall_array = Array.new
+          all_is_ok = true
+          env.postinstall.each { |p|
+            md5 = MD5::get_md5_sum(p["file"])
+            if (md5 != "" ) then
+              postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{md5}|#{p["script"]}")
+            else
+              all_is_ok = false
+              Debug::distant_client_error("The md5 of the file #{p["file"]} cannot be obtained", client)
+              break
+            end
+          }
+          if all_is_ok
+            query2 = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" \
+                                          WHERE name=\"#{env_name}\" \
+                                          AND user=\"#{env_user}\" \
+                                          AND version=\"#{version}\""
+            db.run_query(query2)
+            if (db.get_nb_affected_rows == 0) then
+              Debug::distant_client_print("No update has been performed", client)
+            end
+          end
+        else
+          Debug::distant_client_print("No postinstall to update", client)
         end
-      else
-        Debug::distant_client_print("No postinstall to update", client)
-      end
-    }
+      }
+    else
+      Debug::distant_client_error("The environment specified does not exist", client)      
+    end
   end
 
   # Update the md5sum of the postinstall files
   #
-  # * config: instance of Config
-  # * db: database handler
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
+    # * db: database handler
   # Output
   # * nothing
   def kaenv_update_postinstall_md5(exec_specific, client, db)
-    _update_postinstall_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client)
+    _update_postinstall_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client) if _allowed_to_update_env?(exec_specific.user, exec_specific.true_user, client)
   end
 
   # Remove the demolishing tag on an environment
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
@@ -1504,12 +1604,13 @@ class KadeployServer
   # Modify the visibility tag of an environment
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
   def kaenv_set_visibility_tag(exec_specific, client, db)
-    if (exec_specific.visibility_tag == "public") && (not config.common.almighty_env_users.include?(exec_specific.true_user)) then
+    if (exec_specific.visibility_tag == "public") && (not @config.common.almighty_env_users.include?(exec_specific.true_user)) then
       Debug::distant_client_print("Only the environment administrators can set the \"public\" tag", client)
     else
       query = "UPDATE environments SET visibility=\"#{exec_specific.visibility_tag}\" \
@@ -1526,7 +1627,8 @@ class KadeployServer
   # Move some file locations in the environment table
   #
   # Arguments
-  # * config: instance of Config
+  # * exec_specific: instance of Config.exec_specific
+  # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
   # * nothing
@@ -1569,7 +1671,15 @@ class KadeployServer
   ##################################
   #           Kaconsole            #
   ##################################
-  
+
+  # Run a Kaconsole command
+  #
+  # Arguments
+  # * db: database handler
+  # * client: DRb handler of the Kadeploy client
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return true if everything is ok, false otherwise  
   def run_kaconsole(db, client, exec_specific)
     #Try do find a free port to bind
     sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
