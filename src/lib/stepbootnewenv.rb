@@ -155,8 +155,11 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -206,8 +209,11 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -255,8 +261,11 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -308,8 +317,11 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
