@@ -1182,7 +1182,15 @@ We present now the use cases.
 \begin{verbatim}
 > kanodes3 -d
 \end{verbatim}
-This commands prints the global state of all the nodes managed by a Kadeploy server.
+This commands prints the global state of all the nodes managed by a Kadeploy server. The output is as follows 1,2,3,4,5,6, where :
+\begin{itemize}
+\item 1 is the hostname ;
+\item 2 is the deployment state of the node (prod\_env, deployed, deploy\_failed, aborted) ;
+\item 3 is the username who launched the last deployment ;
+\item 4 is the environment name ;
+\item 5 is the environment version ;
+\item 6 is the environment owner.
+\end{itemize}
 
 \paragraph{Use case 2 - print the deployment state of some nodes}
 \begin{verbatim}
