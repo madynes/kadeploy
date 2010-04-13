@@ -120,6 +120,12 @@ do
     echo "nameserver $ns" >> /etc/resolv.conf
 done
 
+# synchronize system clock with ntp and set the hardware clock
+echo "Synchronizing the system clock with ntp" > ${TTY}
+ntpdate ntp.${DNSDOMAIN}
+echo "Synchronizing the hardware clock with the system clock" > ${TTY}
+hwclock --systohw
+
 ## load disk driver
 get_param DISK_DRV
 DISK_DRV=$CMD_PARAM

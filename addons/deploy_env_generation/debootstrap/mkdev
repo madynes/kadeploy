@@ -6,6 +6,9 @@ mknod tty c 5 0
 mknod console c 5 1
 mknod urandom c 1 9
 
+# hardware clock rtc
+mknod rtc c 254 0
+
 # create ttyS
 for i in 64 65 66 67 68 69; do
 	x=$(($i-64));
