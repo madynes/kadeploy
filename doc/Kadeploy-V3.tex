@@ -704,6 +704,7 @@ The environment can be specified with the \texttt{-e|--env-name} option if you w
 > kadeploy3 -m gdx-[5-12].orsay.grid5000.fr -e lenny-x64-base -o nodes_ok -n nodes_ko
 > kadeploy3 -f nodes -a custom_env.dsc
 > kadeploy3 -f nodes -m gdx-5.orsay.grid5000.fr -a custom_env.dsc
+> cat nodefile|kadeploy3 -f - -e lenny-x64-base
 \end{verbatim}
 
 We present now several use cases.
@@ -866,6 +867,7 @@ Here are some basic examples:
 \begin{verbatim}
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot
 > kareboot3 -m gdx-[5-8].orsay.grid5000.fr -r simple_reboot
+> cat nodefile|kareboot3 -f - -r simple_reboot
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot -o reboot_ok.txt \
                                                         -n reboot_ko.txt
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile

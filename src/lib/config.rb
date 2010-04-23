@@ -1006,11 +1006,8 @@ module ConfigInformation
           exec_specific.load_env_arg = n
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            IO.readlines(f).sort.uniq.each { |hostname|
+          if (f == "-") then
+            STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
@@ -1018,6 +1015,20 @@ module ConfigInformation
                 exec_specific.node_array.push(hostname.chomp)
               end
             }
+          else
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              IO.readlines(f).sort.uniq.each { |hostname|
+                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                  error("Invalid hostname: #{hostname}")
+                  return false
+                else
+                  exec_specific.node_array.push(hostname.chomp)
+                end
+              }
+            end
           end
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
@@ -1534,17 +1545,28 @@ module ConfigInformation
           exec_specific.operation = "delete"
         }
         opt.on("-f", "--file FILE", "Machine file")  { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            IO.readlines(f).sort.uniq.each { |hostname|
+          if (f == "-") then
+            STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
+              else
+                exec_specific.node_list.push(hostname.chomp)
               end
-              exec_specific.node_list.push(hostname.chomp)
             }
+          else
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              IO.readlines(f).sort.uniq.each { |hostname|
+                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                  error("Invalid hostname: #{hostname}")
+                  return false
+                end
+                exec_specific.node_list.push(hostname.chomp)
+              }
+            end
           end
         }
         opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
@@ -1831,17 +1853,28 @@ module ConfigInformation
           exec_specific.operation = "get_deploy_state"
         }
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            IO.readlines(f).sort.uniq.each { |hostname|
+          if (f == "-") then
+            STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
+              else
+                exec_specific.node_list.push(hostname.chomp)
               end
-              exec_specific.node_list.push(hostname.chomp)
             }
+          else
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              IO.readlines(f).sort.uniq.each { |hostname|
+                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                  error("Invalid hostname: #{hostname}")
+                  return false
+                end
+                exec_specific.node_list.push(hostname.chomp)
+              }
+            end
           end
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
@@ -1970,18 +2003,29 @@ module ConfigInformation
           exec_specific.env_arg = e
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            IO.readlines(f).sort.uniq.each { |hostname|
+          if (f == "-") then
+            STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
                 error("Invalid hostname: #{hostname}")
                 return false
               else
-                 exec_specific.node_array.push(hostname.chomp)
+                exec_specific.node_array.push(hostname.chomp)
               end
             }
+          else
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              IO.readlines(f).sort.uniq.each { |hostname|
+                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                  error("Invalid hostname: #{hostname}")
+                  return false
+                else
+                  exec_specific.node_array.push(hostname.chomp)
+                end
+              }
+            end
           end
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|

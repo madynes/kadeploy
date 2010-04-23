@@ -840,7 +840,7 @@ class KadeployServer
              ORDER BY nodes.hostname"
     else
       hosts = Array.new
-      exec_specific.node_set.each { |node|
+      exec_specific.node_list.each { |node|
         if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
           nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
         else

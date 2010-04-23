@@ -51,7 +51,7 @@
 	<term><option>-c</option></term>
 	<term><option>--check-prod-env</option></term>
 	<listitem>
-	  <para>Check if the production environment has been detroyed.</para>
+	  <para>Check if the production environment has been destroyed.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
