@@ -100,9 +100,10 @@ class KadeployServer
   #
   # Arguments
   # * filename: name of the destination file
+  # * cache_dir: cache directory
   # Output
   # * return the port allocated to the socket server
-  def create_a_socket_server(filename)
+  def create_a_socket_server(filename, cache_dir)
     sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
     sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
     begin
@@ -115,7 +116,7 @@ class KadeployServer
       sock.listen(10)
       begin
         session = sock.accept
-        file = File.new(@config.common.kadeploy_cache_dir + "/" + filename, "w")
+        file = File.new(cache_dir + "/" + filename, "w")
         while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
           file.write(buf)
         end

@@ -405,7 +405,7 @@ module Managers
                                  0.5, /./,
                                  @output)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
-              if not @client.get_file(client_file, prefix) then
+              if not @client.get_file(client_file, prefix, cache_dir) then
                 @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
                 return false
               end
@@ -499,7 +499,7 @@ module Managers
                                (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
                                0.5, /./,
                                @output)
-            if not @client.get_file(client_file, prefix) then
+            if not @client.get_file(client_file, prefix, cache_dir) then
               @output.verbosel(0, "Unable to grab the file #{client_file}")
               return false
             end

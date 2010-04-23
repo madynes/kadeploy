@@ -517,10 +517,6 @@ module ConfigInformation
                 puts "Invalid value for the nodes_check_window field"
                 return false
               end
-            when "nfsroot_kernel"
-              @common.nfsroot_kernel = val
-            when "nfs_server"
-              @common.nfs_server = val
             when "bootloader"
               if val =~ /\A(chainload_pxe|pure_pxe)\Z/
                 @common.bootloader = val
@@ -725,6 +721,10 @@ module ConfigInformation
                   @cluster_specific[cluster].pxe_header = val.gsub("\\n","\n")
                 when "kernel_params"
                   @cluster_specific[cluster].kernel_params = val
+                when "nfsroot_kernel"
+                  @cluster_specific[cluster].nfsroot_kernel = val
+                when "nfsroot_params"
+                  @cluster_specific[cluster].nfsroot_params = val
                 when "admin_pre_install"
                   #filename|kind|script,filename|kind|script,...
                   if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
@@ -2282,8 +2282,6 @@ module ConfigInformation
     attr_accessor :reboot_window
     attr_accessor :reboot_window_sleep_time
     attr_accessor :nodes_check_window
-    attr_accessor :nfsroot_kernel
-    attr_accessor :nfs_server
     attr_accessor :bootloader
     attr_accessor :purge_deployment_timer
     attr_accessor :rambin_path
@@ -2331,8 +2329,8 @@ module ConfigInformation
           (@ssh_port == nil) || (@rsh_port == nil) || (@test_deploy_env_port == nil) || (@use_rsh_to_deploy == nil) ||
           (@environment_extraction_dir == nil) || (@log_to_syslog == nil) || (@log_to_db == nil) ||
           (@dbg_to_syslog == nil) || (@dbg_to_syslog_level == nil) || (@reboot_window == nil) || 
-          (@reboot_window_sleep_time == nil) || (@nodes_check_window == nil) || (@nfsroot_kernel == nil) ||
-          (@nfs_server == nil) || (@bootloader == nil) || (@purge_deployment_timer == nil) || (@rambin_path == nil) ||
+          (@reboot_window_sleep_time == nil) || (@nodes_check_window == nil) ||
+          (@bootloader == nil) || (@purge_deployment_timer == nil) || (@rambin_path == nil) ||
           (@mkfs_options == nil) || (@demolishing_env_threshold == nil) ||
           (@bt_tracker_ip == nil) || (@bt_download_timeout == nil) || (@almighty_env_users == nil)) then
         puts "Some mandatory fields are missing in the common configuration file"
@@ -2365,6 +2363,8 @@ module ConfigInformation
     attr_accessor :drivers
     attr_accessor :pxe_header
     attr_accessor :kernel_params
+    attr_accessor :nfsroot_kernel
+    attr_accessor :nfsroot_params
     attr_accessor :admin_pre_install
     attr_accessor :admin_post_install
 
@@ -2393,6 +2393,8 @@ module ConfigInformation
       @drivers = nil
       @pxe_header = nil
       @kernel_params = nil
+      @nfsroot_kernel = nil
+      @nfsroot_params = nil
       @admin_pre_install = nil
       @admin_post_install = nil
       @partition_creation_kind = nil
@@ -2426,6 +2428,8 @@ module ConfigInformation
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
+      dest.nfsroot_kernel = @nfsroot_kernel.clone if (@nfsroot_kernel != nil)
+      dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
@@ -2460,6 +2464,8 @@ module ConfigInformation
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
+      dest.nfsroot_kernel = @nfsroot_kernel.clone if (@nfsroot_kernel != nil)
+      dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone

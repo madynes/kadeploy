@@ -358,10 +358,10 @@ module SetDeploymentEnvironnment
           instance_thread = Thread.new {
             @logger.increment("retry_step1", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
-            @output.verbosel(1, "Performing a SetDeploymentEnvUntrusted step on the nodes: #{@nodes_ok.to_s_fold}")
+            @output.verbosel(1, "Performing a SetDeploymentEnvNfsroot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps
-            result = result && @step.switch_pxe("prod_to_nfsroot_env")
+            result = result && @step.switch_pxe("prod_to_nfsroot_env")            
             result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
             result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
                                                  @config.cluster_specific[@cluster].timeout_reboot_classical)

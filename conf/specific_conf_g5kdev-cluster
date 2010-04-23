@@ -15,6 +15,8 @@ cmd_console = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/co
 #drivers = ata_piix,ata_generic
 pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
 kernel_params = console=tty0 console=ttyS0,38400n8
+nfsroot_kernel = deploy-vmlinuz-2.6.27.7-nfsroot
+nfsroot_params = rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=172.24.120.35:/mnt/nfsroot/rootfs init=/sbin/init
 admin_pre_install = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_pre_install_g5kdev.tgz|tgz|launch_admin_pre_install.sh
 admin_post_install = /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_post_install_g5kdev.tgz|tgz|launch_admin_post_install.sh
 partition_creation_kind = fdisk

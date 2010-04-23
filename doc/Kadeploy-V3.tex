@@ -802,7 +802,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
 \end{verbatim}
 If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
 
-\paragraph{Use case 9 - expert usage - insert custom operations in the deployment workflow}
+\paragraph{Use case 10 - expert usage - insert custom operations in the deployment workflow}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \

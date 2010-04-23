@@ -41,6 +41,7 @@ module PXEOperations
   # Fixme
   # * should do something if the PXE configuration cannot be written
   def PXEOperations::write_pxe(ips, msg, tftp_repository, tftp_cfg)
+    puts "ZZZZ3"
     ips.each { |ip|
       file = tftp_repository + "/" + tftp_cfg + "/" + hexalize_ip(ip)
       #prevent from overwriting some linked files
@@ -122,22 +123,24 @@ module PXEOperations
   #
   # Arguments
   # * ips: array of ip (aaa.bbb.ccc.ddd string representation)
-  # * kernel: basename of the vmlinuz file
-  # * nfs_server: ip of the NFS server
+  # * nfsroot_kernel: basename of the vmlinuz file
+  # * nfsroot_params: append line
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_img: relative path to the TFTP image repository
   # * tftp_cfg: relative path to the TFTP configuration repository
   # * pxe_header: header of the pxe profile
   # Output
   # * returns the value of write_pxe
-  def PXEOperations::set_pxe_for_nfsroot(ips, kernel, nfs_server, tftp_repository, tftp_img, tftp_cfg, pxe_header)
-    if /\Ahttp[s]?:\/\/.+/ =~ kernel then
-      kernel_line = "\tKERNEL " + kernel + "\n" #gpxelinux 
+  def PXEOperations::set_pxe_for_nfsroot(ips, nfsroot_kernel, nfsroot_params, tftp_repository, tftp_img, tftp_cfg, pxe_header)
+    if /\Ahttp[s]?:\/\/.+/ =~ nfsroot_kernel then
+      kernel_line = "\tKERNEL " + nfsroot_kernel + "\n" #gpxelinux 
     else
-      kernel_line = "\tKERNEL " + tftp_img + "/" + kernel + "\n" #pxelinux
+      kernel_line = "\tKERNEL " + tftp_img + "/" + nfsroot_kernel + "\n" #pxelinux
     end
-    append_line = "\tAPPEND rw console=ttyS0,115200n81 console=tty0 root=/dev/nfs ip=dhcp nfsroot=#{nfs_server}:#{nfs_root_path}\n"
+    #append_line = "\tAPPEND rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=#{nfs_root_path}:#{nfs_server} init=/linuxrc\n"
+    append_line = "\tAPPEND #{nfsroot_params}\n"
     msg = pxe_header + kernel_line + append_line
+    puts msg
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
   end
 

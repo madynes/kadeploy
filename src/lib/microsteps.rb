@@ -1062,8 +1062,8 @@ module MicroStepsLibrary
         end
       when "prod_to_nfsroot_env"
         if not PXEOperations::set_pxe_for_nfsroot(@nodes_ok.make_array_of_ip,
-                                                  @config.common.nfsroot_kernel,
-                                                  @config.common.nfs_server,
+                                                  @config.cluster_specific[@cluster].nfsroot_kernel,
+                                                  @config.cluster_specific[@cluster].nfsroot_params,
                                                   @config.common.tftp_repository,
                                                   @config.common.tftp_images_path,
                                                   @config.common.tftp_cfg,
