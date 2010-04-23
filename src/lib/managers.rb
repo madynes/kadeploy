@@ -566,6 +566,7 @@ module Managers
     @nodes_to_deploy_backup = nil
     @killed = nil
     @deploy_id = nil
+    @async_deployment = nil
 
     # Constructor of WorkflowManager
     #
@@ -721,7 +722,13 @@ module Managers
                 @thread_set_deployment_environment.join
                 @thread_broadcast_environment.join
                 @thread_boot_new_environment.join
-                @mutex.unlock
+                if ((@async_deployment) && (@config.common.async_end_of_deployment_hook != "")) then
+                  tmp = cmd = @config.common.async_end_of_deployment_hook.clone
+                  while (tmp.sub!("WORKFLOW_ID", @deploy_id) != nil)  do
+                    cmd = tmp
+                  end
+                  system(cmd)
+                end
               }
               @thread_tab.push(tid)
             else
@@ -914,6 +921,7 @@ module Managers
     # Output
     # * nothing
     def run_sync
+      @async_deployment = false
       @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
         @queue_manager.next_macro_step(nil, set)
       }
@@ -933,6 +941,7 @@ module Managers
     # * nothing
     # Output
     def run_async
+      @async_deployment = true
       @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
         @queue_manager.next_macro_step(nil, set)
       }

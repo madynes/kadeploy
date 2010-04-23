@@ -274,8 +274,6 @@ dbg_to_syslog_level = 4
 reboot_window = 100
 reboot_window_sleep_time = 10
 nodes_check_window = 90
-nfsroot_kernel = vmlinuz-2.6.27.7
-nfs_server = 172.16.160.1
 bootloader = chainload_pxe
 purge_deployment_timer = 900
 rambin_path = /rambin
@@ -286,6 +284,7 @@ demolishing_env_auto_tag = false
 bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
 almighty_env_users = root,ejeanvoine
+async_end_of_deployment_hook = echo WORKFLOW_ID
 \end{verbatim}
 \end{small}
 
@@ -328,8 +327,6 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{reboot\_window}: global size of the reboot window (ie. maximum number of nodes able to reboot at the same time). This might be useful to avoid high electricity peak.
 \item \texttt{reboot\_window\_sleep\_time}: time to wait if the reboot window is full.
 \item \texttt{nodes\_check\_window}: size of the nodes check window.
-\item \texttt{nfsroot\_kernel}: absolute path of an NFSRoot kernel (only useful if you use NFSRoot as a deployment environment).
-\item \texttt{nfs\_server}: ip of the server for NFSRoot (only useful if you use NFSRoot as a deployment environment).
 \item \texttt{bootloader}: kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe).
 \item \texttt{purge\_deployment\_timer}: timeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
 \item \texttt{rambin\_path}: path of the ramdisk directory in the deployment environment (/rambin seems to be a good value).
@@ -339,6 +336,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{bt\_tracker\_ip}: ip of the Bittorrent tracker.
 \item \texttt{bt\_download\_timeout}: timeout for the Bittorrent file download.
 \item \texttt{almighty\_env\_users}: list of users allowed to perform special operations on the environments like publishing environments or moving files.
+\item \texttt{async\_end\_of\_deployment\_hook}: command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
 \end{itemize}
 
 \section{Cluster-specific configuration files}\label{sec:specific_config}
@@ -368,6 +366,8 @@ cmd_console = /usr/local/kadeploy/bin/console HOSTNAME_SHORT
 drivers = ata_piix,ata_generic
 kernel_params = console=tty0 console=ttyS1,38400n8
 pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
+nfsroot_kernel = deploy-vmlinuz-2.6.27.7-nfsroot
+nfsroot_params = rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=172.24.120.35:/mnt/nfsroot/rootfs init=/sbin/init
 partition_creation_kind = fdisk
 admin_pre_install = /g5k/admin_pre_install.tgz|tgz|launch.sh
 admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
@@ -398,6 +398,8 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{drivers}: list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
 \item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
 \item \texttt{pxe\_header}: default PXE header (must be defined in one line).
+\item \texttt{nfsroot\_kernel}: kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+\item \texttt{nfsroot\_params}: kernel params for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
 \item \texttt{partition\_creation\_kind}: tool used to create the partition table. The expected values are \texttt{fdisk} or \texttt{parted}.
 \item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
 \item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.

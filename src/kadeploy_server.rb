@@ -420,7 +420,6 @@ class KadeployServer
     workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
     kadeploy_add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
-    puts "workflow #{workflow_id}"
     if workflow.prepare() then
       if workflow.manage_files(true) then
         workflow.run_async()

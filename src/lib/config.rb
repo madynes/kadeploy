@@ -578,6 +578,8 @@ module ConfigInformation
               if val =~ /\A\w+(,\w+)*\Z/ then
                 @common.almighty_env_users = val.split(",")
               end
+            when "async_end_of_deployment_hook"
+              @common.async_end_of_deployment_hook = val
             end
           end
         end
@@ -2336,6 +2338,8 @@ module ConfigInformation
     attr_accessor :bt_download_timeout
     attr_accessor :almighty_env_users
     attr_accessor :version
+    attr_accessor :async_end_of_deployment_hook
+
 
     # Constructor of CommonConfig
     #
@@ -2348,6 +2352,7 @@ module ConfigInformation
       @kadeploy_disable_cache = false
       @demolishing_env_auto_tag = false
       @log_to_file = ""
+      @async_end_of_deployment_hook = ""
     end
 
     # Check if all the fields of the common configuration file are filled

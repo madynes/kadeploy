@@ -43,3 +43,4 @@ demolishing_env_auto_tag = false
 bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
 almighty_env_users = root,ejeanvoine
+async_end_of_deployment_hook = echo WORKFLOW_ID
