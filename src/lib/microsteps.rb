@@ -1194,7 +1194,8 @@ module MicroStepsLibrary
                                                     get_deploy_part_str(),
                                                     @config.common.tftp_repository,
                                                     @config.common.tftp_images_path,
-                                                    @config.common.tftp_cfg) then
+                                                    @config.common.tftp_cfg,
+                                                    @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end

@@ -41,7 +41,6 @@ module PXEOperations
   # Fixme
   # * should do something if the PXE configuration cannot be written
   def PXEOperations::write_pxe(ips, msg, tftp_repository, tftp_cfg)
-    puts "ZZZZ3"
     ips.each { |ip|
       file = tftp_repository + "/" + tftp_cfg + "/" + hexalize_ip(ip)
       #prevent from overwriting some linked files
