@@ -405,6 +405,10 @@ module Managers
                                  0.5, /./,
                                  @output)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
+              if (@client.get_file_md5(client_file) != expected_md5) then
+                @output.verbosel(0, "The md5 of #{client_file} does not match with the one recorded in the database, please consider to update your environment")
+                return false
+              end
               if not @client.get_file(client_file, prefix, cache_dir) then
                 @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
                 return false
