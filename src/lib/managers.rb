@@ -567,6 +567,19 @@ module Managers
     @killed = nil
     @deploy_id = nil
     @async_deployment = nil
+    attr_reader :async_file_error
+
+    class FetchFileError
+      NO_ERROR = 0
+      INVALID_ENVIRONMENT_TARBALL = 1
+      INVALID_PREINSTALL = 2
+      PREINSTALL_TOO_BIG = 3
+      INVALID_POSTINSTALL = 4
+      POSTINSTALL_TOO_BIG = 5
+      INVALID_KEY = 6
+      INVALID_CUSTOM_FILE = 7
+      INVALID_PXE_FILE = 8
+    end
 
     # Constructor of WorkflowManager
     #
@@ -587,6 +600,7 @@ module Managers
       @config = config
       @client = client
       @deploy_id = deploy_id
+      @async_file_error = FetchFileError::NO_ERROR
       if (@config.exec_specific.verbose_level != nil) then
         @output = Debug::OutputControl.new(@config.exec_specific.verbose_level, @config.exec_specific.debug, client, 
                                            @config.exec_specific.true_user, @deploy_id,
@@ -770,6 +784,7 @@ module Managers
 
       if not gfm.grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, 
                            @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+        @async_file_error = FetchFileError::INVALID_ENVIRONMENT_TARBALL if async
         return false
       end
       tarball["file"] = local_tarball
@@ -779,6 +794,7 @@ module Managers
         local_key = use_local_cache_filename(key, user_prefix)
         if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, @config.common.kadeploy_cache_dir, 
                                              @config.common.kadeploy_cache_size, async) then
+          @async_file_error = FetchFileError::INVALID_KEY if async
           return false
         end
         @config.exec_specific.key = local_key
@@ -789,11 +805,13 @@ module Managers
         local_preinstall =  use_local_cache_filename(preinstall["file"], env_prefix)
         if not gfm.grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, 
                              @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
+          @async_file_error = FetchFileError::INVALID_PREINSTALL if async
           return false
         end
         if (File.size(local_preinstall) / (1024.0 * 1024.0)) > @config.common.max_preinstall_size then
           @output.verbosel(0, "The preinstall file #{preinstall["file"]} is too big (#{@config.common.max_preinstall_size} MB is the maximum size allowed)")
           File.delete(local_preinstall)
+          @async_file_error = FetchFileError::PREINSTALL_TOO_BIG if async
           return false
         end
         preinstall["file"] = local_preinstall
@@ -804,11 +822,13 @@ module Managers
           local_postinstall = use_local_cache_filename(postinstall["file"], env_prefix)
           if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
                                @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+            @async_file_error = FetchFileError::INVALID_POSTINSTALL if async
             return false
           end
           if (File.size(local_postinstall) / (1024.0 * 1024.0)) > @config.common.max_postinstall_size then
             @output.verbosel(0, "The postinstall file #{postinstall["file"]} is too big (#{@config.common.max_postinstall_size} MB is the maximum size allowed)")
             File.delete(local_postinstall)
+            @async_file_error = FetchFileError::POSTINSTALL_TOO_BIG if async
             return false
           end
           postinstall["file"] = local_postinstall
@@ -825,6 +845,7 @@ module Managers
                 if not gfm.grab_file_without_caching(custom_file, local_custom_file, "custom_file", 
                                                      user_prefix, @config.common.kadeploy_cache_dir, 
                                                      @config.common.kadeploy_cache_size, async) then
+                  @async_file_error = FetchFileError::INVALID_CUSTOM_FILE if async
                   return false
                 end
                 entry[1] = local_custom_file
@@ -843,6 +864,7 @@ module Managers
             if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",
                                                  user_prefix, tftp_images_path, 
                                                  @config.common.tftp_images_max_size, async) then
+              @async_file_error = FetchFileError::INVALID_PXE_FILE if async
               return false
             end
           }
@@ -941,9 +963,22 @@ module Managers
     # * nothing
     # Output
     def run_async
-      @async_deployment = true
-      @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
-        @queue_manager.next_macro_step(nil, set)
+      Thread.new {
+        @async_deployment = true
+        if manage_files(true) then
+          @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
+            @queue_manager.next_macro_step(nil, set)
+          }
+        else
+          @async_file_error = true
+          if (@config.common.async_end_of_deployment_hook != "") then
+            tmp = cmd = @config.common.async_end_of_deployment_hook.clone
+            while (tmp.sub!("WORKFLOW_ID", @deploy_id) != nil)  do
+              cmd = tmp
+            end
+            system(cmd)
+          end
+        end
       }
     end
 

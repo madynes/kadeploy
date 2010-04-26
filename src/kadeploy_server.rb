@@ -151,7 +151,7 @@ class KadeployServer
 
     if (kind == "kadeploy_async") then
       if (not @config.check_client_config(kind, exec_specific_config, db, nil)) then
-        return nil,3
+        return nil,2
       else
         return run_kadeploy_async(db, exec_specific_config)
       end
@@ -206,6 +206,24 @@ class KadeployServer
     return ret
   end
 
+  # Test if the workflow encountered an error while grabbing files (RPC: only for async execution)
+  #
+  # Arguments
+  # * workflow_id: worklfow id
+  # Output
+  # * return true if the workflow encountered and error, false if not, and nil if the workflow does not exist
+  def async_deploy_file_error?(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = workflow.async_file_error
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
+  end
+
   # Get the results of a workflow (RPC: only for async execution)
   #
   # Arguments
@@ -249,7 +267,6 @@ class KadeployServer
     @workflow_info_hash_lock.unlock
     return ret
   end
-
 
 
   private
@@ -386,7 +403,7 @@ class KadeployServer
   # * db: database handler
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return a workflow (id, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded, 2: some files cannot be grabbed, 3: server cannot connect to DB)
+  # * return a workflow (id, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded)
   def run_kadeploy_async(db, exec_specific)
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new("empty")
@@ -421,15 +438,10 @@ class KadeployServer
     kadeploy_add_workflow_info(workflow, workflow_id)
     @workflow_info_hash_lock.unlock
     if workflow.prepare() then
-      if workflow.manage_files(true) then
-        workflow.run_async()
-        return workflow_id, 0
-      else
-        free(workflow_id)
-        return nil, 2 # some files cannot be grabbed
-      end
+      workflow.run_async()
+      return workflow_id, 0
     else
-      free(workflow_id)
+      async_deploy_free(workflow_id)
       return nil, 1 # all the nodes are involved in another deployment
     end
   end

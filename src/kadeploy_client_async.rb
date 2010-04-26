@@ -32,15 +32,17 @@ if (exec_specific_config != nil) then
     while (not kadeploy_server.async_deploy_ended?(workflow_id)) do
       sleep(10)        
     end
-    puts kadeploy_server.async_deploy_get_results(workflow_id)
+    if (kadeploy_server.async_deploy_file_error?(workflow_id) != 0) then
+      puts "Error while grabbing the files"
+    else
+      puts kadeploy_server.async_deploy_get_results(workflow_id)
+    end
     kadeploy_server.async_deploy_free(workflow_id)
   else
     case error
     when 1
       puts "All the nodes have been discarded"
     when 2
-      puts "Some files cannot be grabbed"
-    when 3
       puts "Invalid options or invalid rights on nodes"
     end
   end
