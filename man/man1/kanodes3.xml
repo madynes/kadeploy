@@ -51,7 +51,7 @@
 	<term><option>-f</option></term>
 	<term><option>--file <replaceable>MACHINEFILE</replaceable></option></term>
 	<listitem>
-	  <para>Only print information about the given machines.</para>
+	  <para>Only print information about the given machines (- means stdin).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

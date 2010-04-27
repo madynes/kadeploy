@@ -13,6 +13,7 @@ require 'stepbroadcastenv'
 require 'stepbootnewenv'
 require 'md5'
 require 'http'
+require 'error'
 
 #Ruby libs
 require 'thread'
@@ -569,18 +570,6 @@ module Managers
     @async_deployment = nil
     attr_reader :async_file_error
 
-    class FetchFileError
-      NO_ERROR = 0
-      INVALID_ENVIRONMENT_TARBALL = 1
-      INVALID_PREINSTALL = 2
-      PREINSTALL_TOO_BIG = 3
-      INVALID_POSTINSTALL = 4
-      POSTINSTALL_TOO_BIG = 5
-      INVALID_KEY = 6
-      INVALID_CUSTOM_FILE = 7
-      INVALID_PXE_FILE = 8
-    end
-
     # Constructor of WorkflowManager
     #
     # Arguments
@@ -970,7 +959,6 @@ module Managers
             @queue_manager.next_macro_step(nil, set)
           }
         else
-          @async_file_error = true
           if (@config.common.async_end_of_deployment_hook != "") then
             tmp = cmd = @config.common.async_end_of_deployment_hook.clone
             while (tmp.sub!("WORKFLOW_ID", @deploy_id) != nil)  do
@@ -989,7 +977,7 @@ module Managers
     # Output
     # * return true if the workflow has reached the end, false otherwise
     def ended?
-      if (@thread_process_finished_nodes.status == false) then
+      if (@async_file_error > FetchFileError::NO_ERROR) || (@thread_process_finished_nodes.status == false) then
         if not @killed then
           if (@nodes_to_deploy_backup != nil) then #it may be called several time in async mode
             @deployments_table_lock.synchronize {

@@ -665,7 +665,7 @@ General options:
   -b, --block-device BLOCKDEVICE   Specify the block device to use
   -d, --debug-mode                 Activate the debug mode
   -e, --env-name ENVNAME           Name of the recorded environment to deploy
-  -f, --file MACHINELIST           Files containing list of nodes
+  -f, --file MACHINELIST           Files containing list of nodes (- means stdin)
   -k, --key [FILE]                 Public key to copy in the root's authorized_keys, 
                                    if no argument is specified, use the authorized_keys
   -m, --machine MACHINE            Node to run on
@@ -834,7 +834,7 @@ General options:
   -b, --block-device BLOCKDEVICE Specify the block device to use
   -c, --check-prod-env           Check if the production environment has been detroyed
   -e, --env-name ENVNAME         Name of the recorded environment
-  -f, --file MACHINELIST         Files containing list of nodes
+  -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
   -k, --key [FILE]               Public key to copy in the root's authorized_keys, 
                                  if no argument is specified, use the authorized_keys
   -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
@@ -1040,6 +1040,7 @@ Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --add                    Add some rights to a user
   -d, --delete                 Delete some rights to a user
+  -f, --file FILE              Machine file (- means stdin)
   -m, --machine MACHINE        Include the machine in the operation
   -o, --overwrite-rights       Overwrite existing rights
   -p, --part PARTNAME          Include the partition in the operation
@@ -1170,7 +1171,7 @@ Usage: kanodes3 [options]
 Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -d, --get-deploy-state       Get the deploy state of the nodes
-  -f, --file MACHINELIST       Only print information about the given machines
+  -f, --file MACHINELIST       Only print information about the given machines (- means stdin)
   -m, --machine MACHINE        Only print information about the given machines
   -v, --version                Get the version
   -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 

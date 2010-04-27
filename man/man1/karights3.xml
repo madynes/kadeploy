@@ -68,7 +68,7 @@
 	<term><option>-f</option></term>
 	<term><option>--file <replaceable>FILE</replaceable></option></term>
 	<listitem>
-	  <para>Machine file.</para>
+	  <para>Machine file (- means stdin).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

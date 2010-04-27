@@ -1007,7 +1007,7 @@ module ConfigInformation
           exec_specific.load_env_kind = "db"
           exec_specific.load_env_arg = n
         }
-        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
+        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
@@ -1546,7 +1546,7 @@ module ConfigInformation
         opt.on("-d", "--delete", "Delete some rights to a user") {
           exec_specific.operation = "delete"
         }
-        opt.on("-f", "--file FILE", "Machine file")  { |f|
+        opt.on("-f", "--file FILE", "Machine file (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
@@ -1854,7 +1854,7 @@ module ConfigInformation
         opt.on("-d", "--get-deploy-state", "Get the deploy state of the nodes") {
           exec_specific.operation = "get_deploy_state"
         }
-        opt.on("-f", "--file MACHINELIST", "Only print information about the given machines")  { |f|
+        opt.on("-f", "--file MACHINELIST", "Only print information about the given machines (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
@@ -2004,7 +2004,7 @@ module ConfigInformation
         opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |e|
           exec_specific.env_arg = e
         }
-        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f|
+        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
               if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then

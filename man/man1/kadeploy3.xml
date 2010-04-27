@@ -72,7 +72,7 @@
 	<term><option>-f</option></term>
 	<term><option>--file <replaceable>MACHINELIST</replaceable></option></term>
 	<listitem>
-	  <para>Files containing list of nodes.</para>
+	  <para>Files containing list of nodes (- means stdin).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

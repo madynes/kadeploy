@@ -7,6 +7,7 @@
 
 #Kadeploy libs
 require 'config'
+require 'error'
 
 #Ruby libs
 require 'thread'
@@ -30,10 +31,11 @@ if (exec_specific_config != nil) then
   workflow_id, error = kadeploy_server.run("kadeploy_async", exec_specific_config, nil, nil)
   if (workflow_id != nil) then
     while (not kadeploy_server.async_deploy_ended?(workflow_id)) do
-      sleep(10)        
+      sleep(10)
     end
-    if (kadeploy_server.async_deploy_file_error?(workflow_id) != 0) then
-      puts "Error while grabbing the files"
+    error = kadeploy_server.async_deploy_file_error?(workflow_id)
+    if (error != FetchFileError::NO_ERROR) then
+      puts "Error while grabbing the files (error #{error})"
     else
       puts kadeploy_server.async_deploy_get_results(workflow_id)
     end
