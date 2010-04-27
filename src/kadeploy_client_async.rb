@@ -13,7 +13,7 @@ require 'error'
 require 'thread'
 require 'drb'
 require 'socket'
-
+require 'pp'
 
 #Connect to the server
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
@@ -37,7 +37,7 @@ if (exec_specific_config != nil) then
     if (error != FetchFileError::NO_ERROR) then
       puts "Error while grabbing the files (error #{error})"
     else
-      puts kadeploy_server.async_deploy_get_results(workflow_id)
+      pp kadeploy_server.async_deploy_get_results(workflow_id)
     end
     kadeploy_server.async_deploy_free(workflow_id)
   else
