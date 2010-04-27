@@ -187,7 +187,6 @@ class KadeployServer
     end
   end
 
-
   # Test if the workflow has reached the end (RPC: only for async execution)
   #
   # Arguments
@@ -195,15 +194,9 @@ class KadeployServer
   # Output
   # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
   def async_deploy_ended?(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      ret = workflow.ended?
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
+    return async_deploy_lock_wid(workflow_id) { |workflow|
+      workflow.ended?
+    }
   end
 
   # Test if the workflow encountered an error while grabbing files (RPC: only for async execution)
@@ -213,15 +206,9 @@ class KadeployServer
   # Output
   # * return true if the workflow encountered and error, false if not, and nil if the workflow does not exist
   def async_deploy_file_error?(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      ret = workflow.async_file_error
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
+    return async_deploy_lock_wid(workflow_id) { |workflow|
+      workflow.async_file_error
+    }
   end
 
   # Get the results of a workflow (RPC: only for async execution)
@@ -231,15 +218,9 @@ class KadeployServer
   # Output
   # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
   def async_deploy_get_results(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      ret = workflow.get_results
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
+    return async_deploy_lock_wid(workflow_id) { |workflow|
+      workflow.get_results
+    }
   end
 
   # Clean the stuff related to the deployment (RPC: only for async execution)
@@ -249,9 +230,7 @@ class KadeployServer
   # Output
   # * nothing
   def async_deploy_free(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
+    return async_deploy_lock_wid(workflow_id) { |workflow|
       workflow.db.disconnect
       kadeploy_delete_workflow_info(workflow_id)
       #let's free memory at the end of the workflow
@@ -260,14 +239,8 @@ class KadeployServer
       workflow = nil
       exec_specific = nil
       GC.start
-      ret = true
-    else
-      ret = nil
-    end
-    @workflow_info_hash_lock.unlock
-    return ret
+    }
   end
-
 
   private
 
@@ -446,7 +419,23 @@ class KadeployServer
     end
   end
 
-
+  # Take a lock on the workflow_info_hash and execute a block with the given workflow_id
+  #
+  # Arguments
+  # * workflow_id: workflow id
+  # Output
+  # * return the result of the block or nil if the workflow_id does not exist
+  def async_deploy_lock_wid(workflow_id)
+    @workflow_info_hash_lock.lock
+    if @workflow_info_hash.has_key?(workflow_id) then
+      workflow = @workflow_info_hash[workflow_id]
+      ret = yield(workflow)
+    else
+      ret = nil
+    end
+    @workflow_info_hash_lock.unlock
+    return ret
+  end
 
 
   ##################################
