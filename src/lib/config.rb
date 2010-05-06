@@ -883,14 +883,14 @@ module ConfigInformation
               content = Regexp.last_match
               node = @common.nodes_desc.get_node_by_host(content[1])
               case content[2]
-              when "reboot_soft_rsh"
+              when "soft_reboot_rsh"
                 node.cmd.reboot_soft_rsh = content[3].strip
-              when "reboot_soft_ssh"
+              when "soft_reboot_ssh"
                 node.cmd.reboot_soft_ssh = content[3].strip
-              when "reboot_hard"
+              when "hard_reboot"
                 node.cmd.reboot_hard = content[3].strip
-              when "reboot_veryhard"
-              node.cmd.reboot_veryhard = content[3].strip
+              when "very_hard_reboot"
+                node.cmd.reboot_veryhard = content[3].strip
               when "console"
                 node.cmd.console = content[3].strip
               else

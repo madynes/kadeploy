@@ -45,6 +45,9 @@ class KaconsoleClient
   end
 end
 
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket.do_not_reverse_lookup = true
+
 exec_specific_config = ConfigInformation::Config.load_kaconsole_exec_specific()
 
 if exec_specific_config != nil then

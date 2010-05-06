@@ -155,7 +155,8 @@ class KarebootClient
   end
 end
 
-
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket.do_not_reverse_lookup = true
 
 exec_specific_config = ConfigInformation::Config.load_kareboot_exec_specific()
 files_ok_nodes = Array.new
