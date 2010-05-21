@@ -176,6 +176,8 @@ class KadeployServer
         res = res && run_kaenv(db, client, exec_specific_config)
       when "kaconsole"
         res = res && run_kaconsole(db, client, exec_specific_config)
+      when "kapower"
+        res = res && run_kapower(db, client, exec_specific_config)
       end
 
       db.disconnect
@@ -460,7 +462,6 @@ class KadeployServer
     else
       vl = @config.common.verbose_level
     end
-    @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
     output = Debug::OutputControl.new(vl, exec_specific.debug, client, exec_specific.true_user, -1, 
                                       @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
     if (exec_specific.reboot_kind == "env_recorded") && 
@@ -509,7 +510,7 @@ class KadeployServer
           else
             raise "Invalid kind of reboot: #{@reboot_kind}"
           end
-          step.reboot(exec_specific.reboot_level, false, true)
+          step.reboot(exec_specific.reboot_level, true)
           if exec_specific.wait then
             if (exec_specific.reboot_kind == "deploy_env") then
               step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
@@ -542,14 +543,14 @@ class KadeployServer
             end
             if not step.nodes_ok.empty? then
               output.verbosel(0, "Nodes correctly rebooted on cluster #{cluster}:")
-              output.verbosel(0, step.nodes_ok.to_s(false, "\n"))
+              output.verbosel(0, step.nodes_ok.to_s(false, false, "\n"))
               global_nodes_mutex.synchronize {
                 nodes_ok.add(step.nodes_ok)
               }
             end
             if not step.nodes_ko.empty? then
               output.verbosel(0, "Nodes not correctly rebooted on cluster #{cluster}:")
-              output.verbosel(0, step.nodes_ko.to_s(true, "\n"))
+              output.verbosel(0, step.nodes_ko.to_s(false, true, "\n"))
               global_nodes_mutex.synchronize {
                 nodes_ko.add(step.nodes_ko)
               }
@@ -1683,22 +1684,10 @@ class KadeployServer
   # Output
   # * return true if everything is ok, false otherwise  
   def run_kaconsole(db, client, exec_specific)
-    #Try do find a free port to bind
-    sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
-    sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
-    begin
-      sock.bind(sockaddr)
-    rescue
-      Debug::distant_client_print("Cannot bind: #{$!}", client)
-      return false
-    end
-    port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
-
     set = Nodes::NodeSet.new
     set.push(exec_specific.node)
     part = @config.cluster_specific[exec_specific.node.cluster].block_device + @config.cluster_specific[exec_specific.node.cluster].deploy_part
     if (CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) then
-      sock.close
       pid = fork {
         client.connect_console(exec_specific.node.cmd.console)
       }
@@ -1723,6 +1712,98 @@ class KadeployServer
       return false
     end
     return true
+  end
+
+
+  ##################################
+  #            Kapower             #
+  ##################################
+
+  # Run a Kaconsole command
+  #
+  # Arguments
+  # * db: database handler
+  # * client: DRb handler of the Kadeploy client
+  # * exec_specific: instance of Config.exec_specific
+  # Output
+  # * return true if everything is ok, false otherwise  
+  def run_kapower(db, client, exec_specific)
+    client_disconnected = false
+    finished = false    
+
+    ret = 0
+
+    if (exec_specific.verbose_level != "") then
+      vl = exec_specific.verbose_level
+    else
+      vl = @config.common.verbose_level
+    end
+
+    output = Debug::OutputControl.new(vl, exec_specific.debug, client, exec_specific.true_user, -1, 
+                                      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
+
+    #We create a new instance of Config with a specific exec_specific part
+    config = ConfigInformation::Config.new("empty")
+    config.common = @config.common.clone
+    config.cluster_specific = @config.cluster_specific.clone
+    config.exec_specific = exec_specific
+    nodes_ok = Nodes::NodeSet.new
+    nodes_ko = Nodes::NodeSet.new
+    global_nodes_mutex = Mutex.new
+    tid_array = Array.new
+
+    exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
+      tid_array << Thread.new {
+        step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kapower")
+        step.power(exec_specific.operation, exec_specific.level)
+        if not step.nodes_ok.empty? then
+          output.verbosel(0, "Operation correctly performed on cluster #{cluster}:")
+          if (exec_specific.operation != "status") then
+            output.verbosel(0, step.nodes_ok.to_s(false, false, "\n"))
+          else
+            output.verbosel(0, step.nodes_ok.to_s(true, false, "\n"))
+          end
+          global_nodes_mutex.synchronize {
+            nodes_ok.add(step.nodes_ok)
+          }
+        end
+        if not step.nodes_ko.empty? then
+          output.verbosel(0, "Operation not correctly performed on cluster #{cluster}:")
+          output.verbosel(0, step.nodes_ko.to_s(false, true, "\n"))
+          global_nodes_mutex.synchronize {
+            nodes_ko.add(step.nodes_ko)
+          }
+        end
+      }
+      Thread.new {
+        while (not finished) do
+          begin
+            client.test()
+          rescue DRb::DRbConnError
+            output.disable_client_output()
+            output.verbosel(3, "Client disconnection")
+            client_disconnected = true
+            tid_array.each { |tid|
+              output.verbosel(3, " *** Kill a power operation thread")
+              Thread.kill(tid)
+            }
+            finished = true
+          end
+          sleep(1)
+        end
+      }
+      tid_array.each { |tid|
+        tid.join
+      }
+      if (not client_disconnected) then
+        client.generate_files(nodes_ok, nodes_ko)
+      end
+    }
+    finished = true
+    nodes_ok.free()
+    nodes_ko.free()
+    config = nil
+    return ret
   end
 end
 

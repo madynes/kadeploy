@@ -6,18 +6,31 @@
 
 module Nodes
   class NodeCmd
-    attr_accessor :reboot_soft_rsh
-    attr_accessor :reboot_soft_ssh
+    attr_accessor :reboot_soft
     attr_accessor :reboot_hard
     attr_accessor :reboot_very_hard
     attr_accessor :console
+    attr_accessor :power_on_soft
+    attr_accessor :power_on_hard
+    attr_accessor :power_on_very_hard
+    attr_accessor :power_off_soft
+    attr_accessor :power_off_hard
+    attr_accessor :power_off_very_hard
+    attr_accessor :power_status
+
 
     def free
-      @reboot_soft_rsh = nil
-      @reboot_soft_ssh = nil
+      @reboot_soft = nil
       @reboot_hard = nil
       @reboot_very_hard = nil
-      @console  = nil
+      @console = nil
+      @power_on_soft = nil
+      @power_on_hard = nil
+      @power_on_very_hard = nil
+      @power_off_soft = nil
+      @power_off_hard = nil
+      @power_off_very_hard = nil
+      @power_status = nil
     end
   end
 
@@ -56,14 +69,24 @@ module Nodes
     # Make a string with the characteristics of a node
     #
     # Arguments
-    # * dbg(opt): boolean that specifies if the output contains stderr
+    # * show_out(opt): boolean that specifies if the output must contain stdout
+    # * show_err(opt): boolean that specifies if the output must contain stderr
     # Output
     # * return a string that contains the information
-    def to_s(dbg = false)
-      if (dbg) && (last_cmd_stderr != nil) then
-        return "#{@hostname} (#{@last_cmd_stderr})"
+    def to_s(show_out = false, show_err = false)
+      s = String.new  
+      s = "stdout: #{@last_cmd_stdout.chomp}" if (show_out) && (last_cmd_stdout != nil)
+      if (show_err) && (last_cmd_stderr != nil) then
+        if (s == "") then
+          s = "stderr: #{@last_cmd_stderr.chomp}"
+        else
+          s += ", stderr: #{@last_cmd_stderr.chomp}"
+        end
+      end
+      if (s == "") then
+        return @hostname
       else
-        return "#{@hostname}"
+        return "#{hostname} (#{s})"
       end
     end
 
@@ -82,7 +105,7 @@ module Nodes
       @last_cmd_exit_status = nil
       @last_cmd_stdout = nil
       @last_cmd_stderr = nil
-      @cmd.free()
+      @cmd.free() if @cmd != nil
       @cmd = nil
     end
     # Duplicate an instance of Node
@@ -606,14 +629,15 @@ module Nodes
     # Make a string with the characteristics of the nodes of a NodeSet
     #
     # Arguments
-    # * dbg (opt): specify if the debug mode must be used
+    # * show_out (opt): specify if stdout must be shown
+    # * show_err (opt): specify if stderr must be shown
     # * delimiter (opt): specify a delimiter
     # Output
     # * return a string that contains the information
-    def to_s(dbg = false, delimiter = ", ")
+    def to_s(show_out = false, show_err = false, delimiter = ", ")
       out = Array.new
       @set.each { |node|
-        out.push(node.to_s(dbg))
+        out.push(node.to_s(show_out, show_err))
       }
       return out.join(delimiter)
     end

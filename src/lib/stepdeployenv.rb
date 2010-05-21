@@ -156,13 +156,6 @@ module SetDeploymentEnvironnment
     # Output
     # * return a thread id
     def run
-      if @config.common.use_rsh_to_deploy then
-        @config.common.taktuk_connector = @config.common.taktuk_rsh_connector
-        connector_port = @config.common.rsh_port
-      else
-        @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
-        connector_port = @config.common.ssh_port
-      end
       first_attempt = true
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
@@ -177,8 +170,8 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
-            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+            result = result && @step.reboot("soft", first_attempt)
+            result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
@@ -223,13 +216,6 @@ module SetDeploymentEnvironnment
     # Output
     # * return a thread id
     def run
-      if @config.common.use_rsh_to_deploy then
-        @config.common.taktuk_connector = @config.common.taktuk_rsh_connector
-        connector_port = @config.common.rsh_port
-      else
-        @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
-        connector_port = @config.common.ssh_port
-      end
       first_attempt = true
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
@@ -244,8 +230,8 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
-            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+            result = result && @step.reboot("soft", first_attempt)
+            result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.manage_admin_pre_install("tree")
@@ -286,7 +272,6 @@ module SetDeploymentEnvironnment
     # Output
     # * return a thread id
     def run
-      @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
         @nodes.duplicate_and_free(@nodes_ko)
@@ -341,13 +326,6 @@ module SetDeploymentEnvironnment
     # Output
     # * return a thread id
     def run
-      if @config.common.use_rsh_to_deploy then
-        @config.common.taktuk_connector = @config.common.taktuk_rsh_connector
-        connector_port = @config.common.rsh_port
-      else
-        @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
-        connector_port = @config.common.ssh_port
-      end
       first_attempt = true
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
@@ -362,8 +340,8 @@ module SetDeploymentEnvironnment
             result = true
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_nfsroot_env")            
-            result = result && @step.reboot("soft", @config.common.use_rsh_to_deploy, first_attempt)
-            result = result && @step.wait_reboot([connector_port,@config.common.test_deploy_env_port],[],
+            result = result && @step.reboot("soft", first_attempt)
+            result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  @config.cluster_specific[@cluster].timeout_reboot_classical)
             result = result && @step.send_key_in_deploy_env("tree")
             result = result && @step.create_partition_table("untrusted_env")
@@ -408,7 +386,6 @@ module SetDeploymentEnvironnment
     # Output
     # * return a thread id
     def run
-      @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads

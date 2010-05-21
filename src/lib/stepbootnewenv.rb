@@ -270,7 +270,6 @@ module BootNewEnvironment
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
           instance_thread = Thread.new {
-            use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s_fold}")
@@ -326,13 +325,12 @@ module BootNewEnvironment
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
           instance_thread = Thread.new {
-            use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             #Here are the micro steps 
-            result = result && @step.reboot("hard", use_rsh_for_reboot, false)
+            result = result && @step.reboot("hard", false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
                                                  @config.cluster_specific[@cluster].timeout_reboot_classical)
             #End of micro steps
@@ -371,7 +369,6 @@ module BootNewEnvironment
     # Output
     # * return a thread id
     def run
-      @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads

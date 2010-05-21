@@ -82,6 +82,8 @@ module ConfigInformation
         return check_kaconsole_config(exec_specific_config, db, client)
       when "kanodes"
         return check_kanodes_config(exec_specific_config, db, client)
+      when "kapower"
+        return check_kapower_config(exec_specific_config, db, client)
       end
     end
 
@@ -212,6 +214,31 @@ module ConfigInformation
     end
 
     def check_kanodes_config(exec_specific_config, db, client)
+      return true
+    end
+
+    def check_kapower_config(exec_specific_config, db, client)
+      exec_specific_config.node_array.each { |hostname|
+        if not add_to_node_set(hostname, exec_specific_config) then
+          Debug::distant_client_error("The node #{hostname} does not exist", client)
+          return false
+        end
+      }
+
+      #Rights check
+      allowed_to_deploy = true
+      #The rights must be checked for each cluster if the node_list contains nodes from several clusters
+      exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
+        part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
+        allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
+                                                                   exec_specific_config.true_user,
+                                                                   client, set, db, part).granted?
+      }
+      if (allowed_to_deploy != true) then
+        Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
+        return false
+      end
+
       return true
     end
 
@@ -383,10 +410,8 @@ module ConfigInformation
               @common.deploy_db_passwd = val
             when "rights_kind"
               @common.rights_kind = val
-            when "taktuk_ssh_connector"
-              @common.taktuk_ssh_connector = val
-            when "taktuk_rsh_connector"
-              @common.taktuk_rsh_connector = val
+            when "taktuk_connector"
+              @common.taktuk_connector = val
             when "taktuk_tree_arity"
               @common.taktuk_tree_arity = val.to_i
             when "taktuk_auto_propagate"
@@ -425,25 +450,11 @@ module ConfigInformation
                 puts "Invalid value for SSH port"
                 return false
               end
-            when "rsh_port"
-              if val =~ /\A\d+\Z/ then
-                @common.rsh_port = val
-              else
-                puts "Invalid value for SSH port"
-                return false
-              end
             when "test_deploy_env_port"
               if val =~ /\A\d+\Z/ then
                 @common.test_deploy_env_port = val
               else
                 puts "Invalid value for the test_deploy_env_port field"
-                return false
-              end
-            when "use_rsh_to_deploy"
-              if val =~ /\A(true|false)\Z/ then
-                @common.use_rsh_to_deploy = (val == "true")
-              else
-                puts "Invalid value for the use_rsh_to_deploy field"
                 return false
               end
             when "environment_extraction_dir"
@@ -704,16 +715,28 @@ module ConfigInformation
                     puts "Invalid value for the timeout_reboot_kexec field in the #{cluster} config file"
                     return false
                   end
-                when "cmd_soft_reboot_rsh"
-                  @cluster_specific[cluster].cmd_soft_reboot_rsh = val
-                when "cmd_soft_reboot_ssh"
-                  @cluster_specific[cluster].cmd_soft_reboot_ssh = val
+                when "cmd_soft_reboot"
+                  @cluster_specific[cluster].cmd_soft_reboot = val
                 when "cmd_hard_reboot"
                   @cluster_specific[cluster].cmd_hard_reboot = val
                 when "cmd_very_hard_reboot"
                   @cluster_specific[cluster].cmd_very_hard_reboot = val
                 when "cmd_console"
                   @cluster_specific[cluster].cmd_console = val
+                when "cmd_soft_power_off"
+                  @cluster_specific[cluster].cmd_soft_power_off = val
+                when "cmd_hard_power_off"
+                  @cluster_specific[cluster].cmd_hard_power_off = val
+                when "cmd_very_hard_power_off"
+                  @cluster_specific[cluster].cmd_very_hard_power_off = val
+                when "cmd_soft_power_on"
+                  @cluster_specific[cluster].cmd_soft_power_on = val
+                when "cmd_hard_power_on"
+                  @cluster_specific[cluster].cmd_hard_power_on = val
+                when "cmd_very_hard_power_on"
+                  @cluster_specific[cluster].cmd_very_hard_power_on = val
+                when "cmd_power_status"
+                  @cluster_specific[cluster].cmd_power_status = val
                 when "drivers"
                   val.split(",").each { |driver|
                     @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
@@ -883,16 +906,28 @@ module ConfigInformation
               content = Regexp.last_match
               node = @common.nodes_desc.get_node_by_host(content[1])
               case content[2]
-              when "soft_reboot_rsh"
-                node.cmd.reboot_soft_rsh = content[3].strip
-              when "soft_reboot_ssh"
-                node.cmd.reboot_soft_ssh = content[3].strip
+              when "soft_reboot"
+                node.cmd.reboot_soft = content[3].strip
               when "hard_reboot"
                 node.cmd.reboot_hard = content[3].strip
               when "very_hard_reboot"
-                node.cmd.reboot_veryhard = content[3].strip
+                node.cmd.reboot_very_hard = content[3].strip
               when "console"
                 node.cmd.console = content[3].strip
+              when "soft_power_on"
+                node.cmd.soft_power_on = content[3].strip
+              when "hard_power_on"
+                node.cmd.hard_power_on = content[3].strip
+              when "very_hard_power_on"
+                node.cmd.very_hard_power_on = content[3].strip
+              when "soft_power_off"
+                node.cmd.soft_power_off = content[3].strip
+              when "hard_power_off"
+                node.cmd.hard_power_off = content[3].strip
+              when "very_hard_power_off"
+                node.cmd.very_hard_power_off = content[3].strip
+              when "very_power_status"
+                node.cmd.power_status = content[3].strip
               else
                 puts "Unknown command: #{content[2]}"
                 return false
@@ -926,15 +961,19 @@ module ConfigInformation
     # Output
     # * return the new string       
     def replace_hostname(str, hostname)
-      cmd_to_expand = str.clone # we must use this temporary variable since sub() modify the strings
-      save = str
-      while cmd_to_expand.sub!("HOSTNAME_FQDN", hostname) != nil  do
-        save = cmd_to_expand
+      if (str != nil) then
+        cmd_to_expand = str.clone # we must use this temporary variable since sub() modify the strings
+        save = str
+        while cmd_to_expand.sub!("HOSTNAME_FQDN", hostname) != nil  do
+          save = cmd_to_expand
+        end
+        while cmd_to_expand.sub!("HOSTNAME_SHORT", hostname.split(".")[0]) != nil  do
+          save = cmd_to_expand
+        end
+        return save
+      else
+        return nil
       end
-      while cmd_to_expand.sub!("HOSTNAME_SHORT", hostname.split(".")[0]) != nil  do
-        save = cmd_to_expand
-      end
-      return save
     end
 
     # Generate the commands used for a node
@@ -947,11 +986,17 @@ module ConfigInformation
     def generate_commands(hostname, cluster)
       cmd = Nodes::NodeCmd.new
       if @cluster_specific.has_key?(cluster) then
-        cmd.reboot_soft_rsh = replace_hostname(@cluster_specific[cluster].cmd_soft_reboot_rsh, hostname)
-        cmd.reboot_soft_ssh = replace_hostname(@cluster_specific[cluster].cmd_soft_reboot_ssh, hostname)
+        cmd.reboot_soft = replace_hostname(@cluster_specific[cluster].cmd_soft_reboot, hostname)
         cmd.reboot_hard = replace_hostname(@cluster_specific[cluster].cmd_hard_reboot, hostname)
         cmd.reboot_very_hard = replace_hostname(@cluster_specific[cluster].cmd_very_hard_reboot, hostname)
         cmd.console = replace_hostname(@cluster_specific[cluster].cmd_console, hostname)
+        cmd.power_on_soft = replace_hostname(@cluster_specific[cluster].cmd_soft_power_on, hostname)
+        cmd.power_on_hard = replace_hostname(@cluster_specific[cluster].cmd_hard_power_on, hostname)
+        cmd.power_on_very_hard = replace_hostname(@cluster_specific[cluster].cmd_very_hard_power_on, hostname)
+        cmd.power_off_soft = replace_hostname(@cluster_specific[cluster].cmd_soft_power_off, hostname)
+        cmd.power_off_hard = replace_hostname(@cluster_specific[cluster].cmd_hard_power_off, hostname)
+        cmd.power_off_very_hard = replace_hostname(@cluster_specific[cluster].cmd_very_hard_power_off, hostname)
+        cmd.power_status = replace_hostname(@cluster_specific[cluster].cmd_power_status, hostname)
         return cmd
       else
         puts "Missing specific config file for the cluster #{cluster}"
@@ -2286,6 +2331,182 @@ module ConfigInformation
       end
       return true
     end
+
+
+
+
+##################################
+#        Kapower specific        #
+##################################
+
+    # Load the kapower specific stuffs
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return true in case of success, false otherwise
+    def Config.load_kapower_exec_specific()
+      exec_specific = OpenStruct.new
+      exec_specific.verbose_level = String.new
+      exec_specific.node_set = Nodes::NodeSet.new
+      exec_specific.node_array = Array.new
+      exec_specific.true_user = USER
+      exec_specific.nodes_ok_file = String.new
+      exec_specific.nodes_ko_file = String.new
+      exec_specific.breakpoint_on_microstep = "none"
+      exec_specific.operation = ""
+      exec_specific.level = "soft"
+      exec_specific.wait = true
+      exec_specific.debug = false
+      exec_specific.get_version = false
+      exec_specific.chosen_server = String.new
+      exec_specific.servers = Config.load_client_config_file
+      exec_specific.kadeploy_server = String.new
+      exec_specific.kadeploy_server_port = String.new
+      exec_specific.multi_server = false
+      exec_specific.debug = false
+      
+      if Config.load_kapower_cmdline_options(exec_specific) then
+        return exec_specific
+      else
+        return nil
+      end
+    end
+
+    # Load the command-line options of kapower
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return true in case of success, false otherwise
+    def Config.load_kapower_cmdline_options(exec_specific)
+      opts = OptionParser::new do |opt|
+        opt.summary_indent = "  "
+        opt.summary_width = 30
+        opt.banner = "Usage: kapower3 [options]"
+        opt.separator "Contact: #{CONTACT_EMAIL}"
+        opt.separator ""
+        opt.separator "General options:"
+        opt.on("-d", "--debug-mode", "Activate the debug mode") {
+          exec_specific.debug = true
+        }
+        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
+          if (f == "-") then
+            STDIN.read.split("\n").sort.uniq.each { |hostname|
+              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                error("Invalid hostname: #{hostname}")
+                return false
+              else
+                exec_specific.node_array.push(hostname.chomp)
+              end
+            }
+          else
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              IO.readlines(f).sort.uniq.each { |hostname|
+                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                  error("Invalid hostname: #{hostname}")
+                  return false
+                else
+                  exec_specific.node_array.push(hostname.chomp)
+                end
+              }
+            end
+          end
+        }
+        opt.on("-l", "--level VALUE", "Level (soft, hard, very_hard)") { |l|
+          if l =~ /\A(soft|hard|very_hard)\Z/ then
+            exec_specific.level = l
+          else
+            error("Invalid level")
+            return false
+          end
+        }   
+        opt.on("-m", "--machine MACHINE", "Operate on the given machines") { |hostname|
+          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+            error("Invalid hostname: #{hostname}")
+            return false
+          else
+            exec_specific.node_array.push(hostname)
+          end
+        }
+        opt.on("--multi-server", "Activate the multi-server mode") {
+          exec_specific.multi_server = true
+        }
+        opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes on which the operation has not been correctly performed")  { |f|
+          exec_specific.nodes_ko_file = f
+        }
+        opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes on which the operation has been correctly performed")  { |f|
+          exec_specific.nodes_ok_file = f
+        }
+        opt.on("--off", "Shutdown the nodes") {
+          exec_specific.operation = "off"
+        }
+        opt.on("--on", "Power on the nodes") {
+          exec_specific.operation = "on"
+        }      
+        opt.on("--status", "Get the status of the nodes") {
+          exec_specific.operation = "status"
+        }
+        opt.on("-v", "--version", "Get the version") {
+          exec_specific.get_version = true
+        }
+        opt.on("--no-wait", "Do not wait the end of the power operation") {
+          exec_specific.wait = false
+        }
+        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
+          exec_specific.chosen_server = s
+        } 
+        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
+          if d =~ /\A[0-4]\Z/ then
+            exec_specific.verbose_level = d.to_i
+          else
+            error("Invalid verbose level")
+            return false
+          end
+        }
+      end
+      @opts = opts
+      begin
+        opts.parse!(ARGV)
+      rescue 
+        error("Option parsing error: #{$!}")
+        return false
+      end
+
+      if (exec_specific.chosen_server != "") then
+        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
+          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
+          return false
+        end
+      else
+        exec_specific.chosen_server = exec_specific.servers["default"]
+      end
+      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
+      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
+
+      return true if exec_specific.get_version
+
+      if exec_specific.node_array.empty? then
+        error("No node is chosen")
+        return false
+      end    
+      if (exec_specific.verbose_level != "") && ((exec_specific.verbose_level > 4) || (exec_specific.verbose_level < 0)) then
+        error("Invalid verbose level")
+        return false
+      end
+      if (exec_specific.operation == "") then
+        error("No operation is chosen")
+        return false
+      end
+      if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
+        error("The files used for the output of the OK and the KO nodes must not be the same")
+        return false
+      end
+      return true
+    end
   end
   
   class CommonConfig
@@ -2301,8 +2522,6 @@ module ConfigInformation
     attr_accessor :deploy_db_passwd
     attr_accessor :rights_kind
     attr_accessor :nodes_desc     #information about all the nodes
-    attr_accessor :taktuk_ssh_connector
-    attr_accessor :taktuk_rsh_connector
     attr_accessor :taktuk_connector
     attr_accessor :taktuk_tree_arity
     attr_accessor :taktuk_auto_propagate
@@ -2316,9 +2535,7 @@ module ConfigInformation
     attr_accessor :max_postinstall_size
     attr_accessor :kadeploy_disable_cache
     attr_accessor :ssh_port
-    attr_accessor :rsh_port
     attr_accessor :test_deploy_env_port
-    attr_accessor :use_rsh_to_deploy
     attr_accessor :environment_extraction_dir
     attr_accessor :log_to_file
     attr_accessor :log_to_syslog
@@ -2370,12 +2587,12 @@ module ConfigInformation
       if ((@verbose_level == nil) || (@tftp_repository == nil) || (@tftp_images_path == nil) || (@tftp_cfg == nil) ||
           (@tftp_images_max_size == nil) || (@db_kind == nil) || (@deploy_db_host == nil) || (@deploy_db_name == nil) ||
           (@deploy_db_login == nil) || (@deploy_db_passwd == nil) || (@rights_kind == nil) || (@nodes_desc == nil) ||
-          (@taktuk_ssh_connector == nil) || (@taktuk_rsh_connector == nil) ||
+          (@taktuk_connector == nil) ||
           (@taktuk_tree_arity == nil) || (@taktuk_auto_propagate == nil) || (@tarball_dest_dir == nil) ||
           (@kadeploy_server == nil) || (@kadeploy_server_port == nil) ||
           (@max_preinstall_size == nil) || (@max_postinstall_size == nil) ||
           (@kadeploy_tcp_buffer_size == nil) || (@kadeploy_cache_dir == nil) || (@kadeploy_cache_size == nil) ||
-          (@ssh_port == nil) || (@rsh_port == nil) || (@test_deploy_env_port == nil) || (@use_rsh_to_deploy == nil) ||
+          (@ssh_port == nil) || (@test_deploy_env_port == nil) ||
           (@environment_extraction_dir == nil) || (@log_to_syslog == nil) || (@log_to_db == nil) ||
           (@dbg_to_syslog == nil) || (@dbg_to_syslog_level == nil) || (@reboot_window == nil) || 
           (@reboot_window_sleep_time == nil) || (@nodes_check_window == nil) ||
@@ -2402,11 +2619,17 @@ module ConfigInformation
     attr_accessor :workflow_steps   #Array of MacroStep
     attr_accessor :timeout_reboot_classical
     attr_accessor :timeout_reboot_kexec
-    attr_accessor :cmd_soft_reboot_rsh
-    attr_accessor :cmd_soft_reboot_ssh
+    attr_accessor :cmd_soft_reboot
     attr_accessor :cmd_hard_reboot
     attr_accessor :cmd_very_hard_reboot
     attr_accessor :cmd_console
+    attr_accessor :cmd_soft_power_off
+    attr_accessor :cmd_hard_power_off
+    attr_accessor :cmd_very_hard_power_off
+    attr_accessor :cmd_soft_power_on
+    attr_accessor :cmd_hard_power_on
+    attr_accessor :cmd_very_hard_power_on
+    attr_accessor :cmd_power_status
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
     attr_accessor :drivers
@@ -2434,11 +2657,17 @@ module ConfigInformation
       @swap_part = nil
       @timeout_reboot_classical = nil
       @timeout_reboot_kexec = nil
-      @cmd_soft_reboot_rsh = nil
-      @cmd_soft_reboot_ssh = nil
+      @cmd_soft_reboot = nil
       @cmd_hard_reboot = nil
       @cmd_very_hard_reboot = nil
       @cmd_console = nil
+      @cmd_soft_power_on = nil
+      @cmd_hard_power_on = nil
+      @cmd_very_hard_power_on = nil
+      @cmd_soft_power_off = nil
+      @cmd_hard_power_off = nil
+      @cmd_very_hard_power_off = nil
+      @cmd_power_status = nil
       @drivers = nil
       @pxe_header = nil
       @kernel_params = nil
@@ -2469,11 +2698,17 @@ module ConfigInformation
       dest.swap_part = @swap_part.clone if (@swap_part != nil)
       dest.timeout_reboot_classical = @timeout_reboot_classical
       dest.timeout_reboot_kexec = @timeout_reboot_kexec
-      dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
-      dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
-      dest.cmd_hard_reboot = @cmd_hard_reboot.clone
-      dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone
+      dest.cmd_soft_reboot = @cmd_soft_reboot.clone if (@cmd_soft_reboot != nil)
+      dest.cmd_hard_reboot = @cmd_hard_reboot.clone if (@cmd_hard_reboot != nil)
+      dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone if (@cmd_very_hard_reboot)
       dest.cmd_console = @cmd_console.clone
+      dest.cmd_soft_power_on = @cmd_soft_power_on.clone if (@cmd_soft_power_on != nil)
+      dest.cmd_hard_power_on = @cmd_hard_power_on.clone if (@cmd_hard_power_on != nil)
+      dest.cmd_very_hard_power_on = @cmd_very_hard_power_on.clone if (@cmd_very_hard_power_on != nil)
+      dest.cmd_soft_power_off = @cmd_soft_power_off.clone if (@cmd_soft_power_off != nil)
+      dest.cmd_hard_power_off = @cmd_hard_power_off.clone if (@cmd_hard_power_off != nil) 
+      dest.cmd_very_hard_power_off = @cmd_very_hard_power_off.clone if (@cmd_very_hard_power_off != nil)
+      dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
@@ -2505,11 +2740,17 @@ module ConfigInformation
       dest.swap_part = @swap_part.clone if (@swap_part != nil)
       dest.timeout_reboot_classical = @timeout_reboot_classical
       dest.timeout_reboot_kexec = @timeout_reboot_kexec
-      dest.cmd_soft_reboot_rsh = @cmd_soft_reboot_rsh.clone
-      dest.cmd_soft_reboot_ssh = @cmd_soft_reboot_ssh.clone
-      dest.cmd_hard_reboot = @cmd_hard_reboot.clone
-      dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone
+      dest.cmd_soft_reboot = @cmd_soft_reboot.clone if (@cmd_soft_reboot != nil)
+      dest.cmd_hard_reboot = @cmd_hard_reboot.clone if (@cmd_hard_reboot != nil)
+      dest.cmd_very_hard_reboot = @cmd_very_hard_reboot.clone if (@cmd_very_hard_reboot)
       dest.cmd_console = @cmd_console.clone
+      dest.cmd_soft_power_on = @cmd_soft_power_on.clone if (@cmd_soft_power_on != nil)
+      dest.cmd_hard_power_on = @cmd_hard_power_on.clone if (@cmd_hard_power_on != nil)
+      dest.cmd_very_hard_power_on = @cmd_very_hard_power_on.clone if (@cmd_very_hard_power_on != nil)
+      dest.cmd_soft_power_off = @cmd_soft_power_off.clone if (@cmd_soft_power_off != nil)
+      dest.cmd_hard_power_off = @cmd_hard_power_off.clone if (@cmd_hard_power_off != nil) 
+      dest.cmd_very_hard_power_off = @cmd_very_hard_power_off.clone if (@cmd_very_hard_power_off != nil)
+      dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
@@ -2535,8 +2776,7 @@ module ConfigInformation
       }
       if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
           (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot_classical == nil) || (@timeout_reboot_kexec == nil) ||
-          (@pxe_header == nil) || (@cmd_soft_reboot_rsh == nil) || (@cmd_soft_reboot_ssh == nil) ||
-          #(@cmd_hard_reboot == nil) || (@cmd_very_hard_reboot == nil) ||
+          (@pxe_header == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
         puts "Some mandatory fields are missing in the specific configuration file for #{cluster}"
         return false

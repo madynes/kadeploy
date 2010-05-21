@@ -213,46 +213,82 @@ module MicroStepsLibrary
       return (not @nodes_ok.empty?)
     end
 
-    # Sub function for reboot_wrapper
+    # Wrap a parallel command to get the power status
     #
     # Arguments
-    # * kind: kind of reboot to perform
-    # * node_set: NodeSet that must be rebooted 
-    # * use_rsh_for_reboot : specify if rsh must be use for soft reboot
     # * instance_thread: thread id of the current thread
     # Output
-    # * nothing
-    def _reboot_wrapper(kind, node_set, use_rsh_for_reboot, instance_thread)
-      @output.verbosel(3, "  *** A #{kind} reboot will be performed on the nodes #{node_set.to_s_fold}")
+    # * return true if the power status has been reached at least on one node, false otherwise
+    def parallel_get_power_status(instance_thread)
+      node_set = Nodes::NodeSet.new
+      @nodes_ok.duplicate_and_free(node_set)
+      @output.verbosel(3, "  *** A power status will be performed on the nodes #{node_set.to_s_fold}")
       pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
       node_set.set.each { |node|
-        case kind
-        when "soft"
-          if (use_rsh_for_reboot) then
-            pr.add(node.cmd.reboot_soft_rsh, node)
-          else
-            pr.add(node.cmd.reboot_soft_ssh, node)
-          end
-        when "hard"
-          pr.add(node.cmd.reboot_hard, node)
-        when "very_hard"
-          pr.add(node.cmd.reboot_very_hard, node)
+        if (node.cmd.power_status != nil) then
+          pr.add(node.cmd.power_status, node)
+        else
+          node.last_cmd_stderr = "power_status command is not provided"
+          @nodes_ko.push(node)
         end
       }
       pr.run
       pr.wait
-      return classify_only_good_nodes(pr.get_results)
+      classify_nodes(pr.get_results)
+      return (not @nodes_ok.empty?)
     end
 
-    # Wrap the reboot command
+    # Sub function for ecalation_cmd_wrapper
     #
     # Arguments
-    # * kind: kind of reboot to perform
-    # * use_rsh_for_reboot : specify if rsh must be use for soft reboot
+    # * kind: kind of command to perform (reboot, power_on, power_off)
+    # * level: start level of the command (soft, hard, very_hard)
+    # * ns: NodeSet
     # * instance_thread: thread id of the current thread
     # Output
-    # * nothing    
-    def reboot_wrapper(kind, use_rsh_for_reboot, instance_thread)
+    # * nothing
+    def _escalation_cmd_wrapper(kind, level, ns, instance_thread)
+      node_set = Nodes::NodeSet.new
+      ns.duplicate(node_set)
+      @output.verbosel(3, "  *** A #{level} #{kind} will be performed on the nodes #{node_set.to_s_fold}")
+      pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+      no_command_provided_nodes = Nodes::NodeSet.new
+      node_set.set.each { |node|
+        cmd = node.cmd.instance_variable_get("@#{kind}_#{level}")
+        if (cmd != nil) then
+          pr.add(cmd, node)
+        else
+          node.last_cmd_stderr = "#{kind}_#{level} command is not provided"
+          no_command_provided_nodes.push(node)
+        end
+      }
+      pr.run
+      pr.wait
+      bad_nodes = classify_only_good_nodes(pr.get_results)
+      if bad_nodes == nil then
+        if no_command_provided_nodes.empty? then
+          return nil
+        else
+          return no_command_provided_nodes
+        end
+      else
+        if no_command_provided_nodes.empty? then
+          return bad_nodes
+        else
+          return no_command_provided_nodes.add(bad_nodes)
+        end
+      end
+    end
+    
+    # Wrap an escalation command
+    #
+    # Arguments
+    # * kind: kind of command to perform (reboot, power_on, power_off)
+    # * level: start level of the command (soft, hard, very_hard)
+    # * instance_thread: thread id of the current thread
+    # Output
+    # * nothing 
+    def escalation_cmd_wrapper(kind, level, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
       callback = Proc.new { |ns|
@@ -261,11 +297,11 @@ module MicroStepsLibrary
         map.push("soft")
         map.push("hard")
         map.push("very_hard")
-        index = map.index(kind)
+        index = map.index(level)
         finished = false
         
         while ((index < map.length) && (not finished))
-          bad_nodes = _reboot_wrapper(map[index], ns, use_rsh_for_reboot, instance_thread)
+          bad_nodes = _escalation_cmd_wrapper(kind, map[index], ns, instance_thread)
           if (bad_nodes != nil) then
             ns.free
             index = index + 1
@@ -281,9 +317,12 @@ module MicroStepsLibrary
         map.clear
       }
       @reboot_window.launch(node_set, &callback)
-      @nodes_ko.add(node_set) if @nodes_ok.empty?
+      if @nodes_ok.empty? then
+        @nodes_ko.add(node_set)
+      end
       node_set = nil
     end
+
 
     # Test if the given symlink is an absolute link
     #
@@ -1216,23 +1255,22 @@ module MicroStepsLibrary
     # Arguments
     # * instance_thread: thread id of the current thread
     # * reboot_kind: kind of reboot (soft, hard, very_hard, kexec)
-    # * use_rsh_for_reboot (opt): specify if rsh must be used for soft reboot
     # * first_attempt (opt): specify if it is the first attempt or not 
     # Output
     # * return true (should be false sometimes :D)
-    def ms_reboot(instance_thread, reboot_kind, use_rsh_for_reboot = false, first_attempt = true)
+    def ms_reboot(instance_thread, reboot_kind, first_attempt = true)
       case reboot_kind
       when "soft"
         if first_attempt then
-          reboot_wrapper("soft", use_rsh_for_reboot, instance_thread)
+          escalation_cmd_wrapper("reboot", "soft", instance_thread)
         else
           #After the first attempt, we must not perform another soft reboot in order to avoid loop reboot on the same environment 
-          reboot_wrapper("hard", use_rsh_for_reboot, instance_thread)
+          escalation_cmd_wrapper("reboot", "hard", instance_thread)
         end
       when "hard"
-        reboot_wrapper("hard", use_rsh_for_reboot, instance_thread)
+        escalation_cmd_wrapper("reboot", "hard", instance_thread)
       when "very_hard"
-        reboot_wrapper("very_hard", use_rsh_for_reboot, instance_thread)
+        escalation_cmd_wrapper("reboot", "very_hard", instance_thread)
       when "kexec"
         if (@config.exec_specific.environment.environment_kind == "linux") then
           kernel = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.kernel}"
@@ -1243,7 +1281,7 @@ module MicroStepsLibrary
                                                @config.common.taktuk_connector, instance_thread)
         else
           @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
-          reboot_wrapper("soft", use_rsh_for_reboot, instance_thread)
+          escalation_cmd_wrapper("reboot", "soft", instance_thread)
         end
       end
       return true
@@ -1257,6 +1295,18 @@ module MicroStepsLibrary
     # * return true if the reboot has been successfully performed, false otherwise
     def ms_reboot_from_deploy_env(instance_thread)
       return parallel_exec_command_wrapper("/usr/local/bin/reboot_detach", @config.common.taktuk_connector, instance_thread)
+    end
+
+    # Perform a power operation on the current set of nodes_ok
+    def ms_power(instance_thread, operation, level)
+      case operation
+      when "on"
+        escalation_cmd_wrapper("power_on", level, instance_thread)
+      when "off"
+        escalation_cmd_wrapper("power_off", level, instance_thread)
+      when "status"
+        parallel_get_power_status(instance_thread)
+      end
     end
 
     # Check the state of a set of nodes

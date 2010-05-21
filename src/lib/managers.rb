@@ -710,13 +710,13 @@ module Managers
                 @logger.set("success", true, @nodes_ok)
                 @nodes_ok.group_by_cluster.each_pair { |cluster, set|
                   @output.verbosel(0, "Nodes correctly deployed on cluster #{cluster}")
-                  @output.verbosel(0, set.to_s(false, "\n"))
+                  @output.verbosel(0, set.to_s(false, false, "\n"))
                 }
                 @logger.set("success", false, @nodes_ko)
                 @logger.error(@nodes_ko)
                 @nodes_ko.group_by_cluster.each_pair { |cluster, set|
                   @output.verbosel(0, "Nodes not correctly deployed on cluster #{cluster}")
-                  @output.verbosel(0, set.to_s(true, "\n"))
+                  @output.verbosel(0, set.to_s(false, true, "\n"))
                 }
                 @client.generate_files(@nodes_ok, @nodes_ko) if @client != nil
                 Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/, @output) if @config.exec_specific.load_env_kind == "file"

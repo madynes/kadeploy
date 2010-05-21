@@ -383,7 +383,6 @@ module BroadcastEnvironment
     # Output
     # * return a thread id
     def run
-      @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads
