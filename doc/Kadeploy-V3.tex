@@ -1299,6 +1299,16 @@ Here are two examples:
 
 If everything went right, the output of \texttt{kaenv2to3} shows the description in the new format. You can redirect this output to a file and use this file as an input for \texttt{kaenv}.
 
+\section{Environment variables in the pre- and post-install context}
+When writing a script for an admin pre-install, an admin post-install and a user post-install, you can use the following environment variables :
+\begin{itemize}
+\item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
+\item \texttt{KADEPLOY\_ENV} : environment deployed
+\item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
+\item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
+\item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
+\end{itemize}
+
 \section{Build a custom pre-install}\label{sec:custom-preinstall}
 The goal of the pre-install in the Kadeploy workflow is to prepare the disk of the nodes before the copy of the environment. It can include:
 \begin{itemize}

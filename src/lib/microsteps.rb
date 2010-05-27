@@ -1161,6 +1161,8 @@ module MicroStepsLibrary
       env = "KADEPLOY_CLUSTER=\"#{@cluster}\""
       env += " KADEPLOY_ENV=\"#{@config.exec_specific.environment.name}\""
       env += " KADEPLOY_DEPLOY_PART=\"#{get_deploy_part_str()}\""
+      env += " KADEPLOY_ENV_EXTRACTION_DIR=\"#{@config.common.environment_extraction_dir}\""
+      env += " KADEPLOY_PREPOST_EXTRACTION_DIR=\"#{@config.common.rambin_path}\""
       return env
     end
 
