@@ -451,7 +451,7 @@ module ParallelOperations
             sub_tid.join
           }
         }
-        nodes_check_window.launch(nodes_to_test, &callback)
+        nodes_check_window.launch_on_node_set(nodes_to_test, &callback)
         nodes_to_test = nil
       end
 

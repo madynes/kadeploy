@@ -477,6 +477,16 @@ module Nodes
     def copy(node)
       @set.push(node.dup)
     end
+    
+    # Remove a node from a set
+    #
+    # Arguments
+    # * node: instance of Node
+    # Output
+    # * nothing
+    def remove(node)
+      @set.delete(node)
+    end
 
     # Test if the node set is empty
     #
@@ -486,6 +496,18 @@ module Nodes
     # * return true if the set is empty, false otherwise
     def empty?
       return @set.empty?
+    end
+
+    # Create a linked copy of a NodeSet
+    #
+    # Arguments
+    # * dest: destination NodeSet
+    # Output
+    # * nothing
+    def linked_copy(dest)
+      @set.each { |node|
+        dest.push(node)
+      }
     end
 
     # Duplicate a NodeSet
@@ -511,6 +533,19 @@ module Nodes
         dest.push(node.dup)
       }
       free()
+    end
+
+    # Move the nodes of a NodeSet to another
+    #
+    # Arguments
+    # * dest: destination NodeSet
+    # Output
+    # * nothing
+    def move(dest)
+      @set.each { |node|
+        dest.push(node)
+      }
+      @set.delete_if { true }
     end
 
     # Add the diff of a NodeSet and free it
@@ -571,6 +606,16 @@ module Nodes
         end
       }
       return true
+    end
+
+    # Delete a NodeSet without freeing the memory
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def delete
+      @set.delete_if { true }
     end
 
     # Free a NodeSet

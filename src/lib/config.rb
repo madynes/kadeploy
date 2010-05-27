@@ -656,6 +656,19 @@ module ConfigInformation
       return servers
     end
 
+
+    def add_group_of_nodes(command, file, cluster)
+      if File.readable?(file) then
+        @cluster_specific[cluster].group_of_nodes[command] = Array.new
+        IO.readlines(file).each { |line|
+          @cluster_specific[cluster].group_of_nodes[command].push(line.chomp.split(","))
+        }
+        return true
+      else
+        return false
+      end
+    end
+
     # Load the specific configuration files
     #
     # Arguments
@@ -716,25 +729,43 @@ module ConfigInformation
                     return false
                   end
                 when "cmd_soft_reboot"
-                  @cluster_specific[cluster].cmd_soft_reboot = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_soft_reboot = tmp[0]
+                  (return false if not add_group_of_nodes("soft_reboot", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_hard_reboot"
-                  @cluster_specific[cluster].cmd_hard_reboot = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_hard_reboot = tmp[0]
+                  (return false if not add_group_of_nodes("hard_reboot", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_very_hard_reboot"
-                  @cluster_specific[cluster].cmd_very_hard_reboot = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_very_hard_reboot = tmp[0]
+                  (return false if not add_group_of_nodes("very_hard_reboot", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_console"
                   @cluster_specific[cluster].cmd_console = val
                 when "cmd_soft_power_off"
-                  @cluster_specific[cluster].cmd_soft_power_off = val
-                when "cmd_hard_power_off"
-                  @cluster_specific[cluster].cmd_hard_power_off = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_soft_power_off = tmp[0]
+                  (return false if not add_group_of_nodes("soft_power_off", tmp[1], cluster)) if (tmp[1] != nil)
+                  when "cmd_hard_power_off"
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_hard_power_off = tmp[0]
+                  (return false if not add_group_of_nodes("hard_power_off", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_very_hard_power_off"
-                  @cluster_specific[cluster].cmd_very_hard_power_off = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_very_hard_power_off = tmp[0]
+                  (return false if not add_group_of_nodes("very_hard_power_off", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_soft_power_on"
-                  @cluster_specific[cluster].cmd_soft_power_on = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_soft_power_on = tmp[0]
+                  (return false if not add_group_of_nodes("soft_power_on", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_hard_power_on"
-                  @cluster_specific[cluster].cmd_hard_power_on = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_hard_power_on = tmp[0]
+                  (return false if not add_group_of_nodes("hard_power_on", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_very_hard_power_on"
-                  @cluster_specific[cluster].cmd_very_hard_power_on = val
+                  tmp = val.split(",")
+                  @cluster_specific[cluster].cmd_very_hard_power_on = tmp[0]
+                  (return false if not add_group_of_nodes("very_hard_power_on", tmp[1], cluster)) if (tmp[1] != nil)
                 when "cmd_power_status"
                   @cluster_specific[cluster].cmd_power_status = val
                 when "drivers"
@@ -915,17 +946,17 @@ module ConfigInformation
               when "console"
                 node.cmd.console = content[3].strip
               when "soft_power_on"
-                node.cmd.soft_power_on = content[3].strip
+                node.cmd.power_on_soft = content[3].strip
               when "hard_power_on"
-                node.cmd.hard_power_on = content[3].strip
+                node.cmd.power_on_hard = content[3].strip
               when "very_hard_power_on"
-                node.cmd.very_hard_power_on = content[3].strip
+                node.cmd.hard_power_on_very_hard = content[3].strip
               when "soft_power_off"
-                node.cmd.soft_power_off = content[3].strip
+                node.cmd.power_off_soft = content[3].strip
               when "hard_power_off"
-                node.cmd.hard_power_off = content[3].strip
+                node.cmd.power_off_hard = content[3].strip
               when "very_hard_power_off"
-                node.cmd.very_hard_power_off = content[3].strip
+                node.cmd.hard_power_off_very_hard = content[3].strip
               when "very_power_status"
                 node.cmd.power_status = content[3].strip
               else
@@ -2630,6 +2661,7 @@ module ConfigInformation
     attr_accessor :cmd_hard_power_on
     attr_accessor :cmd_very_hard_power_on
     attr_accessor :cmd_power_status
+    attr_accessor :group_of_nodes #Hashtable (key is a command name)
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
     attr_accessor :drivers
@@ -2668,6 +2700,7 @@ module ConfigInformation
       @cmd_hard_power_off = nil
       @cmd_very_hard_power_off = nil
       @cmd_power_status = nil
+      @group_of_nodes = Hash.new
       @drivers = nil
       @pxe_header = nil
       @kernel_params = nil
@@ -2709,6 +2742,7 @@ module ConfigInformation
       dest.cmd_hard_power_off = @cmd_hard_power_off.clone if (@cmd_hard_power_off != nil) 
       dest.cmd_very_hard_power_off = @cmd_very_hard_power_off.clone if (@cmd_very_hard_power_off != nil)
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
+      dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
@@ -2751,6 +2785,7 @@ module ConfigInformation
       dest.cmd_hard_power_off = @cmd_hard_power_off.clone if (@cmd_hard_power_off != nil) 
       dest.cmd_very_hard_power_off = @cmd_very_hard_power_off.clone if (@cmd_very_hard_power_off != nil)
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
+      dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)

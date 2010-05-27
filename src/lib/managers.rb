@@ -100,7 +100,7 @@ module Managers
     # * callback: reference on block that takes a NodeSet as argument
     # Output
     # * nothing
-    def launch(node_set, &callback)
+    def launch_on_node_set(node_set, &callback)
       remaining = node_set.length
       while (remaining != 0)
         regenerate_lost_resources()
@@ -108,6 +108,21 @@ module Managers
         if (taken > 0) then
           partial_set = node_set.extract(taken)
           callback.call(partial_set)
+          release(taken)
+        end
+        sleep(@sleep_time) if remaining != 0
+      end
+    end
+
+    def launch_on_node_array(node_array, &callback)
+      remaining = node_array.length
+      while (remaining != 0)
+        regenerate_lost_resources()
+        remaining, taken = acquire(remaining)
+        if (taken > 0) then
+          partial_array = Array.new
+          (1..taken).each { partial_array.push(node_array.shift) }
+          callback.call(partial_array)
           release(taken)
         end
         sleep(@sleep_time) if remaining != 0

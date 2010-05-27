@@ -1,3 +1,4 @@
+# -*- coding: undecided -*-
 # Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
@@ -238,34 +239,272 @@ module MicroStepsLibrary
       return (not @nodes_ok.empty?)
     end
 
+    # For history ...
+    #
+    # # Sub function for ecalation_cmd_wrapper
+    # #
+    # # Arguments
+    # # * kind: kind of command to perform (reboot, power_on, power_off)
+    # # * level: start level of the command (soft, hard, very_hard)
+    # # * ns: NodeSet
+    # # * instance_thread: thread id of the current thread
+    # # Output
+    # # * nothing
+    # def _escalation_cmd_wrapper(kind, level, ns, instance_thread)
+    #   node_set = Nodes::NodeSet.new
+    #   ns.duplicate(node_set)
+    #   @output.verbosel(3, "  *** A #{level} #{kind} will be performed on the nodes #{node_set.to_s_fold}")
+    #   pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+    #   no_command_provided_nodes = Nodes::NodeSet.new
+    #   node_set.set.each { |node|
+    #     cmd = node.cmd.instance_variable_get("@#{kind}_#{level}")
+    #     if (cmd != nil) then
+    #       pr.add(cmd, node)
+    #     else
+    #       node.last_cmd_stderr = "#{kind}_#{level} command is not provided"
+    #       no_command_provided_nodes.push(node)
+    #     end
+    #   }
+    #   pr.run
+    #   pr.wait
+    #   bad_nodes = classify_only_good_nodes(pr.get_results)
+    #   if bad_nodes == nil then
+    #     if no_command_provided_nodes.empty? then
+    #       return nil
+    #     else
+    #       return no_command_provided_nodes
+    #     end
+    #   else
+    #     if no_command_provided_nodes.empty? then
+    #       return bad_nodes
+    #     else
+    #       return no_command_provided_nodes.add(bad_nodes)
+    #     end
+    #   end
+    # end
+    
+    # # Wrap an escalation command
+    # #
+    # # Arguments
+    # # * kind: kind of command to perform (reboot, power_on, power_off)
+    # # * level: start level of the command (soft, hard, very_hard)
+    # # * instance_thread: thread id of the current thread
+    # # Output
+    # # * nothing 
+    # def escalation_cmd_wrapper(kind, level, instance_thread)
+    #   node_set = Nodes::NodeSet.new
+    #   initial_node_set = Nodes::NodeSet.new
+    #   @nodes_ok.duplicate(initial_node_set)
+    #   @nodes_ok.duplicate_and_free(node_set)
+    #   callback = Proc.new { |ns|
+    #     bad_nodes = Nodes::NodeSet.new
+    #     map = Array.new
+    #     map.push("soft")
+    #     map.push("hard")
+    #     map.push("very_hard")
+    #     index = map.index(level)
+    #     finished = false
+        
+    #     while ((index < map.length) && (not finished))
+    #       bad_nodes = _escalation_cmd_wrapper(kind, map[index], ns, instance_thread)
+    #       if (bad_nodes != nil) then
+    #         ns.free
+    #         index = index + 1
+    #         if (index < map.length) then
+    #           bad_nodes.duplicate_and_free(ns)
+    #         else
+    #           @nodes_ko.add(bad_nodes)
+    #         end
+    #       else
+    #         finished = true
+    #       end
+    #     end
+    #     map.clear
+    #   }
+    #   @reboot_window.launch(node_set, &callback)
+    #   if @nodes_ok.empty? then
+    #     @nodes_ko.add(node_set)
+    #   end
+    #   node_set = nil
+    #   initial_node_set.free
+    #   initial_node_set = nil
+    # end
+
+
+    # Replace a group of nodes in a command
+    #
+    # Arguments
+    # * str: command that contains the patterns GROUP_FQDN or GROUP_SHORT 
+    # * array_of_hostname: array of hostnames
+    # Output
+    # * return a string with the patterns replaced by the hostnames
+    def replace_groups_in_command(str, array_of_hostname)
+      fqdn_hosts = array_of_hostname.join(",")
+      short_hosts_array = Array.new
+      array_of_hostname.each { |host|
+        short_hosts_array.push(host.split(".")[0])
+      }
+      short_hosts = short_hosts_array.join(",")
+      if (str != nil) then
+        cmd_to_expand = str.clone # we must use this temporary variable since sub() modify the strings
+        save = str
+        while cmd_to_expand.sub!("GROUP_FQDN", fqdn_hosts) != nil  do
+          save = cmd_to_expand
+        end
+        while cmd_to_expand.sub!("GROUP_SHORT", short_hosts) != nil  do
+          save = cmd_to_expand
+        end
+        return save
+      else
+        return nil
+      end
+    end
+
     # Sub function for ecalation_cmd_wrapper
     #
     # Arguments
     # * kind: kind of command to perform (reboot, power_on, power_off)
     # * level: start level of the command (soft, hard, very_hard)
-    # * ns: NodeSet
+    # * node_set: NodeSet
+    # * initial_node_set: initial NodeSet
     # * instance_thread: thread id of the current thread
     # Output
     # * nothing
-    def _escalation_cmd_wrapper(kind, level, ns, instance_thread)
-      node_set = Nodes::NodeSet.new
-      ns.duplicate(node_set)
+    def _escalation_cmd_wrapper(kind, level, node_set, initial_node_set, instance_thread)
       @output.verbosel(3, "  *** A #{level} #{kind} will be performed on the nodes #{node_set.to_s_fold}")
-      pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+
+      #First, we remove the nodes without command
       no_command_provided_nodes = Nodes::NodeSet.new
+      to_remove = Array.new
       node_set.set.each { |node|
-        cmd = node.cmd.instance_variable_get("@#{kind}_#{level}")
-        if (cmd != nil) then
-          pr.add(cmd, node)
-        else
-          node.last_cmd_stderr = "#{kind}_#{level} command is not provided"
+        if (node.cmd.instance_variable_get("@#{kind}_#{level}") == nil) then
+          node.last_cmd_stderr = "#{level}_#{kind} command is not provided"
           no_command_provided_nodes.push(node)
+          to_remove.push(node)
         end
       }
-      pr.run
-      pr.wait
-      bad_nodes = classify_only_good_nodes(pr.get_results)
-      if bad_nodes == nil then
+      to_remove.each { |node|
+        node_set.remove(node)
+      }
+
+      final_node_array = Array.new
+      #Then, we check if there are grouped commands
+      missing_dependency = false
+      if @config.cluster_specific[@cluster].group_of_nodes.has_key?("#{level}_#{kind}") then
+        node_set.set.each { |node|
+          if (not missing_dependency) then
+            node_found_in_final_array = false
+            final_node_array.each { |entry|
+              if entry.is_a?(String) then
+                if node.hostname == entry then
+                  node_found_in_final_array = true
+                  break
+                end
+              elsif entry.is_a?(Array) then
+                node_found_in_final_array = false
+                entry.each { |hostname|
+                  if node.hostname == hostname then
+                    node_found_in_final_array = true
+                    break
+                  end
+                }
+                break if node_found_in_final_array
+              end
+            }
+
+            if not node_found_in_final_array then
+              node_found_in_group = false
+              dependency_group = nil
+              @config.cluster_specific[@cluster].group_of_nodes["#{level}_#{kind}"].each { |group|
+                #The node belongs to a group
+                node_found_in_group = false
+                dependency_group = group
+                if group.include?(node.hostname) then
+                  node_found_in_group = true
+                  all_nodes_of_the_group_found = true
+                  group.each { |hostname|
+                    if (initial_node_set.get_node_by_host(hostname) == nil) then
+                      puts "PAS DANS LE GROUPE INITIALE #{initial_node_set.to_s}"
+                      all_nodes_of_the_group_found = false
+                      break
+                    end
+                  }
+                  if all_nodes_of_the_group_found then
+                    final_node_array.push(group)
+                    missing_dependency = false
+                  else
+                    missing_dependency = true
+                  end
+                  break
+                end
+                break if node_found_in_group
+              }
+              final_node_array.push(node.hostname) if not node_found_in_group
+              if missing_dependency then
+                @output.verbosel(3, "The #{level} #{kind} command cannot be performed since the node #{node.hostname} belongs to the following group of nodes [#{dependency_group.join(",")}] and all the nodes of the group are not in involved in the command")
+                break
+              end
+            end
+          else
+            break
+          end
+        }
+      else
+        final_node_array = node_set.make_array_of_hostname
+      end
+
+      #We remove the grouped nodes previously ok
+      final_node_array.each { |entry|
+        if entry.is_a?(Array) then
+          entry.each { |hostname|
+            @nodes_ok.remove(initial_node_set.get_node_by_host(hostname))
+          }
+        end
+      }
+       backup_of_final_node_array = final_node_array.clone
+      #Finally, fire !!!!!!!!
+      bad_nodes = Nodes::NodeSet.new
+      callback = Proc.new { |na|
+        pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+        na.each { |entry|
+          node = nil
+          if entry.is_a?(String) then
+            node = initial_node_set.get_node_by_host(entry)
+            cmd = node.cmd.instance_variable_get("@#{kind}_#{level}")
+          elsif entry.is_a?(Array) then
+            node = initial_node_set.get_node_by_host(entry[0])
+            cmd = replace_groups_in_command(node.cmd.instance_variable_get("@#{kind}_#{level}"), entry)
+          else
+            raise "Invalid entry in array"
+          end
+          pr.add(cmd, node)
+        }
+        pr.run
+        pr.wait
+        res = classify_only_good_nodes(pr.get_results)
+        bad_nodes.add(res) if res != nil
+      }
+      @reboot_window.launch_on_node_array(final_node_array, &callback) if not final_node_array.empty?
+
+      #We eventually copy the status of grouped nodes
+      backup_of_final_node_array.each { |entry|
+        if entry.is_a?(Array) then
+          ref_node = initial_node_set.get_node_by_host(entry[0])
+          (1...(entry.length)).each { |index|
+            node = initial_node_set.get_node_by_host(entry[index])
+            node.last_cmd_exit_status = ref_node.last_cmd_exit_status
+            node.last_cmd_stdout = ref_node.last_cmd_stdout
+            node.last_cmd_stderr = ref_node.last_cmd_stderr
+            if (ref_node.last_cmd_exit_status == "0") then
+              @nodes_ok.push(node)
+            else
+              bad_nodes.push(node)
+            end
+          }
+        end
+      }
+
+      if bad_nodes.empty? then
         if no_command_provided_nodes.empty? then
           return nil
         else
@@ -279,7 +518,7 @@ module MicroStepsLibrary
         end
       end
     end
-    
+
     # Wrap an escalation command
     #
     # Arguments
@@ -290,39 +529,36 @@ module MicroStepsLibrary
     # * nothing 
     def escalation_cmd_wrapper(kind, level, instance_thread)
       node_set = Nodes::NodeSet.new
-      @nodes_ok.duplicate_and_free(node_set)
-      callback = Proc.new { |ns|
-        bad_nodes = Nodes::NodeSet.new
-        map = Array.new
-        map.push("soft")
-        map.push("hard")
-        map.push("very_hard")
-        index = map.index(level)
-        finished = false
+      initial_node_set = Nodes::NodeSet.new
+      @nodes_ok.move(node_set)
+      node_set.linked_copy(initial_node_set)
+
+      bad_nodes = Nodes::NodeSet.new
+      map = Array.new
+      map.push("soft")
+      map.push("hard")
+      map.push("very_hard")
+      index = map.index(level)
+      finished = false
         
-        while ((index < map.length) && (not finished))
-          bad_nodes = _escalation_cmd_wrapper(kind, map[index], ns, instance_thread)
-          if (bad_nodes != nil) then
-            ns.free
-            index = index + 1
+      while ((index < map.length) && (not finished))
+        bad_nodes = _escalation_cmd_wrapper(kind, map[index], node_set, initial_node_set, instance_thread)
+        if (bad_nodes != nil) then
+          node_set.delete
+          index = index + 1
             if (index < map.length) then
-              bad_nodes.duplicate_and_free(ns)
+              bad_nodes.move(node_set)
             else
               @nodes_ko.add(bad_nodes)
             end
-          else
-            finished = true
-          end
+        else
+          finished = true
         end
-        map.clear
-      }
-      @reboot_window.launch(node_set, &callback)
-      if @nodes_ok.empty? then
-        @nodes_ko.add(node_set)
       end
+      map.clear
       node_set = nil
+      initial_node_set = nil
     end
-
 
     # Test if the given symlink is an absolute link
     #
@@ -389,7 +625,6 @@ module MicroStepsLibrary
       return content[2]
     end
 
-
     # Extract some file from an archive
     #
     # Arguments
@@ -446,7 +681,6 @@ module MicroStepsLibrary
       }
       return true
     end
-
 
     # Copy the kernel and the initrd into the PXE directory
     #
@@ -1343,7 +1577,7 @@ module MicroStepsLibrary
         }
         node_set = Nodes::NodeSet.new
         @nodes_ok.duplicate_and_free(node_set)
-        @reboot_window.launch(node_set, &callback)
+        @reboot_window.launch_on_node_set(node_set, &callback)
         return (not @nodes_ok.empty?)
       end
     end

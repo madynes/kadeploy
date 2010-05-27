@@ -257,14 +257,14 @@ class KadeployServer
   # * client: DRb handler of the Kadeploy client
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return false if cannot connect to DB, true otherwise
+  # * return true
   def run_kadeploy_sync(db, client, exec_specific)
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new(true)
     config.common = @config.common
     config.exec_specific = exec_specific
     config.cluster_specific = Hash.new
-    
+
     #Overide the configuration if the steps are specified in the command line
     if (not exec_specific.steps.empty?) then
       exec_specific.node_set.group_by_cluster.each_key { |cluster|
@@ -524,7 +524,7 @@ class KadeployServer
               if (exec_specific.reboot_kind == "env_recorded") then
                 part = String.new
                 if (exec_specific.block_device == "") then
-                  part = get_block_device(cluster) + exec_specific.deploy_part
+                  part = @config.cluster_specific[cluster].block_device + exec_specific.deploy_part
                 else
                   part = exec_specific.block_device + exec_specific.deploy_part
                 end
