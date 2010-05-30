@@ -128,7 +128,7 @@ if exec_specific_config != nil then
           client_port = content[2]
           cloned_config = exec_specific_config.clone
           cloned_config.node_array = nodes_by_server[server]
-          kadeploy_server.run("kapower", exec_specific_config, client_host, client_port)
+          kadeploy_server.run("kapower_sync", exec_specific_config, client_host, client_port)
         else
           puts "The URI #{DRb.uri} is not correct"
         end

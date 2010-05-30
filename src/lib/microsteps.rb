@@ -424,7 +424,6 @@ module MicroStepsLibrary
                   all_nodes_of_the_group_found = true
                   group.each { |hostname|
                     if (initial_node_set.get_node_by_host(hostname) == nil) then
-                      puts "PAS DANS LE GROUPE INITIALE #{initial_node_set.to_s}"
                       all_nodes_of_the_group_found = false
                       break
                     end
@@ -461,7 +460,9 @@ module MicroStepsLibrary
           }
         end
       }
-       backup_of_final_node_array = final_node_array.clone
+
+      backup_of_final_node_array = final_node_array.clone
+
       #Finally, fire !!!!!!!!
       bad_nodes = Nodes::NodeSet.new
       callback = Proc.new { |na|
@@ -476,6 +477,10 @@ module MicroStepsLibrary
             cmd = replace_groups_in_command(node.cmd.instance_variable_get("@#{kind}_#{level}"), entry)
           else
             raise "Invalid entry in array"
+          end
+          #We directly transmit the --no-wait parameter to the power_on/power_off commands
+          if (kind == "power_on") || (kind == "power_off") then
+            cmd += " --no-wait" if (not @config.exec_specific.wait)
           end
           pr.add(cmd, node)
         }

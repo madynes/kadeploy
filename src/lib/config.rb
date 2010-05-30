@@ -76,13 +76,17 @@ module ConfigInformation
         return check_karights_config(exec_specific_config, db, client)
       when "kastat"
         return check_kastat_config(exec_specific_config, db, client)
-      when "kareboot"
+      when "kareboot_sync"
+        return check_kareboot_config(exec_specific_config, db, client)
+      when "kareboot_async"
         return check_kareboot_config(exec_specific_config, db, client)
       when "kaconsole"
         return check_kaconsole_config(exec_specific_config, db, client)
       when "kanodes"
         return check_kanodes_config(exec_specific_config, db, client)
-      when "kapower"
+      when "kapower_sync"
+        return check_kapower_config(exec_specific_config, db, client)
+      when "kapower_async"
         return check_kapower_config(exec_specific_config, db, client)
       end
     end
@@ -147,7 +151,7 @@ module ConfigInformation
     end
 
     def check_kareboot_config(exec_specific_config, db, client)
-      exec_specific_config.node_array.each { |hostname|
+       exec_specific_config.node_array.each { |hostname|
         if not add_to_node_set(hostname, exec_specific_config) then
           Debug::distant_client_error("The node #{hostname} does not exist", client)
           return false
@@ -172,6 +176,7 @@ module ConfigInformation
                                                                    client, set, db, part).granted?
       }
       if (allowed_to_deploy != true) then
+        puts "You do not have the right to deploy on all the nodes"
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
         return false
       end

@@ -14,3 +14,11 @@ class FetchFileError
   INVALID_CUSTOM_FILE = 7
   INVALID_PXE_FILE = 8
 end
+
+class KarebootAsyncError
+  NO_ERROR = 0
+  REBOOT_FAILED_ON_SOME_NODES = 1
+  DEMOLISHING_ENV = 2
+  PXE_FILE_FETCH_ERROR = 3
+  NO_RIGHT_TO_DEPLOY = 4
+end
