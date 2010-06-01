@@ -246,11 +246,10 @@ deploy_db_name = deploy3
 deploy_db_login = deploy_user
 deploy_db_passwd = deploy_password
 rights_kind = db
-taktuk_ssh_connector = ssh -q -o StrictHostKeyChecking=no \
-                              -o UserKnownHostsFile=/dev/null \
-                              -o PreferredAuthentications=publickey \
-                              -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
-taktuk_rsh_connector = rsh -l root
+taktuk_connector = ssh -q -o StrictHostKeyChecking=no \
+                          -o UserKnownHostsFile=/dev/null \
+                          -o PreferredAuthentications=publickey \
+                          -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
 taktuk_tree_arity = 0
 taktuk_auto_propagate = false
 tarball_dest_dir = /tmp
@@ -263,7 +262,6 @@ kadeploy_cache_size = 20000
 max_preinstall_size = 30
 max_postinstall_size = 30
 ssh_port = 22
-rsh_port = 514
 test_deploy_env_port = 25300
 use_rsh_to_deploy = false
 log_to_file = /tmp/kadeploy.log
@@ -302,8 +300,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{deploy\_db\_login}: login for the Kadeploy database.
 \item \texttt{deploy\_db\_passwd}: password for the Kadeploy database.
 \item \texttt{rights\_kind}: authentication kind (use db for a true rights management or dummy to bypass the rights management).
-\item \texttt{taktuk\_ssh\_connector}: SSH connector used by Taktuk.
-\item \texttt{taktuk\_rsh\_connector}: RSH connector used by Taktuk.
+\item \texttt{taktuk\_connector}: connector used by Taktuk.
 \item \texttt{taktuk\_tree\_arity}: Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
 \item \texttt{taktuk\_auto\_propagate}: use of the auto propagation feature of Taktuk (expected values are true or false). You should use this feature if the deployment environment doesn't contain Taktuk.
 \item \texttt{tarball\_dest\_dir}: destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent .
@@ -316,7 +313,6 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{max\_preinstall\_size}: maximum size in MB of the preinstall files.
 \item \texttt{max\_postinstall\_size}: maximum size in MB of the postinstall files.
 \item \texttt{ssh\_port}: port used by SSH
-\item \texttt{rsh\_port}: port used by RSH
 \item \texttt{test\_deploy\_env\_port}: port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted.
 \item \texttt{use\_rsh\_to\_deploy}: use rsh in the deployment workflow (expected values are true or false).
 \item \texttt{log\_to\_file}: absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
@@ -353,16 +349,22 @@ prod_part = 2
 deploy_part = 3
 tmp_part = 5
 swap_part = 1
-timeout_reboot_classical = 200
+timeout_reboot_classical = 200 + 150 * Math.log(n)
 timeout_reboot_kexec = 60
-cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
-                             -o PreferredAuthentications=publickey \
-                             -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
-                             -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
-cmd_soft_reboot_rsh = rsh -l root HOSTNAME_FQDN /usr/local/bin/reboot_detach
+cmd_soft_reboot = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
+                         -o PreferredAuthentications=publickey \
+                         -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
+                         -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
 cmd_hard_reboot = /usr/local/kadeploy/bin/reboot.rb HOSTNAME_SHORT
 cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
 cmd_console = /usr/local/kadeploy/bin/console HOSTNAME_SHORT
+#cmd_soft_power_on = 
+#cmd_hard_power_on = 
+#cmd_very_hard_power_on = 
+#cmd_soft_power_off = 
+#cmd_hard_power_off = 
+#cmd_very_hard_power_off = 
+#cmd_power_status =
 drivers = ata_piix,ata_generic
 kernel_params = console=tty0 console=ttyS1,38400n8
 pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
@@ -389,13 +391,19 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{deploy\_part}: number of the deployment partition on the disk.
 \item \texttt{tmp\_part}: number of the tmp partition on the disk.
 \item \texttt{swap\_part}: number of the swap partition on the disk. If the \texttt{none} value is specified, the swap format at the deployment time will be bypassed.
-\item \texttt{timeout\_reboot\_classical}: classical reboot timeout.
-\item \texttt{timeout\_reboot\_kexec}: kexec reboot timeout.
-\item \texttt{cmd\_soft\_reboot\_ssh}: generic ssh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_soft\_reboot\_rsh}: generic rsh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{timeout\_reboot\_classical}: classical reboot timeout. A Ruby expression can be used here to represent a function depending on n (the number of nodes currently rebooted).
+\item \texttt{timeout\_reboot\_kexec}: kexec reboot timeout. A Ruby expression can be used here to represent a function depending on n (the number of nodes currently rebooted).
+\item \texttt{cmd\_soft\_reboot}: generic soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_hard\_reboot}: generic hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_very\_hard\_reboot}: generic very hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{drivers}: list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
+\item \texttt{cmd\_soft\_power\_on}: generic soft power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_hard\_power\_on}: generic hard power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_very\_hard\_power\_on}: generic very hard power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_soft\_power\_off}: generic soft power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_hard\_power\_off}: generic hard power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_very\_hard\_power\_off}: generic very hard power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_power\_status}: generic power status command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
 \item \texttt{pxe\_header}: default PXE header (must be defined in one line).
 \item \texttt{nfsroot\_kernel}: kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
@@ -510,6 +518,20 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
   \end{itemize}
 \end{itemize}
 
+\paragraph{Note about the reboot/power-on/power-off commands}
+In some special cases, a such command can affect a group of nodes. Thus, you can specify group of nodes for a given command using the following syntax :
+\begin{small}
+\begin{verbatim}
+cmd_very_hard_power_off = /usr/sbin/very_hard_power_off GROUP_SHORT,path_to_group_of_node_for_hard_power_off_cmd
+\end{verbatim}
+\end{small}
+You can remark two things :
+\begin{itemize}
+\item the \texttt{HOSTNAME\_SHORT} and \texttt{HOSTNAME\_FQDN} patterns are not used in these commands, instead you must use the \texttt{GROUP\_SHORT} and \texttt{GROUP\_FQDN} patterns.
+\item the affinity between nodes is specified in a file (here \texttt{path\_to\_group\_of\_node\_for\_hard\_power\_off\_cmd}) that contains as much lines as the number of groups. Then, each line contains the nodes of a group, for instance: \texttt{node1,node2,node3}.
+\end{itemize}
+For a given command on a given cluster, if you specify some group of nodes (with \texttt{GROUP\_SHORT} or \texttt{GROUP\_FQDN} patterns), you will also be able to specify, for some nodes of the cluster, a command that does not imply a group of nodes. To do this, you must specify these commands in the cpecific commands configuration files.
+
 \section{Clusters file}
 The list of all the clusters must be defined in the  \texttt{/etc/kadeploy3/clusters} file. For instance, the file may contain something like :
 \begin{small}
@@ -560,20 +582,27 @@ netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
 \end{small}
 
 \section{Specific commands configuration files}
-In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|\texttt{cmd\_kind}|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for \texttt{cmd\_kind} are:
+In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|command kind|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for command kind are:
 \begin{itemize}
-\item \texttt{cmd\_soft\_reboot\_ssh}
-\item \texttt{cmd\_soft\_reboot\_rsh}
-\item \texttt{cmd\_hard\_reboot}
-\item \texttt{cmd\_very\_hard\_reboot}
+\item \texttt{soft\_reboot}
+\item \texttt{hard\_reboot}
+\item \texttt{very\_hard\_reboot}
+\item \texttt{soft\_power\_on}
+\item \texttt{hard\_power\_on}
+\item \texttt{very\_hard\_power\_on}
+\item \texttt{soft\_power\_off}
+\item \texttt{hard\_power\_off}
+\item \texttt{very\_hard\_power\_off}
+\item \texttt{power\_status}
+\item \texttt{console}
 \end{itemize}
 
 Here is an example:
 \begin{small}
 \begin{verbatim}
-vm-001|reboot_soft|ssh -q root@vm-001 /sbin/special_reboot_for_vm
-vm-001|reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
-vm-002|reboot_soft|ssh -q root@vm-002 /sbin/special_reboot_for_vm
+vm-001|soft_reboot|ssh -q root@vm-001 /sbin/special_reboot_for_vm
+vm-001|hard_reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
+vm-002|soft_reboot|ssh -q root@vm-002 /sbin/special_reboot_for_vm
 \end{verbatim}
 \end{small}
 Note: it is not mandatory to override all the commands for a given node.

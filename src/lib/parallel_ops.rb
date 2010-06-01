@@ -24,7 +24,7 @@ module ParallelOperations
 
     # Constructor of ParallelOps
     #
-    # Arguments
+    # Arguments   
     # * nodes: instance of NodeSet
     # * config: instance of Config
     # * taktuk_connector: specifies the connector to use with Taktuk
@@ -392,8 +392,11 @@ module ParallelOperations
         @config.set_node_state(node.hostname, "", "", "reboot_in_progress")
       }
       sleep(20)
+      
+      n = @nodes.length
+      t = eval(timeout).to_i
 
-      while (((Time.now.tv_sec - start) < timeout) && (not @nodes.all_ok?))
+      while (((Time.now.tv_sec - start) < t) && (not @nodes.all_ok?))
         sleep(5)
         nodes_to_test = Nodes::NodeSet.new
         @nodes.set.each { |node|
