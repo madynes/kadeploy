@@ -256,13 +256,30 @@ class KadeployServer
       workflow.db.disconnect
       kadeploy_delete_workflow_info(workflow_id)
       #let's free memory at the end of the workflow
-      tid = nil
       workflow.finalize()
       workflow = nil
-      exec_specific = nil
       GC.start
     }
   end
+
+  # Kill a workflow (RPC)
+  #
+  # Arguments
+  # * workflow_id: id of the workflow
+  # Output
+  # * nothing  
+  def async_deploy_kill(workflow_id)
+    return async_deploy_lock_wid(workflow_id) { |workflow|
+      workflow.kill()
+      workflow.db.disconnect
+      kadeploy_delete_workflow_info(workflow_id)
+      #let's free memory at the end of the workflow
+      workflow.finalize()
+      workflow = nil
+      GC.start
+    }
+  end
+
 
   def async_power_ended?(power_id)
     r = nil
@@ -585,14 +602,19 @@ class KadeployServer
           end
           step.reboot(exec_specific.reboot_level, true)
           if exec_specific.wait then
+            if (exec_specific.reboot_classical_timeout == nil) then
+              timeout = @config.cluster_specific[cluster].timeout_reboot_classical
+            else
+              timeout = exec_specific.reboot_classical_timeout
+            end
             if (exec_specific.reboot_kind == "deploy_env") then
               step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
-                               @config.cluster_specific[cluster].timeout_reboot_classical)
+                               timeout)
               step.send_key_in_deploy_env("tree")
               set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
             else
               step.wait_reboot([@config.common.ssh_port],[],
-                               @config.cluster_specific[cluster].timeout_reboot_classical)
+                               timeout)
 
               if (exec_specific.reboot_kind == "env_recorded") then
                 part = String.new

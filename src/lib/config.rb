@@ -294,7 +294,9 @@ module ConfigInformation
       exec_specific.multi_server = false
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
-
+      exec_specific.reboot_classical_timeout = nil
+      exec_specific.reboot_kexec_timeout = nil
+      
       if Config.load_kadeploy_cmdline_options(exec_specific) then
         return exec_specific
       else
@@ -1282,6 +1284,20 @@ module ConfigInformation
             }
           end
         }
+        opt.on("--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots") { |t|
+          if (t =~ /\A\d+\Z/) then
+            exec_specific.reboot_classical_timeout = t
+          else
+            error("A number is required for the reboot classical timeout")
+          end
+        }
+        opt.on("--reboot-kexec-timeout VALUE", "Overload the default timeout for kexec reboots") { |t|
+          if (t =~ /\A\d+\Z/) then
+            exec_specific.reboot_kexec_timeout = t
+          else
+            error("A number is required for the reboot kexec timeout")
+          end
+        }
         opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
           s.split("&").each { |macrostep|
             macrostep_name = macrostep.split("|")[0]
@@ -2050,7 +2066,8 @@ module ConfigInformation
       exec_specific.kadeploy_server_port = String.new
       exec_specific.multi_server = false
       exec_specific.debug = false
-      
+      exec_specific.reboot_classical_timeout = nil      
+
       if Config.load_kareboot_cmdline_options(exec_specific) then
         return exec_specific
       else
@@ -2213,6 +2230,13 @@ module ConfigInformation
           else
             error("Invalid verbose level")
             return false
+          end
+        }
+        opt.on("--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots") { |t|
+          if (t =~ /\A\d+\Z/) then
+            exec_specific.reboot_classical_timeout = t
+          else
+            error("A number is required for the reboot classical timeout")
           end
         }
       end
