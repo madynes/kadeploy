@@ -40,16 +40,6 @@
     <para>General options:</para>
 
     <variablelist>
-      -a, --add                    Add some rights to a user
-      -d, --delete                 Delete some rights to a user
-      -f, --file FILE              Machine file
-      -m, --machine MACHINE        Include the machine in the operation
-      -o, --overwrite-rights       Overwrite existing rights
-      -p, --part PARTNAME          Include the partition in the operation
-      -s, --show-rights            Show the rights for a given user
-      -u, --user USERNAME          Specify the user
-      -v, --version                Get the version
-      
       <varlistentry>
 	<term><option>-a</option></term>
 	<term><option>--add</option></term>
@@ -114,7 +104,7 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--server <replaceable>STRNG</replaceable></option></term>
+	<term><option>--server <replaceable>STRING</replaceable></option></term>
 	<listitem>
 	  <para>Specify the Kadeploy server to use.</para>
 	</listitem>

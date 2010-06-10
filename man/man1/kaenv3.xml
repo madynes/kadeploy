@@ -109,8 +109,17 @@
 	  <para>Specify the version.</para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>--server <replaceable>STRING</replaceable></option></term>
+	<listitem>
+	  <para>Specify the Kadeploy server to use.</para>
+	</listitem>
+      </varlistentry>
+    </variablelist>
 
-<para>Advanced options:</para>
+    <para>Advanced options:</para>
+
+    <variablelist>
       <varlistentry>
 	<term><option>--remove-demolishing-tag <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
@@ -145,12 +154,6 @@
 	<term><option>--move-files <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
 	  <para>Move the files of the environment.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>--server <replaceable>STRNG</replaceable></option></term>
-	<listitem>
-	  <para>Specify the Kadeploy server to use.</para>
 	</listitem>
       </varlistentry>
     </variablelist>

@@ -111,7 +111,7 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--server <replaceable>STRNG</replaceable></option></term>
+	<term><option>--server <replaceable>STRING</replaceable></option></term>
 	<listitem>
 	  <para>Specify the Kadeploy server to use.</para>
 	</listitem>
