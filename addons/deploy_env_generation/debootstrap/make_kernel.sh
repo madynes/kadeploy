@@ -12,34 +12,8 @@
 #
 #######################################################################
 
-PATH=/bin:/sbin:/usr/bin:/usr/sbin
-
-# Fill-in these values (absolute path is needed)
-KERNEL_CONFIG=""
-KERNEL_VERSION=""
-OUTPUT_KERNEL="deploy-vmlinuz"
-OUTPUT_INITRD="deploy-initrd"
-KERNEL_2_6_ARCHIVE_URL="http://www.eu.kernel.org/pub/linux/kernel/v2.6/"
-
-# Ramdisk size in Ko
-INITRD_SIZE="200000"
-INITRD_ROOTDEVICE="/dev/ram0"
-
-# For // kernel compilation
-NUMBER_OF_CPU=2
-NUMBER_OF_CORE=2
-COMPILATION_PARALLELISM=$(( ${NUMBER_OF_CPU} * ${NUMBER_OF_CORE} ))
-
-# TMP_INITRD=$OUTPUT_INITRD.uncompressed
-CURRENT_DIR=$( pwd )
-TODAY=$( date +%Y%m%d-%H%M-%N )
-CURRENT_BUILTDIR="$CURRENT_DIR/built-$TODAY"
-TMP_ROOTDIR="/tmp"
-RD_MOUNT="$TMP_ROOTDIR/__mountrd"
-RD_FILE="$TMP_ROOTDIR/initrd.build"
-TMP_KERNELDIR="$TMP_ROOTDIR/__buildkernel"
-
-DEBOOTSTRAP=bootstrap-dir
+# Load variables from external configuration file
+. configuration.sh
 
 Die()
 {
@@ -66,10 +40,12 @@ CreateInitrd()
   local initrd_size=""
 
   Banner "Deployment ramdisk creation"
-  echo -en "- Enter INITRD size (in Ko / default = 200000 Ko) : "
-  read initrdsize
-  if [ -z "$initrdsize" ]; then
-    initrdsize=${INITRD_SIZE}
+  if [ -z "$INITRD_SIZE" ]
+  then
+    echo -en "- Enter INITRD size (in Ko / default = 200000 Ko) : "
+    read initrdsize
+  else
+    initrdsize=$INITRD_SIZE
   fi
    
   if [ ! -d "$RD_MOUNT" ]; then
@@ -83,7 +59,7 @@ CreateInitrd()
   mount -o loop -t ext2 ${RD_FILE} ${RD_MOUNT} || Die "Unable to mount empty ramdisk loopback file"
 
   Info "Copying debootstrap"
-  (cd $DEBOOTSTRAP; tar cO .) | (cd ${RD_MOUNT}; tar xvf -)
+  (cd $DEBOOTSTRAP_DIR; tar cO .) | (cd ${RD_MOUNT}; tar xvf -)
 }
 
 GrabKernelArchive()
@@ -93,24 +69,21 @@ GrabKernelArchive()
   fi
   
   Banner "Retrieving linux kernel"
-  echo -en "- Enter wanted version of kernel : "
-
-  while true; do
+  
+  if [ -z "$KERNEL_VERSION" ]
+  then
+    echo -en "- Enter wanted version of kernel : "
     read KERNEL_VERSION
-    if [ -f "$CURRENT_DIR/linux-$KERNEL_VERSION.tar.bz2" ]; then
-      Info "linux-$KERNEL_VERSION already grabbed"
-      break
-    else
-      wget --verbose --progress=bar "${KERNEL_2_6_ARCHIVE_URL}/linux-${KERNEL_VERSION}.tar.bz2"
-      if [ "$?" -eq 0 ]; then
-        break
-      else
-        echo 
-        Warn "Previous entry is not a valid version !"
-        echo -en "- Please enter a valid kernel version number : "
-      fi
+  fi
+
+  if [ -f "$CURRENT_DIR/linux-$KERNEL_VERSION.tar.bz2" ]; then
+    Info "linux-$KERNEL_VERSION already grabbed"
+  else
+    wget --verbose --progress=bar "${KERNEL_2_6_ARCHIVE_URL}/linux-${KERNEL_VERSION}.tar.bz2"
+    if [ "$?" -ne 0 ]; then
+      Die "Previous entry is not a valid version !"
     fi
-  done
+  fi
 
   Info "Decompressing kernel archive"
   ( bzip2 -cd $CURRENT_DIR/linux-${KERNEL_VERSION}.tar.bz2|tar -C $TMP_KERNELDIR -xvf - 2>&1 >/dev/null ) || ( CleanOut && Die "Failed to decompress kernel archive" )
@@ -121,33 +94,22 @@ BuildKernel()
 {  
   Banner "Kernel build"
 
-  echo -en "- Enter pathname of a kernel config file or [Return] otherwise (use defaults) : "
-  read configfile
-
-  while true; do
-    if [ -z "$configfile" ]; then
-      Info "Trying to launch kernel configuration utility..."
-      ( cd ${TMP_KERNELDIR}/linux-${KERNEL_VERSION} && make menuconfig ) || ( CleanOut && Die "Failed to run kernel menuconfig" )
-      break
-    elif [ ! -f "$configfile" ]; then
-       Warn "$configfile : not a valid kernel config file"
-       echo -en "- Enter pathname of a kernel config file or [Return] otherwise (use defaults) : "
-       read configfile
-    else
-      echo -en "Do you wish to setup manually new kernel options (Y/n) ? "
-      read rep
-      case "$rep" in
-        N|n|No|no|non|Non)
-	  ( cd ${TMP_KERNELDIR}/linux-${KERNEL_VERSION} && KCONFIG_ALLCONFIG=${configfile} make allmodconfig 2>&1 >/dev/null ) || ( CleanOut && Die "Failed to run : make allmodconfig" )
-	  ;;
-	*)
-	  cp ${configfile} ${TMP_KERNELDIR}/linux-${KERNEL_VERSION}/.config
-	  ( cd ${TMP_KERNELDIR}/linux-${KERNEL_VERSION} && make silentoldconfig && make menuconfig ) || ( CleanOut && Die "Failed to run kernel menuconfig" )
-	  ;;
-      esac
-      break
-    fi
-  done
+  if [ -z "$KERNEL_CONFIG" ]
+  then
+    echo -en "- Enter pathname of a kernel config file or [Return] otherwise (use defaults) : "
+    read configfile
+  else
+    configfile=$KERNEL_CONFIG
+  fi
+  
+  if [ -z "$configfile" ]; then
+    Info "Trying to launch kernel configuration utility..."
+    ( cd ${TMP_KERNELDIR}/linux-${KERNEL_VERSION} && make menuconfig ) || ( CleanOut && Die "Failed to run kernel menuconfig" )
+  elif [ ! -f "$configfile" ]; then
+    Die "$configfile : not a valid kernel config file"
+  else
+    ( cd ${TMP_KERNELDIR}/linux-${KERNEL_VERSION} && KCONFIG_ALLCONFIG=${configfile} make allmodconfig 2>&1 >/dev/null ) || ( CleanOut && Die "Failed to run : make allmodconfig" )
+  fi
 
 
   cd ${TMP_KERNELDIR}/linux-${KERNEL_VERSION}/
@@ -235,4 +197,3 @@ Main()
 }
 
 Main $*
-
