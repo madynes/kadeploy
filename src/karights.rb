@@ -1,189 +1,58 @@
 #!/usr/bin/ruby -w
 
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
 #Kadeploy libs
 require 'config'
-require 'db'
 
 #Ruby libs
 require 'drb'
 
-# Show the rights of a user defined in Config.exec_specific.user
-#
-# Arguments
-# * config: instance of Config
-# * db: database handler
-# Output
-# * prints the rights of a specific user
-def show_rights(config, db)
-  hash = Hash.new
-  query = "SELECT * FROM rights WHERE user=\"#{config.exec_specific.user}\""
-  res = db.run_query(query)
-  if res != nil then
-    res.each_hash { |row|
-      if (not hash.has_key?(row["node"])) then
-        hash[row["node"]] = Array.new
-      end
-      hash[row["node"]].push(row["part"])
-    }
-    if (res.num_rows > 0) then
-      puts "The user #{config.exec_specific.user} has the deployment rights on the following nodes:"
-      hash.each_pair { |node, part_list|
-        puts "### #{node}: #{part_list.join(", ")}"
-      }
-    else
-      puts "No rights have been given for the user #{config.exec_specific.user}"
-    end
+class KarightsClient
+  # Print a message (RPC)
+  #
+  # Arguments
+  # * msg: string to print
+  # Output
+  # * prints a message
+  def print(msg)
+    puts msg
   end
 end
 
-# Add some rights on the nodes defined in Config.exec_specific.node_list
-# and on the parts defined in Config.exec_specific.part_list to a specific
-# user defined in Config.exec_specific.user
-#
-# Arguments
-# * config: instance of Config
-# * db: database handler
-# Output
-# * nothing
-def add_rights(config, db)
-  #check if other users have rights on some nodes
-  nodes_to_remove = Array.new
-  hosts = Array.new
-  config.exec_specific.node_list.each { |node|
-    if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
-      nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-    else
-      nodes = [node]
-    end
-    nodes.each{ |n|
-      if (node != "*") then
-        hosts.push("node=\"#{n}\"")
-      end
-    }
-  }
-  if not hosts.empty? then
-    query = "SELECT DISTINCT node FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
-    res = db.run_query(query)
-    res.each_hash { |row|
-      nodes_to_remove.push(row["node"])
-    }
-  end
-  if (not nodes_to_remove.empty?) then
-    if (config.exec_specific.overwrite_existing_rights) then
-      hosts = Array.new
-      nodes_to_remove.each { |node|
-        hosts.push("node=\"#{node}\"")
-      }
-      query = "DELETE FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
-      db.run_query(query)
-      puts "Some rights have been removed on the nodes #{nodes_to_remove.join(", ")}"
-    else
-      config.exec_specific.node_list.delete_if { |node|
-        nodes_to_remove.include?(node)
-      }
-      puts "The nodes #{nodes_to_remove.join(", ")} have been removed from the rights assignation since another user has some rights on them"
-    end
-  end
-  values_to_insert = Array.new
-  config.exec_specific.node_list.each { |node|
-    config.exec_specific.part_list.each { |part|
-      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
-        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-      else
-        nodes = [node]
-      end
-      nodes.each{ |n|
-        if ((node == "*") || (part == "*")) then
-          #check if the rights are already inserted
-          query = "SELECT * FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
-          res = db.run_query(query)
-          values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{n}\", \"#{part}\")") if (res.num_rows == 0)
-        else
-          values_to_insert.push("(\"#{config.exec_specific.user}\", \"#{n}\", \"#{part}\")")
-        end
-      }
-    }
-  }
-  #add the rights
-  if (not values_to_insert.empty?) then
-    query = "INSERT INTO rights (user, node, part) VALUES #{values_to_insert.join(",")}"
-    db.run_query(query)
-  else
-    puts "No rights added"
-  end
-end
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket.do_not_reverse_lookup = true
 
-# Remove some rights on the nodes defined in Config.exec_specific.node_list
-# and on the parts defined in Config.exec_specific.part_list to a specific
-# user defined in Config.exec_specific.user
-#
-# Arguments
-# * config: instance of Config
-# * db: database handler
-# Output
-# * nothing
-def delete_rights(config, db)
-  config.exec_specific.node_list.each { |node|
-    config.exec_specific.part_list.each { |part|
-#      query = "DELETE FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{node}\" AND part=\"#{part}\""
-#      db.run_query(query)
-#      puts "No rights have been removed" if (db.dbh.affected_rows == 0)
-      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
-        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-      else
-        nodes = [node]
-      end
-      nodes.each{ |n|
-        query = "DELETE FROM rights WHERE user=\"#{config.exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
-        db.run_query(query)
-        puts "No rights have been removed" if (db.dbh.affected_rows == 0)
-      }
-    }
-  }
-end
+exec_specific_config = ConfigInformation::Config.load_karights_exec_specific()
 
-def _exit(exit_code, dbh)
-  dbh.disconnect if (dbh != nil)
-  exit(exit_code)
-end
+if (exec_specific_config != nil) then
+  #Connect to the server
+  DRb.start_service()
+  uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
+  kadeploy_server = DRbObject.new(nil, uri)
 
-begin
-  config = ConfigInformation::Config.new("karights")
-rescue
-  _exit(1, nil)
-end
-#Connect to the Kadeploy server to get the common configuration
-client_config = ConfigInformation::Config.load_client_config_file
-DRb.start_service()
-uri = "druby://#{client_config.kadeploy_server}:#{client_config.kadeploy_server_port}"
-kadeploy_server = DRbObject.new(nil, uri)
-config.common = kadeploy_server.get_common_config
-
-if (config.check_config("karights") == true)
-  if config.exec_specific.get_version then
+  if exec_specific_config.get_version then
     puts "Karights version: #{kadeploy_server.get_version()}"
-    _exit(0, nil)
+    exit(0)
   end
-  db = Database::DbFactory.create(config.common.db_kind)
-  db.connect(config.common.deploy_db_host,
-             config.common.deploy_db_login,
-             config.common.deploy_db_passwd,
-             config.common.deploy_db_name)
 
-  case config.exec_specific.operation  
-  when "add"
-    add_rights(config, db)
-  when "delete"
-    delete_rights(config,db)
-  when "show"
-    show_rights(config, db)
+  karights_client = KarightsClient.new()
+  DRb.start_service(nil, karights_client)
+  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+    content = Regexp.last_match
+    client_host = content[1]
+    client_port = content[2]
+  else
+    puts "The URI #{DRb.uri} is not correct"
+    exit(1)
   end
-  _exit(0, db)
+
+  kadeploy_server.run("karights", exec_specific_config, client_host, client_port)
+
+  exit(0)
 else
-  _exit(1, db)
+  exit(1)
 end

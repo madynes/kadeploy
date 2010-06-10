@@ -19,37 +19,34 @@ require 'pp'
 Socket.do_not_reverse_lookup = true
 
 #Connect to the server
-exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
+exec_specific_config = ConfigInformation::Config.load_kareboot_exec_specific()
 if (exec_specific_config != nil) then
   DRb.start_service()
   uri = "druby://#{exec_specific_config.servers[exec_specific_config.chosen_server][0]}:#{exec_specific_config.servers[exec_specific_config.chosen_server][1]}"
   kadeploy_server = DRbObject.new(nil, uri)
   
-  workflow_id = -1
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
 
-  workflow_id, error = kadeploy_server.run("kadeploy_async", exec_specific_config, nil, nil)
-  if (workflow_id != nil) then
-    while (not kadeploy_server.async_deploy_ended?(workflow_id)) do
+  reboot_id, error = kadeploy_server.run("kareboot_async", exec_specific_config, nil, nil)
+  if (reboot_id != nil) then
+    while (not kadeploy_server.async_reboot_ended?(reboot_id)) do
       sleep(10)
     end
-    error = kadeploy_server.async_deploy_file_error?(workflow_id)
-    if (error != FetchFileError::NO_ERROR) then
-      puts "Error while grabbing the files (error #{error})"
-    else
-      pp kadeploy_server.async_deploy_get_results(workflow_id)
-    end
-    kadeploy_server.async_deploy_free(workflow_id)
-  else
-    case error
-    when 1
-      puts "All the nodes have been discarded"
-    when 2
-      puts "Invalid options or invalid rights on nodes"
-    end
+    pp kadeploy_server.async_reboot_get_results(reboot_id)
+    kadeploy_server.async_reboot_free(reboot_id)
+  end
+  case error
+  when KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
+    puts "Reboot failed on some nodes"
+  when KarebootAsyncError::DEMOLISHING_ENV
+    puts "Cannot reboot since the nodes have been previously deployed with a demolishinf environment"
+  when KarebootAsyncError::PXE_FILE_FETCH_ERROR
+    puts "Some PXE files cannot be fetched"
+  when KarebootAsyncError::NO_RIGHT_TO_DEPLOY
+    puts "You do not have the right to deploy on all the nodes"
   end
 
   DRb.stop_service()

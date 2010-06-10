@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -7,13 +7,14 @@
 require 'syslog'
 
 module Debug
-  # Print an error message
+  # Print an error message on a local client
   #
   # Arguments
   # * msg: error message
+  # * usage_handler(opt): usage handler
   # Output
   # * nothing
-  def Debug::client_error(msg, usage_handler = nil)
+  def Debug::local_client_error(msg, usage_handler = nil)
     puts "ERROR: #{msg}."
     puts "---"
     if (usage_handler == nil) then
@@ -21,6 +22,28 @@ module Debug
     else
       usage_handler.call
     end
+  end
+
+  # Print an error message on a distant client
+  #
+  # Arguments
+  # * msg: error message
+  # * client: DRb client handler
+  # Output
+  # * nothing
+  def Debug::distant_client_error(msg, client)
+    client.print("ERROR: #{msg}") if client != nil
+  end
+
+  # Print a message
+  #
+  # Arguments
+  # * msg: message
+  # * client: DRb client handler
+  # Output
+  # * nothing
+  def Debug::distant_client_print(msg, client)
+    client.print(msg) if client != nil
   end
 
   class OutputControl
@@ -94,27 +117,6 @@ module Debug
       end
     end
 
-    # Print a message on the server side
-    #
-    # Arguments
-    # * msg: message
-    # Output
-    # * prints the message on the server and on the client
-    def debug_server(msg)
-      server_str = "#{@deploy_id}|#{@user} -> #{msg}"
-      puts server_str
-      if @syslog then
-        @syslog_lock.lock
-        while Syslog.opened?
-          sleep 0.2
-        end
-        sl = Syslog.open("Kadeploy-dbg")
-        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-        sl.close
-        @syslog_lock.unlock
-      end
-    end
-
     # Print the debug output of a command
     #
     # Arguments
@@ -140,6 +142,27 @@ module Debug
           }
         end
         @client.print("-------------------------")
+      end
+    end
+
+    # Print a message on the server side
+    #
+    # Arguments
+    # * msg: message
+    # Output
+    # * prints the message on the server and on the client
+    def debug_server(msg)
+      server_str = "#{@deploy_id}|#{@user} -> #{msg}"
+      puts server_str
+      if @syslog then
+        @syslog_lock.lock
+        while Syslog.opened?
+          sleep 0.2
+        end
+        sl = Syslog.open("Kadeploy-dbg")
+        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
+        sl.close
+        @syslog_lock.unlock
       end
     end
 
@@ -363,21 +386,25 @@ module Debug
     # Output
     # * nothing
     def dump_to_file
-      fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
-      fd.flock(File::LOCK_EX)
-      @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
-        str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
-        str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
-        str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
-        str += node_infos["start"].to_i.to_s + ","
-        str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
-        str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"] + ","
-        str += node_infos["success"].to_s + "," + node_infos["error"].to_s
-        fd.write("#{Time.now.to_i}: #{str}\n")
-      }
-      fd.flock(File::LOCK_UN)
-      fd.close
+      begin
+        fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
+        fd.flock(File::LOCK_EX)
+        @nodes.each_pair { |hostname, node_infos|
+          str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
+          str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
+          str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
+          str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
+          str += node_infos["start"].to_i.to_s + ","
+          str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
+          str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"] + ","
+          str += node_infos["success"].to_s + "," + node_infos["error"].to_s
+          fd.write("#{Time.now.to_i}: #{str}\n")
+        }
+        fd.flock(File::LOCK_UN)
+        fd.close
+      rescue
+        puts "Cannot write in the log file #{@config.common.log_to_file}"
+      end
     end
   end
 end

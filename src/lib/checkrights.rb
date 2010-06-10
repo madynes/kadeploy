@@ -1,29 +1,29 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+#Kadeploy libs
+require 'debug'
 
-module CheckRights
-  
-  USER = `id -nu`.chomp
-
+module CheckRights 
   class CheckRightsFactory
-    
     # Factory for the methods to check the rights
     #
     # Arguments
     # * kind: specifies the method to use
+    # * user: username
+    # * client: DRb handler to client
     # * node_list(opt): instance of NodeSet that contains the nodes on which the rights must be checked
     # * part(opt): string that specifies the partition on which the rights must be checked
     # Output
     # * returns a Check instance (CheckDummy or CheckInDB)
-    def CheckRightsFactory.create(kind, node_list = nil, db = nil, part = nil)
+    def CheckRightsFactory.create(kind, user, client, node_list = nil, db = nil, part = nil)
       case kind
       when "dummy"
         return CheckDummy.new
       when "db"
-        return CheckInDB.new(node_list, db, part)
+        return CheckInDB.new(node_list, user, client, db, part)
       else
         raise "Invalid kind of rights check"
       end
@@ -68,6 +68,8 @@ module CheckRights
   end
 
   class CheckInDB < Check
+    @user = nil
+    @client = nil
     @db = nil
     @host_list = nil
     @part = nil
@@ -76,12 +78,16 @@ module CheckRights
     #
     # Arguments
     # * node_list: NodeSet involved in the deployment
+    # * user: username
+    # * client: DRb handler to client
     # * db: database handler
     # * part: partition required for the deployment
     # Output
     # * nothing
-    def initialize(node_list, db, part)
+    def initialize(node_list, user, client, db, part)
       @host_list = node_list.make_array_of_hostname
+      @user = user
+      @client = client
       @db = db
       @part = part
       @granted = false
@@ -94,7 +100,7 @@ module CheckRights
     # Output
     # * returns true if the rights are granted, false otherwise
     def granted?
-      query = "SELECT * FROM rights WHERE user=\"#{USER}\" AND (part=\"#{@part}\" OR part=\"*\")"
+      query = "SELECT * FROM rights WHERE user=\"#{@user}\" AND (part=\"#{@part}\" OR part=\"*\")"
       @host_list.each { |host|
         node_found = false
         res = @db.run_query(query)
@@ -106,7 +112,7 @@ module CheckRights
           end
         end
         if (node_found == false) then
-          puts "You do not have the rights to deploy on the node #{host}:#{@part}"
+          Debug::distant_client_print("You do not have the rights to deploy on the node #{host}:#{@part}", @client)
           return false
         end
       }

@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -155,8 +155,11 @@ module BroadcastEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -209,8 +212,11 @@ module BroadcastEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -247,7 +253,7 @@ module BroadcastEnvironment
           end
         else
           @queue_manager.decrement_active_threads
-        end    
+        end
         finalize()
       }
       return tid
@@ -263,8 +269,11 @@ module BroadcastEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -317,8 +326,11 @@ module BroadcastEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -371,7 +383,6 @@ module BroadcastEnvironment
     # Output
     # * return a thread id
     def run
-      @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads

@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -166,9 +166,11 @@ module ParallelRunner
         node.last_cmd_stdout = node.last_cmd_stdout.chomp.gsub(/\n/,"\\n")
         node.last_cmd_stderr = node.last_cmd_stderr.chomp.gsub(/\n/,"\\n")
         if (node.last_cmd_exit_status == "0") then
-          good_nodes.push(node.dup)
+#          good_nodes.push(node.dup)
+          good_nodes.push(node)
         else
-          bad_nodes.push(node.dup)
+#          bad_nodes.push(node.dup)
+          bad_nodes.push(node)
         end
         nodeset = Nodes::NodeSet.new
         nodeset.push(node)
@@ -191,14 +193,16 @@ module ParallelRunner
       @nodes.each_key { |node|
         if (node.last_cmd_exit_status == "0") then
           if (node.last_cmd_stdout.split("\n")[0] == value) then
-            good_nodes.push(node.dup)
+#            good_nodes.push(node.dup)
+            good_nodes.push(node)
           else
             node.last_cmd_stderr = error_msg
-            bad_nodes.push(node.dup)
+#            bad_nodes.push(node.dup)
+            bad_nodes.push(node)
           end
         else
           node.last_cmd_stderr = "Cannot connect to the node"
-          bad_nodes.push(node.dup)
+          bad_nodes.push(node)
         end
         nodeset = Nodes::NodeSet.new
         nodeset.push(node)

@@ -15,7 +15,7 @@
     </author>
     <address>&address;</address>
     <copyright>
-      <year>2008-2009</year>
+      <year>2008-2010</year>
       <holder>INRIA - &firstname; &surname;</holder>
     </copyright>
   </refentryinfo>
@@ -51,7 +51,14 @@
 	<term><option>-c</option></term>
 	<term><option>--check-prod-env</option></term>
 	<listitem>
-	  <para>Check if the production environment has been detroyed.</para>
+	  <para>Check if the production environment has been destroyed.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-d</option></term>
+	<term><option>--debug-mode</option></term>
+	<listitem>
+	  <para>Activate the debug mode.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -65,7 +72,7 @@
 	<term><option>-f</option></term>
 	<term><option>--file <replaceable>MACHINELIST</replaceable></option></term>
 	<listitem>
-	  <para>Files containing list of nodes.</para>
+	  <para>Files containing list of nodes (- means stdin).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -87,6 +94,12 @@
 	<term><option>--machine <replaceable>MACHINE</replaceable></option></term>
 	<listitem>
 	  <para>Reboot the given machines.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--multi-server</option></term>
+	<listitem>
+	  <para>Activate the multi-server mode.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -161,6 +174,18 @@
 	<term><option>--verbose-level <replaceable>VALUE</replaceable></option></term>
 	<listitem>
 	  <para>Verbose level between 0 to 4.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--server <replaceable>STRING</replaceable></option></term>
+	<listitem>
+	  <para>Specify the Kadeploy server to use.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--reboot-classical-timeout <replaceable>VALUE</replaceable></option></term>
+	<listitem>
+	  <para>Overload the default timeout for classical reboots.</para>
 	</listitem>
       </varlistentry>
     </variablelist>

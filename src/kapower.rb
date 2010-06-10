@@ -9,28 +9,20 @@
 require 'config'
 
 #Ruby libs
-require 'thread'
 require 'drb'
-require 'socket'
-require 'md5'
-require 'tempfile'
 require 'ping'
 
-class KadeployClient
-  @kadeploy_server = nil
+class KapowerClient
   @site = nil
-  attr_accessor :workflow_id
   @files_ok_nodes = nil
   @files_ko_nodes = nil
   
-  def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
-    @kadeploy_server = kadeploy_server
+  def initialize(site, files_ok_nodes, files_ko_nodes)
     @site = site
-    @workflow_id = -1
     @files_ok_nodes = files_ok_nodes
     @files_ko_nodes = files_ko_nodes
   end
-  
+
   # Print a message (RPC)
   #
   # Arguments
@@ -45,91 +37,6 @@ class KadeployClient
     end
   end
 
-  # Test method to check that the client is still there (RPC)
-  #
-  # Arguments
-  # * nothing
-  # Output
-  # * nothing
-  def test
-  end
-
-  # Get a file from the client (RPC)
-  #
-  # Arguments
-  # * file_name: name of the file on the client side
-  # * prefix: prefix to add to the file_name
-  # * cache_dir: cache directory
-  # Output
-  # * return true if the file has been successfully transfered, false otherwise
-  def get_file(file_name, prefix, cache_dir)
-    if (File.exist?(file_name)) then
-      if (File.readable?(file_name)) then
-        port = @kadeploy_server.create_a_socket_server(prefix + File.basename(file_name), cache_dir)
-        if port != -1 then
-          sock = TCPSocket.new(@kadeploy_server.dest_host, port)
-          file = File.open(file_name)
-          tcp_buffer_size = @kadeploy_server.tcp_buffer_size
-          while (buf = file.read(tcp_buffer_size))
-            sock.send(buf, 0)
-          end
-          sock.close
-          return true
-        else
-          return false
-        end
-      else
-        puts "The file #{file_name} cannot be read"
-        return false
-      end
-    else
-      puts "The file #{file_name} cannot be found"
-      return false
-    end
-  end
-  
-  # Get the mtime of a file from the client (RPC)
-  #
-  # Arguments
-  # * file_name: name of the file on the client side
-  # Output
-  # * return the mtime of the file, or 0 if it cannot be read.
-  def get_file_mtime(file_name)
-    if File.readable?(file_name) then
-      return File.mtime(file_name).to_i
-    else
-      return 0
-    end
-  end
-
-  # Get the MD5 of a file from the client (RPC)
-  #
-  # Arguments
-  # * file_name: name of the file on the client side
-  # Output
-  # * return the MD5 of the file, or 0 if it cannot be read.
-  def get_file_md5(file_name)
-    if File.readable?(file_name) then
-      return MD5::get_md5_sum(file_name)
-    else
-      return 0
-    end
-  end
-
-  # Get the size of a file from the client (RPC)
-  #
-  # Arguments
-  # * file_name: name of the file on the client side
-  # Output
-  # * return the size of the file, or 0 if it cannot be read.
-  def get_file_size(file_name)
-    if File.readable?(file_name) then
-      return File.stat(file_name).size
-    else
-      return 0
-    end
-  end
-
   # Print the results of the deployment (RPC)
   #
   # Arguments
@@ -140,7 +47,7 @@ class KadeployClient
   def generate_files(nodes_ok, nodes_ko)
     t = nodes_ok.make_array_of_hostname
     if (not t.empty?) then
-      file_ok = Tempfile.new("kadeploy_nodes_ok")
+      file_ok = Tempfile.new("kapower_nodes_ok")
       @files_ok_nodes.push(file_ok)     
       t.each { |n|
         file_ok.write("#{n}\n")
@@ -150,7 +57,7 @@ class KadeployClient
 
     t = nodes_ko.make_array_of_hostname
     if (not t.empty?) then
-      file_ko = Tempfile.new("kadeploy_nodes_ko")
+      file_ko = Tempfile.new("kapower_nodes_ko")
       @files_ko_nodes.push(file_ko)      
       t.each { |n|
         file_ko.write("#{n}\n")
@@ -158,38 +65,14 @@ class KadeployClient
       file_ko.close
     end
   end
-  
-  # Set the workflow id (RPC)
-  #
-  # Arguments
-  # * id: id of the workflow
-  # Output
-  # * nothing
-  def set_workflow_id(id)
-    @workflow_id = id
-  end
-
-  # Write the workflow id in a file (RPC)
-  #
-  # Arguments
-  # * file: destination file
-  # Output
-  # * nothing
-  def write_workflow_id(file)
-    file = "#{file}_#{@site}" if (@site != nil)
-    File.delete(file) if File.exist?(file)
-    file = File.new(file, "w")
-    file.write("#{@workflow_id}\n")
-    file.close
-  end
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure
 Socket.do_not_reverse_lookup = true
 
-exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
+exec_specific_config = ConfigInformation::Config.load_kapower_exec_specific()
 
-if (exec_specific_config != nil) then
+if exec_specific_config != nil then
   nodes_by_server = Hash.new
   remaining_nodes = exec_specific_config.node_array.clone
 
@@ -205,10 +88,10 @@ if (exec_specific_config != nil) then
             nodes_by_server[server] = nodes_known
           end
           DRb.stop_service()
-        else
-          puts "The #{server} server is unreachable"
+          break if (remaining_nodes.length == 0)
         end
-        break if (remaining_nodes.length == 0)
+      else
+        puts "The #{server} server is unreachable"
       end
     }
     if (not remaining_nodes.empty?) then
@@ -223,41 +106,41 @@ if (exec_specific_config != nil) then
       exit(1)
     end
   end
-  
+
   tid_array = Array.new
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
-
   files_ok_nodes = Array.new
   files_ko_nodes = Array.new
   nodes_by_server.each_key { |server|
     tid_array << Thread.new {
+
       #Connect to the server
       DRb.start_service()
+      
       uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
       kadeploy_server = DRbObject.new(nil, uri)
 
       if exec_specific_config.get_version then
-        puts "#{server} server: Kadeploy version: #{kadeploy_server.get_version()}"
+        puts "Kapower version: #{kadeploy_server.get_version()}"
       else
-        #Launch the listener on the client
         if (exec_specific_config.multi_server) then
-          kadeploy_client = KadeployClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
+          kapower_client = KapowerClient.new(server, files_ok_nodes, files_ko_nodes)
         else
-          kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
+          kapower_client = KapowerClient.new(nil, files_ok_nodes, files_ko_nodes)
         end
-        DRb.start_service(nil, kadeploy_client)
+        DRb.start_service(nil, kapower_client)
         if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
           content = Regexp.last_match
           client_host = content[1]
           client_port = content[2]
           cloned_config = exec_specific_config.clone
           cloned_config.node_array = nodes_by_server[server]
-          kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
+          kadeploy_server.run("kapower_sync", exec_specific_config, client_host, client_port)
         else
-          puts "#{server} server: The URI #{DRb.uri} is not correct"
+          puts "The URI #{DRb.uri} is not correct"
         end
       end
     }
@@ -265,6 +148,7 @@ if (exec_specific_config != nil) then
   tid_array.each { |tid|
     tid.join
   }
+
 
   #We merge the files
   if (exec_specific_config.nodes_ok_file != "") then
@@ -282,12 +166,6 @@ if (exec_specific_config != nil) then
     end
   end
 
-  #We execute a script at the end of the deployment if required
-  if (exec_specific_config.script != "") then
-    system(exec_specific_config.script)
-  end
-
-  exec_specific_config = nil
   exit(0)
 else
   exit(1)

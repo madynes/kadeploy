@@ -15,7 +15,7 @@
     </author>
     <address>&address;</address>
     <copyright>
-      <year>2008-2009</year>
+      <year>2008-2010</year>
       <holder>INRIA - &firstname; &surname;</holder>
     </copyright>
   </refentryinfo>
@@ -72,7 +72,7 @@
 	<term><option>-f</option></term>
 	<term><option>--file <replaceable>MACHINELIST</replaceable></option></term>
 	<listitem>
-	  <para>Files containing list of nodes.</para>
+	  <para>Files containing list of nodes (- means stdin).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -87,6 +87,12 @@
 	<term><option>--machine <replaceable>MACHINE</replaceable></option></term>
 	<listitem>
 	  <para>Node to run on.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--multi-server</option></term>
+	<listitem>
+	  <para>Activate the multi-server mode.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -158,14 +164,23 @@
 	  <para>Number of version of the environment to deploy.</para>
 	</listitem>
       </varlistentry>
+     <varlistentry>
+	<term><option>--server <replaceable>STRING</replaceable></option></term>
+	<listitem>
+	  <para>Specify the Kadeploy server to use.</para>
+	</listitem>
+      </varlistentry>
       <varlistentry>
 	<term><option>--verbose-level <replaceable>VALUE</replaceable></option></term>
 	<listitem>
 	  <para>Verbose level between 0 to 4.</para>
 	</listitem>
       </varlistentry>
+    </variablelist>
 
-      <para>Advanced options:</para>
+    <para>Advanced options:</para>
+
+    <variablelist>
       <varlistentry>
 	<term><option>--write-workflow-id <replaceable>FILE</replaceable></option></term>
 	<listitem>
@@ -180,6 +195,12 @@
       </varlistentry>
      <varlistentry>
 	<term><option>--disable-bootloader-install</option></term>
+	<listitem>
+	  <para>Disable the automatic installation of a bootloader for a Linux based environnment.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--disable-disk-partitioning</option></term>
 	<listitem>
 	  <para>Disable the disk partitioning.</para>
 	</listitem>
@@ -197,7 +218,19 @@
 	</listitem>
       </varlistentry>
      <varlistentry>
-	<term><option>--force-steps <replaceable>STRNG</replaceable></option></term>
+	<term><option>--reboot-classical-timeout <replaceable>VALUE</replaceable></option></term>
+	<listitem>
+	  <para>Overload the default timeout for classical reboots.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--reboot-kexec-timeout <replaceable>VALUE</replaceable></option></term>
+	<listitem>
+	  <para>Overload the default timeout for kexec reboots.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
+	<term><option>--force-steps <replaceable>STRING</replaceable></option></term>
 	<listitem>
 	  <para>Undocumented, for administration purpose only.</para>
 	</listitem>

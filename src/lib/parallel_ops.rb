@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -24,7 +24,7 @@ module ParallelOperations
 
     # Constructor of ParallelOps
     #
-    # Arguments
+    # Arguments   
     # * nodes: instance of NodeSet
     # * config: instance of Config
     # * taktuk_connector: specifies the connector to use with Taktuk
@@ -392,8 +392,11 @@ module ParallelOperations
         @config.set_node_state(node.hostname, "", "", "reboot_in_progress")
       }
       sleep(20)
+      
+      n = @nodes.length
+      t = eval(timeout).to_i
 
-      while (((Time.now.tv_sec - start) < timeout) && (not @nodes.all_ok?))
+      while (((Time.now.tv_sec - start) < t) && (not @nodes.all_ok?))
         sleep(5)
         nodes_to_test = Nodes::NodeSet.new
         @nodes.set.each { |node|
@@ -451,7 +454,7 @@ module ParallelOperations
             sub_tid.join
           }
         }
-        nodes_check_window.launch(nodes_to_test, &callback)
+        nodes_check_window.launch_on_node_set(nodes_to_test, &callback)
         nodes_to_test = nil
       end
 

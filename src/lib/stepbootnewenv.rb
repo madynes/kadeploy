@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -155,8 +155,11 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -165,10 +168,15 @@ module BootNewEnvironment
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
+            if (@config.exec_specific.reboot_kexec_timeout == nil) then
+              timeout = @config.cluster_specific[@cluster].timeout_reboot_classical
+            else
+              timeout = @config.exec_specific.reboot_kexec_timeout
+            end
             #Here are the micro steps
             result = result && @step.reboot("kexec", false, false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
-                                                 @config.cluster_specific[@cluster].timeout_reboot_kexec)
+                                                 timeout)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -206,8 +214,11 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
@@ -255,22 +266,29 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
           instance_thread = Thread.new {
-            use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
+            if (@config.exec_specific.reboot_classical_timeout == nil) then
+              timeout = @config.cluster_specific[@cluster].timeout_reboot_classical
+            else
+              timeout = @config.exec_specific.reboot_classical_timeout
+            end
             #Here are the micro steps 
             result = result && @step.umount_deploy_part
             result = result && @step.reboot_from_deploy_env
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
-                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
+                                                 timeout)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -308,21 +326,28 @@ module BootNewEnvironment
     # * return a thread id
     def run
       tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
-        @nodes.duplicate_and_free(@nodes_ko)
+        if @config.exec_specific.breakpointed
+          @queue_manager.next_macro_step(get_macro_step_name, @nodes)
+        else
+          @nodes.duplicate_and_free(@nodes_ko)
+        end
         while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
           instance_thread = Thread.new {
-            use_rsh_for_reboot = (@config.common.taktuk_connector == @config.common.taktuk_rsh_connector)
             @logger.increment("retry_step3", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
+            if (@config.exec_specific.reboot_classical_timeout == nil) then
+              timeout = @config.cluster_specific[@cluster].timeout_reboot_classical
+            else
+              timeout = @config.exec_specific.reboot_classical_timeout
+            end
             #Here are the micro steps 
-            result = result && @step.reboot("hard", use_rsh_for_reboot, false)
+            result = result && @step.reboot("hard", false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
-                                                 @config.cluster_specific[@cluster].timeout_reboot_classical)
+                                                 timeout)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -359,7 +384,6 @@ module BootNewEnvironment
     # Output
     # * return a thread id
     def run
-      @config.common.taktuk_connector = @config.common.taktuk_ssh_connector
       tid = Thread.new {
         @queue_manager.next_macro_step(get_macro_step_name, @nodes)
         @queue_manager.decrement_active_threads

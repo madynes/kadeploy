@@ -19,37 +19,26 @@ require 'pp'
 Socket.do_not_reverse_lookup = true
 
 #Connect to the server
-exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
+exec_specific_config = ConfigInformation::Config.load_kapower_exec_specific()
 if (exec_specific_config != nil) then
   DRb.start_service()
   uri = "druby://#{exec_specific_config.servers[exec_specific_config.chosen_server][0]}:#{exec_specific_config.servers[exec_specific_config.chosen_server][1]}"
   kadeploy_server = DRbObject.new(nil, uri)
   
-  workflow_id = -1
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
 
-  workflow_id, error = kadeploy_server.run("kadeploy_async", exec_specific_config, nil, nil)
-  if (workflow_id != nil) then
-    while (not kadeploy_server.async_deploy_ended?(workflow_id)) do
+  power_id, error = kadeploy_server.run("kapower_async", exec_specific_config, nil, nil)
+  if (power_id != nil) then
+    while (not kadeploy_server.async_power_ended?(power_id)) do
       sleep(10)
     end
-    error = kadeploy_server.async_deploy_file_error?(workflow_id)
-    if (error != FetchFileError::NO_ERROR) then
-      puts "Error while grabbing the files (error #{error})"
-    else
-      pp kadeploy_server.async_deploy_get_results(workflow_id)
-    end
-    kadeploy_server.async_deploy_free(workflow_id)
+    pp kadeploy_server.async_power_get_results(power_id)
+    kadeploy_server.async_power_free(power_id)
   else
-    case error
-    when 1
-      puts "All the nodes have been discarded"
-    when 2
-      puts "Invalid options or invalid rights on nodes"
-    end
+    puts "You do not have the right to deploy on all the nodes"
   end
 
   DRb.stop_service()

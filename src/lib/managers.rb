@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -13,6 +13,7 @@ require 'stepbroadcastenv'
 require 'stepbootnewenv'
 require 'md5'
 require 'http'
+require 'error'
 
 #Ruby libs
 require 'thread'
@@ -99,7 +100,7 @@ module Managers
     # * callback: reference on block that takes a NodeSet as argument
     # Output
     # * nothing
-    def launch(node_set, &callback)
+    def launch_on_node_set(node_set, &callback)
       remaining = node_set.length
       while (remaining != 0)
         regenerate_lost_resources()
@@ -107,6 +108,21 @@ module Managers
         if (taken > 0) then
           partial_set = node_set.extract(taken)
           callback.call(partial_set)
+          release(taken)
+        end
+        sleep(@sleep_time) if remaining != 0
+      end
+    end
+
+    def launch_on_node_array(node_array, &callback)
+      remaining = node_array.length
+      while (remaining != 0)
+        regenerate_lost_resources()
+        remaining, taken = acquire(remaining)
+        if (taken > 0) then
+          partial_array = Array.new
+          (1..taken).each { partial_array.push(node_array.shift) }
+          callback.call(partial_array)
           release(taken)
         end
         sleep(@sleep_time) if remaining != 0
@@ -405,7 +421,11 @@ module Managers
                                  0.5, /./,
                                  @output)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
-              if not @client.get_file(client_file, prefix) then
+              if (@client.get_file_md5(client_file) != expected_md5) then
+                @output.verbosel(0, "The md5 of #{client_file} does not match with the one recorded in the database, please consider to update your environment")
+                return false
+              end
+              if not @client.get_file(client_file, prefix, cache_dir) then
                 @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
                 return false
               end
@@ -499,7 +519,7 @@ module Managers
                                (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
                                0.5, /./,
                                @output)
-            if not @client.get_file(client_file, prefix) then
+            if not @client.get_file(client_file, prefix, cache_dir) then
               @output.verbosel(0, "Unable to grab the file #{client_file}")
               return false
             end
@@ -562,6 +582,8 @@ module Managers
     @nodes_to_deploy_backup = nil
     @killed = nil
     @deploy_id = nil
+    @async_deployment = nil
+    attr_reader :async_file_error
 
     # Constructor of WorkflowManager
     #
@@ -582,6 +604,7 @@ module Managers
       @config = config
       @client = client
       @deploy_id = deploy_id
+      @async_file_error = FetchFileError::NO_ERROR
       if (@config.exec_specific.verbose_level != nil) then
         @output = Debug::OutputControl.new(@config.exec_specific.verbose_level, @config.exec_specific.debug, client, 
                                            @config.exec_specific.true_user, @deploy_id,
@@ -593,7 +616,7 @@ module Managers
       end
       @nodes_ok = Nodes::NodeSet.new
       @nodes_ko = Nodes::NodeSet.new
-      @nodeset = @config.exec_specific.node_list
+      @nodeset = @config.exec_specific.node_set
       @queue_manager = QueueManager.new(@config, @nodes_ok, @nodes_ko)
       @reboot_window = reboot_window
       @nodes_check_window = nodes_check_window
@@ -702,22 +725,28 @@ module Managers
                 @logger.set("success", true, @nodes_ok)
                 @nodes_ok.group_by_cluster.each_pair { |cluster, set|
                   @output.verbosel(0, "Nodes correctly deployed on cluster #{cluster}")
-                  @output.verbosel(0, set.to_s(false, "\n"))
+                  @output.verbosel(0, set.to_s(false, false, "\n"))
                 }
                 @logger.set("success", false, @nodes_ko)
                 @logger.error(@nodes_ko)
                 @nodes_ko.group_by_cluster.each_pair { |cluster, set|
                   @output.verbosel(0, "Nodes not correctly deployed on cluster #{cluster}")
-                  @output.verbosel(0, set.to_s(true, "\n"))
+                  @output.verbosel(0, set.to_s(false, true, "\n"))
                 }
-                @client.generate_files(@nodes_ok, @config.exec_specific.nodes_ok_file, @nodes_ko, @config.exec_specific.nodes_ko_file) if @client != nil
+                @client.generate_files(@nodes_ok, @nodes_ko) if @client != nil
                 Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/, @output) if @config.exec_specific.load_env_kind == "file"
                 @logger.dump
                 @queue_manager.send_exit_signal
                 @thread_set_deployment_environment.join
                 @thread_broadcast_environment.join
                 @thread_boot_new_environment.join
-                @mutex.unlock
+                if ((@async_deployment) && (@config.common.async_end_of_deployment_hook != "")) then
+                  tmp = cmd = @config.common.async_end_of_deployment_hook.clone
+                  while (tmp.sub!("WORKFLOW_ID", @deploy_id) != nil)  do
+                    cmd = tmp
+                  end
+                  system(cmd)
+                end
               }
               @thread_tab.push(tid)
             else
@@ -759,6 +788,7 @@ module Managers
 
       if not gfm.grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, 
                            @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+        @async_file_error = FetchFileError::INVALID_ENVIRONMENT_TARBALL if async
         return false
       end
       tarball["file"] = local_tarball
@@ -768,6 +798,7 @@ module Managers
         local_key = use_local_cache_filename(key, user_prefix)
         if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, @config.common.kadeploy_cache_dir, 
                                              @config.common.kadeploy_cache_size, async) then
+          @async_file_error = FetchFileError::INVALID_KEY if async
           return false
         end
         @config.exec_specific.key = local_key
@@ -778,11 +809,13 @@ module Managers
         local_preinstall =  use_local_cache_filename(preinstall["file"], env_prefix)
         if not gfm.grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, 
                              @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
+          @async_file_error = FetchFileError::INVALID_PREINSTALL if async
           return false
         end
         if (File.size(local_preinstall) / (1024.0 * 1024.0)) > @config.common.max_preinstall_size then
           @output.verbosel(0, "The preinstall file #{preinstall["file"]} is too big (#{@config.common.max_preinstall_size} MB is the maximum size allowed)")
           File.delete(local_preinstall)
+          @async_file_error = FetchFileError::PREINSTALL_TOO_BIG if async
           return false
         end
         preinstall["file"] = local_preinstall
@@ -793,11 +826,13 @@ module Managers
           local_postinstall = use_local_cache_filename(postinstall["file"], env_prefix)
           if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
                                @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+            @async_file_error = FetchFileError::INVALID_POSTINSTALL if async
             return false
           end
           if (File.size(local_postinstall) / (1024.0 * 1024.0)) > @config.common.max_postinstall_size then
             @output.verbosel(0, "The postinstall file #{postinstall["file"]} is too big (#{@config.common.max_postinstall_size} MB is the maximum size allowed)")
             File.delete(local_postinstall)
+            @async_file_error = FetchFileError::POSTINSTALL_TOO_BIG if async
             return false
           end
           postinstall["file"] = local_postinstall
@@ -814,6 +849,7 @@ module Managers
                 if not gfm.grab_file_without_caching(custom_file, local_custom_file, "custom_file", 
                                                      user_prefix, @config.common.kadeploy_cache_dir, 
                                                      @config.common.kadeploy_cache_size, async) then
+                  @async_file_error = FetchFileError::INVALID_CUSTOM_FILE if async
                   return false
                 end
                 entry[1] = local_custom_file
@@ -832,6 +868,7 @@ module Managers
             if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",
                                                  user_prefix, tftp_images_path, 
                                                  @config.common.tftp_images_max_size, async) then
+              @async_file_error = FetchFileError::INVALID_PXE_FILE if async
               return false
             end
           }
@@ -910,6 +947,7 @@ module Managers
     # Output
     # * nothing
     def run_sync
+      @async_deployment = false
       @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
         @queue_manager.next_macro_step(nil, set)
       }
@@ -929,8 +967,21 @@ module Managers
     # * nothing
     # Output
     def run_async
-      @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
-        @queue_manager.next_macro_step(nil, set)
+      Thread.new {
+        @async_deployment = true
+        if manage_files(true) then
+          @nodes_to_deploy.group_by_cluster.each_pair { |cluster, set|
+            @queue_manager.next_macro_step(nil, set)
+          }
+        else
+          if (@config.common.async_end_of_deployment_hook != "") then
+            tmp = cmd = @config.common.async_end_of_deployment_hook.clone
+            while (tmp.sub!("WORKFLOW_ID", @deploy_id) != nil)  do
+              cmd = tmp
+            end
+            system(cmd)
+          end
+        end
       }
     end
 
@@ -941,7 +992,7 @@ module Managers
     # Output
     # * return true if the workflow has reached the end, false otherwise
     def ended?
-      if (@thread_process_finished_nodes.status == false) then
+      if (@async_file_error > FetchFileError::NO_ERROR) || (@thread_process_finished_nodes.status == false) then
         if not @killed then
           if (@nodes_to_deploy_backup != nil) then #it may be called several time in async mode
             @deployments_table_lock.synchronize {

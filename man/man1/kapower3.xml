@@ -1,7 +1,7 @@
 <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook V4.1//EN"
 	  "http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd"
 	  [
-	  <!ENTITY program "kanodes3">
+	  <!ENTITY program "kapower3">
 	  <!ENTITY command "<command>&program;</command>">
 	  <!ENTITY firstname "Emmanuel">
 	  <!ENTITY surname "Jeanvoine">
@@ -25,7 +25,7 @@
   </refmeta>
   <refnamediv>
     <refname>The Kadeploy software suite V3</refname>
-    <refpurpose>Kanodes</refpurpose>
+    <refpurpose>Kapower</refpurpose>
   </refnamediv>
   <refsynopsisdiv>
     <cmdsynopsis>
@@ -35,30 +35,75 @@
   <refsect1>
     <title>DESCRIPTION</title>
     
-    <para><command>&program;</command> allows to get information on the current deployments.</para>
+    <para><command>&program;</command> allows to perform several operations to control the power status of nodes.</para>
 
     <para>General options:</para>
 
     <variablelist>
       <varlistentry>
 	<term><option>-d</option></term>
-	<term><option>--get-deploy-state</option></term>
+	<term><option>--debug-mode</option></term>
 	<listitem>
-	  <para>Get the deploy state of the nodes.</para>
+	  <para>Activate the debug mode.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>-f</option></term>
-	<term><option>--file <replaceable>MACHINEFILE</replaceable></option></term>
+	<term><option>--file <replaceable>MACHINELIST</replaceable></option></term>
 	<listitem>
-	  <para>Only print information about the given machines (- means stdin).</para>
+	  <para>Files containing list of nodes (- means stdin).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-l</option></term>
+	<term><option>--level <replaceable>VALUE</replaceable></option></term>
+	<listitem>
+	  <para>Level (soft, hard, very_hard)</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
 	<term><option>-m</option></term>
 	<term><option>--machine <replaceable>MACHINE</replaceable></option></term>
 	<listitem>
-	  <para>Only print information about the given machines.</para>
+	  <para>Operate on the given machines.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--multi-server</option></term>
+	<listitem>
+	  <para>Activate the multi-server mode.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-n</option></term>
+	<term><option>--output-ko-nodes <replaceable>FILENAME</replaceable></option></term>
+	<listitem>
+	  <para>File that will contain the nodes on which the operation has not been correctly performed.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-o</option></term>
+	<term><option>--output-ok-nodes <replaceable>FILENAME</replaceable></option></term>
+	<listitem>
+	  <para>File that will contain the nodes on which the operation has been correctly performed.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--off</option></term>
+	<listitem>
+	  <para>Shutdown the nodes.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--on</option></term>
+	<listitem>
+	  <para>Power on the nodes.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>--status</option></term>
+	<listitem>
+	  <para>Get the status of the nodes.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -69,17 +114,9 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>-w</option></term>
-	<term><option>--workflow-id <replaceable>WID</replaceable></option></term>
+	<term><option>--no-wait</option></term>
 	<listitem>
-	  <para>Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>-y</option></term>
-	<term><option>--get-yaml-dump</option></term>
-	<listitem>
-	  <para>Get the yaml dump.</para>
+	  <para>Do not wait the end of the power operation.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -88,16 +125,23 @@
 	  <para>Specify the Kadeploy server to use.</para>
 	</listitem>
       </varlistentry>
+      <varlistentry>
+	<term><option>-V</option></term>
+	<term><option>--verbose-level <replaceable>VALUE</replaceable></option></term>
+	<listitem>
+	  <para>Verbose level between 0 to 4.</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
   </refsect1>
   <refsect1>
     <title>SEE ALSO</title>
     <para>
-      <citerefentry><refentrytitle>kadeploy3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
       <citerefentry><refentrytitle>kareboot3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
       <citerefentry><refentrytitle>kaenv3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
-      <citerefentry><refentrytitle>kastat3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
       <citerefentry><refentrytitle>kaconsole3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kastat3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
+      <citerefentry><refentrytitle>kanodes3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
       <citerefentry><refentrytitle>karights3</refentrytitle><manvolnum>1</manvolnum></citerefentry>
     </para>
   

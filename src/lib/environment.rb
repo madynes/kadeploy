@@ -1,4 +1,4 @@
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
@@ -10,6 +10,7 @@ require 'tempfile'
 require 'db'
 require 'md5'
 require 'http'
+require 'debug'
 
 module EnvironmentManagement
   class Environment
@@ -38,25 +39,28 @@ module EnvironmentManagement
     # Arguments
     # * file: filename
     # * almighty_env_users: array that contains almighty users
+    # * client: DRb handler to client
+    # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(file, almighty_env_users)
+    def load_from_file(file, file_content, almighty_env_users, user, client, record_in_db)
       temp_env_file = Tempfile.new("env_file")
       if (file =~ /^http[s]?:\/\//) then
         http_response, etag = HTTP::fetch_file(file, temp_env_file.path, nil)
         if http_response != "200" then
-          puts "The file #{file} cannot be fetched: http_response #{http_response}"
+          Debug::distant_client_error("The file #{file} cannot be fetched: http_response #{http_response}", client)
           return false
-        else
-          file = temp_env_file.path
+        end
+      else
+        if not system("echo \"#{file_content}\" > #{temp_env_file.path}") then
+          Debug::distant_client_error("Cannot write the environment file", client)
+          return false
         end
       end
-      if not File.exist?(file)
-        puts "The file \"#{file}\" does not exist"
-        return false
-      end
+      file = temp_env_file.path
       @preinstall = nil
       @postinstall = nil
+      @environment_kind = nil
       @demolishing_env = "0"
       @author = "no author"
       @description = "no description"
@@ -68,7 +72,7 @@ module EnvironmentManagement
       @fdisk_type = nil
       @filesystem = nil
       @visibility = "shared"
-      @user = `id -nu`.chomp
+      @user = user
       @version = 0
       @id = -1
       IO::read(file).split("\n").each { |line|
@@ -83,7 +87,7 @@ module EnvironmentManagement
             if val =~ /\A\d+\Z/ then
               @version = val
             else
-              puts "The environment version must be a number"
+              Debug::distant_client_error("The environment version must be a number", client)
               return false
             end
           when "description"
@@ -98,18 +102,20 @@ module EnvironmentManagement
               @tarball["file"] = tmp[0]
               @tarball["kind"] = tmp[1]
               if @tarball["file"] =~ /^http[s]?:\/\// then
-                puts "#{@tarball["file"]} is an HTTP file, let's bypass the md5sum"
+                Debug::distant_client_print("#{@tarball["file"]} is an HTTP file, let's bypass the md5sum", client)
                 @tarball["md5"] = ""
               else
-                if not File.readable?(@tarball["file"]) then
-                  puts "The tarball file #{@tarball["file"]} cannot be read"
-                  return false
+                if (record_in_db) then
+                  if (not File.readable?(@tarball["file"])) then
+                    Debug::distant_client_error("The tarball file #{@tarball["file"]} cannot be read", client)
+                    return false
+                  end
+                  Debug::distant_client_print("Computing the md5sum for #{@tarball["file"]}", client)
+                  @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
                 end
-                puts "Computing the md5sum for #{@tarball["file"]}"
-                @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
               end
             else
-              puts "The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2"
+              Debug::distant_client_error("The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2", client)
               return false
             end
           when "preinstall"
@@ -120,18 +126,20 @@ module EnvironmentManagement
               @preinstall["kind"] = entry[1]
               @preinstall["script"] = entry[2]
               if @preinstall["file"] =~ /^http[s]?:\/\// then
-                puts "#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum"
+                Debug::distant_client_print("#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum", client)
                 @preinstall["md5"] = ""
               else
-                if not File.readable?(@preinstall["file"]) then
-                  puts "The pre-install file #{@preinstall["file"]} cannot be read"
-                  return false
+                if (record_in_db) then
+                  if (not File.readable?(@preinstall["file"])) then
+                    Debug::distant_client_error("The pre-install file #{@preinstall["file"]} cannot be read", client)
+                    return false
+                  end
+                  Debug::distant_client_print("Computing the md5sum for #{@preinstall["file"]}", client)
+                  @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
                 end
-                puts "Computing the md5sum for #{@preinstall["file"]}"
-                @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
               end
             else
-              puts "The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2"
+              Debug::distant_client_error("The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2", client)
               return false
             end
           when "postinstall"
@@ -145,20 +153,22 @@ module EnvironmentManagement
                 entry["kind"] = tmp2[1]
                 entry["script"] = tmp2[2]
                 if entry["file"] =~ /^http[s]?:\/\// then
-                  puts "#{entry["file"]} is an HTTP file, let's bypass the md5sum"
+                  Debug::distant_client_print("#{entry["file"]} is an HTTP file, let's bypass the md5sum", client)
                   entry["md5"] = ""
                 else
-                  if not File.readable?(entry["file"]) then
-                    puts "The post-install file #{entry["file"]} cannot be read"
-                    return false
+                  if (record_in_db) then
+                    if (not File.readable?(entry["file"])) then
+                      Debug::distant_client_error("The post-install file #{entry["file"]} cannot be read", client)
+                      return false
+                    end
+                    Debug::distant_client_print("Computing the md5sum for #{entry["file"]}", client)
+                    entry["md5"] = MD5::get_md5_sum(entry["file"])
                   end
-                  puts "Computing the md5sum for #{entry["file"]}"
-                  entry["md5"] = MD5::get_md5_sum(entry["file"])
                 end
                 @postinstall.push(entry)
               }
             else
-              puts "The environment postinstall must be described like filename1|kind1|script1,filename2|kind2|script2,...  where kind is tgz or tbz2"
+              Debug::distant_client_error("The environment postinstall must be described like filename1|kind1|script1,filename2|kind2|script2,...  where kind is tgz or tbz2", client)
               return false
             end
           when "kernel"
@@ -179,29 +189,29 @@ module EnvironmentManagement
             if val =~ /\A(linux|xen|other)\Z/ then
               @environment_kind = val
             else
-              puts "The environment kind must be linux, xen or other"
+              Debug::distant_client_error("The environment kind must be linux, xen or other", client)
               return false
             end
           when "visibility"
             if val =~ /\A(private|shared|public)\Z/ then
               @visibility = val
               if (@visibility == "public") && (not almighty_env_users.include?(@user)) then
-                puts "Only the environment administrators can set the \"public\" tag"
+                Debug::distant_client_error("Only the environment administrators can set the \"public\" tag", client)
                 return false
               end
             else
-              puts "The environment visibility must be private, shared or public"
+              Debug::distant_client_error("The environment visibility must be private, shared or public", client)
               return false
             end
           when "demolishing_env"
             if val =~ /\A\d+\Z/ then
               @demolishing_env = val
             else
-              puts "The environment demolishing_env must be a number"
+              Debug::distant_client_error("The environment demolishing_env must be a number", client)
               return false
             end
           else
-            puts "#{attr} is an invalid attribute"
+            Debug::distant_client_error("#{attr} is an invalid attribute", client)
             return false
           end
         end
@@ -209,21 +219,21 @@ module EnvironmentManagement
       case @environment_kind
       when "linux"
         if ((@name == nil) || (@tarball == nil) || (@kernel == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
-          puts "The name, tarball, kernel, fdisktype, filesystem, and environment_kind fields are mandatory"
+          Debug::distant_client_error("The name, tarball, kernel, fdisktype, filesystem, and environment_kind fields are mandatory", client)
           return false
         end
       when "xen"
         if ((@name == nil) || (@tarball == nil) || (@kernel == nil) || (@hypervisor == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
-          puts "The name, tarball, kernel, hypervisor, fdisktype, filesystem, and environment_kind fields are mandatory"
+          Debug::distant_client_error("The name, tarball, kernel, hypervisor, fdisktype, filesystem, and environment_kind fields are mandatory", client)
           return false
         end
       when "other"
         if ((@name == nil) || (@tarball == nil) ||(@fdisk_type == nil)) then
-          puts "The name, tarball, fdisktype, and environment_kind fields are mandatory"
+          Debug::distant_client_error("The name, tarball, fdisktype, and environment_kind fields are mandatory", client)
           return false
         end        
       when nil
-        puts "The environment_kind field is mandatory"
+        Debug::distant_client_error("The environment_kind field is mandatory", client)
         return false       
       end
       return true
@@ -235,11 +245,12 @@ module EnvironmentManagement
     # * name: environment name
     # * version: environment version
     # * user: environment owner
+    # * true_user: true user
     # * dbh: database handler
+    # * client: DRb handler to client
     # Output
     # * returns true if the environment can be loaded, false otherwise
-    def load_from_db(name, version, user, dbh)
-      true_user = `id -nu`.chomp
+    def load_from_db(name, version, user, true_user, dbh, client)
       mask_private_env = false
       if (true_user != user) then
         mask_private_env = true
@@ -301,7 +312,7 @@ module EnvironmentManagement
         end
       end
       
-      puts "The environment #{name} cannot be loaded. Maybe the version number does not exist or it belongs to another user"
+      Debug::distant_client_error("The environment #{name} cannot be loaded. Maybe the version number does not exist or it belongs to another user", client)
       return false
     end
 
@@ -413,9 +424,11 @@ module EnvironmentManagement
     # * nothing
     # Output
     # * nothing
-    def short_view_header
-      puts "Name                Version     User            Description"
-      puts "####                #######     ####            ###########"
+    def short_view_header(client)
+      out = String.new
+      out += "Name                Version     User            Description\n"
+      out += "####                #######     ####            ###########\n"
+      Debug::distant_client_print(out, client)
     end
 
     # Print the short view
@@ -424,8 +437,8 @@ module EnvironmentManagement
     # * nothing
     # Output
     # * nothing
-    def short_view
-      printf("%-21s %-7s %-10s %-40s\n", @name, @version, @user, @description)
+    def short_view(client)
+      Debug::distant_client_print(sprintf("%-21s %-7s %-10s %-40s\n", @name, @version, @user, @description), client)
     end
 
     # Print the full view
@@ -434,24 +447,26 @@ module EnvironmentManagement
     # * nothing
     # Output
     # * nothing
-    def full_view
-      puts "name : #{@name}"
-      puts "version : #{@version}"
-      puts "description : #{@description}"
-      puts "author : #{@author}"
-      puts "tarball : #{flatten_tarball()}"
-      puts "preinstall : #{flatten_pre_install()}" if (@preinstall != nil)
-      puts "postinstall : #{flatten_post_install()}" if (@postinstall != nil)
-      puts "kernel : #{@kernel}" if (@kernel != nil)
-      puts "kernel_params : #{@kernel_params}" if (@kernel_params != nil)
-      puts "initrd : #{@initrd}" if (@initrd != nil)
-      puts "hypervisor : #{@hypervisor}" if (@hypervisor != nil)
-      puts "hypervisor_params : #{@hypervisor_params}" if (@hypervisor_params != nil)
-      puts "fdisktype : #{@fdisk_type}"
-      puts "filesystem : #{@filesystem}" if (@filesystem != nil)
-      puts "environment_kind : #{@environment_kind}"
-      puts "visibility : #{@visibility}"
-      puts "demolishing_env : #{@demolishing_env}"
+    def full_view(client)
+      out = String.new
+      out += "name : #{@name}\n"
+      out += "version : #{@version}\n"
+      out += "description : #{@description}\n"
+      out += "author : #{@author}\n"
+      out += "tarball : #{flatten_tarball()}\n"
+      out += "preinstall : #{flatten_pre_install()}\n" if (@preinstall != nil)
+      out += "postinstall : #{flatten_post_install()}\n" if (@postinstall != nil)
+      out += "kernel : #{@kernel}\n" if (@kernel != nil)
+      out += "kernel_params : #{@kernel_params}\n" if (@kernel_params != nil)
+      out += "initrd : #{@initrd}\n" if (@initrd != nil)
+      out += "hypervisor : #{@hypervisor}\n" if (@hypervisor != nil)
+      out += "hypervisor_params : #{@hypervisor_params}\n" if (@hypervisor_params != nil)
+      out += "fdisktype : #{@fdisk_type}\n"
+      out += "filesystem : #{@filesystem}\n" if (@filesystem != nil)
+      out += "environment_kind : #{@environment_kind}\n"
+      out += "visibility : #{@visibility}\n"
+      out += "demolishing_env : #{@demolishing_env}\n"
+      Debug::distant_client_print(out, client)
     end
 
     # Give the flatten view of the tarball info without the md5sum

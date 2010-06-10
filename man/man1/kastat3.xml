@@ -15,7 +15,7 @@
     </author>
     <address>&address;</address>
     <copyright>
-      <year>2008-2009</year>
+      <year>2008-2010</year>
       <holder>INRIA - &firstname; &surname;</holder>
     </copyright>
   </refentryinfo>
@@ -109,7 +109,13 @@
 	<listitem>
 	  <para>Get the stats to this date (yyyy:mm:dd:hh:mm:ss).</para>
 	</listitem>
-      </varlistentry>   
+      </varlistentry>
+      <varlistentry>
+	<term><option>--server <replaceable>STRING</replaceable></option></term>
+	<listitem>
+	  <para>Specify the Kadeploy server to use.</para>
+	</listitem>
+      </varlistentry>
     </variablelist>
   </refsect1>
   <refsect1>

@@ -6,7 +6,7 @@
 \usepackage{hyperref}
 \usepackage{fancyvrb}
 
-\newcommand{\version}{3.0-7}
+\newcommand{\version}{3.1-0}
 
 \addtolength{\hoffset}{-1.5cm}
 \addtolength{\textwidth}{3cm}
@@ -17,7 +17,7 @@
 
 \vspace*{18cm}
 \noindent Copyright \copyright by INRIA, Emmanuel Jeanvoine, emmanuel.jeanvoine@inria.fr 2008-2010\\
-KADEPLOY 3.0, CECILL 2.0 license, All rights reserved.
+KADEPLOY 3.1, CECILL 2.0 license, All rights reserved.
 
 \tableofcontents
 
@@ -246,11 +246,10 @@ deploy_db_name = deploy3
 deploy_db_login = deploy_user
 deploy_db_passwd = deploy_password
 rights_kind = db
-taktuk_ssh_connector = ssh -q -o StrictHostKeyChecking=no \
-                              -o UserKnownHostsFile=/dev/null \
-                              -o PreferredAuthentications=publickey \
-                              -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
-taktuk_rsh_connector = rsh -l root
+taktuk_connector = ssh -q -o StrictHostKeyChecking=no \
+                          -o UserKnownHostsFile=/dev/null \
+                          -o PreferredAuthentications=publickey \
+                          -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
 taktuk_tree_arity = 0
 taktuk_auto_propagate = false
 tarball_dest_dir = /tmp
@@ -263,7 +262,6 @@ kadeploy_cache_size = 20000
 max_preinstall_size = 30
 max_postinstall_size = 30
 ssh_port = 22
-rsh_port = 514
 test_deploy_env_port = 25300
 use_rsh_to_deploy = false
 log_to_file = /tmp/kadeploy.log
@@ -274,8 +272,6 @@ dbg_to_syslog_level = 4
 reboot_window = 100
 reboot_window_sleep_time = 10
 nodes_check_window = 90
-nfsroot_kernel = vmlinuz-2.6.27.7
-nfs_server = 172.16.160.1
 bootloader = chainload_pxe
 purge_deployment_timer = 900
 rambin_path = /rambin
@@ -286,6 +282,9 @@ demolishing_env_auto_tag = false
 bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
 almighty_env_users = root,ejeanvoine
+async_end_of_deployment_hook = echo WORKFLOW_ID
+async_end_of_reboot_hook = echo REBOOT_ID
+async_end_of_power_hook = echo POWER_ID
 \end{verbatim}
 \end{small}
 
@@ -303,8 +302,7 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{deploy\_db\_login}: login for the Kadeploy database.
 \item \texttt{deploy\_db\_passwd}: password for the Kadeploy database.
 \item \texttt{rights\_kind}: authentication kind (use db for a true rights management or dummy to bypass the rights management).
-\item \texttt{taktuk\_ssh\_connector}: SSH connector used by Taktuk.
-\item \texttt{taktuk\_rsh\_connector}: RSH connector used by Taktuk.
+\item \texttt{taktuk\_connector}: connector used by Taktuk.
 \item \texttt{taktuk\_tree\_arity}: Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
 \item \texttt{taktuk\_auto\_propagate}: use of the auto propagation feature of Taktuk (expected values are true or false). You should use this feature if the deployment environment doesn't contain Taktuk.
 \item \texttt{tarball\_dest\_dir}: destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent .
@@ -317,7 +315,6 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{max\_preinstall\_size}: maximum size in MB of the preinstall files.
 \item \texttt{max\_postinstall\_size}: maximum size in MB of the postinstall files.
 \item \texttt{ssh\_port}: port used by SSH
-\item \texttt{rsh\_port}: port used by RSH
 \item \texttt{test\_deploy\_env\_port}: port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted.
 \item \texttt{use\_rsh\_to\_deploy}: use rsh in the deployment workflow (expected values are true or false).
 \item \texttt{log\_to\_file}: absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
@@ -328,8 +325,6 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{reboot\_window}: global size of the reboot window (ie. maximum number of nodes able to reboot at the same time). This might be useful to avoid high electricity peak.
 \item \texttt{reboot\_window\_sleep\_time}: time to wait if the reboot window is full.
 \item \texttt{nodes\_check\_window}: size of the nodes check window.
-\item \texttt{nfsroot\_kernel}: absolute path of an NFSRoot kernel (only useful if you use NFSRoot as a deployment environment).
-\item \texttt{nfs\_server}: ip of the server for NFSRoot (only useful if you use NFSRoot as a deployment environment).
 \item \texttt{bootloader}: kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe).
 \item \texttt{purge\_deployment\_timer}: timeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
 \item \texttt{rambin\_path}: path of the ramdisk directory in the deployment environment (/rambin seems to be a good value).
@@ -339,6 +334,9 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{bt\_tracker\_ip}: ip of the Bittorrent tracker.
 \item \texttt{bt\_download\_timeout}: timeout for the Bittorrent file download.
 \item \texttt{almighty\_env\_users}: list of users allowed to perform special operations on the environments like publishing environments or moving files.
+\item \texttt{async\_end\_of\_deployment\_hook}: command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
+\item \texttt{async\_end\_of\_reboot\_hook}: command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
+\item \texttt{async\_end\_of\_power\_hook}: command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
 \end{itemize}
 
 \section{Cluster-specific configuration files}\label{sec:specific_config}
@@ -355,18 +353,27 @@ prod_part = 2
 deploy_part = 3
 tmp_part = 5
 swap_part = 1
-timeout_reboot = 220
-cmd_soft_reboot_ssh = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
-                             -o PreferredAuthentications=publickey \
-                             -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
-                             -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
-cmd_soft_reboot_rsh = rsh -l root HOSTNAME_FQDN /usr/local/bin/reboot_detach
+timeout_reboot_classical = 200 + 150 * Math.log(n)
+timeout_reboot_kexec = 60
+cmd_soft_reboot = ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no \
+                         -o PreferredAuthentications=publickey \
+                         -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
+                         -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
 cmd_hard_reboot = /usr/local/kadeploy/bin/reboot.rb HOSTNAME_SHORT
 cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
 cmd_console = /usr/local/kadeploy/bin/console HOSTNAME_SHORT
+#cmd_soft_power_on = 
+#cmd_hard_power_on = 
+#cmd_very_hard_power_on = 
+#cmd_soft_power_off = 
+#cmd_hard_power_off = 
+#cmd_very_hard_power_off = 
+#cmd_power_status =
 drivers = ata_piix,ata_generic
 kernel_params = console=tty0 console=ttyS1,38400n8
 pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
+nfsroot_kernel = deploy-vmlinuz-2.6.27.7-nfsroot
+nfsroot_params = rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=172.24.120.35:/mnt/nfsroot/rootfs init=/sbin/init
 partition_creation_kind = fdisk
 admin_pre_install = /g5k/admin_pre_install.tgz|tgz|launch.sh
 admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
@@ -388,14 +395,23 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{deploy\_part}: number of the deployment partition on the disk.
 \item \texttt{tmp\_part}: number of the tmp partition on the disk.
 \item \texttt{swap\_part}: number of the swap partition on the disk. If the \texttt{none} value is specified, the swap format at the deployment time will be bypassed.
-\item \texttt{timeout\_reboot}: reboot timeout.
-\item \texttt{cmd\_soft\_reboot\_ssh}: generic ssh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_soft\_reboot\_rsh}: generic rsh soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{timeout\_reboot\_classical}: classical reboot timeout. A Ruby expression can be used here to represent a function depending on n (the number of nodes currently rebooted).
+\item \texttt{timeout\_reboot\_kexec}: kexec reboot timeout. A Ruby expression can be used here to represent a function depending on n (the number of nodes currently rebooted).
+\item \texttt{cmd\_soft\_reboot}: generic soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_hard\_reboot}: generic hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{cmd\_very\_hard\_reboot}: generic very hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{drivers}: list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
+\item \texttt{cmd\_soft\_power\_on}: generic soft power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_hard\_power\_on}: generic hard power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_very\_hard\_power\_on}: generic very hard power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_soft\_power\_off}: generic soft power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_hard\_power\_off}: generic hard power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_very\_hard\_power\_off}: generic very hard power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+\item \texttt{cmd\_power\_status}: generic power status command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
 \item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
 \item \texttt{pxe\_header}: default PXE header (must be defined in one line).
+\item \texttt{nfsroot\_kernel}: kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+\item \texttt{nfsroot\_params}: kernel params for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
 \item \texttt{partition\_creation\_kind}: tool used to create the partition table. The expected values are \texttt{fdisk} or \texttt{parted}.
 \item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
 \item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
@@ -506,6 +522,20 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
   \end{itemize}
 \end{itemize}
 
+\paragraph{Note about the reboot/power-on/power-off commands}
+In some special cases, a such command can affect a group of nodes. Thus, you can specify group of nodes for a given command using the following syntax :
+\begin{small}
+\begin{verbatim}
+cmd_very_hard_power_off = /usr/sbin/very_hard_power_off GROUP_SHORT,path_to_group_of_node_for_hard_power_off_cmd
+\end{verbatim}
+\end{small}
+You can remark two things :
+\begin{itemize}
+\item the \texttt{HOSTNAME\_SHORT} and \texttt{HOSTNAME\_FQDN} patterns are not used in these commands, instead you must use the \texttt{GROUP\_SHORT} and \texttt{GROUP\_FQDN} patterns.
+\item the affinity between nodes is specified in a file (here \texttt{path\_to\_group\_of\_node\_for\_hard\_power\_off\_cmd}) that contains as much lines as the number of groups. Then, each line contains the nodes of a group, for instance: \texttt{node1,node2,node3}.
+\end{itemize}
+For a given command on a given cluster, if you specify some group of nodes (with \texttt{GROUP\_SHORT} or \texttt{GROUP\_FQDN} patterns), you will also be able to specify, for some nodes of the cluster, a command that does not imply a group of nodes. To do this, you must specify these commands in the cpecific commands configuration files.
+
 \section{Clusters file}
 The list of all the clusters must be defined in the  \texttt{/etc/kadeploy3/clusters} file. For instance, the file may contain something like :
 \begin{small}
@@ -556,20 +586,27 @@ netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
 \end{small}
 
 \section{Specific commands configuration files}
-In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|\texttt{cmd\_kind}|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for \texttt{cmd\_kind} are:
+In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|command kind|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for command kind are:
 \begin{itemize}
-\item \texttt{cmd\_soft\_reboot\_ssh}
-\item \texttt{cmd\_soft\_reboot\_rsh}
-\item \texttt{cmd\_hard\_reboot}
-\item \texttt{cmd\_very\_hard\_reboot}
+\item \texttt{soft\_reboot}
+\item \texttt{hard\_reboot}
+\item \texttt{very\_hard\_reboot}
+\item \texttt{soft\_power\_on}
+\item \texttt{hard\_power\_on}
+\item \texttt{very\_hard\_power\_on}
+\item \texttt{soft\_power\_off}
+\item \texttt{hard\_power\_off}
+\item \texttt{very\_hard\_power\_off}
+\item \texttt{power\_status}
+\item \texttt{console}
 \end{itemize}
 
 Here is an example:
 \begin{small}
 \begin{verbatim}
-vm-001|reboot_soft|ssh -q root@vm-001 /sbin/special_reboot_for_vm
-vm-001|reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
-vm-002|reboot_soft|ssh -q root@vm-002 /sbin/special_reboot_for_vm
+vm-001|soft_reboot|ssh -q root@vm-001 /sbin/special_reboot_for_vm
+vm-001|hard_reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
+vm-002|soft_reboot|ssh -q root@vm-002 /sbin/special_reboot_for_vm
 \end{verbatim}
 \end{small}
 Note: it is not mandatory to override all the commands for a given node.
@@ -611,7 +648,12 @@ TODO
 In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastafior} macro-step), the server must be able to perform an ssh connection on itself. Thus, you must add the deploy key installed in the \texttt{/etc/kadeploy3/keys/id\_deploy.pub} in the \texttt{.ssh/authorized\_keys} file of the \texttt{deploy} user. This step is optional if you do not plan to use the \texttt{BroadcastEnvKastafior} macro-step.
 
 \chapter{Client side configuration}
-On the client side, you only have to configure the file named \texttt{client\_conf}. This file only defines two values used to find the kadeploy server: \texttt{kadeploy\_server} and \texttt{kadeploy\_server\_port}.
+On the client side, you only have to configure the file named \texttt{client\_conf}. This file defines one Kadeploy server per line and a default server. For instance:
+\begin{verbatim}
+default = rennes
+rennes = rennes.grid5000.fr:25300
+toulouse = toulouse.grid5000.fr:25300
+\end{verbatim}
 
 \chapter{User guide}
 
@@ -656,10 +698,11 @@ General options:
   -b, --block-device BLOCKDEVICE   Specify the block device to use
   -d, --debug-mode                 Activate the debug mode
   -e, --env-name ENVNAME           Name of the recorded environment to deploy
-  -f, --file MACHINELIST           Files containing list of nodes
+  -f, --file MACHINELIST           Files containing list of nodes (- means stdin)
   -k, --key [FILE]                 Public key to copy in the root's authorized_keys, 
                                    if no argument is specified, use the authorized_keys
   -m, --machine MACHINE            Node to run on
+      --multi-server               Activate the multi-server mode
   -n, --output-ko-nodes FILENAME   File that will contain the nodes not correctly deployed
   -o, --output-ok-nodes FILENAME   File that will contain the nodes correctly deployed
   -p, --partition-number NUMBER    Specify the partition number to use
@@ -672,7 +715,8 @@ General options:
   -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
                                    directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER         Number of version of the environment to deploy
-      --verbose-level VALUE        Verbose level between 0 to 4
+      --server STRING              Specify the Kadeploy server to use
+  -V, --verbose-level VALUE        Verbose level between 0 to 4
 Advanced options:
       --write-workflow-id FILE     Write the workflow id in a file
       --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying" 
@@ -683,6 +727,8 @@ Advanced options:
       --breakpoint MICROSTEP       Set a breakpoint just before launching the give micro-step, the 
                                    syntax is macrostep:microstep (use this only if you know what you do)
       --set-custom-operations FILE Add some custom operations defined in a file
+      --reboot-classical-timeout V Overload the default timeout for classical reboots
+      --reboot-kexec-timeout V     Overload the default timeout for kexec reboots
       --force-steps STRING         Undocumented, for administration purpose only
 
 \end{verbatim}
@@ -695,6 +741,7 @@ The environment can be specified with the \texttt{-e|--env-name} option if you w
 > kadeploy3 -m gdx-[5-12].orsay.grid5000.fr -e lenny-x64-base -o nodes_ok -n nodes_ko
 > kadeploy3 -f nodes -a custom_env.dsc
 > kadeploy3 -f nodes -m gdx-5.orsay.grid5000.fr -a custom_env.dsc
+> cat nodefile|kadeploy3 -f - -e lenny-x64-base
 \end{verbatim}
 
 We present now several use cases.
@@ -793,7 +840,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
 \end{verbatim}
 If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
 
-\paragraph{Use case 9 - expert usage - insert custom operations in the deployment workflow}
+\paragraph{Use case 10 - expert usage - insert custom operations in the deployment workflow}
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
@@ -822,11 +869,12 @@ General options:
   -b, --block-device BLOCKDEVICE Specify the block device to use
   -c, --check-prod-env           Check if the production environment has been detroyed
   -e, --env-name ENVNAME         Name of the recorded environment
-  -f, --file MACHINELIST         Files containing list of nodes
+  -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
   -k, --key [FILE]               Public key to copy in the root's authorized_keys, 
                                  if no argument is specified, use the authorized_keys
   -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
   -m, --machine MACHINE          Reboot the given machines
+      --multi-server             Activate the multi-server mode
   -n, --output-ko-nodes FILENAME File that will contain the nodes not correctly rebooted
   -o, --output-ok-nodes FILENAME File that will contain the nodes correctly rebooted
   -p, --partition-number NUMBER  Specify the partition number to use
@@ -839,7 +887,9 @@ General options:
                                  directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER       Specify the environment version
       --no-wait                  Do not wait the end of the reboot
-      --verbose-level VALUE      Verbose level between 0 to 4
+      --server STRING            Specify the Kadeploy server to use
+  -V, --verbose-level VALUE      Verbose level between 0 to 4
+      --reboot-classical-timeout V Overload the default timeout for classical reboots
 \end{verbatim}
 \end{small}
 
@@ -855,6 +905,7 @@ Here are some basic examples:
 \begin{verbatim}
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot
 > kareboot3 -m gdx-[5-8].orsay.grid5000.fr -r simple_reboot
+> cat nodefile|kareboot3 -f - -r simple_reboot
 > kareboot3 -m gdx-5.orsay.grid5000.fr -r simple_reboot -o reboot_ok.txt \
                                                         -n reboot_ko.txt
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
@@ -893,13 +944,14 @@ General options:
   -t, --visibility-tag TAG              Set the visibility tag (private, shared, public)
   -u, --user USERNAME                   Specify the user
       --env-version NUMBER              Specify the version
+      --server STRING                   Specify the Kadeploy server to use
+Advanced options:
       --remove-demolishing-tag ENVNAME  Remove demolishing tag on an environment
       --set-visibility-tag ENVNAME      Set the visibility tag on an environment
       --update-tarball-md5 ENVNAME      Update the MD5 of the environment tarball
       --update-preinstall-md5 ENVNAME   Update the MD5 of the environment preinstall
       --update-postinstalls-md5 ENVNAME Update the MD5 of the environment postinstalls
       --move-files ENVNAME              Move the files of the environment
-
 \end{verbatim}
 \end{small}
 
@@ -1024,12 +1076,14 @@ Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --add                    Add some rights to a user
   -d, --delete                 Delete some rights to a user
+  -f, --file FILE              Machine file (- means stdin)
   -m, --machine MACHINE        Include the machine in the operation
   -o, --overwrite-rights       Overwrite existing rights
   -p, --part PARTNAME          Include the partition in the operation
   -s, --show-rights            Show the rights for a given user
   -u, --user USERNAME          Specify the user
   -v, --version                Get the version
+      --server STRING          Specify the Kadeploy server to use
 \end{verbatim}
 \end{small}
 
@@ -1102,6 +1156,7 @@ General options:
   -v, --version                    Get the version
   -x, --date-min DATE              Get the stats from this date (yyyy:mm:dd:hh:mm:ss)
   -y, --date-max DATE              Get the stats to this date
+      --server STRING              Specify the Kadeploy server to use
 \end{verbatim}
 \end{small}
 
@@ -1152,13 +1207,14 @@ Usage: kanodes3 [options]
 Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -d, --get-deploy-state       Get the deploy state of the nodes
-  -f, --file MACHINELIST       Only print information about the given machines
+  -f, --file MACHINELIST       Only print information about the given machines (- means stdin)
   -m, --machine MACHINE        Only print information about the given machines
   -v, --version                Get the version
   -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 
                                operation. If no wid is specified, the information of all
                                the running worklfows will be dumped
   -y, --get-yaml-dump          Get the yaml dump
+      --server STRING          Specify the Kadeploy server to use
 \end{verbatim}
 \end{small}
 
@@ -1167,7 +1223,15 @@ We present now the use cases.
 \begin{verbatim}
 > kanodes3 -d
 \end{verbatim}
-This commands prints the global state of all the nodes managed by a Kadeploy server.
+This commands prints the global state of all the nodes managed by a Kadeploy server. The output is as follows 1,2,3,4,5,6, where :
+\begin{itemize}
+\item 1 is the hostname ;
+\item 2 is the deployment state of the node (prod\_env, deployed, deploy\_failed, aborted) ;
+\item 3 is the username who launched the last deployment ;
+\item 4 is the environment name ;
+\item 5 is the environment version ;
+\item 6 is the environment owner.
+\end{itemize}
 
 \paragraph{Use case 2 - print the deployment state of some nodes}
 \begin{verbatim}
@@ -1270,6 +1334,16 @@ Here are two examples:
 \end{small}
 
 If everything went right, the output of \texttt{kaenv2to3} shows the description in the new format. You can redirect this output to a file and use this file as an input for \texttt{kaenv}.
+
+\section{Environment variables in the pre- and post-install context}
+When writing a script for an admin pre-install, an admin post-install and a user post-install, you can use the following environment variables :
+\begin{itemize}
+\item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
+\item \texttt{KADEPLOY\_ENV} : environment deployed
+\item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
+\item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
+\item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
+\end{itemize}
 
 \section{Build a custom pre-install}\label{sec:custom-preinstall}
 The goal of the pre-install in the Kadeploy workflow is to prepare the disk of the nodes before the copy of the environment. It can include:

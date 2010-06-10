@@ -1,107 +1,58 @@
 #!/usr/bin/ruby -w
 
-# Kadeploy 3.0
+# Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
 #Kadeploy libs
 require 'config'
-require 'db'
 
 #Ruby libs
 require 'drb'
 
 
-
-# List the deploy information about the nodes
-#
-# Arguments
-# * config: instance of Config
-# * db: database handler
-# Output
-# * prints the information about the nodes in a CSV format
-def get_deploy_state(config, db)
-  #If no node list is given, we print everything
-  if config.exec_specific.node_list.empty? then
-    query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
-             FROM nodes \
-             LEFT JOIN environments ON nodes.env_id = environments.id \
-             ORDER BY nodes.hostname"
-  else
-    hosts = Array.new
-    config.exec_specific.node_list.each { |node|
-      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
-        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-      else
-        nodes = [node]
-      end
-      nodes.each { |n|
-        hosts.push("nodes.hostname=\"#{n}\"")
-      }
-    }
-    query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
-             FROM nodes \
-             LEFT JOIN environments ON nodes.env_id = environments.id \
-             WHERE (#{hosts.join(" OR ")}) \
-             ORDER BY nodes.hostname"
-  end
-  res = db.run_query(query)
-  if (res.num_rows > 0)
-    res.each { |row|
-      puts "#{row[0]},#{row[1]},#{row[2]},#{row[3]},#{row[4]},#{row[5]}"
-    }
-  else
-    puts "No information concerning these nodes"
+class KanodesClient
+  # Print a message (RPC)
+  #
+  # Arguments
+  # * msg: string to print
+  # Output
+  # * prints a message
+  def print(msg)
+    puts msg
   end
 end
 
-# Get a YAML output of the current deployments
-#
-# Arguments
-# * kadeploy_server: pointer to the Kadeploy server (DRbObject)
-# * wid: workflow id
-# Output
-# * prints the YAML output of the current deployments
-def get_yaml_dump(kadeploy_server, wid)
-  puts kadeploy_server.get_workflow_state(wid)
-end
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket.do_not_reverse_lookup = true
 
-def _exit(exit_code, dbh)
-  dbh.disconnect if (dbh != nil)
-  exit(exit_code)
-end
+exec_specific_config = ConfigInformation::Config.load_kanodes_exec_specific()
 
-begin
-  config = ConfigInformation::Config.new("kanodes")
-rescue
-  _exit(1, nil)
-end
+if exec_specific_config != nil then
+  #Connect to the server
+  DRb.start_service()
+  uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
+  kadeploy_server = DRbObject.new(nil, uri)
 
-#Connect to the Kadeploy server to get the common configuration
-client_config = ConfigInformation::Config.load_client_config_file
-DRb.start_service()
-uri = "druby://#{client_config.kadeploy_server}:#{client_config.kadeploy_server_port}"
-kadeploy_server = DRbObject.new(nil, uri)
-config.common = kadeploy_server.get_common_config
-
-if (config.check_config("kanodes") == true) then
-  if config.exec_specific.get_version then
+  if exec_specific_config.get_version then
     puts "Kanodes version: #{kadeploy_server.get_version()}"
-    _exit(0, nil)
+    exit(0)
   end
-  db = Database::DbFactory.create(config.common.db_kind)
-  db.connect(config.common.deploy_db_host,
-             config.common.deploy_db_login,
-             config.common.deploy_db_passwd,
-             config.common.deploy_db_name)
-  case config.exec_specific.operation
-  when "get_deploy_state"
-    get_deploy_state(config, db)
-  when "get_yaml_dump"
-    get_yaml_dump(kadeploy_server, config.exec_specific.wid)
+
+  kanodes_client = KanodesClient.new()
+  DRb.start_service(nil, kanodes_client)
+  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+    content = Regexp.last_match
+    client_host = content[1]
+    client_port = content[2]
+  else
+    puts "The URI #{DRb.uri} is not correct"
+    exit(1)
   end
-  _exit(0, db)
+
+  kadeploy_server.run("kanodes", exec_specific_config, client_host, client_port)
+  exit(0)
 else
-  _exit(1, db)
+  exit(1)
 end
