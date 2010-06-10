@@ -663,7 +663,7 @@ class KadeployServer
                   part = exec_specific.block_device + exec_specific.deploy_part
                 end
                 #Reboot on the production environment
-                if (part == get_prod_part(cluster)) then
+                if (part == @config.cluster_specific[cluster].prod_part) then
                   step.check_nodes("prod_env_booted")
                   set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
                   if (exec_specific.check_prod_env) then
@@ -819,7 +819,7 @@ class KadeployServer
                       part = exec_specific.block_device + exec_specific.deploy_part
                     end
                     #Reboot on the production environment
-                    if (part == get_prod_part(cluster)) then
+                    if (part == @config.cluster_specific[cluster].prod_part) then
                       step.check_nodes("prod_env_booted")
                       set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
                       if (exec_specific.check_prod_env) then
