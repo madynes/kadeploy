@@ -62,6 +62,7 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0444,root,root) /usr/local/man/man1/karights3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kanodes3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kaconsole3.1
+%doc %attr(0444,root,root) /usr/local/man/man1/kapower3.1
 
 %files server
 %defattr(-,deploy,deploy,-)
@@ -88,6 +89,7 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/kadeploy3
 /usr/bin/kaenv3
 /usr/bin/kareboot3
+/usr/bin/kapower3
 /usr/sbin/karights3
 
 %pre common
