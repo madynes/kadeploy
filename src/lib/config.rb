@@ -1618,7 +1618,7 @@ module ConfigInformation
       exec_specific.node_list = Array.new
       exec_specific.true_user = USER
       exec_specific.overwrite_existing_rights = false
-      exec_specific.get_version = fals
+      exec_specific.get_version = false
       exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
