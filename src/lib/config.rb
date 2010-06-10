@@ -185,7 +185,9 @@ module ConfigInformation
         if (exec_specific_config.environment.load_from_db(exec_specific_config.env_arg,
                                                           exec_specific_config.env_version,
                                                           exec_specific_config.user,
-                                                          db) == false) then
+                                                          exec_specific_config.true_user,
+                                                          db,
+                                                          client) == false) then
           return false
         end
       end
@@ -200,6 +202,8 @@ module ConfigInformation
       if not @common.almighty_env_users.include?(exec_specific_config.true_user) then
         Debug::distant_client_error("Only administrators are allowed to set rights", client)
         return false
+      else
+        return true
       end
     end
 
