@@ -5,11 +5,17 @@ MANKINDS="1"
 DB2MAN=""
 
 #Fedora, Centos
-which db2x_docbook2man &>/dev/null && DB2MAN=`which db2x_docbook2man`
+if [ "$DB2MAN" = "" ]
+then
+    which db2x_docbook2man &>/dev/null && DB2MAN=`which db2x_docbook2man`
+fi
 #Debian, Ubuntu
-which docbook2x-man &>/dev/null && DB2MAN=`which docbook2x-man`
+if [ "$DB2MAN" = "" ]
+then
+    which docbook2x-man &>/dev/null && DB2MAN=`which docbook2x-man`
+fi
 
-[ ! -n "$DB2MAN" ] && echo "Cannot find the docbook2man command" && exit 1
+[ "$DB2MAN" = "" ] && echo "Cannot find the docbook2man command" && exit 1
 
 for kind in $MANKINDS
 do
