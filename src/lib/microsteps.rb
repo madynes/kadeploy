@@ -1313,6 +1313,8 @@ module MicroStepsLibrary
                                                          @config.common.taktuk_connector,
                                                          "0",
                                                          instance_thread)
+      else
+        @output.verbosel(3, "  *** No key has been specified")
       end
       return true
     end

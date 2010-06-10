@@ -248,9 +248,9 @@ class KadeployServer
   # Clean the stuff related to the deployment (RPC: only for async execution)
   #
   # Arguments
-  # * id: worklfow id
+  # * workflow_id: worklfow id
   # Output
-  # * nothing
+  # * return true if the deployment has been freed and nil if workflow id does no exist
   def async_deploy_free(workflow_id)
     return async_deploy_lock_wid(workflow_id) { |workflow|
       workflow.db.disconnect
@@ -259,6 +259,7 @@ class KadeployServer
       workflow.finalize()
       workflow = nil
       GC.start
+      true
     }
   end
 
@@ -267,7 +268,7 @@ class KadeployServer
   # Arguments
   # * workflow_id: id of the workflow
   # Output
-  # * nothing  
+  # * return true if the deployment has been killed and nil if workflow id does no exist
   def async_deploy_kill(workflow_id)
     return async_deploy_lock_wid(workflow_id) { |workflow|
       workflow.kill()
@@ -277,10 +278,16 @@ class KadeployServer
       workflow.finalize()
       workflow = nil
       GC.start
+      true
     }
   end
 
-
+  # Test if the power operation has reached the end (RPC: only for async execution)
+  #
+  # Arguments
+  # * power_id: power id
+  # Output
+  # * return true if the power operation has reached the end, false if not, and nil if the power id does not exist
   def async_power_ended?(power_id)
     r = nil
     @power_info_hash_lock.synchronize {
@@ -289,16 +296,31 @@ class KadeployServer
     return r
   end
 
+  # Clean the stuff related to a power operation (RPC: only for async execution)
+  #
+  # Arguments
+  # * power_id: power id
+  # Output
+  # * return true if the power operation has been freed and nil if power id does no exist
   def async_power_free(power_id)
+    r = nil
     @power_info_hash_lock.synchronize {
       if @power_info_hash.has_key?(power_id) then
         @power_info_hash[power_id][0].free()
         @power_info_hash[power_id][1].free()
         kapower_delete_power_info(power_id)
+        r = true
       end
     }
+    return r
   end
 
+  # Get the results of a power operation (RPC: only for async execution)
+  #
+  # Arguments
+  # * power_id: power id
+  # Output
+  # * return an array containing two arrays (0: nodes_ok, 1: nodes_ko) or nil if the power id does not exist
   def async_power_get_results(power_id)
     if @power_info_hash.has_key?(power_id) then
       return [@power_info_hash[power_id][0],@power_info_hash[power_id][1]]
@@ -307,6 +329,12 @@ class KadeployServer
     end
   end
 
+  # Test if the reboot operation has reached the end (RPC: only for async execution)
+  #
+  # Arguments
+  # * reboot_id: reboot id
+  # Output
+  # * return true if the reboot operation has reached the end, false if not, and nil if the reboot id does not exist
   def async_reboot_ended?(reboot_id)
     r = nil
     @reboot_info_hash_lock.synchronize {
@@ -315,6 +343,12 @@ class KadeployServer
     return r
   end
 
+  # Clean the stuff related to a reboot operation (RPC: only for async execution)
+  #
+  # Arguments
+  # * reboot_id: reboot id
+  # Output
+  # * return true if the reboot operation has been freed and nil if reboot id does no exist
   def async_reboot_free(reboot_id)
     @reboot_info_hash_lock.synchronize {
       if @reboot_info_hash.has_key?(reboot_id) then
@@ -325,6 +359,12 @@ class KadeployServer
     }
   end
 
+  # Get the results of a reboot operation (RPC: only for async execution)
+  #
+  # Arguments
+  # * reboot_id: reboot id
+  # Output
+  # * return an array containing two arrays (0: nodes_ok, 1: nodes_ko) or nil if the reboot id does not exist
   def async_reboot_get_results(reboot_id)
     if @reboot_info_hash.has_key?(reboot_id) then
       return [@reboot_info_hash[reboot_id][0],@reboot_info_hash[reboot_id][1]]
@@ -452,7 +492,6 @@ class KadeployServer
   def kadeploy_delete_workflow_info(workflow_id)
     @workflow_info_hash.delete(workflow_id)
   end
-
 
 
 
@@ -816,6 +855,13 @@ class KadeployServer
         @reboot_info_hash_lock.synchronize {
           finished[0] = true
         }
+        if (@config.common.async_end_of_reboot_hook != "") then
+          tmp = cmd = @config.common.async_end_of_reboot_hook.clone
+          while (tmp.sub!("REBOOT_ID", reboot_id) != nil)  do
+            cmd = tmp
+          end
+          system(cmd)
+        end
         config = nil
       }
       return reboot_id,error
@@ -2125,10 +2171,17 @@ class KadeployServer
           tid.join
         }
       }
-      config = nil
       @power_info_hash_lock.synchronize {
         finished[0] = true
       }
+      if (@config.common.async_end_of_power_hook != "") then
+        tmp = cmd = @config.common.async_end_of_power_hook.clone
+        while (tmp.sub!("POWER_ID", power_id) != nil)  do
+          cmd = tmp
+        end
+        system(cmd)
+      end
+      config = nil
     }
     return power_id
   end

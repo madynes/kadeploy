@@ -598,6 +598,10 @@ module ConfigInformation
               end
             when "async_end_of_deployment_hook"
               @common.async_end_of_deployment_hook = val
+            when "async_end_of_reboot_hook"
+              @common.async_end_of_reboot_hook = val
+            when "async_end_of_power_hook"
+              @common.async_end_of_power_hook = val
             end
           end
         end
@@ -1284,14 +1288,14 @@ module ConfigInformation
             }
           end
         }
-        opt.on("--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots") { |t|
+        opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
           if (t =~ /\A\d+\Z/) then
             exec_specific.reboot_classical_timeout = t
           else
             error("A number is required for the reboot classical timeout")
           end
         }
-        opt.on("--reboot-kexec-timeout VALUE", "Overload the default timeout for kexec reboots") { |t|
+        opt.on("--reboot-kexec-timeout V", "Overload the default timeout for kexec reboots") { |t|
           if (t =~ /\A\d+\Z/) then
             exec_specific.reboot_kexec_timeout = t
           else
@@ -2084,7 +2088,7 @@ module ConfigInformation
     def Config.load_kareboot_cmdline_options(exec_specific)
       opts = OptionParser::new do |opt|
         opt.summary_indent = "  "
-        opt.summary_width = 30
+        opt.summary_width = 32
         opt.banner = "Usage: kareboot3 [options]"
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""
@@ -2232,7 +2236,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots") { |t|
+        opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
           if (t =~ /\A\d+\Z/) then
             exec_specific.reboot_classical_timeout = t
           else
@@ -2620,7 +2624,8 @@ module ConfigInformation
     attr_accessor :almighty_env_users
     attr_accessor :version
     attr_accessor :async_end_of_deployment_hook
-
+    attr_accessor :async_end_of_reboot_hook
+    attr_accessor :async_end_of_power_hook
 
     # Constructor of CommonConfig
     #
@@ -2634,6 +2639,8 @@ module ConfigInformation
       @demolishing_env_auto_tag = false
       @log_to_file = ""
       @async_end_of_deployment_hook = ""
+      @async_end_of_reboot_hook = ""
+      @async_end_of_power_hook = ""
     end
 
     # Check if all the fields of the common configuration file are filled

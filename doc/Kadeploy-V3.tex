@@ -283,6 +283,8 @@ bt_tracker_ip = 172.24.100.2
 bt_download_timeout = 1800
 almighty_env_users = root,ejeanvoine
 async_end_of_deployment_hook = echo WORKFLOW_ID
+async_end_of_reboot_hook = echo REBOOT_ID
+async_end_of_power_hook = echo POWER_ID
 \end{verbatim}
 \end{small}
 
@@ -333,6 +335,8 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{bt\_download\_timeout}: timeout for the Bittorrent file download.
 \item \texttt{almighty\_env\_users}: list of users allowed to perform special operations on the environments like publishing environments or moving files.
 \item \texttt{async\_end\_of\_deployment\_hook}: command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
+\item \texttt{async\_end\_of\_reboot\_hook}: command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
+\item \texttt{async\_end\_of\_power\_hook}: command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
 \end{itemize}
 
 \section{Cluster-specific configuration files}\label{sec:specific_config}
@@ -723,6 +727,8 @@ Advanced options:
       --breakpoint MICROSTEP       Set a breakpoint just before launching the give micro-step, the 
                                    syntax is macrostep:microstep (use this only if you know what you do)
       --set-custom-operations FILE Add some custom operations defined in a file
+      --reboot-classical-timeout V Overload the default timeout for classical reboots
+      --reboot-kexec-timeout V     Overload the default timeout for kexec reboots
       --force-steps STRING         Undocumented, for administration purpose only
 
 \end{verbatim}
@@ -883,6 +889,7 @@ General options:
       --no-wait                  Do not wait the end of the reboot
       --server STRING            Specify the Kadeploy server to use
   -V, --verbose-level VALUE      Verbose level between 0 to 4
+      --reboot-classical-timeout V Overload the default timeout for classical reboots
 \end{verbatim}
 \end{small}
 

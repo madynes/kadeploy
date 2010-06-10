@@ -14,6 +14,7 @@ require 'drb'
 require 'socket'
 require 'md5'
 require 'tempfile'
+require 'ping'
 
 class KadeployClient
   @kadeploy_server = nil
@@ -195,14 +196,18 @@ if (exec_specific_config != nil) then
   if (exec_specific_config.multi_server) then
     exec_specific_config.servers.each_pair { |server,info|
       if (server != "default") then
-        DRb.start_service()
-        uri = "druby://#{info[0]}:#{info[1]}"
-        kadeploy_server = DRbObject.new(nil, uri)
-        nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
-        if (nodes_known.length > 0) then
-          nodes_by_server[server] = nodes_known
+        if (Ping.pingecho(info[0], 1, info[1])) then
+          DRb.start_service()
+          uri = "druby://#{info[0]}:#{info[1]}"
+          kadeploy_server = DRbObject.new(nil, uri)
+          nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
+          if (nodes_known.length > 0) then
+            nodes_by_server[server] = nodes_known
+          end
+          DRb.stop_service()
+        else
+          puts "The #{server} server is unreachable"
         end
-        DRb.stop_service()
         break if (remaining_nodes.length == 0)
       end
     }
@@ -211,7 +216,12 @@ if (exec_specific_config != nil) then
       exit(1)
     end
   else
-    nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
+    if (Ping.pingecho(exec_specific_config.servers[exec_specific_config.chosen_server][0], 1, exec_specific_config.servers[exec_specific_config.chosen_server][1])) then
+      nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
+    else
+      puts "The #{exec_specific_config.chosen_server} server is unreachable"
+      exit(1)
+    end
   end
   
   tid_array = Array.new
@@ -219,6 +229,7 @@ if (exec_specific_config != nil) then
     puts "SIGINT trapped, let's clean everything ..."
     exit(1)
   end
+
   files_ok_nodes = Array.new
   files_ko_nodes = Array.new
   nodes_by_server.each_key { |server|
@@ -275,6 +286,7 @@ if (exec_specific_config != nil) then
   if (exec_specific_config.script != "") then
     system(exec_specific_config.script)
   end
+
   exec_specific_config = nil
   exit(0)
 else
