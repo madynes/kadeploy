@@ -1813,7 +1813,7 @@ module ConfigInformation
         opt.on("-b", "--list-failure-rate", "Print the failure rate for the nodes") { |n|
           exec_specific.operation = "list_failure_rate"
         }
-        opt.on("-c", "--list-min-failure-rate RATE", "Print the nodes which have a minimum failure-rate of RATE (0 <= RATE <= 100") { |r|
+        opt.on("-c", "--list-min-failure-rate RATE", "Print the nodes which have a minimum failure-rate of RATE (0 <= RATE <= 100)") { |r|
           if ((/\A\d+/ =~ r) && ((r.to_i >= 0) && ((r.to_i <= 100)))) then
             exec_specific.operation = "list_min_failure_rate"
             exec_specific.min_rate = r.to_i

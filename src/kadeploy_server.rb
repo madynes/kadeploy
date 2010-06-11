@@ -971,7 +971,7 @@ class KadeployServer
     fields = Array.new  
     if (not exec_specific.fields.empty?) then
       exec_specific.fields.each{ |f|
-        fields.push(row[f].gsub(/n/, "\\n").gsub(/\r/, "\\r"))
+        fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
       }
     else
       default_fields.each { |f|
