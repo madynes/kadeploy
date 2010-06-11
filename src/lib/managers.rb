@@ -862,7 +862,7 @@ module Managers
       if @config.exec_specific.pxe_profile_file != "" then
         if not @config.exec_specific.pxe_upload_files.empty? then
           @config.exec_specific.pxe_upload_files.each { |pxe_file|
-            user_prefix = "pxe-#{@config.exec_specific.true_user}-"
+            user_prefix = "pxe-#{@config.exec_specific.true_user}--"
             tftp_images_path = "#{@config.common.tftp_repository}/#{@config.common.tftp_images_path}"
             local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
             if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",

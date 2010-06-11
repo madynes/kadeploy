@@ -580,7 +580,7 @@ class KadeployServer
   # * client: DRb client handler
   # * exec_specific: instance of Config.exec_specific
   # Output
-  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed
+  # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed, 4 if the ssh key file cannot be grabbed
   def run_kareboot_sync(db, client, exec_specific)
     client_disconnected = false
     finished = false    
@@ -612,7 +612,7 @@ class KadeployServer
       if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
         gfm = Managers::GrabFileManager.new(config, output, client, db)
         exec_specific.pxe_upload_files.each { |pxe_file|
-          user_prefix = "pxe-#{config.exec_specific.true_user}-"
+          user_prefix = "pxe-#{config.exec_specific.true_user}--"
           tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
           local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
@@ -621,6 +621,25 @@ class KadeployServer
             return 3
           end
         }
+        gfm = nil
+      end
+      if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
+        gfm = Managers::GrabFileManager.new(config, output, client, db)
+        user_prefix = "u-#{exec_specific.true_user}--"
+        key = exec_specific.key
+        case key
+        when /^http[s]?:\/\//
+          local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1))
+        else
+          local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + File.basename(key)
+        end
+        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
+                                             config.common.kadeploy_cache_size, false) then
+          output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
+          return 4
+        end
+        exec_specific.key = local_key
+        gfm = nil
       end
 
       exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
@@ -781,6 +800,26 @@ class KadeployServer
               error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
             end
           }
+          gfm = nil
+        end
+
+        if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
+          gfm = Managers::GrabFileManager.new(config, output, client, db)
+          user_prefix = "u-#{exec_specific.true_user}--"
+          key = exec_specific.key
+          case key
+          when /^http[s]?:\/\//
+            local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1))
+          else
+            local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + File.basename(key)
+          end
+          if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
+                                               config.common.kadeploy_cache_size, false) then
+            output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
+            error = FetchFileError::INVALID_KEY
+          end
+          exec_specific.key = local_key
+          gfm = nil
         end
         
         if (error == KarebootAsyncError::NO_ERROR) then
