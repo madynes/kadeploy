@@ -7,12 +7,12 @@
 
 #Kadeploy libs
 require 'config'
+require 'md5'
 
 #Ruby libs
 require 'thread'
 require 'drb'
 require 'socket'
-require 'md5'
 require 'tempfile'
 require 'ping'
 

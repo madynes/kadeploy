@@ -106,12 +106,13 @@ module EnvironmentManagement
                 @tarball["md5"] = ""
               else
                 if (record_in_db) then
-                  if (not File.readable?(@tarball["file"])) then
+                  md5 = client.get_file_md5(@tarball["file"])
+                  if (md5 != 0) then
+                    @tarball["md5"] = md5
+                  else
                     Debug::distant_client_error("The tarball file #{@tarball["file"]} cannot be read", client)
                     return false
                   end
-                  Debug::distant_client_print("Computing the md5sum for #{@tarball["file"]}", client)
-                  @tarball["md5"] = MD5::get_md5_sum(@tarball["file"])
                 end
               end
             else
@@ -130,12 +131,13 @@ module EnvironmentManagement
                 @preinstall["md5"] = ""
               else
                 if (record_in_db) then
-                  if (not File.readable?(@preinstall["file"])) then
+                  md5 = client.get_file_md5(@preinstall["file"])
+                  if (md5 != 0) then
+                    @preinstall["md5"] = md5
+                  else
                     Debug::distant_client_error("The pre-install file #{@preinstall["file"]} cannot be read", client)
                     return false
                   end
-                  Debug::distant_client_print("Computing the md5sum for #{@preinstall["file"]}", client)
-                  @preinstall["md5"] = MD5::get_md5_sum(@preinstall["file"])
                 end
               end
             else
@@ -157,12 +159,13 @@ module EnvironmentManagement
                   entry["md5"] = ""
                 else
                   if (record_in_db) then
-                    if (not File.readable?(entry["file"])) then
+                    md5 = client.get_file_md5(entry["file"])
+                    if (md5 != 0) then
+                      entry["md5"] = md5
+                    else
                       Debug::distant_client_error("The post-install file #{entry["file"]} cannot be read", client)
                       return false
                     end
-                    Debug::distant_client_print("Computing the md5sum for #{entry["file"]}", client)
-                    entry["md5"] = MD5::get_md5_sum(entry["file"])
                   end
                 end
                 @postinstall.push(entry)
