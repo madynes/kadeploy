@@ -202,9 +202,8 @@ module ConfigInformation
       if not @common.almighty_env_users.include?(exec_specific_config.true_user) then
         Debug::distant_client_error("Only administrators are allowed to set rights", client)
         return false
-      else
-        return true
       end
+      return true
     end
 
     def check_kastat_config(exec_specific_config, db, client)
