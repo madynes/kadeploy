@@ -1764,8 +1764,8 @@ class KadeployServer
       res.each_hash  { |row|
         env = EnvironmentManagement::Environment.new
         env.load_from_hash(row)
-        md5 = MD5::get_md5_sum(env.tarball["file"])
-        if (md5 != "") then
+        md5 = client.get_file_md5(env.tarball["file"])
+        if (md5 != 0) then
           tarball = "#{env.tarball["file"]}|#{env.tarball["kind"]}|#{md5}"         
           query2 = "UPDATE environments SET tarball=\"#{tarball}\" WHERE name=\"#{env_name}\" \
                                                                    AND user=\"#{env_user}\" \
@@ -1820,8 +1820,8 @@ class KadeployServer
         env = EnvironmentManagement::Environment.new
         env.load_from_hash(row)
         if (env.preinstall != nil) then
-          md5 = MD5::get_md5_sum(env.preinstall["file"])
-          if (md5 != "" ) then
+          md5 = client.get_file_md5(env.preinstall["file"])
+          if (md5 != 0) then
             tarball = "#{env.preinstall["file"]}|#{env.preinstall["kind"]}|#{md5}|#{env.preinstall["script"]}"
             query2 = "UPDATE environments SET preinstall=\"#{tarball}\" WHERE name=\"#{env_name}\" \
                                                                         AND user=\"#{env_user}\" \
@@ -1882,8 +1882,8 @@ class KadeployServer
           postinstall_array = Array.new
           all_is_ok = true
           env.postinstall.each { |p|
-            md5 = MD5::get_md5_sum(p["file"])
-            if (md5 != "" ) then
+            md5 = client.get_file_md5(p["file"])
+            if (md5 != 0) then
               postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{md5}|#{p["script"]}")
             else
               all_is_ok = false
