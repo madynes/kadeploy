@@ -443,7 +443,7 @@ module ParallelOperations
               else
                 nodeid = node.hostname
               end
-              PortScanner::is_open?(nodeid, @config.common.ssh_port) then
+              if (PortScanner::is_open?(nodeid, @config.common.ssh_port)) then
                 ports_up.each { |port|
                   begin
                     s = TCPsocket.open(nodeid, port)

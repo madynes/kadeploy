@@ -947,16 +947,26 @@ module MicroStepsLibrary
 
       list = String.new
       list = "-m #{Socket.gethostname()}"
-
+    
       if @config.cluster_specific[@cluster].use_ip_to_deploy then
         @nodes_ok.make_sorted_array_of_nodes.each { |node|
           list += " -m #{node.ip}"
         }
+        kastafior_hostname = node.ip
       else
         @nodes_ok.make_sorted_array_of_nodes.each { |node|
           list += " -m #{node.hostname}"
         }
+        kastafior_hostname = node.hostname
       end
+
+      pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+      @nodes_ok.set { |node|
+        cmd = "#{@config.common.taktuk_connector} \"echo #{kastafior_hostname} > /tmp/kastafior.hostname\""
+        pr.add(cmd, node)
+      }
+      pr.run
+      pr.wait
 
       if @config.common.taktuk_auto_propagate then
         cmd = "kastafior -s -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
