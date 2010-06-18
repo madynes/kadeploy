@@ -687,7 +687,7 @@ class KadeployServer
                   set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
                   if (exec_specific.check_prod_env) then
                     step.nodes_ko.tag_demolishing_env(db) if @config.common.demolishing_env_auto_tag
-                    ret = 1
+                    ret = 1 if not step.nodes_ko.empty?
                   end
                 else
                   set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)

@@ -7,6 +7,7 @@
 
 #Kadeploy libs
 require 'config'
+require 'port_scanner'
 
 #Ruby libs
 require 'drb'
@@ -30,6 +31,10 @@ Socket.do_not_reverse_lookup = true
 exec_specific_config = ConfigInformation::Config.load_kastat_exec_specific()
 
 if (exec_specific_config != nil) then
+  if not (PortScanner::is_open?(exec_specific_config.kadeploy_server, exec_specific_config.kadeploy_server_port)) then
+    puts "The server #{exec_specific_config.chosen_server} is unreahchable"
+    exit(1)
+  end
   #Connect to the server
   DRb.start_service()
   uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"

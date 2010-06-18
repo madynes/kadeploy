@@ -118,7 +118,7 @@ module MicroStepsLibrary
     def parallel_exec_command_wrapper(cmd, taktuk_connector, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, taktuk_connector, @output, instance_thread, @process_container)
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
       classify_nodes(po.execute(cmd))
       return (not @nodes_ok.empty?)
     end
@@ -135,7 +135,7 @@ module MicroStepsLibrary
     def parallel_exec_command_wrapper_expecting_status(cmd, status, taktuk_connector, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, taktuk_connector, @output, instance_thread, @process_container)
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
       classify_nodes(po.execute_expecting_status(cmd, status))
       return (not @nodes_ok.empty?)
     end 
@@ -153,7 +153,7 @@ module MicroStepsLibrary
     def parallel_exec_command_wrapper_expecting_status_and_output(cmd, status, output, taktuk_connector, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, taktuk_connector, @output, instance_thread, @process_container)
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
       classify_nodes(po.execute_expecting_status_and_output(cmd, status, output))
       return (not @nodes_ok.empty?)
     end
@@ -171,7 +171,7 @@ module MicroStepsLibrary
     def parallel_send_file_command_wrapper(file, dest_dir, scattering_kind, taktuk_connector, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, taktuk_connector, @output, instance_thread, @process_container)
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
       classify_nodes(po.send_file(file, dest_dir, scattering_kind))
       return (not @nodes_ok.empty?)
     end
@@ -191,7 +191,7 @@ module MicroStepsLibrary
     def parallel_exec_cmd_with_input_file_wrapper(file, cmd, scattering_kind, taktuk_connector, status, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, taktuk_connector, @output, instance_thread, @process_container)
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
       classify_nodes(po.exec_cmd_with_input_file(file, cmd, scattering_kind, status))
       return (not @nodes_ok.empty?)
     end
@@ -209,7 +209,7 @@ module MicroStepsLibrary
     def parallel_wait_nodes_after_reboot_wrapper(timeout, ports_up, ports_down, nodes_check_window, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, nil, @output, instance_thread, @process_container)
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, nil, @output, instance_thread, @process_container)
       classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window))
       return (not @nodes_ok.empty?)
     end
@@ -944,11 +944,20 @@ module MicroStepsLibrary
         @output.verbosel(0, "The #{tarball_kind} archive kind is not supported")
         return false
       end
+
       list = String.new
       list = "-m #{Socket.gethostname()}"
-      @nodes_ok.make_sorted_array_of_nodes.each { |node|
-        list += " -m #{node.hostname}"
-      }
+
+      if @config.cluster_specific[@cluster].use_ip_to_deploy then
+        @nodes_ok.make_sorted_array_of_nodes.each { |node|
+          list += " -m #{node.ip}"
+        }
+      else
+        @nodes_ok.make_sorted_array_of_nodes.each { |node|
+          list += " -m #{node.hostname}"
+        }
+      end
+
       if @config.common.taktuk_auto_propagate then
         cmd = "kastafior -s -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
       else

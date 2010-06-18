@@ -8,13 +8,13 @@
 #Kadeploy libs
 require 'config'
 require 'md5'
+require 'port_scanner'
 
 #Ruby libs
 require 'thread'
 require 'drb'
 require 'socket'
 require 'tempfile'
-require 'ping'
 
 class KadeployClient
   @kadeploy_server = nil
@@ -196,7 +196,7 @@ if (exec_specific_config != nil) then
   if (exec_specific_config.multi_server) then
     exec_specific_config.servers.each_pair { |server,info|
       if (server != "default") then
-        if (Ping.pingecho(info[0], 1, info[1])) then
+        if (PortScanner::is_open?(info[0], info[1])) then
           DRb.start_service()
           uri = "druby://#{info[0]}:#{info[1]}"
           kadeploy_server = DRbObject.new(nil, uri)
@@ -216,7 +216,7 @@ if (exec_specific_config != nil) then
       exit(1)
     end
   else
-    if (Ping.pingecho(exec_specific_config.servers[exec_specific_config.chosen_server][0], 1, exec_specific_config.servers[exec_specific_config.chosen_server][1])) then
+    if (PortScanner::is_open?(exec_specific_config.servers[exec_specific_config.chosen_server][0], exec_specific_config.servers[exec_specific_config.chosen_server][1]) then
       nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
     else
       puts "The #{exec_specific_config.chosen_server} server is unreachable"

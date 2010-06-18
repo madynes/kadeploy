@@ -853,6 +853,13 @@ module ConfigInformation
                     puts "Invalid value for the partition_creation_kind in the #{cluster} config file. Expected values are fdisk or parted"
                     return false
                   end
+                when "use_ip_to_deploy"
+                  if val =~ /\A(true|false)\Z/ then
+                    @cluster_specific[cluster].use_ip_to_deploy = (val == "true")
+                  else
+                    puts "Invalid value for the use_ip_to_deploy field in the #{cluster} config file. Expected values are true or false"
+                    return false
+                  end
                 end
               end
             end
@@ -2714,6 +2721,7 @@ module ConfigInformation
     attr_accessor :nfsroot_params
     attr_accessor :admin_pre_install
     attr_accessor :admin_post_install
+    attr_accessor :use_ip_to_deploy
 
     # Constructor of ClusterSpecificConfig
     #
@@ -2753,6 +2761,7 @@ module ConfigInformation
       @admin_post_install = nil
       @partition_creation_kind = nil
       @partition_file = nil
+      @use_ip_to_deploy = false
     end
     
 
@@ -2795,6 +2804,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.use_ip_to_deploy = @use_ip_to_deploy
     end
     
     # Duplicate a ClusterSpecificConfig instance
@@ -2838,6 +2848,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.use_ip_to_deploy = @use_ip_to_deploy
     end
 
     # Check if all the fields of the common configuration file are filled

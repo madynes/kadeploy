@@ -748,6 +748,19 @@ module Nodes
       return nil
     end
 
+    # Get a Node in a NodeSet by its ip
+    #
+    # Arguments
+    # * ip: ip of the node searched
+    # Output
+    # * return nil if the node can not be found
+    def get_node_by_ip(ip)
+      @set.each { |node|
+        return node if (node.ip == ip)
+      }
+      return nil
+    end
+
     # Set an error message to a NodeSet
     #
     # Arguments

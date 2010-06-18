@@ -5,11 +5,11 @@
 
 #Contrib libs
 require 'taktuk_wrapper'
+require 'port_scanner'
 
 #Ruby libs
 require 'yaml'
 require 'socket'
-require 'ping'
 
 module ParallelOperations
   class ParallelOps
@@ -19,6 +19,7 @@ module ParallelOperations
     @taktuk_auto_propagate = nil
     @output = nil
     @config = nil
+    @cluster = nil
     @instance_thread = nil
     @process_container = nil
 
@@ -27,19 +28,37 @@ module ParallelOperations
     # Arguments   
     # * nodes: instance of NodeSet
     # * config: instance of Config
+    # * cluster: cluster
     # * taktuk_connector: specifies the connector to use with Taktuk
     # * output: OutputControl instance
+    # * instance_thread: current thread instance
+    # * process_container: process container
     # Output
     # * nothing
-    def initialize(nodes, config, taktuk_connector, output, instance_thread, process_container)
+    def initialize(nodes, config, cluster, taktuk_connector, output, instance_thread, process_container)
       @nodes = nodes
       @config = config
+      @cluster = cluster
       @taktuk_connector = taktuk_connector
       @taktuk_tree_arity = config.common.taktuk_tree_arity
       @taktuk_auto_propagate = config.common.taktuk_auto_propagate
       @output = output
       @instance_thread = instance_thread
       @process_container = process_container
+    end
+
+    def make_node_list_for_taktuk
+      n = String.new
+      if @config.cluster_specific[@cluster].use_ip_to_deploy then
+        @nodes.make_sorted_array_of_nodes.each { |node|
+          n += " -m #{node.ip}"
+        }
+      else
+        @nodes.make_sorted_array_of_nodes.each { |node|
+          n += " -m #{node.hostname}"
+        }
+      end
+      return n
     end
 
     # Generate the header of a Taktuk command
@@ -66,9 +85,7 @@ module ParallelOperations
     # * returns a string that contains the Taktuk command line for an exec command
     def make_taktuk_exec_cmd(cmd)
       args = String.new
-      @nodes.set.each { |node|
-        args += " -m #{node.hostname}"
-      }
+      args += make_node_list_for_taktuk()
       args += " broadcast exec [ #{cmd} ]"
       return make_taktuk_header_cmd + args.split(" ")
     end
@@ -93,9 +110,7 @@ module ParallelOperations
       else
         raise "Invalid structure for broadcasting file"
       end
-      @nodes.make_sorted_array_of_nodes.each { |node|
-        args += " -m #{node.hostname}"
-      }
+      args += make_node_list_for_taktuk()
       args += " broadcast put [ #{file} ] [ #{dest_dir} ]"
       return make_taktuk_header_cmd + args.split(" ")
     end
@@ -120,9 +135,7 @@ module ParallelOperations
       else
         raise "Invalid structure for broadcasting file"
       end
-      @nodes.make_sorted_array_of_nodes.each { |node|
-        args += " -m #{node.hostname}"
-      }
+      args += make_node_list_for_taktuk()
       args += " broadcast exec [ #{cmd} ];"
       args += " broadcast input file [ #{file} ]"
       return make_taktuk_header_cmd + args.split(" ")      
@@ -181,9 +194,14 @@ module ParallelOperations
       init_nodes_state_before_exec_command
       tree['hosts'].each_value { |h|
         h['commands'].each_value { |x|
-          @nodes.get_node_by_host(h['host_name']).last_cmd_exit_status = x['status']
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
+          if @config.cluster_specific[@cluster].use_ip_to_deploy then
+            node = @nodes.get_node_by_ip(h['host_name'])
+          else
+            node = @nodes.get_node_by_host(h['host_name'])
+          end
+          node.last_cmd_exit_status = x['status']
+          node.last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
+          node.last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
         }
       }
     end
@@ -201,8 +219,13 @@ module ParallelOperations
                                     "infos"=>tw.infos})))
       init_nodes_state_before_send_file_command
       tree['connectors'].each_value { |h|
-        @nodes.get_node_by_host(h['peer']).last_cmd_exit_status = "256"
-        @nodes.get_node_by_host(h['peer']).last_cmd_stderr = "The node #{h['peer']} is unreachable"
+        if @config.cluster_specific[@cluster].use_ip_to_deploy then
+          node = @nodes.get_node_by_ip(h['host_name'])
+        else
+          node = @nodes.get_node_by_host(h['host_name'])
+        end
+        node.last_cmd_exit_status = "256"
+        node.last_cmd_stderr = "The node #{h['peer']} is unreachable"
        }
     end
 
@@ -220,9 +243,14 @@ module ParallelOperations
       init_nodes_state_before_exec_command
       tree['hosts'].each_value { |h|
         h['commands'].each_value { |x|
-          @nodes.get_node_by_host(h['host_name']).last_cmd_exit_status = x['status']
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
-          @nodes.get_node_by_host(h['host_name']).last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
+          if @config.cluster_specific[@cluster].use_ip_to_deploy then
+            node = @nodes.get_node_by_ip(h['host_name'])
+          else
+            node = @nodes.get_node_by_host(h['host_name'])
+          end
+          node.last_cmd_exit_status = x['status']
+          node.last_cmd_stdout = x['output'].chomp.gsub(/\n/,"\\n")
+          node.last_cmd_stderr = x['error'].chomp.gsub(/\n/,"\\n")
         }
       }
     end
@@ -409,10 +437,16 @@ module ParallelOperations
           ns.set.each { |node|
             sub_tid = Thread.new {
               all_ports_ok = true
-              if Ping.pingecho(node.hostname, 1, @config.common.ssh_port) then
+              
+              if @config.cluster_specific[@cluster].use_ip_to_deploy
+                nodeid = node.ip
+              else
+                nodeid = node.hostname
+              end
+              PortScanner::is_open?(nodeid, @config.common.ssh_port) then
                 ports_up.each { |port|
                   begin
-                    s = TCPsocket.open(node.hostname, port)
+                    s = TCPsocket.open(nodeid, port)
                     s.close
                   rescue Errno::ECONNREFUSED
                     all_ports_ok = false
@@ -425,7 +459,7 @@ module ParallelOperations
                 if all_ports_ok then
                   ports_down.each { |port|
                     begin
-                      s = TCPsocket.open(node.hostname, port)
+                      s = TCPsocket.open(nodeid, port)
                       all_ports_ok = false
                       s.close
                     rescue Errno::ECONNREFUSED
