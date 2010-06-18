@@ -3,6 +3,8 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+require 'socket'
+
 module PortScanner
   # Test if a port is open
   #
