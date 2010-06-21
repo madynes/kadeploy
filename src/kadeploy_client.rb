@@ -216,7 +216,7 @@ if (exec_specific_config != nil) then
       exit(1)
     end
   else
-    if (PortScanner::is_open?(exec_specific_config.servers[exec_specific_config.chosen_server][0], exec_specific_config.servers[exec_specific_config.chosen_server][1]) then
+    if (PortScanner::is_open?(exec_specific_config.servers[exec_specific_config.chosen_server][0], exec_specific_config.servers[exec_specific_config.chosen_server][1])) then
       nodes_by_server[exec_specific_config.chosen_server] = exec_specific_config.node_array
     else
       puts "The #{exec_specific_config.chosen_server} server is unreachable"

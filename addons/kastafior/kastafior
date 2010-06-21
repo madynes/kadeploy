@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
 # Originally developped by Olivier Richard - IMAG ( - 2008)
-# Slightly modified by Emmanuel Jeanvoine - INRIA (2009)
+# Slightly modified by Emmanuel Jeanvoine - INRIA (2009 - 2010)
 
 use strict;
 use IO::Socket;
@@ -39,6 +39,9 @@ my $remote_port = 0;
 my $nb_bytes = 0;
 
 my $buf_size = 64 * 1024;
+
+my $host = "";
+my $server_hostport = "";
 
 # Print help message
 sub usage()
@@ -227,8 +230,16 @@ else
     else  
     {
 	$server_socket = create_TCP_server_socket();
-	my $server_hostport = hostname.':'.$server_socket->sockport();
-
+	# If /tmp/kastafior_hostname doesn't exist, we use a gethostname call to get the hostname
+	if (-r "/tmp/kastafior_hostname") {
+	    open(FD, "/tmp/kastafior_hostname");
+	    $host = <FD>;
+	    close(FD);
+	    chomp($host);
+	    $server_hostport = $host.':'.$server_socket->sockport();
+	} else {
+	    $server_hostport = hostname.':'.$server_socket->sockport();
+	}
 	my $next = $ENV{TAKTUK_RANK}-1;
 	if (not taktuk::send(to=>$next,body=>"$server_hostport"))
 	{

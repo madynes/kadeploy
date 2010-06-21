@@ -1430,7 +1430,7 @@ module ConfigInformation
     def Config.load_kaenv_cmdline_options(exec_specific)
       opts = OptionParser::new do |opt|
         opt.summary_indent = "  "
-        opt.summary_width = 36
+        opt.summary_width = 38
         opt.banner = "Usage: kaenv3 [options]"
         opt.separator "Contact: #{CONTACT_EMAIL}"
         opt.separator ""

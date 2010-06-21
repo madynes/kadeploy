@@ -931,6 +931,30 @@ module MicroStepsLibrary
     # Output
     # * return true if the operation is correctly performed, false otherwise
     def send_tarball_and_uncompress_with_kastafior(tarball_file, tarball_kind, deploy_mount_point, deploy_part, instance_thread)
+      if @config.cluster_specific[@cluster].use_ip_to_deploy then
+        pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+        @nodes_ok.set.each { |node|
+          kastafior_hostname = node.ip
+          cmd = "#{@config.common.taktuk_connector} #{node.ip} \"echo #{node.ip} > /tmp/kastafior_hostname\""
+          pr.add(cmd, node)
+        }
+        pr.run
+        pr.wait
+      end
+
+      list = String.new
+      list = "-m #{Socket.gethostname()}"
+    
+      if @config.cluster_specific[@cluster].use_ip_to_deploy then
+        @nodes_ok.make_sorted_array_of_nodes.each { |node|
+          list += " -m #{node.ip}"
+        }
+      else
+        @nodes_ok.make_sorted_array_of_nodes.each { |node|
+          list += " -m #{node.hostname}"
+        }
+      end
+
       case tarball_kind
       when "tgz"
         cmd = "tar xz -C #{deploy_mount_point}"
@@ -944,29 +968,6 @@ module MicroStepsLibrary
         @output.verbosel(0, "The #{tarball_kind} archive kind is not supported")
         return false
       end
-
-      list = String.new
-      list = "-m #{Socket.gethostname()}"
-    
-      if @config.cluster_specific[@cluster].use_ip_to_deploy then
-        @nodes_ok.make_sorted_array_of_nodes.each { |node|
-          list += " -m #{node.ip}"
-        }
-        kastafior_hostname = node.ip
-      else
-        @nodes_ok.make_sorted_array_of_nodes.each { |node|
-          list += " -m #{node.hostname}"
-        }
-        kastafior_hostname = node.hostname
-      end
-
-      pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
-      @nodes_ok.set { |node|
-        cmd = "#{@config.common.taktuk_connector} \"echo #{kastafior_hostname} > /tmp/kastafior.hostname\""
-        pr.add(cmd, node)
-      }
-      pr.run
-      pr.wait
 
       if @config.common.taktuk_auto_propagate then
         cmd = "kastafior -s -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
