@@ -5,11 +5,11 @@
 
 #Contrib libs
 require 'taktuk_wrapper'
-require 'port_scanner'
 
 #Ruby libs
 require 'yaml'
 require 'socket'
+require 'ping'
 
 module ParallelOperations
   class ParallelOps
@@ -443,7 +443,7 @@ module ParallelOperations
               else
                 nodeid = node.hostname
               end
-              if (PortScanner::is_open?(nodeid, @config.common.ssh_port)) then
+              if Ping.pingecho(nodeid, 1, @config.common.ssh_port) then
                 ports_up.each { |port|
                   begin
                     s = TCPsocket.open(nodeid, port)
