@@ -173,8 +173,6 @@ module BroadcastEnvironment
             result = result && @step.manage_admin_post_install("tree")
             result = result && @step.manage_user_post_install("tree")
             result = result && @step.send_key("tree")
-            result = result && @step.install_bootloader
-            result = result && @step.switch_pxe("deploy_to_deployed_env")
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -230,8 +228,6 @@ module BroadcastEnvironment
             result = result && @step.manage_admin_post_install("tree")
             result = result && @step.manage_user_post_install("tree")
             result = result && @step.send_key("tree")
-            result = result && @step.install_bootloader
-            result = result && @step.switch_pxe("deploy_to_deployed_env")
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -287,8 +283,6 @@ module BroadcastEnvironment
             result = result && @step.manage_admin_post_install("tree")
             result = result && @step.manage_user_post_install("tree")
             result = result && @step.send_key("tree")
-            result = result && @step.install_bootloader
-            result = result && @step.switch_pxe("deploy_to_deployed_env")
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -345,8 +339,6 @@ module BroadcastEnvironment
             result = result && @step.manage_admin_post_install("tree")
             result = result && @step.manage_user_post_install("tree")
             result = result && @step.send_key("tree")
-            result = result && @step.install_bootloader
-            result = result && @step.switch_pxe("deploy_to_deployed_env")
             #End of micro steps
           }
           @instances.push(instance_thread)

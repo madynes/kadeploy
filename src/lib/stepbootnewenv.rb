@@ -174,6 +174,8 @@ module BootNewEnvironment
               timeout = @config.exec_specific.reboot_kexec_timeout
             end
             #Here are the micro steps
+            result = result && @step.install_bootloader
+            result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.reboot("kexec", false, false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
                                                  timeout)
@@ -285,6 +287,8 @@ module BootNewEnvironment
               timeout = @config.exec_specific.reboot_classical_timeout
             end
             #Here are the micro steps 
+            result = result && @step.install_bootloader
+            result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.umount_deploy_part
             result = result && @step.reboot_from_deploy_env
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
@@ -345,6 +349,8 @@ module BootNewEnvironment
               timeout = @config.exec_specific.reboot_classical_timeout
             end
             #Here are the micro steps 
+            result = result && @step.install_bootloader
+            result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.reboot("hard", false)
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
                                                  timeout)
