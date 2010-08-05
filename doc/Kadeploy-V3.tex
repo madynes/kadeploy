@@ -285,6 +285,8 @@ almighty_env_users = root,ejeanvoine
 async_end_of_deployment_hook = echo WORKFLOW_ID
 async_end_of_reboot_hook = echo REBOOT_ID
 async_end_of_power_hook = echo POWER_ID
+vlan_hostname_suffix = -kavlan-VLAN_ID
+set_vlan_cmd = kavlan NODES -s -i VLAN_ID -u USER
 \end{verbatim}
 \end{small}
 
@@ -337,6 +339,8 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{async\_end\_of\_deployment\_hook}: command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
 \item \texttt{async\_end\_of\_reboot\_hook}: command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
 \item \texttt{async\_end\_of\_power\_hook}: command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
+\item \texttt{vlan\_hostname\_suffix}: this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
+\item \texttt{set\_vlan\_cmd}: command to launch in orded to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
 \end{itemize}
 
 \section{Cluster-specific configuration files}\label{sec:specific_config}
@@ -711,6 +715,7 @@ General options:
   -s, --script FILE                Execute a script at the end of the deployment
   -u, --user USERNAME              Specify the user
   -v, --version                    Get the version
+      --vlan VLANID                Set the VLAN"
   -w, --set-pxe-profile FILE       Set the PXE profile (use with caution)
   -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
                                    directory. Those files will be prefixed with "pxe-$username-" 

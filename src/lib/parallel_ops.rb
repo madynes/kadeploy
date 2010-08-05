@@ -409,9 +409,10 @@ module ParallelOperations
     # * ports_up: array of ports that must be up on the rebooted nodes to test
     # * ports_down: array of ports that must be down on the rebooted nodes to test
     # * nodes_check_window: instance of WindowManager
+    # * last_reboot: specify if we wait the last reboot
     # Output
     # * returns an array that contains two arrays ([0] is the nodes OK and [1] is the nodes KO)    
-    def wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window)
+    def wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, last_reboot)
       start = Time.now.tv_sec
       good_nodes = Array.new
       bad_nodes = Array.new
@@ -438,10 +439,14 @@ module ParallelOperations
             sub_tid = Thread.new {
               all_ports_ok = true
               
-              if @config.cluster_specific[@cluster].use_ip_to_deploy
-                nodeid = node.ip
+              if (last_reboot && (@config.exec_specific.vlan != nil)) then
+                nodeid = @config.exec_specific.ip_in_vlan[node.hostname]
               else
-                nodeid = node.hostname
+                if (@config.cluster_specific[@cluster].use_ip_to_deploy) then
+                  nodeid = node.ip
+                else
+                  nodeid = node.hostname
+                end
               end
               if Ping.pingecho(nodeid, 1, @config.common.ssh_port) then
                 ports_up.each { |port|

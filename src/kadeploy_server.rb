@@ -620,6 +620,10 @@ class KadeployServer
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             return 3
           end
+          if not system("chmod +r #{local_pxe_file}") then
+            output.verbosel(0, "Cannot add read rights on the pxe file")
+            return 3
+          end
         }
         gfm = nil
       end
@@ -659,6 +663,7 @@ class KadeployServer
             raise "Invalid kind of reboot: #{@reboot_kind}"
           end
           step.reboot(exec_specific.reboot_level, true)
+          step.set_vlan
           if exec_specific.wait then
             if (exec_specific.reboot_classical_timeout == nil) then
               timeout = @config.cluster_specific[cluster].timeout_reboot_classical
@@ -667,12 +672,12 @@ class KadeployServer
             end
             if (exec_specific.reboot_kind == "deploy_env") then
               step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
-                               timeout)
+                               timeout, true)
               step.send_key_in_deploy_env("tree")
               set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
             else
               step.wait_reboot([@config.common.ssh_port],[],
-                               timeout)
+                               timeout, true)
 
               if (exec_specific.reboot_kind == "env_recorded") then
                 part = String.new
@@ -840,15 +845,16 @@ class KadeployServer
                 raise "Invalid kind of reboot: #{@reboot_kind}"
               end
               step.reboot(exec_specific.reboot_level, true)
+              step.set_vlan
               if exec_specific.wait then
                 if (exec_specific.reboot_kind == "deploy_env") then
                   step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
-                                   @config.cluster_specific[cluster].timeout_reboot_classical)
+                                   @config.cluster_specific[cluster].timeout_reboot_classical, true)
                   step.send_key_in_deploy_env("tree")
                   set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
                 else
                   step.wait_reboot([@config.common.ssh_port],[],
-                                   @config.cluster_specific[cluster].timeout_reboot_classical)
+                                   @config.cluster_specific[cluster].timeout_reboot_classical, true)
 
                   if (exec_specific.reboot_kind == "env_recorded") then
                     part = String.new

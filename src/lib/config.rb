@@ -12,7 +12,8 @@ require 'checkrights'
 #Ruby libs
 require 'optparse'
 require 'ostruct'
-require "fileutils"
+require 'fileutils'
+require 'resolv'
 
 module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
@@ -99,6 +100,24 @@ module ConfigInformation
           return false
         end
       }
+      
+      #VLAN
+      if (exec_specific_config.vlan != nil) then
+        if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
+          Debug::distant_client_error("No VLAN can be used on this site (some configuration is missing)", client)
+          return false
+        else
+          dns = Resolv::DNS.new
+          exec_specific_config.ip_in_vlan = Hash.new
+          exec_specific_config.node_array.each { |hostname|
+            hostname_a = hostname.split(".")
+            hostname_in_vlan = "#{hostname_a[0]}#{@common.vlan_hostname_suffix}.#{hostname_a[1..-1].join(".")}".gsub("VLAN_ID", exec_specific_config.vlan)
+            exec_specific_config.ip_in_vlan[hostname] = dns.getaddress(hostname_in_vlan).to_s
+          }
+          dns.close
+          dns = nil
+        end
+      end
 
       #Rights check
       allowed_to_deploy = true
@@ -151,12 +170,31 @@ module ConfigInformation
     end
 
     def check_kareboot_config(exec_specific_config, db, client)
-       exec_specific_config.node_array.each { |hostname|
+      #Nodes check
+      exec_specific_config.node_array.each { |hostname|
         if not add_to_node_set(hostname, exec_specific_config) then
           Debug::distant_client_error("The node #{hostname} does not exist", client)
           return false
         end
       }
+      
+      #VLAN
+      if (exec_specific_config.vlan != nil) then
+        if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
+          Debug::distant_client_error("No VLAN can be used on this site (some configuration is missing)", client)
+          return false
+        else
+          dns = Resolv::DNS.new
+          exec_specific_config.ip_in_vlan = Hash.new
+          exec_specific_config.node_array.each { |hostname|
+            hostname_a = hostname.split(".")
+            hostname_in_vlan = "#{hostname_a[0]}#{@common.vlan_hostname_suffix}.#{hostname_a[1..-1].join(".")}".gsub("VLAN_ID", exec_specific_config.vlan)
+            exec_specific_config.ip_in_vlan[hostname] = dns.getaddress(hostname_in_vlan).to_s
+          }
+          dns.close
+          dns = nil
+        end
+      end
 
       #Rights check
       allowed_to_deploy = true
@@ -299,6 +337,8 @@ module ConfigInformation
       exec_specific.kadeploy_server_port = String.new
       exec_specific.reboot_classical_timeout = nil
       exec_specific.reboot_kexec_timeout = nil
+      exec_specific.vlan = nil
+      exec_specific.ip_in_vlan = nil
       
       if Config.load_kadeploy_cmdline_options(exec_specific) then
         return exec_specific
@@ -605,6 +645,10 @@ module ConfigInformation
               @common.async_end_of_reboot_hook = val
             when "async_end_of_power_hook"
               @common.async_end_of_power_hook = val
+            when "vlan_hostname_suffix"
+              @common.vlan_hostname_suffix = val
+            when "set_vlan_cmd"
+              @common.set_vlan_cmd = val
             end
           end
         end
@@ -1207,6 +1251,9 @@ module ConfigInformation
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
+        }
+        opt.on("--vlan VLANID", "Set the VLAN") { |id|
+          exec_specific.vlan = id
         }
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
           if not File.readable?(f) then
@@ -2080,7 +2127,9 @@ module ConfigInformation
       exec_specific.kadeploy_server_port = String.new
       exec_specific.multi_server = false
       exec_specific.debug = false
-      exec_specific.reboot_classical_timeout = nil      
+      exec_specific.reboot_classical_timeout = nil
+      exec_specific.vlan = nil
+      exec_specific.ip_in_vlan = nil
 
       if Config.load_kareboot_cmdline_options(exec_specific) then
         return exec_specific
@@ -2205,6 +2254,9 @@ module ConfigInformation
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
+        }
+        opt.on("--vlan VLANID", "Set the VLAN") { |id|
+          exec_specific.vlan = id
         }
         opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
           exec_specific.pxe_profile_file = file
@@ -2636,6 +2688,8 @@ module ConfigInformation
     attr_accessor :async_end_of_deployment_hook
     attr_accessor :async_end_of_reboot_hook
     attr_accessor :async_end_of_power_hook
+    attr_accessor :vlan_hostname_suffix
+    attr_accessor :set_vlan_cmd
 
     # Constructor of CommonConfig
     #
@@ -2651,6 +2705,8 @@ module ConfigInformation
       @async_end_of_deployment_hook = ""
       @async_end_of_reboot_hook = ""
       @async_end_of_power_hook = ""
+      @vlan_hostname_suffix = ""
+      @set_vlan_cmd = ""
     end
 
     # Check if all the fields of the common configuration file are filled

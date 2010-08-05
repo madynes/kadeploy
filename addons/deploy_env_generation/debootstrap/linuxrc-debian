@@ -120,11 +120,12 @@ do
     echo "nameserver $ns" >> /etc/resolv.conf
 done
 
-# synchronize system clock with ntp and set the hardware clock
-echo "Synchronizing the system clock with ntp" > ${TTY}
-ntpdate ntp.${DNSDOMAIN}
-echo "Synchronizing the hardware clock with the system clock" > ${TTY}
-hwclock --systohw
+# This is useful in Grid5000
+# # synchronize system clock with ntp and set the hardware clock
+# echo "Synchronizing the system clock with ntp" > ${TTY}
+# ntpdate ntp.${DNSDOMAIN}
+# echo "Synchronizing the hardware clock with the system clock" > ${TTY}
+# hwclock --systohc
 
 ## load disk driver
 get_param DISK_DRV

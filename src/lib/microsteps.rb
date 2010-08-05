@@ -204,13 +204,14 @@ module MicroStepsLibrary
     # * ports_down: down ports probed on the rebooted nodes to test
     # * nodes_check_window: instance of WindowManager
     # * instance_thread: thread id of the current thread
+    # * last_reboot: specify if we wait the last reboot
     # Output
     # * return true if at least one node has been successfully rebooted, false otherwise
-    def parallel_wait_nodes_after_reboot_wrapper(timeout, ports_up, ports_down, nodes_check_window, instance_thread)
+    def parallel_wait_nodes_after_reboot_wrapper(timeout, ports_up, ports_down, nodes_check_window, instance_thread, last_reboot)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
       po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, nil, @output, instance_thread, @process_container)
-      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window))
+      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, last_reboot))
       return (not @nodes_ok.empty?)
     end
 
@@ -1382,8 +1383,16 @@ module MicroStepsLibrary
           return false
         end
       when "deploy_to_deployed_env"
+        array_of_ip = Array.new
+        if (@config.exec_specific.vlan == nil) then
+          array_of_ip = @nodes_ok.make_array_of_ip
+        else
+          @nodes_ok.make_array_of_hostname.each { |hostname|
+            array_of_ip.push(@config.exec_specific.ip_in_vlan[hostname])
+          }
+        end
         if (@config.exec_specific.pxe_profile_msg != "") then
-          if not PXEOperations::set_pxe_for_custom(@nodes_ok.make_array_of_ip,
+          if not PXEOperations::set_pxe_for_custom(array_of_ip,
                                                    @config.exec_specific.pxe_profile_msg,
                                                    @config.common.tftp_repository,
                                                    @config.common.tftp_cfg) then
@@ -1408,7 +1417,7 @@ module MicroStepsLibrary
                   return false
                 end
               end
-              if not PXEOperations::set_pxe_for_linux(@nodes_ok.make_array_of_ip,
+              if not PXEOperations::set_pxe_for_linux(array_of_ip,
                                                       kernel,
                                                       get_kernel_params(),
                                                       initrd,
@@ -1439,7 +1448,7 @@ module MicroStepsLibrary
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{hypervisor}")
                 return false
               end
-              if not PXEOperations::set_pxe_for_xen(@nodes_ok.make_array_of_ip,
+              if not PXEOperations::set_pxe_for_xen(array_of_ip,
                                                     hypervisor,
                                                     @config.exec_specific.environment.hypervisor_params,
                                                     kernel,
@@ -1461,7 +1470,7 @@ module MicroStepsLibrary
                                @output)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
-              PXEOperations::set_pxe_for_chainload(@nodes_ok.make_array_of_ip,
+              PXEOperations::set_pxe_for_chainload(array_of_ip,
                                                    get_deploy_part_num(),
                                                    @config.common.tftp_repository,
                                                    @config.common.tftp_images_path,
@@ -1487,7 +1496,7 @@ module MicroStepsLibrary
                 @output.verbosel(0, "Cannot touch #{images_dir}/#{hypervisor}")
                 return false
               end
-              if not PXEOperations::set_pxe_for_xen(@nodes_ok.make_array_of_ip,
+              if not PXEOperations::set_pxe_for_xen(array_of_ip,
                                                     hypervisor,
                                                     @config.exec_specific.environment.hypervisor_params,
                                                     kernel,
@@ -1780,14 +1789,16 @@ module MicroStepsLibrary
     # * ports_up: up ports used to perform a reach test on the nodes
     # * ports_down: down ports used to perform a reach test on the nodes
     # * timeout: reboot timeout
+    # * last_reboot: specify if we wait the last reboot
     # Output
     # * return true if some nodes are here, false otherwise
-    def ms_wait_reboot(instance_thread, ports_up, ports_down, timeout)
+    def ms_wait_reboot(instance_thread, ports_up, ports_down, timeout, last_reboot = false)
       return parallel_wait_nodes_after_reboot_wrapper(timeout, 
                                                       ports_up, 
                                                       ports_down,
                                                       @nodes_check_window,
-                                                      instance_thread)
+                                                      instance_thread,
+                                                      last_reboot)
     end
     
     # Eventually install a bootloader
@@ -2007,6 +2018,30 @@ module MicroStepsLibrary
         }
       else
         @output.verbosel(3, "  *** Bypass the user postinstalls")
+      end
+      return true
+    end
+
+    # Set a VLAN for the deployed nodes
+    #
+    # Arguments
+    # * instance_thread: thread id of the current thread
+    # Output
+    # * return true if the operation has been correctly performed, false otherwise
+    def ms_set_vlan(instance_thread)
+      if (@config.exec_specific.vlan != nil) then
+        list = String.new
+        @nodes_ok.make_array_of_hostname.each { |hostname|
+          list += " -m #{hostname}"
+        }
+        cmd = @config.common.set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", @config.exec_specific.vlan).gsub("USER", @config.exec_specific.true_user)
+        if (not system(cmd)) then
+          @output.verbosel(0, "Cannot set the VLAN")
+          @nodes_ok.duplicate_and_free(@nodes_ko)
+          return false
+        end
+      else
+        @output.verbosel(3, "  *** Bypass the VLAN setting")
       end
       return true
     end

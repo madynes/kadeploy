@@ -120,6 +120,7 @@
       <citerefentry><refentrytitle>kanodes3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
       <citerefentry><refentrytitle>kaconsole3</refentrytitle><manvolnum>1</manvolnum></citerefentry>,
       <citerefentry><refentrytitle>kastat3</refentrytitle><manvolnum>1</manvolnum></citerefentry>
+      <citerefentry><refentrytitle>kapower3</refentrytitle><manvolnum>1</manvolnum></citerefentry>
     </para>
     
     <para>Project homepage: <ulink url="https://gforge.inria.fr/projects/kadeploy3/">https://gforge.inria.fr/projects/kadeploy3/</ulink></para>
