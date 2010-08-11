@@ -15,17 +15,18 @@ module Cache
   # * output: OutputControl instance
   # Output
   # * returns the size in bytes if the directory exist, 0 otherwise
-  def Cache::get_dir_size(dir, output)
+  def Cache::get_dir_size_with_sub_dirs(dir, output)
     sum = 0
     if FileTest.directory?(dir) then
       begin
         Dir.foreach(dir) { |f|
-          if (f != ".") && (f != "..") then
-            if FileTest.directory?(dir + "/" + f) then
-              sum += get_dir_size(dir + "/" + f, output)
-            else
-              sum += File.stat(dir + "/" + f).size
+          full_path = File.join(dir, f)
+          if FileTest.directory?(full_path) then
+            if (f != ".") && (f != "..") then
+              sum += get_dir_size(full_path, output)
             end
+          else
+            sum += File.stat(full_path).size
           end
         }
       rescue
@@ -34,6 +35,30 @@ module Cache
     end
     return sum
   end
+
+  # Get the size of a directory (excluding sub-dirs)
+  # Arguments
+  # * dir: dirname
+  # * output: OutputControl instance
+  # Output
+  # * returns the size in bytes if the directory exist, 0 otherwise
+  def Cache::get_dir_size_without_sub_dirs(dir, output)
+    sum = 0
+    if FileTest.directory?(dir) then
+      begin
+        Dir.foreach(dir) { |f|
+          full_path = File.join(dir, f)
+          if not FileTest.directory?(full_path) then
+            sum += File.stat(full_path).size
+          end
+        }
+      rescue
+        output.debug_server("Access not allowed in the cache: #{$!}")
+      end
+    end
+    return sum
+  end
+
 
   public
 
@@ -49,16 +74,17 @@ module Cache
   # * nothing
   def Cache::clean_cache(dir, max_size, time_before_delete, pattern, output)
     no_change = false
-    while (get_dir_size(dir, output) > max_size) && (not no_change)
+    while (get_dir_size_without_sub_dirs(dir, output) > max_size) && (not no_change)
       lru = ""
       begin
         Dir.foreach(dir) { |f|
-          if ((f =~ pattern) == 0) && (f != "..") && (f != ".") then
-            access_time = File.atime(dir + "/" + f).to_i
+          full_path = File.join(dir, f)
+          if (((f =~ pattern) == 0) && (not FileTest.directory?(full_path))) then
+            access_time = File.atime(full_path).to_i
             now = Time.now.to_i
             #We only delete the file older than a given number of hours
             if  ((now - access_time) > (60 * 60 * time_before_delete)) && ((lru == "") || (File.atime(lru).to_i > access_time)) then
-              lru = dir + "/" + f
+              lru = full_path
             end
           end
         }
@@ -66,7 +92,7 @@ module Cache
           begin
             File.delete(lru)
           rescue
-            output.debug_server("Cannot delete the file #{dir}/#{f}: #{$!}")
+            output.debug_server("Cannot delete the file #{full_path}: #{$!}")
           end
         else
           no_change = true
@@ -87,11 +113,12 @@ module Cache
   # * nothing
   def Cache::remove_files(dir, pattern, output)
     Dir.foreach(dir) { |f|
-      if ((f =~ pattern) == 0) && (f != "..") && (f != ".") then
+      full_path = File.join(dir, f)
+      if (((f =~ pattern) == 0) && (not FileTest.directory?(full_path))) then
         begin
-          File.delete("#{dir}/#{f}")
+          File.delete(full_path)
         rescue
-          output.debug_server("Cannot delete the file #{dir}/#{f}: #{$!}")
+          output.debug_server("Cannot delete the file #{full_path}: #{$!}")
         end
       end
     }

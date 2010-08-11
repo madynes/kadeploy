@@ -124,7 +124,7 @@ class KadeployServer
       sock.listen(10)
       begin
         session = sock.accept
-        file = File.new(cache_dir + "/" + filename, "w")
+        file = File.new(File.join(cache_dir, filename), "w")
         while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
           file.write(buf)
         end
@@ -633,9 +633,9 @@ class KadeployServer
         key = exec_specific.key
         case key
         when /^http[s]?:\/\//
-          local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1))
+          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
         else
-          local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + File.basename(key)
+          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
         end
         if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
                                              config.common.kadeploy_cache_size, false) then
@@ -814,9 +814,9 @@ class KadeployServer
           key = exec_specific.key
           case key
           when /^http[s]?:\/\//
-            local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1))
+            local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
           else
-            local_key = config.common.kadeploy_cache_dir + "/" + user_prefix + File.basename(key)
+            local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
           end
           if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
                                                config.common.kadeploy_cache_size, false) then

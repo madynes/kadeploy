@@ -17,14 +17,14 @@ require 'resolv'
 
 module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
-  COMMANDS_FILE = "cmd"
-  NODES_FILE = "nodes"
-  VERSION_FILE = "version"
-  COMMON_CONFIGURATION_FILE = "conf"
-  CLUSTER_CONFIGURATION_FILE = "clusters"
-  CLIENT_CONFIGURATION_FILE = "client_conf"
-  SPECIFIC_CONFIGURATION_FILE_PREFIX = "specific_conf_"
-  PARTITION_FILE_PREFIX = "partition_file_"
+  COMMANDS_FILE = File.join(CONFIGURATION_FOLDER, "cmd")
+  NODES_FILE = File.join(CONFIGURATION_FOLDER, "nodes")
+  VERSION_FILE = File.join(CONFIGURATION_FOLDER, "version")
+  COMMON_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "conf")
+  CLUSTER_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "clusters")
+  CLIENT_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "client_conf")
+  SPECIFIC_CONFIGURATION_FILE_PREFIX = File.join(CONFIGURATION_FOLDER, "specific_conf_")
+  PARTITION_FILE_PREFIX = File.join(CONFIGURATION_FOLDER, "partition_file_")
   USER = `id -nu`.chomp
   CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
 
@@ -399,21 +399,21 @@ module ConfigInformation
     # Output
     # * return true if the installation is correct, false otherwise
     def sanity_check()
-      if not File.readable?(CONFIGURATION_FOLDER + "/" + COMMON_CONFIGURATION_FILE) then
-        puts "The #{CONFIGURATION_FOLDER + "/" + COMMON_CONFIGURATION_FILE} file cannot be read"
+      if not File.readable?(COMMON_CONFIGURATION_FILE) then
+        puts "The #{COMMON_CONFIGURATION_FILE} file cannot be read"
         return false
       end
-      if not File.readable?(CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE) then
-        puts "The #{CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE} file cannot be read"
+      if not File.readable?(CLUSTER_CONFIGURATION_FILE) then
+        puts "The #{CLUSTER_CONFIGURATION_FILE} file cannot be read"
         return false
       end
       #configuration node file
-      if not File.readable?(CONFIGURATION_FOLDER + "/" + NODES_FILE) then
-        puts "The #{CONFIGURATION_FOLDER + "/" + NODES_FILE} file cannot be read"
+      if not File.readable?(NODES_FILE) then
+        puts "The #{NODES_FILE} file cannot be read"
         return false
       end
-      if not File.readable?(CONFIGURATION_FOLDER + "/" + VERSION_FILE) then
-        puts "The #{CONFIGURATION_FOLDER + "/" + VERSION_FILE} file cannot be read"
+      if not File.readable?(VERSION_FILE) then
+        puts "The #{VERSION_FILE} file cannot be read"
         return false
       end
       return true
@@ -426,7 +426,7 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_common_config_file
-      IO.readlines(CONFIGURATION_FOLDER + "/" + COMMON_CONFIGURATION_FILE).each { |line|
+      IO.readlines(COMMON_CONFIGURATION_FILE).each { |line|
         if not (/^#/ =~ line) then #we ignore commented lines
           if /(.+)\ \=\ (.+)/ =~ line then
             content = Regexp.last_match
@@ -675,13 +675,13 @@ module ConfigInformation
         end
       end
       #tftp image directory
-      if not File.exist?(@common.tftp_repository + "/" + @common.tftp_images_path) then
-        puts "The #{@common.tftp_repository}/#{@common.tftp_images_path} directory does not exist"
+      if not File.exist?(File.join(@common.tftp_repository, @common.tftp_images_path)) then
+        puts "The #{File.join(@common.tftp_repository, @common.tftp_images_path)} directory does not exist"
         return false
       end
       #tftp config directory
-      if not File.exist?(@common.tftp_repository + "/" + @common.tftp_cfg) then
-        puts "The #{@common.tftp_repository}/#{@common.tftp_cfg} directory does not exist"
+      if not File.exist?(File.join(@common.tftp_repository, @common.tftp_cfg)) then
+        puts "The #{File.join(@common.tftp_repository, @common.tftp_cfg)} directory does not exist"
         return false
       end
       return true
@@ -695,7 +695,7 @@ module ConfigInformation
     # * return an Hash that contains the servers info
     def Config.load_client_config_file
       servers = Hash.new
-      IO.readlines(CONFIGURATION_FOLDER + "/" + CLIENT_CONFIGURATION_FILE).each { |line|
+      IO.readlines(CLIENT_CONFIGURATION_FILE).each { |line|
         if not (/^#/ =~ line) then #we ignore commented lines
           if /\A(default)\ \=\ (\w+)\Z/ =~ line then
             content = Regexp.last_match
@@ -734,15 +734,15 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_cluster_specific_config_files
-      IO.readlines(CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE).each { |c|
+      IO.readlines(CLUSTER_CONFIGURATION_FILE).each { |c|
         cluster = c.chomp
         if (not (/^#/ =~ cluster)) && (not (/\A\s*\Z/ =~ cluster)) then
-          cluster_file = CONFIGURATION_FOLDER + "/" + SPECIFIC_CONFIGURATION_FILE_PREFIX + cluster
+          cluster_file = SPECIFIC_CONFIGURATION_FILE_PREFIX + cluster
           if not File.readable?(cluster_file) then
             puts "The #{cluster_file} file cannot be read"
             return false
           end
-          partition_file = CONFIGURATION_FOLDER + "/" + PARTITION_FILE_PREFIX + cluster
+          partition_file = PARTITION_FILE_PREFIX + cluster
           if not File.readable?(partition_file) then
             puts "The #{partition_file} file cannot be read"
             return false
@@ -951,7 +951,7 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_nodes_config_file
-      IO.readlines(CONFIGURATION_FOLDER + "/" + NODES_FILE).each { |line|
+      IO.readlines(NODES_FILE).each { |line|
         if /\A([a-zA-Z]+[-\w.]*)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([\w.-]+)\Z/ =~ line then
           content = Regexp.last_match
           host = content[1]
@@ -960,7 +960,7 @@ module ConfigInformation
           if @cluster_specific.has_key?(cluster) then
             @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
           else
-            puts "The cluster #{cluster} has not been defined in #{CONFIGURATION_FOLDER + "/" + CLUSTER_CONFIGURATION_FILE}"
+            puts "The cluster #{cluster} has not been defined in #{CLUSTER_CONFIGURATION_FILE}"
           end
         end
         if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
@@ -998,7 +998,7 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_commands
-      commands_file = CONFIGURATION_FOLDER + "/" + COMMANDS_FILE
+      commands_file = COMMANDS_FILE
       if File.readable?(commands_file) then
         IO.readlines(commands_file).each { |line|
           if not ((/^#/ =~ line) || (/^$/ =~ line)) then #we ignore commented lines and empty lines
@@ -1049,7 +1049,7 @@ module ConfigInformation
     # Output
     # * nothing
     def load_version
-      line = IO.readlines(CONFIGURATION_FOLDER + "/" + VERSION_FILE)
+      line = IO.readlines(VERSION_FILE)
       @common.version = line[0].chomp
     end
 

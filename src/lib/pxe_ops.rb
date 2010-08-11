@@ -42,7 +42,7 @@ module PXEOperations
   # * should do something if the PXE configuration cannot be written
   def PXEOperations::write_pxe(ips, msg, tftp_repository, tftp_cfg)
     ips.each { |ip|
-      file = tftp_repository + "/" + tftp_cfg + "/" + hexalize_ip(ip)
+      file = File.join(tftp_repository, tftp_cfg, hexalize_ip(ip))
       #prevent from overwriting some linked files
       if File.exist?(file) then
         File.delete(file)

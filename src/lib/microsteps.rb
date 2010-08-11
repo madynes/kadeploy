@@ -658,19 +658,19 @@ module MicroStepsLibrary
             failed_microstep("The file #{file} cannot be extracted")
             return false
           end
-          if File.symlink?("#{dest_dir}/#{file}") then
-            link = File.readlink("#{dest_dir}/#{file}")
+          if File.symlink?(File.join(dest_dir, file)) then
+            link = File.readlink(File.join(dest_dir, file))
             if is_absolute_link?(link) then
               file = link.sub(/\A\//,"")
             elsif is_relative_link?(link) then
               base_dir = remove_sub_paths(File.dirname(file), get_nb_dotdotslash(link))
-              file = (base_dir + "/" + remove_dotdotslash(link)).sub(/\A\//,"")
+              file = File.join(base_dir, remove_dotdotslash(link)).sub(/\A\//,"")
             else
               dirname = File.dirname(file)
               if (dirname == ".") then
                 file = link
               else
-                file = "#{dirname.sub(/\A\.\//,"")}/#{link}"
+                file = File.join(dirname.sub(/\A\.\//,""),link)
               end
             end
           else
@@ -679,8 +679,8 @@ module MicroStepsLibrary
         end
         dest = File.basename(initial_file)
         if (file != dest) then
-          if not system("mv #{dest_dir}/#{file} #{dest_dir}/#{dest}") then
-            failed_microstep("Cannot move the file #{dest_dir}/#{file} to #{dest_dir}/#{dest}")
+          if not system("mv #{File.join(dest_dir,file)} #{File.join(dest_dir,dest)}") then
+            failed_microstep("Cannot move the file #{File.join(dest_dir,file)} to #{File.join(dest_dir,dest)}")
             return false
           end
         end
@@ -701,16 +701,16 @@ module MicroStepsLibrary
       }
       must_extract = false
       archive = @config.exec_specific.environment.tarball["file"]
-      dest_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
+      dest_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
       files.each { |file|
-        if not (File.exist?(dest_dir + "/" + @config.exec_specific.prefix_in_cache + File.basename(file))) then
+        if not (File.exist?(File.join(dest_dir, @config.exec_specific.prefix_in_cache + File.basename(file)))) then
           must_extract = true
         end
       }
       if not must_extract then
         files.each { |file|
           #If the archive has been modified, re-extraction required
-          if (File.mtime(archive).to_i > File.atime(dest_dir + "/" + @config.exec_specific.prefix_in_cache + File.basename(file)).to_i) then
+          if (File.mtime(archive).to_i > File.atime(File.join(dest_dir, @config.exec_specific.prefix_in_cache + File.basename(file))).to_i) then
             must_extract = true
           end
         }
@@ -730,8 +730,8 @@ module MicroStepsLibrary
         end
         files_in_archive.clear
         files.each { |file|
-          src = tmpdir + "/" + File.basename(file)
-          dst = dest_dir + "/" + @config.exec_specific.prefix_in_cache + File.basename(file)
+          src = File.join(tmpdir, File.basename(file))
+          dst = File.join(dest_dir, @config.exec_specific.prefix_in_cache + File.basename(file))
           if not system("mv #{src} #{dst}") then
             failed_microstep("Cannot move the file #{src} to #{dst}")
             return false
@@ -1406,14 +1406,14 @@ module MicroStepsLibrary
             when "linux"
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
-              images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
-              if not system("touch -a #{images_dir}/#{kernel}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
+              images_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+              if not system("touch -a #{File.join(images_dir, kernel)}") then
+                @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
                 return false
               end
               if (@config.exec_specific.environment.initrd != nil) then
-                if not system("touch -a #{images_dir}/#{initrd}") then
-                  @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
+                if not system("touch -a #{File.join(images_dir, initrd)}") then
+                  @output.verbosel(0, "Cannot touch #{File.join(images_dir, initrd)}")
                   return false
                 end
               end
@@ -1433,19 +1433,19 @@ module MicroStepsLibrary
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
-              images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
-              if not system("touch -a #{images_dir}/#{kernel}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
+              images_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+              if not system("touch -a #{File.join(images_dir, kernel)}") then
+                @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
                 return false
               end
               if (@config.exec_specific.environment.initrd != nil) then
-                if not system("touch -a #{images_dir}/#{initrd}") then
-                  @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
+                if not system("touch -a #{File.join(images_dir, initrd)}") then
+                  @output.verbosel(0, "Cannot touch #{File.join(images_dir, initrd)}")
                   return false
                 end
               end
-              if not system("touch -a #{images_dir}/#{hypervisor}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{hypervisor}")
+              if not system("touch -a #{File.join(images_dir, hypervisor)}") then
+                @output.verbosel(0, "Cannot touch #{File.join(images_dir, hypervisor)}")
                 return false
               end
               if not PXEOperations::set_pxe_for_xen(array_of_ip,
@@ -1463,10 +1463,10 @@ module MicroStepsLibrary
                 return false
               end
             end
-            Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
+            Cache::clean_cache(File.join(@config.common.tftp_repository, @config.common.tftp_images_path),
                                @config.common.tftp_images_max_size * 1024 * 1024,
                                1,
-                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
+                               /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/,
                                @output)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
@@ -1481,19 +1481,19 @@ module MicroStepsLibrary
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
-              images_dir = @config.common.tftp_repository + "/" + @config.common.tftp_images_path
-              if not system("touch -a #{images_dir}/#{kernel}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{kernel}")
+              images_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+              if not system("touch -a #{File.join(images_dir, kernel)}") then
+                @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
                 return false
               end
               if (@config.exec_specific.environment.initrd != nil) then
-                if not system("touch -a #{images_dir}/#{initrd}") then
-                  @output.verbosel(0, "Cannot touch #{images_dir}/#{initrd}")
+                if not system("touch -a #{File.join(images_dir, initrd)}") then
+                  @output.verbosel(0, "Cannot touch #{File.join(images_dir, initrd)}")
                   return false
                 end
               end
-              if not system("touch -a #{images_dir}/#{hypervisor}") then
-                @output.verbosel(0, "Cannot touch #{images_dir}/#{hypervisor}")
+              if not system("touch -a #{File.join(images_dir, hypervisor)}") then
+                @output.verbosel(0, "Cannot touch #{File.join(images_dir, hypervisor)}")
                 return false
               end
               if not PXEOperations::set_pxe_for_xen(array_of_ip,
@@ -1510,7 +1510,7 @@ module MicroStepsLibrary
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end
-              Cache::clean_cache(@config.common.tftp_repository + "/" + @config.common.tftp_images_path,
+              Cache::clean_cache(File.join(@config.common.tftp_repository, @config.common.tftp_images_path),
                                  @config.common.tftp_images_max_size * 1024 * 1024,
                                  1,
                                  /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,

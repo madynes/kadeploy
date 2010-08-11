@@ -766,9 +766,9 @@ module Managers
     def use_local_cache_filename(file, prefix)
       case file
       when /^http[s]?:\/\//
-        return @config.common.kadeploy_cache_dir + "/" + prefix + file.slice((file.rindex("/") + 1)..(file.length - 1))
+        return File.join(@config.common.kadeploy_cache_dir, prefix + file.slice((file.rindex(File::SEPARATOR) + 1)..(file.length - 1)))
       else
-        return @config.common.kadeploy_cache_dir + "/" + prefix + File.basename(file)
+        return File.join(@config.common.kadeploy_cache_dir, prefix + File.basename(file))
       end
     end
 
