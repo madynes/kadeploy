@@ -36,19 +36,24 @@ module PXEOperations
   # * msg: string that must be written in the PXE configuration
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_cfg: relative path to the TFTP configuration repository
+  # * singularities: hashtable containing the singularity to be replaced in the pxe profile for each node
   # Output
   # * returns true in case of success, false otherwise
   # Fixme
   # * should do something if the PXE configuration cannot be written
-  def PXEOperations::write_pxe(ips, msg, tftp_repository, tftp_cfg)
+  def PXEOperations::write_pxe(ips, msg, tftp_repository, tftp_cfg, singularities = nil)
     ips.each { |ip|
+      msg_dup = msg.dup
       file = File.join(tftp_repository, tftp_cfg, hexalize_ip(ip))
       #prevent from overwriting some linked files
       if File.exist?(file) then
         File.delete(file)
       end
       f = File.new(file, File::CREAT|File::RDWR, 0644)
-      f.write(msg)
+      if (singularities != nil) then
+        msg_dup = msg_dup.gsub("NODE_SINGULARITY", singularities[ip])
+      end
+      f.write(msg_dup)
       f.close
     }
     return true
@@ -136,10 +141,8 @@ module PXEOperations
     else
       kernel_line = "\tKERNEL " + tftp_img + "/" + nfsroot_kernel + "\n" #pxelinux
     end
-    #append_line = "\tAPPEND rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=#{nfs_root_path}:#{nfs_server} init=/linuxrc\n"
     append_line = "\tAPPEND #{nfsroot_params}\n"
     msg = pxe_header + kernel_line + append_line
-    puts msg
     return write_pxe(ips, msg, tftp_repository, tftp_cfg)
   end
 
@@ -168,10 +171,11 @@ module PXEOperations
   # * msg: custom PXE profile
   # * tftp_repository: absolute path to the TFTP repository
   # * tftp_cfg: relative path to the TFTP configuration repository
+  # * singularities: hashtable containing the singularity to be replaced in the pxe profile for each node
   # Output
   # * returns the value of write_pxe
-  def PXEOperations::set_pxe_for_custom(ips, msg, tftp_repository, tftp_cfg)
-    return write_pxe(ips, msg, tftp_repository, tftp_cfg)
+  def PXEOperations::set_pxe_for_custom(ips, msg, tftp_repository, tftp_cfg, singularities)
+    return write_pxe(ips, msg, tftp_repository, tftp_cfg, singularities)
   end
 end
 

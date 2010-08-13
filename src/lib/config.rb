@@ -8,6 +8,7 @@ require 'environment'
 require 'nodes'
 require 'debug'
 require 'checkrights'
+require 'error'
 
 #Ruby libs
 require 'optparse'
@@ -66,30 +67,8 @@ module ConfigInformation
     # Output
     # * calls the chack_config method that correspond to the selected tool
     def check_client_config(kind, exec_specific_config, db, client)
-      case kind
-      when "kadeploy_sync"
-        return check_kadeploy_config(exec_specific_config, db, client)
-      when "kadeploy_async"
-        return check_kadeploy_config(exec_specific_config, db, client)
-      when "kaenv"
-        return check_kaenv_config(exec_specific_config, db, client)
-      when "karights"
-        return check_karights_config(exec_specific_config, db, client)
-      when "kastat"
-        return check_kastat_config(exec_specific_config, db, client)
-      when "kareboot_sync"
-        return check_kareboot_config(exec_specific_config, db, client)
-      when "kareboot_async"
-        return check_kareboot_config(exec_specific_config, db, client)
-      when "kaconsole"
-        return check_kaconsole_config(exec_specific_config, db, client)
-      when "kanodes"
-        return check_kanodes_config(exec_specific_config, db, client)
-      when "kapower_sync"
-        return check_kapower_config(exec_specific_config, db, client)
-      when "kapower_async"
-        return check_kapower_config(exec_specific_config, db, client)
-      end
+      method = "check_#{kind.split("_")[0]}_config".to_sym
+      return send(method, exec_specific_config, db, client)
     end
 
     def check_kadeploy_config(exec_specific_config, db, client)
@@ -97,7 +76,7 @@ module ConfigInformation
       exec_specific_config.node_array.each { |hostname|
         if not add_to_node_set(hostname, exec_specific_config) then
           Debug::distant_client_error("The node #{hostname} does not exist", client)
-          return false
+          return KadeployAsyncError::NODE_NOT_EXIST
         end
       }
       
@@ -105,7 +84,7 @@ module ConfigInformation
       if (exec_specific_config.vlan != nil) then
         if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
           Debug::distant_client_error("No VLAN can be used on this site (some configuration is missing)", client)
-          return false
+          return KadeployAsyncError::VLAN_MGMT_DISABLED
         else
           dns = Resolv::DNS.new
           exec_specific_config.ip_in_vlan = Hash.new
@@ -138,7 +117,7 @@ module ConfigInformation
       }
       if (allowed_to_deploy != true) then
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
-        return false
+        return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
       end
 
       #Environment load
@@ -150,7 +129,7 @@ module ConfigInformation
                                                             exec_specific_config.true_user,
                                                             client,
                                                             false) == false) then
-          return false
+          return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
         end
       when "db"
         if (exec_specific_config.environment.load_from_db(exec_specific_config.load_env_arg,
@@ -159,14 +138,14 @@ module ConfigInformation
                                                           exec_specific_config.true_user,
                                                           db,
                                                           client) == false) then
-          return false
+          return KadeployAsyncError::LOAD_ENV_FROM_DB_ERROR
         end
       else
         Debug::distant_client_error("You must choose an environment", client)
-        return false
+        return KadeployAsyncError::NO_ENV_CHOSEN
       end
 
-      return true
+      return KadeployAsyncError::NO_ERROR
     end
 
     def check_kareboot_config(exec_specific_config, db, client)
@@ -174,7 +153,7 @@ module ConfigInformation
       exec_specific_config.node_array.each { |hostname|
         if not add_to_node_set(hostname, exec_specific_config) then
           Debug::distant_client_error("The node #{hostname} does not exist", client)
-          return false
+          return KarebootAsyncError::NODE_NOT_EXIST
         end
       }
       
@@ -182,7 +161,7 @@ module ConfigInformation
       if (exec_specific_config.vlan != nil) then
         if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
           Debug::distant_client_error("No VLAN can be used on this site (some configuration is missing)", client)
-          return false
+          return KarebootAsyncError::VLAN_MGMT_DISABLED
         else
           dns = Resolv::DNS.new
           exec_specific_config.ip_in_vlan = Hash.new
@@ -216,7 +195,7 @@ module ConfigInformation
       if (allowed_to_deploy != true) then
         puts "You do not have the right to deploy on all the nodes"
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
-        return false
+        return KarebootAsyncError::NO_RIGHT_TO_DEPLOY
       end
 
       if (exec_specific_config.reboot_kind == "env_recorded") then   
@@ -226,48 +205,48 @@ module ConfigInformation
                                                           exec_specific_config.true_user,
                                                           db,
                                                           client) == false) then
-          return false
+          return KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
         end
       end
-      return true
+      return KarebootAsyncError::NO_ERROR
     end
 
     def check_kaenv_config(exec_specific_config, db, client)
-      return true
+      return 0
     end
 
     def check_karights_config(exec_specific_config, db, client)
       if not @common.almighty_env_users.include?(exec_specific_config.true_user) then
         Debug::distant_client_error("Only administrators are allowed to set rights", client)
-        return false
+        return 1
       end
-      return true
+      return 0
     end
 
     def check_kastat_config(exec_specific_config, db, client)
-      return true
+      return 0
     end
 
     def check_kaconsole_config(exec_specific_config, db, client)
       node = @common.nodes_desc.get_node_by_host(exec_specific_config.node)
       if (node == nil) then
         Debug::distant_client_error("The node #{exec_specific_config.node} does not exist", client)
-        return false
+        return 1
       else
         exec_specific_config.node = node
       end
-      return true
+      return 0
     end
 
     def check_kanodes_config(exec_specific_config, db, client)
-      return true
+      return 0
     end
 
     def check_kapower_config(exec_specific_config, db, client)
       exec_specific_config.node_array.each { |hostname|
         if not add_to_node_set(hostname, exec_specific_config) then
           Debug::distant_client_error("The node #{hostname} does not exist", client)
-          return false
+          return 1
         end
       }
 
@@ -282,10 +261,10 @@ module ConfigInformation
       }
       if (allowed_to_deploy != true) then
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
-        return false
+        return 2
       end
 
-      return true
+      return 0
     end
 
     # Load the kadeploy specific stuffs
@@ -314,8 +293,8 @@ module ConfigInformation
       exec_specific.key = String.new
       exec_specific.reformat_tmp = false
       exec_specific.pxe_profile_msg = String.new
-      exec_specific.pxe_profile_file = String.new
       exec_specific.pxe_upload_files = Array.new
+      exec_specific.pxe_profile_singularities = nil
       exec_specific.steps = Array.new
       exec_specific.ignore_nodes_deploying = false
       exec_specific.breakpoint_on_microstep = String.new
@@ -388,6 +367,7 @@ module ConfigInformation
     def Config.error(msg)
       Debug::local_client_error(msg, Proc.new { @opts.display })
     end
+
 ##################################
 #         Generic part           #
 ##################################
@@ -714,7 +694,14 @@ module ConfigInformation
       return servers
     end
 
-
+    # Specify that a command involves a group of node
+    #
+    # Arguments
+    # * command: kind of command concerned
+    # * file: file containing a node list (one group (nodes separated by a comma) by line)
+    # * cluster: cluster concerned
+    # Output
+    # * return true if the group has been added correctly, false otherwise
     def add_group_of_nodes(command, file, cluster)
       if File.readable?(file) then
         @cluster_specific[cluster].group_of_nodes[command] = Array.new
@@ -1005,31 +992,17 @@ module ConfigInformation
             if /(.+)\|(.+)\|(.+)/ =~ line then
               content = Regexp.last_match
               node = @common.nodes_desc.get_node_by_host(content[1])
-              case content[2]
-              when "soft_reboot"
-                node.cmd.reboot_soft = content[3].strip
-              when "hard_reboot"
-                node.cmd.reboot_hard = content[3].strip
-              when "very_hard_reboot"
-                node.cmd.reboot_very_hard = content[3].strip
-              when "console"
-                node.cmd.console = content[3].strip
-              when "soft_power_on"
-                node.cmd.power_on_soft = content[3].strip
-              when "hard_power_on"
-                node.cmd.power_on_hard = content[3].strip
-              when "very_hard_power_on"
-                node.cmd.hard_power_on_very_hard = content[3].strip
-              when "soft_power_off"
-                node.cmd.power_off_soft = content[3].strip
-              when "hard_power_off"
-                node.cmd.power_off_hard = content[3].strip
-              when "very_hard_power_off"
-                node.cmd.hard_power_off_very_hard = content[3].strip
-              when "very_power_status"
-                node.cmd.power_status = content[3].strip
+              if (node != nil) then
+                kind = content[2]
+                val = content[3].strip
+                if (node.cmd.instance_variable_defined?("@#{kind}")) then
+                  node.cmd.instance_variable_set("@#{kind}", val)
+                else
+                  puts "Unknown command kind: #{content[2]}"
+                  return false
+                end
               else
-                puts "Unknown command: #{content[2]}"
+                puts "The node #{content[1]} does not exist"
                 return false
               end
             else
@@ -1260,9 +1233,22 @@ module ConfigInformation
             error("The file #{f} cannot be read")
             return false
           else
-            exec_specific.pxe_profile_file = f
-            IO.readlines(exec_specific.pxe_profile_file).each { |l|
+            IO.readlines(f).each { |l|
               exec_specific.pxe_profile_msg.concat(l)
+            }
+          end
+        }
+        opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
+          if not File.readable?(f) then
+            error("The file #{f} cannot be read")
+            return false
+          else
+            exec_specific.pxe_profile_singularities = Hash.new
+            IO.readlines(f).each { |l|
+              if (not (/^#/ =~ l)) and (not (/^$/ =~ l)) then #we ignore commented and empty lines
+                content = l.split(",")
+                exec_specific.pxe_profile_singularities[content[0]] = content[1].strip
+              end
             }
           end
         }
@@ -2102,7 +2088,6 @@ module ConfigInformation
       exec_specific.verbose_level = String.new
       exec_specific.node_set = Nodes::NodeSet.new
       exec_specific.node_array = Array.new
-      exec_specific.pxe_profile_file = String.new
       exec_specific.check_prod_env = false
       exec_specific.true_user = USER
       exec_specific.user = USER
@@ -2113,8 +2098,8 @@ module ConfigInformation
       exec_specific.deploy_part = String.new
       exec_specific.breakpoint_on_microstep = "none"
       exec_specific.pxe_profile_msg = String.new
-      exec_specific.pxe_profile_file = String.new
       exec_specific.pxe_upload_files = Array.new
+      exec_specific.pxe_profile_singularities = nil
       exec_specific.key = String.new
       exec_specific.nodes_ok_file = String.new
       exec_specific.nodes_ko_file = String.new
@@ -2258,8 +2243,29 @@ module ConfigInformation
         opt.on("--vlan VLANID", "Set the VLAN") { |id|
           exec_specific.vlan = id
         }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |file|
-          exec_specific.pxe_profile_file = file
+        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+          if not File.readable?(f) then
+            error("The file #{f} cannot be read")
+            return false
+          else
+            IO.readlines(f).each { |l|
+              exec_specific.pxe_profile_msg.concat(l)
+            }
+          end
+        }
+        opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
+          if not File.readable?(f) then
+            error("The file #{f} cannot be read")
+            return false
+          else
+            exec_specific.pxe_profile_singularities = Hash.new
+            IO.readlines(f).each { |l|
+              if (not (/^#/ =~ l)) and (not (/^$/ =~ l)) then #we ignore commented and empty lines
+                content = l.split(",")
+                exec_specific.pxe_profile_singularities[content[0]] = content[1].strip
+              end
+            }
+          end
         }
         opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
           l.split(",").each { |file|
@@ -2340,11 +2346,7 @@ module ConfigInformation
         error("Invalid kind of reboot: #{exec_specific.reboot_kind}")
         return false
       end        
-      if (exec_specific.pxe_profile_file != "") && (not File.readable?(exec_specific.pxe_profile_file)) then
-        error("The file #{exec_specific.pxe_profile_file} cannot be read")
-        return false
-      end
-      if (exec_specific.reboot_kind == "set_pxe") && (exec_specific.pxe_profile_file == "") then
+      if (exec_specific.reboot_kind == "set_pxe") && (exec_specific.pxe_profile_msg == "") then
         error("The set_pxe reboot must be used with the -w option")
         return false
       end

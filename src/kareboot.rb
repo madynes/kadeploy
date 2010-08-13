@@ -236,11 +236,6 @@ if (exec_specific_config != nil) then
         else
           verbose_level = nil
         end
-        if (exec_specific_config.pxe_profile_file != "") then
-          IO.readlines(exec_specific_config.pxe_profile_file).each { |l|
-            exec_specific_config.pxe_profile_msg.concat(l)
-          }
-        end
         cloned_config = exec_specific_config.clone
         cloned_config.node_array = nodes_by_server[server]
         ret = kadeploy_server.run("kareboot_sync", cloned_config, client_host, client_port)

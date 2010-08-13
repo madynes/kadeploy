@@ -47,6 +47,14 @@ if (exec_specific_config != nil) then
     puts "Some PXE files cannot be fetched"
   when KarebootAsyncError::NO_RIGHT_TO_DEPLOY
     puts "You do not have the right to deploy on all the nodes"
+  when KarebootAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+    puts "Unknown node in singularity file"
+  when KarebootAsyncError::NODE_NOT_EXIST
+    puts "At least one node in your node list does not exist"
+  when KarebootAsyncError::VLAN_MGMT_DISABLED
+    puts "The VLAN management has been disabled on the site"
+  when KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
+    puts "The environment does not exist"
   end
 
   DRb.stop_service()

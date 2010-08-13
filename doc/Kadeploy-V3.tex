@@ -592,15 +592,15 @@ netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
 \section{Specific commands configuration files}
 In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|command kind|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for command kind are:
 \begin{itemize}
-\item \texttt{soft\_reboot}
-\item \texttt{hard\_reboot}
-\item \texttt{very\_hard\_reboot}
-\item \texttt{soft\_power\_on}
-\item \texttt{hard\_power\_on}
-\item \texttt{very\_hard\_power\_on}
-\item \texttt{soft\_power\_off}
-\item \texttt{hard\_power\_off}
-\item \texttt{very\_hard\_power\_off}
+\item \texttt{reboot\_soft}
+\item \texttt{reboot\_hard}
+\item \texttt{reboot\_very\_hard}
+\item \texttt{power\_on\_soft}
+\item \texttt{power\_on\_hard}
+\item \texttt{power\_on\_very\_hard}
+\item \texttt{power\_off\_soft}
+\item \texttt{power\_off\_hard}
+\item \texttt{power\_off\_very\_hard}
 \item \texttt{power\_status}
 \item \texttt{console}
 \end{itemize}
@@ -608,9 +608,9 @@ In the part~\ref{sec:specific_config} we saw that generic commands can be given 
 Here is an example:
 \begin{small}
 \begin{verbatim}
-vm-001|soft_reboot|ssh -q root@vm-001 /sbin/special_reboot_for_vm
-vm-001|hard_reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
-vm-002|soft_reboot|ssh -q root@vm-002 /sbin/special_reboot_for_vm
+vm-001|reboot_soft|ssh -q root@vm-001 /sbin/special_reboot_for_vm
+vm-001|reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
+vm-002|reboot_soft|ssh -q root@vm-002 /sbin/special_reboot_for_vm
 \end{verbatim}
 \end{small}
 Note: it is not mandatory to override all the commands for a given node.
@@ -717,6 +717,9 @@ General options:
   -v, --version                    Get the version
       --vlan VLANID                Set the VLAN"
   -w, --set-pxe-profile FILE       Set the PXE profile (use with caution)
+      --set-pxe-pattern FILE      Specify a file containing the substituation of a pattern for 
+                                  each node in the PXE profile (the NODE_SINGULARITY pattern must
+                                  be used in the PXE profile)
   -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
                                    directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER         Number of version of the environment to deploy
@@ -800,9 +803,10 @@ This kind of command can be used for debug purpose. It performs a deployment wit
 
 \paragraph{Use case 6 - advanced usage - specific PXE profile}
 \begin{verbatim}
-> kadeploy3 -m gdx-5.orsay.grid5000.fr \
+> kadeploy3 -m gdx-[5-10].orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
-            -w ~/pxe_profile -x "~/custom-kernel,~/custom-initrd"
+            -w ~/pxe_profile -x "~/custom-kernel,~/custom-initrd" \
+            --set-pxe-pattern ~/singularities
 \end{verbatim}
 In some specific case, you may want to use a specific PXE profile to boot your nodes. To do this, you have to provide a PXE profile. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server. So Kadeploy offers a feature to stage some files in an area where the files can be read by the TFTP server. This can be achieved with the \texttt{-x|--upload-pxe-files} option. You must know that such uploaded files will be copied in the \texttt{tftp\_images\_path}, and will be prefixed with \texttt{pxe-username-}.
 
@@ -816,7 +820,17 @@ TIMEOUT 50
 
 label bootlabel
         KERNEL kernels/pxe-ejeanvoine-custom-kernel
-        APPEND initrd=kernels/pxe-ejeanvoine-custom-initrd root=/dev/sda3
+        APPEND initrd=kernels/pxe-ejeanvoine-custom-initrd root=/dev/sda3 node_id=NODE_SINGULARITY
+\end{verbatim}
+
+You can notice the \texttt{NODE\_SINGULARITY} pattern used in the PXE profile. Thanks to the \texttt{--set-pxe-pattern} option, you can also provide a file that defines a value in the PXE profile that depends on the node concerned. This file must define on each line a couple of value as follows : hostname,node singularity. In our example, the file \texttt{~/singularities} can contains something like:
+\begin{verbatim}
+gdx-5.orsay.grid5000.fr,1
+gdx-6.orsay.grid5000.fr,2
+gdx-7.orsay.grid5000.fr,3
+gdx-8.orsay.grid5000.fr,3
+gdx-9.orsay.grid5000.fr,4
+gdx-10.orsay.grid5000.fr,5
 \end{verbatim}
 
 \paragraph{Use case 7 - advanced usage - specific bootloader requirement}
@@ -888,6 +902,9 @@ General options:
   -u, --user USERNAME            Specify the user
   -v, --version                  Get the version
   -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
+      --set-pxe-pattern FILE     Specify a file containing the substituation of a pattern for 
+                                 each node in the PXE profile (the NODE_SINGULARITY pattern must
+                                 be used in the PXE profile)
   -x, --upload-pxe-files FILES   Upload a list of files (file1,file2,file3) to the "tftp_images_path"
                                  directory. Those files will be prefixed with "pxe-$username-" 
       --env-version NUMBER       Specify the environment version
@@ -915,7 +932,8 @@ Here are some basic examples:
                                                         -n reboot_ko.txt
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile
 > kareboot3 -f nodes -r set_pxe -w ~/customized_pxe_profile -l hard \
-                                -x "~/custom_kernel,~/custom_initrd"
+                                -x "~/custom_kernel,~/custom_initrd" \
+                                --set-pxe-pattern ~/singularities (Cf. Kadeploy use case 6)
 > kareboot3 -f nodes -r deploy_env -k .ssh/id_rsa
 > kareboot3 -r env_recorded -e production_environment \
             -p 2 -u root -m gdx-5.orsay.grid5000.fr

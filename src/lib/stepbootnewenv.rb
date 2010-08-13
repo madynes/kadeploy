@@ -22,23 +22,15 @@ module BootNewEnvironment
     # * output: instance of OutputControl
     # * logger: instance of Logger
     # Output
-    # * returns a BootNewEnv instance (BootNewEnvKexec, BootNewEnvPivotRoot, BootNewEnvClassical, BootNewEnvDummy)
+    # * returns a BootNewEnv instance (BootNewEnvKexec, BootNewEnvPivotRoot, BootNewEnvClassical, BootNewEnvHardReboot, BootNewEnvDummy)
     # * raises an exception if an invalid kind of instance is given
     def BootNewEnvFactory.create(kind, max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      case kind
-      when "BootNewEnvKexec"
-        return BootNewEnvKexec.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "BootNewEnvPivotRoot"
-        return BootNewEnvPivotRoot.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger) 
-      when "BootNewEnvClassical"
-        return BootNewEnvClassical.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "BootNewEnvHardReboot"
-        return BootNewEnvHardReboot.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)        
-      when "BootNewEnvDummy"
-        return BootNewEnvDummy.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      else
+      begin
+        klass = BootNewEnvironment::class_eval(kind)
+      rescue NameError
         raise "Invalid kind of step value for the new environment boot step"
       end
+      return klass.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
     end
   end
 

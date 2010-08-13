@@ -23,23 +23,15 @@ module SetDeploymentEnvironnment
     # * output: instance of OutputControl
     # * logger: instance of Logger
     # Output
-    # * returns a SetDeploymentEnv instance (SetDeploymentEnvUntrusted, SetDeploymentEnvNfsroot, SetDeploymentEnvProd, SetDeploymentEnvDummy)
+    # * returns a SetDeploymentEnv instance (SetDeploymentEnvUntrusted, SetDeploymentEnvUntrustedCustomPreInstall, SetDeploymentEnvNfsroot, SetDeploymentEnvProd, SetDeploymentEnvDummy)
     # * raises an exception if an invalid kind of instance is given
     def SetDeploymentEnvFactory.create(kind, max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      case kind
-      when "SetDeploymentEnvUntrusted"
-        return SetDeploymentEnvUntrusted.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "SetDeploymentEnvUntrustedCustomPreInstall"
-        return SetDeploymentEnvUntrustedCustomPreInstall.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "SetDeploymentEnvNfsroot"
-        return SetDeploymentEnvNfsroot.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "SetDeploymentEnvProd"
-        return SetDeploymentEnvProd.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "SetDeploymentEnvDummy"
-        return SetDeploymentEnvDummy.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      else
+      begin
+        klass = SetDeploymentEnvironnment::class_eval(kind)
+      rescue NameError
         raise "Invalid kind of step value for the environment deployment step"
       end
+      return klass.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
     end
   end
 

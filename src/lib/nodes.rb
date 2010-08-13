@@ -55,10 +55,10 @@ module Nodes
     # Output
     # * nothing
     def initialize(hostname, ip, cluster, cmd)
-      @hostname=hostname
-      @ip=ip
+      @hostname = hostname
+      @ip = ip
       @cluster = cluster
-      @state="OK"
+      @state = "OK"
       @cmd = cmd
       @current_step = nil
       @last_cmd_exit_status = nil

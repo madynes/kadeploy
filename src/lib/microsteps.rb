@@ -1378,7 +1378,8 @@ module MicroStepsLibrary
         if not PXEOperations::set_pxe_for_custom(@nodes_ok.make_array_of_ip,
                                                  pxe_profile_msg,
                                                  @config.common.tftp_repository,
-                                                 @config.common.tftp_cfg) then
+                                                 @config.common.tftp_cfg,
+                                                 @config.exec_specific.pxe_profile_singularities) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_custom operation")
           return false
         end
@@ -1395,7 +1396,8 @@ module MicroStepsLibrary
           if not PXEOperations::set_pxe_for_custom(array_of_ip,
                                                    @config.exec_specific.pxe_profile_msg,
                                                    @config.common.tftp_repository,
-                                                   @config.common.tftp_cfg) then
+                                                   @config.common.tftp_cfg,
+                                                   @config.exec_specific.pxe_profile_singularities) then
             @output.verbosel(0, "Cannot perform the set_pxe_for_custom operation")
             return false
           end

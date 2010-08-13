@@ -25,20 +25,12 @@ module BroadcastEnvironment
     # * returns a BroadcastEnv instance (BroadcastEnvChainWithFS, BroadcastEnvTreeWithFS, BroadcastEnvDummy)
     # * raises an exception if an invalid kind of instance is given
     def BroadcastEnvFactory.create(kind, max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      case kind
-      when "BroadcastEnvChain"
-        return BroadcastEnvChain.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "BroadcastEnvKastafior"
-        return BroadcastEnvKastafior.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "BroadcastEnvTree"
-        return BroadcastEnvTree.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "BroadcastEnvBittorrent"
-        return BroadcastEnvBittorrent.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      when "BroadcastEnvDummy"
-        return BroadcastEnvDummy.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-      else
+      begin
+        klass = BroadcastEnvironment::class_eval(kind)
+      rescue NameError
         raise "Invalid kind of step value for the environment broadcast step"
       end
+      return klass.new(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
     end
   end
 

@@ -45,10 +45,22 @@ if (exec_specific_config != nil) then
     kadeploy_server.async_deploy_free(workflow_id)
   else
     case error
-    when 1
+    when KadeployAsyncError::NODES_DISCARDED
       puts "All the nodes have been discarded"
-    when 2
+    when KadeployAsyncError::NO_RIGHT_TO_DEPLOY
       puts "Invalid options or invalid rights on nodes"
+    when KadeployAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+      puts "Unknown node in singularity file"
+    when KadeployAsyncError::NODE_NOT_EXIST
+      puts "At least one node in your node list does not exist"
+    when KadeployAsyncError::VLAN_MGMT_DISABLED
+      puts "The VLAN management has been disabled on the site"
+    when KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
+      puts "The environment cannot be loaded from the file you specified"
+    when KadeployAsyncError::LOAD_ENV_FROM_DB_ERROR
+      puts "The environment does not exist"
+    when KadeployAsyncError::NO_ENV_CHOSEN
+      puts "You must choose an environment"
     end
   end
 

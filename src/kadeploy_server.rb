@@ -157,23 +157,42 @@ class KadeployServer
       return false
     end
 
-    if (kind == "kadeploy_async") then
-      if (not @config.check_client_config(kind, exec_specific_config, db, nil)) then
-        return nil,2
+    if ((kind == "kadeploy_sync") || (kind == "kadeploy_async") ||
+        (kind == "kareboot_sync") || (kind == "kareboot_async")) &&
+        (exec_specific_config.pxe_profile_singularities != nil) then
+      h = Hash.new
+      exec_specific_config.pxe_profile_singularities.each { |hostname, val|
+        n = @config.common.nodes_desc.get_node_by_host(hostname)
+        if (n == nil) then
+          if (kind == "kadeploy_sync") || (kind == "kareboot_sync") then
+            DRb.start_service("druby://localhost:0")
+            uri = "druby://#{host}:#{port}"
+            client = DRbObject.new(nil, uri)
+            client.print("ERROR: The node #{hostname} specified in the PXE singularity file does not exist")
+            return false
+          else
+            case kind
+            when "kadeploy_async"
+              return nil, KadeployAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+            when "kareboot_async"
+              return nil, KarebootAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+            end
+          end
+        else
+          h[n.ip] = val
+        end
+      }
+      exec_specific_config.pxe_profile_singularities.clear
+      exec_specific_config.pxe_profile_singularities = h
+    end
+
+    if ((kind == "kadeploy_async") || (kind == "kareboot_async") || (kind == "kapower_async")) then
+      res = @config.check_client_config(kind, exec_specific_config, db, nil)
+      if (res > 0) then
+        return nil, res
       else
-        return run_kadeploy_async(db, exec_specific_config)
-      end
-    elsif (kind == "kareboot_async") then
-      if (not @config.check_client_config(kind, exec_specific_config, db, nil)) then
-        return nil,KarebootAsyncError::NO_RIGHT_TO_DEPLOY
-      else
-        return run_kareboot_async(db, exec_specific_config)
-      end
-    elsif (kind == "kapower_async") then
-      if (not @config.check_client_config(kind, exec_specific_config, db, nil)) then
-        return nil
-      else
-        return run_kapower_async(db, exec_specific_config)
+        method = "run_#{kind}".to_sym
+        return send(method, db, exec_specific_config)
       end
     else
       DRb.start_service("druby://localhost:0")
@@ -181,23 +200,11 @@ class KadeployServer
       client = DRbObject.new(nil, uri)
       
       res = @config.check_client_config(kind, exec_specific_config, db, client)
-      case kind
-      when "kadeploy_sync"
-        res = res && run_kadeploy_sync(db, client, exec_specific_config)
-      when "kareboot_sync"
-        res = res && run_kareboot_sync(db, client, exec_specific_config)
-      when "kastat"
-        res = res && run_kastat(db, client, exec_specific_config)
-      when "kanodes"
-        res = res && run_kanodes(db, client, exec_specific_config)
-      when "karights"
-        res = res && run_karights(db, client, exec_specific_config)
-      when "kaenv"
-        res = res && run_kaenv(db, client, exec_specific_config)
-      when "kaconsole"
-        res = res && run_kaconsole(db, client, exec_specific_config)
-      when "kapower_sync"
-        res = res && run_kapower_sync(db, client, exec_specific_config)
+      if (res == 0) then
+        method = "run_#{kind}".to_sym
+        res = send(method, db, client, exec_specific_config)
+      else
+        res = false
       end
 
       db.disconnect
@@ -543,10 +550,10 @@ class KadeployServer
     @workflow_info_hash_lock.unlock
     if workflow.prepare() then
       workflow.run_async()
-      return workflow_id, 0
+      return workflow_id, KadeployAsyncError::NO_ERROR
     else
       async_deploy_free(workflow_id)
-      return nil, 1 # all the nodes are involved in another deployment
+      return nil, KadeployAsyncError::NODES_DISCARDED # all the nodes are involved in another deployment
     end
   end
 

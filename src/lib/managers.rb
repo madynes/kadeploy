@@ -859,7 +859,7 @@ module Managers
         }
       end
 
-      if @config.exec_specific.pxe_profile_file != "" then
+      if @config.exec_specific.pxe_profile_msg != "" then
         if not @config.exec_specific.pxe_upload_files.empty? then
           @config.exec_specific.pxe_upload_files.each { |pxe_file|
             user_prefix = "pxe-#{@config.exec_specific.true_user}--"
