@@ -158,12 +158,18 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>--set-pxe-pattern <replaceable>FILE</replaceable></option></term>
+	<listitem>
+	  <para>Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile).</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-x</option></term>
 	<term><option>--upload-pxe-files <replaceable>FILE</replaceable></option></term>
 	<listitem>
 	  <para>Upload a list of files (file1,file2,file3) to the "tftp-images" directory. Those files will be prefixed with "pxe-$username-".</para>
 	</listitem>
-      </varlistentry>  
+      </varlistentry>
       <varlistentry>
 	<term><option>--env-version <replaceable>NUMBER</replaceable></option></term>
 	<listitem>
