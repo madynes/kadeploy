@@ -44,7 +44,7 @@ install_sbin_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/kadeploy3d $(DEB_ROOT_SERVER)/usr/sbin
 
 install_sbin_client:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/karights3 $(DEB_ROOT_SERVER)/usr/sbin
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/karights3 $(DEB_ROOT_CLIENT)/usr/sbin
 
 install_kastafior:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DEB_ROOT_SERVER)/usr/bin
