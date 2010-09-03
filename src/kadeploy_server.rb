@@ -2008,7 +2008,9 @@ class KadeployServer
                 if (db.get_nb_affected_rows > 0) then
                   Debug::distant_client_print("The #{kind_of_file} of {#{row["name"]},#{row["version"]},#{row["user"]}} has been updated", client)
                   Debug::distant_client_print("Let's now update the md5 for this file", client)
-                  send("_update_#{kind_of_file}_md5".to_sym, db, row["name"], row["version"], row["user"])
+                  send("_update_#{kind_of_file}_md5".to_sym,
+                       db, row["name"], row["version"], row["user"],
+                       exec_specific.true_user, client)
                 end
               end
             }
