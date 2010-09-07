@@ -5,7 +5,7 @@
 
 mkdir -p $DEBOOTSTRAP_DIR
 
-$DEBOOTSTRAP --include=$DEBOOTSTRAP_INCLUDE_PACKAGES --exclude=$DEBOOTSTRAP_EXCLUDE_PACKAGE lenny $DEBOOTSTRAP_DIR http://ftp.fr.debian.org/debian
+$DEBOOTSTRAP --include=$DEBOOTSTRAP_INCLUDE_PACKAGES --exclude=$DEBOOTSTRAP_EXCLUDE_PACKAGE squeeze $DEBOOTSTRAP_DIR http://ftp.fr.debian.org/debian
 
 chroot $DEBOOTSTRAP_DIR apt-get -y --force-yes install ash 2>/dev/null
 chroot $DEBOOTSTRAP_DIR apt-get -y --force-yes clean 2>/dev/null

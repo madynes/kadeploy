@@ -38,16 +38,16 @@ esac
 MSG=$MSG"}"
 /bin/echo -e $MSG > $MENU_GRUB
 
-/usr/sbin/grub-install $ROOT --root-directory=$DEST
+/usr/sbin/grub-install $ROOT --root-directory=$DEST --force
 RETVAL=$?
 
 if [ $RETVAL -ne 0 ]; then
-    /usr/sbin/grub-install --recheck $ROOT --root-directory=$DEST
+    /usr/sbin/grub-install --recheck $ROOT --root-directory=$DEST --force
     RETVAL=$?
 fi
 
 
 
-mv $MENU_GRUB $DEST/$MENU_GRUB
+cp $MENU_GRUB $DEST$MENU_GRUB
 
 exit $RETVAL
