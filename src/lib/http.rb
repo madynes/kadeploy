@@ -15,14 +15,15 @@ module HTTP
   # Arguments
   # * uri: URI of the file
   # * output: output file
+  # * cache_dir: cache directory
   # * etag: ETag of the file
   # Output
   # * return http_response and ETag
-  def HTTP::fetch_file(uri, output, expected_etag)
+  def HTTP::fetch_file(uri, output, cache_dir, expected_etag)
     http_response = String.new
     etag = String.new
-    wget_output = Tempfile.new("wget_output")
-    wget_download = Tempfile.new("wget_download")
+    wget_output = Tempfile.new("wget_output", cache_dir)
+    wget_download = Tempfile.new("wget_download", cache_dir)
     if (expected_etag == nil) then
       cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} 2> #{wget_output.path}"
     else

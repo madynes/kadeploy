@@ -361,7 +361,7 @@ module Managers
                            0.5, /./,
                            @output)
         if (not File.exist?(local_file)) then
-          resp,etag = HTTP::fetch_file(client_file, local_file, nil)
+          resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
           if (resp != "200") then
             @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error #{resp}")
             return false
@@ -373,7 +373,7 @@ module Managers
             return false
           end
         else
-          resp,etag = HTTP::fetch_file(client_file, local_file, expected_md5)
+          resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, expected_md5)
           case resp
           when "200"
             @output.verbosel(4, "File #{client_file} fetched")
@@ -487,7 +487,7 @@ module Managers
                            (cache_size * 1024 * 1024) -  file_size,
                            0.5, /./,
                            @output)
-        resp,etag = HTTP::fetch_file(client_file, local_file, nil)
+        resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
         if (resp != "200") then
           @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
           return false

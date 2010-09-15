@@ -1779,7 +1779,7 @@ module MicroStepsLibrary
                                                          scattering_kind,
                                                          @config.common.taktuk_connector,
                                                          "0",
-                                                         instance_thread)
+                                                       instance_thread)
       end
       return true
     end
@@ -1870,7 +1870,7 @@ module MicroStepsLibrary
     def ms_umount_deploy_part(instance_thread)
       if ((@config.exec_specific.environment.tarball["kind"] == "tgz") ||
           (@config.exec_specific.environment.tarball["kind"] == "tbz2")) then
-        return parallel_exec_command_wrapper("umount #{get_deploy_part_str()}",
+        return parallel_exec_command_wrapper("umount -l #{get_deploy_part_str()}",
                                              @config.common.taktuk_connector,
                                              instance_thread)
       else

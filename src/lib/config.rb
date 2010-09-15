@@ -127,6 +127,7 @@ module ConfigInformation
                                                             exec_specific_config.load_env_content,
                                                             @common.almighty_env_users,
                                                             exec_specific_config.true_user,
+                                                            @common.kadeploy_cache_dir,
                                                             client,
                                                             false) == false) then
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR

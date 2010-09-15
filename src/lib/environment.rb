@@ -38,15 +38,18 @@ module EnvironmentManagement
     #
     # Arguments
     # * file: filename
+    # * file_content: environment description
     # * almighty_env_users: array that contains almighty users
+    # * user: true user
+    # * cache_dir: cache directory
     # * client: DRb handler to client
     # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(file, file_content, almighty_env_users, user, client, record_in_db)
+    def load_from_file(file, file_content, almighty_env_users, user, cache_dir, client, record_in_db)
       temp_env_file = Tempfile.new("env_file")
       if (file =~ /^http[s]?:\/\//) then
-        http_response, etag = HTTP::fetch_file(file, temp_env_file.path, nil)
+        http_response, etag = HTTP::fetch_file(file, temp_env_file.path, cache_dir, nil)
         if http_response != "200" then
           Debug::distant_client_error("The file #{file} cannot be fetched: http_response #{http_response}", client)
           return false
