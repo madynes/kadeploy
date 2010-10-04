@@ -24,6 +24,12 @@ module Managers
   class MagicCookie
   end
 
+  class TempfileException < RuntimeError
+  end
+
+  class MoveException < RuntimeError
+  end
+
   class WindowManager
     @mutex = nil
     @resources_used = nil
@@ -362,12 +368,20 @@ module Managers
                            @output)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
-          if (resp != "200") then
+          case resp
+          when -1
+            @output.verbosel(0, "Tempfiles cannot be created")
+            raise TempfileException
+          when -2
+            @output.verbosel(0, "Environment file cannot be moved")
+            raise MoveException
+          when "200"
+            @output.verbosel(4, "File #{client_file} fetched")
+          else
             @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error #{resp}")
             return false
-          else
-            @output.verbosel(4, "File #{client_file} fetched")
           end
+
           if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
             @output.verbosel(0, "Cannot update the md5 of #{client_file}")
             return false
@@ -375,6 +389,12 @@ module Managers
         else
           resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, expected_md5)
           case resp
+          when -1
+            @output.verbosel(0, "Tempfiles cannot be created")
+            raise TempfileException
+          when -2
+            @output.verbosel(0, "Environment file cannot be moved")
+            raise MoveException
           when "200"
             @output.verbosel(4, "File #{client_file} fetched")
             if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
@@ -488,8 +508,17 @@ module Managers
                            0.5, /./,
                            @output)
         resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
-        if (resp != "200") then
-          @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
+        case resp
+        when -1
+          @output.verbosel(0, "Tempfiles cannot be created")
+          raise TempfileException
+        when -2
+          @output.verbosel(0, "Environment file cannot be moved")
+          raise MoveException
+        when "200"
+          @output.verbosel(4, "File #{client_file} fetched")
+        else
+          @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}, http error #{resp}")
           return false
         end
       #classical fetch
@@ -786,31 +815,57 @@ module Managers
       
       gfm = GrabFileManager.new(@config, @output, @client, @db)
 
-      if not gfm.grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, 
-                           @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
-        @async_file_error = FetchFileError::INVALID_ENVIRONMENT_TARBALL if async
+      begin
+        if not gfm.grab_file(tarball["file"], local_tarball, tarball["md5"], "tarball", env_prefix, 
+                             @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+          @async_file_error = FetchFileError::INVALID_ENVIRONMENT_TARBALL if async
+          return false
+        end
+      rescue TempfileException
+        @async_file_error = FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE if async
         return false
+      rescue MoveException
+        @async_file_error = FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE if async
+        return false      
       end
+
       tarball["file"] = local_tarball
 
       if @config.exec_specific.key != "" then
         key = @config.exec_specific.key
         local_key = use_local_cache_filename(key, user_prefix)
-        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, @config.common.kadeploy_cache_dir, 
-                                             @config.common.kadeploy_cache_size, async) then
-          @async_file_error = FetchFileError::INVALID_KEY if async
+        begin
+          if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, @config.common.kadeploy_cache_dir, 
+                                               @config.common.kadeploy_cache_size, async) then
+            @async_file_error = FetchFileError::INVALID_KEY if async
+            return false
+          end
+        rescue TempfileException
+          @async_file_error = FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE if async
           return false
+        rescue MoveException
+          @async_file_error = FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE if async
+          return false  
         end
+
         @config.exec_specific.key = local_key
       end
 
       if (@config.exec_specific.environment.preinstall != nil) then
         preinstall = @config.exec_specific.environment.preinstall
         local_preinstall =  use_local_cache_filename(preinstall["file"], env_prefix)
-        if not gfm.grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, 
-                             @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
-          @async_file_error = FetchFileError::INVALID_PREINSTALL if async
+        begin
+          if not gfm.grab_file(preinstall["file"], local_preinstall, preinstall["md5"], "preinstall", env_prefix, 
+                               @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size,async) then 
+            @async_file_error = FetchFileError::INVALID_PREINSTALL if async
+            return false
+          end
+        rescue TempfileException
+          @async_file_error = FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE if async
           return false
+        rescue MoveException
+          @async_file_error = FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE if async
+          return false  
         end
         if (File.size(local_preinstall) / (1024.0 * 1024.0)) > @config.common.max_preinstall_size then
           @output.verbosel(0, "The preinstall file #{preinstall["file"]} is too big (#{@config.common.max_preinstall_size} MB is the maximum size allowed)")
@@ -824,10 +879,18 @@ module Managers
       if (@config.exec_specific.environment.postinstall != nil) then
         @config.exec_specific.environment.postinstall.each { |postinstall|
           local_postinstall = use_local_cache_filename(postinstall["file"], env_prefix)
-          if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
-                               @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
-            @async_file_error = FetchFileError::INVALID_POSTINSTALL if async
+          begin
+            if not gfm.grab_file(postinstall["file"], local_postinstall, postinstall["md5"], "postinstall", env_prefix, 
+                                 @config.common.kadeploy_cache_dir, @config.common.kadeploy_cache_size, async) then 
+              @async_file_error = FetchFileError::INVALID_POSTINSTALL if async
+              return false
+            end
+          rescue TempfileException
+            @async_file_error = FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE if async
             return false
+          rescue MoveException
+            @async_file_error = FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE if async
+            return false  
           end
           if (File.size(local_postinstall) / (1024.0 * 1024.0)) > @config.common.max_postinstall_size then
             @output.verbosel(0, "The postinstall file #{postinstall["file"]} is too big (#{@config.common.max_postinstall_size} MB is the maximum size allowed)")
@@ -846,11 +909,19 @@ module Managers
               if (entry[0] == "send") then
                 custom_file = entry[1]
                 local_custom_file = use_local_cache_filename(custom_file, user_prefix)
-                if not gfm.grab_file_without_caching(custom_file, local_custom_file, "custom_file", 
-                                                     user_prefix, @config.common.kadeploy_cache_dir, 
-                                                     @config.common.kadeploy_cache_size, async) then
-                  @async_file_error = FetchFileError::INVALID_CUSTOM_FILE if async
+                begin
+                  if not gfm.grab_file_without_caching(custom_file, local_custom_file, "custom_file", 
+                                                       user_prefix, @config.common.kadeploy_cache_dir, 
+                                                       @config.common.kadeploy_cache_size, async) then
+                    @async_file_error = FetchFileError::INVALID_CUSTOM_FILE if async
+                    return false
+                  end
+                rescue TempfileException
+                  @async_file_error = FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE if async
                   return false
+                rescue MoveException
+                  @async_file_error = FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE if async
+                  return false  
                 end
                 entry[1] = local_custom_file
               end
@@ -865,11 +936,19 @@ module Managers
             user_prefix = "pxe-#{@config.exec_specific.true_user}--"
             tftp_images_path = "#{@config.common.tftp_repository}/#{@config.common.tftp_images_path}"
             local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
-            if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",
-                                                 user_prefix, tftp_images_path, 
-                                                 @config.common.tftp_images_max_size, async) then
-              @async_file_error = FetchFileError::INVALID_PXE_FILE if async
+            begin
+              if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",
+                                                   user_prefix, tftp_images_path, 
+                                                   @config.common.tftp_images_max_size, async) then
+                @async_file_error = FetchFileError::INVALID_PXE_FILE if async
+                return false
+              end
+            rescue TempfileException
+              @async_file_error = FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE if async
               return false
+            rescue MoveException
+              @async_file_error = FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE if async
+              return false  
             end
           }
         end

@@ -47,10 +47,23 @@ module EnvironmentManagement
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
     def load_from_file(file, file_content, almighty_env_users, user, cache_dir, client, record_in_db)
-      temp_env_file = Tempfile.new("env_file")
+      begin
+        temp_env_file = Tempfile.new("env_file")
+      rescue StandardException
+        Debug::distant_client_error("Temporary directory is full on the server side, please contact the administrator", client)
+        return false
+      end
       if (file =~ /^http[s]?:\/\//) then
         http_response, etag = HTTP::fetch_file(file, temp_env_file.path, cache_dir, nil)
-        if http_response != "200" then
+        case http_response
+        when -1
+          Debug::distant_client_error("The file #{file} cannot be fetched: impossible to create a tempfile in the cache directory", client)
+          return false
+        when -2
+          Debug::distant_client_error("The file #{file} cannot be fetched: impossible to move the file in the cache directory", client)
+          return false
+        when "200"
+        else
           Debug::distant_client_error("The file #{file} cannot be fetched: http_response #{http_response}", client)
           return false
         end

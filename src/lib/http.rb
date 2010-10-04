@@ -16,14 +16,18 @@ module HTTP
   # * uri: URI of the file
   # * output: output file
   # * cache_dir: cache directory
-  # * etag: ETag of the file
+  # * etag: ETag of the file (http_response is -1 if Tempfiles cannot be created)
   # Output
   # * return http_response and ETag
   def HTTP::fetch_file(uri, output, cache_dir, expected_etag)
     http_response = String.new
     etag = String.new
-    wget_output = Tempfile.new("wget_output", cache_dir)
-    wget_download = Tempfile.new("wget_download", cache_dir)
+    begin
+      wget_output = Tempfile.new("wget_output", cache_dir)
+      wget_download = Tempfile.new("wget_download", cache_dir)
+    rescue StandardError
+      return -1,0
+    end
     if (expected_etag == nil) then
       cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} 2> #{wget_output.path}"
     else
@@ -33,7 +37,7 @@ module HTTP
     http_response = `grep "HTTP/1.1" #{wget_output.path}|cut -f 2 -d' '`.chomp
     if (http_response == "200") then
       if not system("mv #{wget_download.path} #{output}") then
-        return nil
+        return -2,0
       end
     end
     etag = `grep "ETag" #{wget_output.path}|cut -f 2 -d' '`.chomp
