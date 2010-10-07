@@ -102,20 +102,22 @@ module ConfigInformation
       allowed_to_deploy = true
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
-        if (exec_specific_config.deploy_part != "") then
-          if (exec_specific_config.block_device != "") then
-            part = exec_specific_config.block_device + exec_specific_config.deploy_part
+        if (allowed_to_deploy) then
+          if (exec_specific_config.deploy_part != "") then
+            if (exec_specific_config.block_device != "") then
+              part = exec_specific_config.block_device + exec_specific_config.deploy_part
+            else
+              part = @cluster_specific[cluster].block_device + exec_specific_config.deploy_part
+            end
           else
-            part = @cluster_specific[cluster].block_device + exec_specific_config.deploy_part
+            part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
           end
-        else
-          part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
+          allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
+                                                                     exec_specific_config.true_user,
+                                                                     client, set, db, part).granted?
         end
-        allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
-                                                                   exec_specific_config.true_user,
-                                                                   client, set, db, part).granted?
       }
-      if (allowed_to_deploy != true) then
+      if (not allowed_to_deploy) then
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
         return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
       end
@@ -180,20 +182,22 @@ module ConfigInformation
       allowed_to_deploy = true
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
-        if (exec_specific_config.deploy_part != "") then
-          if (exec_specific_config.block_device != "") then
-            part = exec_specific_config.block_device + exec_specific_config.deploy_part
+        if (allowed_to_deploy) then
+          if (exec_specific_config.deploy_part != "") then
+            if (exec_specific_config.block_device != "") then
+              part = exec_specific_config.block_device + exec_specific_config.deploy_part
+            else
+              part = @cluster_specific[cluster].block_device + exec_specific_config.deploy_part
+            end
           else
-            part = @cluster_specific[cluster].block_device + exec_specific_config.deploy_part
+            part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
           end
-        else
-          part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
+          allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
+                                                                     exec_specific_config.true_user,
+                                                                     client, set, db, part).granted?
         end
-        allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
-                                                                   exec_specific_config.true_user,
-                                                                   client, set, db, part).granted?
       }
-      if (allowed_to_deploy != true) then
+      if (not allowed_to_deploy) then
         puts "You do not have the right to deploy on all the nodes"
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
         return KarebootAsyncError::NO_RIGHT_TO_DEPLOY
@@ -255,12 +259,14 @@ module ConfigInformation
       allowed_to_deploy = true
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
-        part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
-        allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
-                                                                   exec_specific_config.true_user,
-                                                                   client, set, db, part).granted?
+        if (allowed_to_deploy) then
+          part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
+          allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
+                                                                     exec_specific_config.true_user,
+                                                                     client, set, db, part).granted?
+        end
       }
-      if (allowed_to_deploy != true) then
+      if (not allowed_to_deploy) then
         Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
         return 2
       end
@@ -2183,11 +2189,15 @@ module ConfigInformation
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
+            if (f =~ /^http[s]?:\/\//) then
+              exec_specific.key = f
             else
-              exec_specific.key = File.expand_path(f)
+              if not File.readable?(f) then
+                error("The file #{f} cannot be read")
+                return false
+              else
+                exec_specific.key = File.expand_path(f)
+              end
             end
           else
             authorized_keys = File.expand_path("~/.ssh/authorized_keys")

@@ -38,6 +38,7 @@ if (exec_specific_config != nil) then
     pp kadeploy_server.async_reboot_get_results(reboot_id)
     kadeploy_server.async_reboot_free(reboot_id)
   end
+  
   case error
   when KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
     puts "Reboot failed on some nodes"
@@ -55,6 +56,8 @@ if (exec_specific_config != nil) then
     puts "The VLAN management has been disabled on the site"
   when KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
     puts "The environment does not exist"
+  when FetchFileError::INVALID_KEY
+    puts "The ssh key cannot be grabbed"
   end
 
   DRb.stop_service()

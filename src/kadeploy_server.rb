@@ -1,4 +1,5 @@
 #!/usr/bin/ruby -w
+# -*- coding: utf-8 -*-
 
 # Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010
@@ -188,11 +189,11 @@ class KadeployServer
 
     if ((kind == "kadeploy_async") || (kind == "kareboot_async") || (kind == "kapower_async")) then
       res = @config.check_client_config(kind, exec_specific_config, db, nil)
-      if (res > 0) then
-        return nil, res
-      else
+      if ((res == KarebootAsyncError::NO_ERROR) || (res == KadeployAsyncError::NO_ERROR) || (res == 0)) then
         method = "run_#{kind}".to_sym
         return send(method, db, exec_specific_config)
+      else
+        return nil, res
       end
     else
       DRb.start_service("druby://localhost:0")
@@ -345,7 +346,9 @@ class KadeployServer
   def async_reboot_ended?(reboot_id)
     r = nil
     @reboot_info_hash_lock.synchronize {
-      r = @reboot_info_hash[reboot_id][2][0] if @reboot_info_hash.has_key?(reboot_id)
+      if @reboot_info_hash.has_key?(reboot_id)
+        r = @reboot_info_hash[reboot_id][2][0]
+      end
     }
     return r
   end
@@ -769,7 +772,6 @@ class KadeployServer
   # * return a reboot id or nil if no reboot has been performed and an error code (0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed)
   def run_kareboot_async(db, exec_specific)
     finished = [false]
-
     output = Debug::OutputControl.new(@config.common.verbose_level, 
                                       exec_specific.debug, nil, 
                                       exec_specific.true_user, -1, 
@@ -798,43 +800,41 @@ class KadeployServer
       }
       
       error = KarebootAsyncError::NO_ERROR
-      
-      Thread.new {
-        if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
-          gfm = Managers::GrabFileManager.new(config, output, nil, db)
-          exec_specific.pxe_upload_files.each { |pxe_file|
-            user_prefix = "pxe-#{config.exec_specific.true_user}-"
-            tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
-            local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
-            if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                                 tftp_images_path, config.common.tftp_images_max_size, true) then
-              output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
-              error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
-            end
-          }
-          gfm = nil
+      if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
+        gfm = Managers::GrabFileManager.new(config, output, nil, db)
+        exec_specific.pxe_upload_files.each { |pxe_file|
+          user_prefix = "pxe-#{config.exec_specific.true_user}-"
+          tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
+          local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
+                                               tftp_images_path, config.common.tftp_images_max_size, true) then
+            output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
+            error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
+          end
+        }
+        gfm = nil
+      end
+      if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
+        gfm = Managers::GrabFileManager.new(config, output, nil, db)
+        user_prefix = "u-#{exec_specific.true_user}--"
+        key = exec_specific.key
+        case key
+        when /^http[s]?:\/\//
+          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
+        else
+          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
         end
-
-        if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
-          gfm = Managers::GrabFileManager.new(config, output, client, db)
-          user_prefix = "u-#{exec_specific.true_user}--"
-          key = exec_specific.key
-          case key
-          when /^http[s]?:\/\//
-            local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
-          else
-            local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
-          end
-          if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
-                                               config.common.kadeploy_cache_size, false) then
-            output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
-            error = FetchFileError::INVALID_KEY
-          end
+        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
+                                             config.common.kadeploy_cache_size, true) then
+          output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
+          error = FetchFileError::INVALID_KEY
+        else
           exec_specific.key = local_key
-          gfm = nil
         end
-        
-        if (error == KarebootAsyncError::NO_ERROR) then
+        gfm = nil
+      end
+      if (error == KarebootAsyncError::NO_ERROR) then
+        Thread.new {
           exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
             tid_array << Thread.new {
               step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
@@ -903,9 +903,9 @@ class KadeployServer
           tid_array.each { |tid|
             tid.join
           }
-        end
-        @reboot_info_hash_lock.synchronize {
-          finished[0] = true
+          @reboot_info_hash_lock.synchronize {
+            finished[0] = true
+          }
         }
         if (@config.common.async_end_of_reboot_hook != "") then
           tmp = cmd = @config.common.async_end_of_reboot_hook.clone
@@ -915,7 +915,9 @@ class KadeployServer
           system(cmd)
         end
         config = nil
-      }
+      else
+        reboot_id = nil
+      end
       return reboot_id,error
     end
   end
