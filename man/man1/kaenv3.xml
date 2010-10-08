@@ -151,9 +151,9 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--move-files <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--move-files</option></term>
 	<listitem>
-	  <para>Move the files of the environment.</para>
+	  <para>Move the files of the environment (for administrators only).</para>
 	</listitem>
       </varlistentry>
     </variablelist>

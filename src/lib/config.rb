@@ -1561,8 +1561,7 @@ module ConfigInformation
           exec_specific.env_name = n
           exec_specific.operation = "update-postinstalls-md5"
         }
-        opt.on("--move-files ENVNAME", "Move the files of the environment") { |n|
-          exec_specific.env_name = n
+        opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
           exec_specific.operation = "move-files"
         }
       end
@@ -1777,12 +1776,16 @@ module ConfigInformation
       exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
 
       return true if exec_specific.get_version
+      if (exec_specific.operation == "") then
+        error("You must choose an operation")
+        return false
+      end
       if (exec_specific.user == "") then
         error("You must choose a user")
         return false
       end
-      case
-      when exec_specific.operation == "add" || exec_specific.operation  == "delete"
+
+      if (exec_specific.operation == "add") || (exec_specific.operation  == "delete") then
         if (exec_specific.part_list.empty?) then
           error("You must specify at least one partition")
           return false
@@ -1791,10 +1794,6 @@ module ConfigInformation
           error("You must specify at least one node")
           return false
         end
-      when exec_specific.operation == "show"
-      else
-        error("You must choose an operation")
-        return false
       end
 
       return true

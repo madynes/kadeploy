@@ -55,9 +55,9 @@ if (exec_specific_config != nil) then
     exit(1)
   end
 
-  kadeploy_server.run("karights", exec_specific_config, client_host, client_port)
-
-  exit(0)
+  res = kadeploy_server.run("karights", exec_specific_config, client_host, client_port)
+  
+  exit((res)?0:1)
 else
   exit(1)
 end

@@ -201,7 +201,7 @@ class KadeployServer
       client = DRbObject.new(nil, uri)
       
       res = @config.check_client_config(kind, exec_specific_config, db, client)
-      if (res == 0) then
+      if ((res == KarebootAsyncError::NO_ERROR) || (res == KadeployAsyncError::NO_ERROR) || (res == 0)) then
         method = "run_#{kind}".to_sym
         res = send(method, db, client, exec_specific_config)
       else
@@ -1283,11 +1283,11 @@ class KadeployServer
   def run_karights(db, client, exec_specific)
     case exec_specific.operation  
     when "add"
-      karights_add_rights(exec_specific, client, db)
+      return karights_add_rights(exec_specific, client, db)
     when "delete"
-      karights_delete_rights(exec_specific, client, db)
+      return karights_delete_rights(exec_specific, client, db)
     when "show"
-      karights_show_rights(exec_specific, client, db)
+      return karights_show_rights(exec_specific, client, db)
     end
   end
 
@@ -1299,6 +1299,7 @@ class KadeployServer
   # * db: database handler
   # Output
   # * print the rights of a specific user
+  # * return true if some rights are granted for the given user, false otherwise
   def karights_show_rights(exec_specific, client, db)
     hash = Hash.new
     query = "SELECT * FROM rights WHERE user=\"#{exec_specific.user}\""
@@ -1313,12 +1314,14 @@ class KadeployServer
       if (res.num_rows > 0) then
         Debug::distant_client_print("The user #{exec_specific.user} has the deployment rights on the following nodes:", client)
         hash.each_pair { |node, part_list|
-          Debug::distant_client_print("### #{node}: #{part_list.join(", ")}", client)
+          Debug::distant_client_print("### #{node}:#{part_list.join(", ")}", client)
         }
       else
         Debug::distant_client_print("No rights have been given for the user #{exec_specific.user}", client)
+        return false
       end
     end
+    return true
   end
 
   # Add some rights on the nodes defined in exec_specific.node_list
@@ -1330,9 +1333,10 @@ class KadeployServer
   # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
-  # * nothing
+  # * return true if all the expected rights have been added, false otherwise
   def karights_add_rights(exec_specific, client, db)
     #check if other users have rights on some nodes
+    res = true
     nodes_to_remove = Array.new
     hosts = Array.new
     exec_specific.node_list.each { |node|
@@ -1347,6 +1351,7 @@ class KadeployServer
         end
       }
     }
+
     if not hosts.empty? then
       query = "SELECT DISTINCT node FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
       res = db.run_query(query)
@@ -1354,22 +1359,17 @@ class KadeployServer
         nodes_to_remove.push(row["node"])
       }
     end
-    if (not nodes_to_remove.empty?) then
-      if exec_specific.overwrite_existing_rights then
-        hosts = Array.new
-        nodes_to_remove.each { |node|
-          hosts.push("node=\"#{node}\"")
-        }
-        query = "DELETE FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
-        db.run_query(query)
-        Debug::distant_client_print("Some rights have been removed on the nodes #{nodes_to_remove.join(", ")}", client)
-      else
-        exec_specific.node_list.delete_if { |node|
-          nodes_to_remove.include?(node)
-        }
-        Debug::distant_client_print("The nodes #{nodes_to_remove.join(", ")} have been removed from the rights assignation since another user has some rights on them", client)
-      end
+    if ((not nodes_to_remove.empty?) && exec_specific.overwrite_existing_rights) then
+      hosts = Array.new
+      nodes_to_remove.each { |node|
+        hosts.push("node=\"#{node}\"")
+      }
+      query = "DELETE FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
+      db.run_query(query)
+      Debug::distant_client_print("Some rights have been removed on the nodes #{nodes_to_remove.join(", ")}", client)
+      nodes_to_remove.clear
     end
+
     values_to_insert = Array.new
     exec_specific.node_list.each { |node|
       exec_specific.part_list.each { |part|
@@ -1379,13 +1379,18 @@ class KadeployServer
           nodes = [node]
         end
         nodes.each{ |n|
-          if ((node == "*") || (part == "*")) then
-            #check if the rights are already inserted
-            query = "SELECT * FROM rights WHERE user=\"#{exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
-            res = db.run_query(query)
-            values_to_insert.push("(\"#{exec_specific.user}\", \"#{n}\", \"#{part}\")") if (res.num_rows == 0)
+          if (not nodes_to_remove.include?(n)) then
+            if ((node == "*") || (part == "*")) then
+              #check if the rights are already inserted
+              query = "SELECT * FROM rights WHERE user=\"#{exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
+              res = db.run_query(query)
+              values_to_insert.push("(\"#{exec_specific.user}\", \"#{n}\", \"#{part}\")") if (res.num_rows == 0)
+            else
+              values_to_insert.push("(\"#{exec_specific.user}\", \"#{n}\", \"#{part}\")")
+            end
           else
-            values_to_insert.push("(\"#{exec_specific.user}\", \"#{n}\", \"#{part}\")")
+            Debug::distant_client_print("The node #{n} has been removed from the rights assignation since another user has some rights on it", client)
+            res = false
           end
         }
       }
@@ -1396,7 +1401,9 @@ class KadeployServer
       db.run_query(query)
     else
       Debug::distant_client_print("No rights added", client)
+      res = false
     end
+    return res
   end
 
   # Remove some rights on the nodes defined in exec_specific.node_list
@@ -1408,8 +1415,9 @@ class KadeployServer
   # * client: DRb handler of the Kadeploy client
   # * db: database handler
   # Output
-  # * nothing
+  # * return true if all the expected rights have been removed, false otherwise
   def karights_delete_rights(exec_specific, client, db)
+    res = true
     exec_specific.node_list.each { |node|
       exec_specific.part_list.each { |part|
         if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
@@ -1420,14 +1428,15 @@ class KadeployServer
         nodes.each{ |n|
           query = "DELETE FROM rights WHERE user=\"#{exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
           db.run_query(query)
-          Debug::distant_client_print("No rights have been removed", client) if (db.dbh.affected_rows == 0)
+          if (db.dbh.affected_rows == 0)
+            Debug::distant_client_print("No rights have been removed for the node #{n} on the partition #{part}", client)
+            res = false
+          end
         }
       }
     }
+    return res
   end
-
-
-
 
 
 
