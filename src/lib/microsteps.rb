@@ -1479,7 +1479,7 @@ module MicroStepsLibrary
                                                    @config.common.tftp_cfg,
                                                    @config.cluster_specific[@cluster].pxe_header)
             else
-              # @output.verbosel(3, "Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
+              # @output.verbosel(3, "Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
@@ -1834,7 +1834,7 @@ module MicroStepsLibrary
             return install_grub2_on_nodes("linux", instance_thread)
           when "xen"
 #            return install_grub2_on_nodes("xen", instance_thread)
-            @output.verbosel(3, "   Hack, Grub2 seems to failed to boot a Xen Dom0, so let's use the pure PXE fashion")
+            @output.verbosel(3, "   Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
             return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
                                               @config.exec_specific.environment.initrd,
                                               @config.exec_specific.environment.hypervisor])

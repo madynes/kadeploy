@@ -72,7 +72,7 @@ install_man:
 
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
-	@mkdir -p $(DEB_ROOT_SERVER)/usr/sbin
+	@mkdir -p $(DEB_ROOT_CLIENT)/usr/sbin
 	@mkdir -p $(DEB_ROOT_CLIENT)/etc/kadeploy3
 
 tree_server:

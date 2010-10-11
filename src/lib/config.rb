@@ -103,15 +103,11 @@ module ConfigInformation
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
         if (allowed_to_deploy) then
-          if (exec_specific_config.deploy_part != "") then
-            if (exec_specific_config.block_device != "") then
-              part = exec_specific_config.block_device + exec_specific_config.deploy_part
-            else
-              part = @cluster_specific[cluster].block_device + exec_specific_config.deploy_part
-            end
-          else
-            part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
-          end
+          b = @cluster_specific[cluster].block_device
+          p = @cluster_specific[cluster].deploy_part
+          b = exec_specific_config.block_device if (exec_specific_config.block_device != "")
+          p = exec_specific_config.deploy_part if (exec_specific_config.deploy_part != "")
+          part = b + p
           allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
                                                                      exec_specific_config.true_user,
                                                                      client, set, db, part).granted?
@@ -183,15 +179,11 @@ module ConfigInformation
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
         if (allowed_to_deploy) then
-          if (exec_specific_config.deploy_part != "") then
-            if (exec_specific_config.block_device != "") then
-              part = exec_specific_config.block_device + exec_specific_config.deploy_part
-            else
-              part = @cluster_specific[cluster].block_device + exec_specific_config.deploy_part
-            end
-          else
-            part = @cluster_specific[cluster].block_device + @cluster_specific[cluster].deploy_part
-          end
+          b = @cluster_specific[cluster].block_device
+          p = @cluster_specific[cluster].deploy_part
+          b = exec_specific_config.block_device if (exec_specific_config.block_device != "")
+          p = exec_specific_config.deploy_part if (exec_specific_config.deploy_part != "")
+          part = b + p
           allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
                                                                      exec_specific_config.true_user,
                                                                      client, set, db, part).granted?
