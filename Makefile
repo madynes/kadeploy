@@ -106,8 +106,8 @@ install_all: install_common install_client install_server
 
 uninstall:
 	@rm -rf $(DESTDIR)/usr/local/kadeploy3
-	@rm -f $(DESTDIR)/usr/sbin/kadeploy3d $(DESTDIR)/usr/sbin/karights3
-	@rm -f $(DESTDIR)/usr/bin/kaconsole3 $(DESTDIR)/usr/bin/kadeploy3 $(DESTDIR)/usr/bin/kaenv3 $(DESTDIR)/usr/bin/kanodes3 $(DESTDIR)/usr/bin/kareboot3 $(DESTDIR)/usr/bin/kastat3
+	@rm -f $(DESTDIR)/usr/sbin/kadeploy3d
+	@rm -f $(DESTDIR)/usr/bin/kaconsole3 $(DESTDIR)/usr/bin/kadeploy3 $(DESTDIR)/usr/bin/kaenv3 $(DESTDIR)/usr/bin/kanodes3 $(DESTDIR)/usr/bin/kareboot3 $(DESTDIR)/usr/bin/kastat3 $(DESTDIR)/usr/bin/kapower3 $(DESTDIR)/usr/sbin/karights3
 
 dist: dist-clean
 	@./make_dist_dir.sh $(DIST_DIR)
