@@ -38,7 +38,7 @@ A DHCP server (\texttt{dhcp3-server} on Debian for instance) must be configured 
 
 A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed.
 
-To allow the network booting, you must specify in the DHCP configuration file the filename option that define the file retrieve by a client. This filename can be pxelinux.0 or gpxelinux.0.
+To allow the network booting, you must specify in the DHCP configuration file the file name option that define the file retrieve by a client. This file name can be pxelinux.0 or gpxelinux.0.
 
 Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files: pxelinux.0 (or gpxelinux.0), chain.c32, and mboot.c32. These files can be found in the Syslinux software (\url{http://syslinux.zytor.com}), the 3.73 version is at least required.
 
@@ -415,11 +415,11 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 \item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
 \item \texttt{pxe\_header}: default PXE header (must be defined in one line).
 \item \texttt{nfsroot\_kernel}: kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
-\item \texttt{nfsroot\_params}: kernel params for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+\item \texttt{nfsroot\_params}: kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
 \item \texttt{partition\_creation\_kind}: tool used to create the partition table. The expected values are \texttt{fdisk} or \texttt{parted}.
-\item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
-\item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
-\item \texttt{macrostep}: list of implementations for a macro-step. The syntax is: macrostepname|implem1:nb\_retry:timeout,implem2:nb\_retry:timeout,... There are 3 macro-steps, so you must specifiy one line in the specific configuration file for each one. Here is the list of the macro-step and their implementation:
+\item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
+\item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
+\item \texttt{macrostep}: list of implementations for a macro-step. The syntax is: macrostepname|implem1:nb\_retry:timeout,implem2:nb\_retry:timeout,... There are 3 macro-steps, so you must specify one line in the specific configuration file for each one. Here is the list of the macro-step and their implementation:
   \begin{itemize}
   \item \texttt{SetDeploymentEnv}
     \begin{itemize}
@@ -530,7 +530,8 @@ Each line of the configuration file must follow the pattern: \texttt{key = value
 In some special cases, a such command can affect a group of nodes. Thus, you can specify group of nodes for a given command using the following syntax :
 \begin{small}
 \begin{verbatim}
-cmd_very_hard_power_off = /usr/sbin/very_hard_power_off GROUP_SHORT,path_to_group_of_node_for_hard_power_off_cmd
+cmd_very_hard_power_off = /usr/sbin/very_hard_power_off GROUP_SHORT, \
+                          path_to_group_of_node_for_hard_power_off_cmd
 \end{verbatim}
 \end{small}
 You can remark two things :
@@ -538,7 +539,7 @@ You can remark two things :
 \item the \texttt{HOSTNAME\_SHORT} and \texttt{HOSTNAME\_FQDN} patterns are not used in these commands, instead you must use the \texttt{GROUP\_SHORT} and \texttt{GROUP\_FQDN} patterns.
 \item the affinity between nodes is specified in a file (here \texttt{path\_to\_group\_of\_node\_for\_hard\_power\_off\_cmd}) that contains as much lines as the number of groups. Then, each line contains the nodes of a group, for instance: \texttt{node1,node2,node3}.
 \end{itemize}
-For a given command on a given cluster, if you specify some group of nodes (with \texttt{GROUP\_SHORT} or \texttt{GROUP\_FQDN} patterns), you will also be able to specify, for some nodes of the cluster, a command that does not imply a group of nodes. To do this, you must specify these commands in the cpecific commands configuration files.
+For a given command on a given cluster, if you specify some group of nodes (with \texttt{GROUP\_SHORT} or \texttt{GROUP\_FQDN} patterns), you will also be able to specify, for some nodes of the cluster, a command that does not imply a group of nodes. To do this, you must specify these commands in the specific commands configuration files.
 
 \section{Clusters file}
 The list of all the clusters must be defined in the  \texttt{/etc/kadeploy3/clusters} file. For instance, the file may contain something like :
@@ -671,9 +672,6 @@ Kareboot is designed to perform several reboot operations on the nodes.
 \subsection{Kaenv}
 Kaenv is designed to manage the users environments.
 
-\subsection{Karights}
-Karights is designed to allow users to perform some deployments on a set of nodes throughout a reservation. This tool is typically called by the resource manager at the prologue and epilogue steps.
-
 \subsection{Kaconsole}
 Kaconsole is designed to provide a user to access to the consoles of the nodes on which the user has the deployment rights.
 
@@ -683,6 +681,12 @@ Kastat is designed to show several statistics about the deployments.
 \subsection{Kanodes}
 Kanodes is designed to show the state of the nodes.
 
+\subsection{Kapower}
+Kapower is designed to control the power state of the nodes.
+
+\subsection{Karights}
+Karights is designed to allow users to perform some deployments on a set of nodes throughout a reservation. This tool is typically called by the resource manager at the prologue and epilogue steps.
+
 \section{Use the Kadeploy tools}
 \subsection{Kadeploy server}
 All the Kadeploy tools use the Kadeploy server. On a well configured system, the Kadeploy server can be launched with the following command (with root rights):
@@ -691,7 +695,7 @@ All the Kadeploy tools use the Kadeploy server. On a well configured system, the
 \end{verbatim}
 
 \subsection{Kadeploy client}
-The Kadeploy client is actually the user interface for the Kadeploy software. It can be used by using the \texttt{kadeploy} command. The CLI looks like this:
+The Kadeploy client is actually the user interface for the Kadeploy software. It can be used by using the \texttt{kadeploy3} command. The CLI looks like this:
 \begin{small}
 \begin{verbatim}
 > kadeploy3 -h
@@ -865,7 +869,7 @@ If you are a power user, you can specify the full Kadeploy workflow and bypass t
             -e lenny-x64-nfs-1.0 \
             --set-custom-operations ~/custom_ops
 \end{verbatim}
-For very specific purpose, you can add some custom operations in the deployment workflow. To do this, you have to specify these operations in a file where each line specify the operations that must be executed at the beginning of a micro-step. The syntax is: \texttt{macrostep,microstep@cmd1\%arg\%dir,cmd2\%arg\%dir,...,cmdN\%arg\%dir}. You can specify two kinds of operations: \textit{send} and \textit{exec}. For the \textit{send} operation, \texttt{arg} is used to specify a filename and \texttt{dir} is used to specify the destination directory. Concerning the \textit{exec} operation, \texttt{arg} is used to specify the command to execute and \texttt{dir} must be empty.
+For very specific purpose, you can add some custom operations in the deployment workflow. To do this, you have to specify these operations in a file where each line specify the operations that must be executed at the beginning of a micro-step. The syntax is: \texttt{macrostep,microstep@cmd1\%arg\%dir,cmd2\%arg\%dir,...,cmdN\%arg\%dir}. You can specify two kinds of operations: \textit{send} and \textit{exec}. For the \textit{send} operation, \texttt{arg} is used to specify a file name and \texttt{dir} is used to specify the destination directory. Concerning the \textit{exec} operation, \texttt{arg} is used to specify the command to execute and \texttt{dir} must be empty.
 
 Here is an example of a file that contains custom operations:
 \begin{small}
@@ -877,7 +881,7 @@ BootNewEnvKexec,reboot@exec%echo "s" > /proc/sysrq-trigger%
 \end{small}
 
 \subsection{Kareboot}
-Kareboot can be used by using the \texttt{kareboot} command. The CLI looks like this:
+Kareboot can be used by using the \texttt{kareboot3} command. The CLI looks like this:
 \begin{small}
 \begin{verbatim}
 > kareboot3 -h
@@ -951,7 +955,7 @@ Warning, if the \texttt{--no-wait} option is used, Kareboot won't wait the end o
 
 \subsection{Kaenv}\label{sec:kaenv}
 \subsubsection{Command line interface}
-Kaenv can be used by using the \texttt{kaenv} command. The CLI looks like this:
+Kaenv can be used by using the \texttt{kaenv3} command. The CLI looks like this:
 \begin{small}
 \begin{verbatim}
 > kaenv3 -h
@@ -1070,8 +1074,8 @@ Explanation of the fields used in the environment description:
 \item \texttt{version}: version of the environment.
 \item \texttt{author}: author of the environment.
 \item \texttt{tarball}: disk image of the environment. The syntax is: \texttt{file|kind}. The allowed kinds are \texttt{tgz}, \texttt{tbz2}, \texttt{ddgz} and \texttt{ddbz2}.
-\item \texttt{preinstall (opt)}: pre-install file. The syntax is: \texttt{file|kind|script [params]}. The allowed kinds of files are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
-\item \texttt{postinstall}: post-install files. The syntax is: \texttt{file1|kind|script1 [params],file2|kind|script2 [params], ...}. The allowed kinds of files for post-installs are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transfered, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
+\item \texttt{preinstall (opt)}: pre-install file. The syntax is: \texttt{file|kind|script [params]}. The allowed kinds of files are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
+\item \texttt{postinstall}: post-install files. The syntax is: \texttt{file1|kind|script1 [params],file2|kind|script2 [params], ...}. The allowed kinds of files for post-installs are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
 \item \texttt{kernel}: path of the kernel in the tarball.
 \item \texttt{kernel\_params}: set of parameters that must be applied to the kernel for a correct boot.
 \item \texttt{initrd}: path of the initrd in the tarball.
@@ -1089,8 +1093,184 @@ Explanation of the fields used in the environment description:
 \item \texttt{demolishing\_env}: specify that the environment is demolishing (expected values are 0 if the environment is not demolishing, 10000 otherwise). SHOULD BE IMPROVED...
 \end{itemize}
 
+\subsection{Kaconsole}\label{sec:kaconsole}
+Karights can be used by using the \texttt{kaconsole} command. It has only one use case that is opening a console on a given node, for instance:
+\begin{verbatim}
+> kaconsole3 -m gdx-25.orsay.grid5000.fr
+\end{verbatim}
+
+Kaconsole can't be used on a node on which a user doesn't have the deployment rights. Furthermore, as soon as the deployments rights are revoked for a user, ever open console is automatically closed.
+
+\subsection{Kastat}\label{sec:kastat}
+Kastat can be used by using the \texttt{kastat3} command. The CLI looks like this:
+\begin{small}
+\begin{verbatim}
+> kastat3 -h
+Usage: kastat3 [options]
+Contact: kadeploy3-users@lists.grid5000.fr
+General options:
+  -a, --list-min-retries NB        Print the statistics about the nodes that need several attempts
+  -b, --list-failure-rate          Print the failure rate for the nodes
+  -c, --list-min-failure-rate RATE Print the nodes which have a minimum failure-rate of 
+                                   RATE (0 <= RATE <= 100
+  -d, --list-all                   Print all the information
+  -f, --field FIELD                Only print the given fields (user,hostname,step1,step2,step3,
+                                                           timeout_step1,timeout_step2,timeout_step3,
+                                                           retry_step1,retry_step2,retry_step3,
+                                                           start,
+                                                           step1_duration,step2_duration,step3_duration,
+                                                           env,md5,success,error)
+  -m, --machine MACHINE            Only print information about the given machines
+  -s, --step STEP                  Applies the retry filter on the given steps (1, 2 or 3)
+  -v, --version                    Get the version
+  -x, --date-min DATE              Get the stats from this date (yyyy:mm:dd:hh:mm:ss)
+  -y, --date-max DATE              Get the stats to this date
+      --server STRING              Specify the Kadeploy server to use
+\end{verbatim}
+\end{small}
+
+We present now the use cases. Note that all the commands can be filtered with a period by using the \texttt{-x|--date-min} and \texttt{-y|--date-max} options.
+\paragraph{Use case 1 - get the information about the deployments performed on a node}
+\begin{verbatim}
+> kastat3 -d -m gdx-25.orsay.grid5000.fr
+\end{verbatim}
+This command prints all the deployment performed on the node \textit{gdx-25.orsay.grid5000.fr}.
+
+\paragraph{Use case 2 - get the information about deployments performed on a range of node}
+\begin{verbatim}
+> kastat3 -d -m gdx-[25-130].orsay.grid5000.fr
+\end{verbatim}
+This command prints all the deployment performed on the nodes \textit{gdx-25.orsay.grid5000.fr}, \textit{gdx-26.orsay.grid5000.fr}, ..., \textit{gdx-130.orsay.grid5000.fr}.
+
+\paragraph{Use case 3 - print only a subset of the information about the deployments performed}
+\begin{verbatim}
+> kastat3 -d -f hostname -f env -f success
+\end{verbatim}
+This command prints all the deployment performed. Because the \texttt{-f|--field} option is used, only the fields \textit{hostname}, \textit{env}, and \textit{success} are printed. If the option \texttt{-f|--field} is not used, all the fields are printed.
+
+\paragraph{Use case 4 - print the failure rate about the nodes wrt the deployments that occurs between two dates}
+\begin{verbatim}
+> kastat3 -b -x 2009:02:12:08:00:00 -y 2009:02:13:08:00:00
+\end{verbatim}
+This command prints the failure rate of all the nodes (at least deployed one time) during the period between the 2009/02/12 - 8h00 and the 2009/02/13 - 8h00. The \texttt{-x|--date-min} and \texttt{-y|--date-max} options can be used separately or can be omitted.
+
+\paragraph{Use case 5 - print the information about the nodes that have at least a given failure rate}
+\begin{verbatim}
+> kastat3 -c 25 -x 2009:02:12:08:00:00
+\end{verbatim}
+This command prints the nodes that have a failure rate of at least 25\% from the 2009/02/12 - 8h00.
+
+\paragraph{Use case 6 - print the information about the nodes that require several retries to deploy correctly}
+\begin{verbatim}
+> kastat3 -a 3 -s 1
+\end{verbatim}
+This command prints the information about the deployments that requires at least 3 retries in the macro-step 1. If the \texttt{-s|--step} option is not set, the information about the deployments that requires at least 3 retries in any macro-step are printed.
+
+
+\subsection{Kanodes}\label{sec:kanodes}
+Kanodes can be used by using the \texttt{kanodes3} command. The CLI looks like this:
+\begin{small}
+\begin{verbatim}
+> kanodes3 -h
+Usage: kanodes3 [options]
+Contact: kadeploy3-users@lists.grid5000.fr
+General options:
+  -d, --get-deploy-state       Get the deploy state of the nodes
+  -f, --file MACHINELIST       Only print information about the given machines (- means stdin)
+  -m, --machine MACHINE        Only print information about the given machines
+  -v, --version                Get the version
+  -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 
+                               operation. If no wid is specified, the information of all
+                               the running worklfows will be dumped
+  -y, --get-yaml-dump          Get the yaml dump
+      --server STRING          Specify the Kadeploy server to use
+\end{verbatim}
+\end{small}
+
+We present now the use cases.
+\paragraph{Use case 1 - print the deployment state of the nodes}
+\begin{verbatim}
+> kanodes3 -d
+\end{verbatim}
+This command prints the global state of all the nodes managed by a Kadeploy server. The output is as follows 1,2,3,4,5,6, where :
+\begin{itemize}
+\item 1 is the hostname ;
+\item 2 is the deployment state of the node (prod\_env, deployed, deploy\_failed, aborted) ;
+\item 3 is the username who launched the last deployment ;
+\item 4 is the environment name ;
+\item 5 is the environment version ;
+\item 6 is the environment owner.
+\end{itemize}
+
+\paragraph{Use case 2 - print the deployment state of some nodes}
+\begin{verbatim}
+> kanodes3 -d -m gdx-25.orsay.grid5000.fr -m netgdx-[1-30].orsay.grid5000.fr -f machine_file
+\end{verbatim}
+This command prints the global state of the node \textit{gdx-25.orsay.grid5000.fr} the nodes \textit{netgdx-1.orsay.grid5000.fr}, \textit{netgdx-2.orsay.grid5000.fr}, ..., \textit{netgdx-30.orsay.grid5000.fr} and of the nodes listed in the file \texttt{machine\_file}.
+
+\paragraph{Use case 3 - get information about all the current deployment workflows}
+\begin{verbatim}
+> kanodes3 -y
+\end{verbatim}
+This command prints a YAML output of the deployment state of all the nodes currently in deployment. On the YAML output, the nodes are sorted according to the deployment workflow they belong to.
+
+\paragraph{Use case 4 - get information about a specific deployment workflows}
+\begin{verbatim}
+> kanodes3 -y -w 78
+\end{verbatim}
+This command prints a YAML output of the deployment state of all the nodes currently in the deployment number 78. The deployment number, or workflow id, can be obtained thanks to a Kadeploy option.
+
+\subsection{Kapower}\label{sec:kapower}
+Kapower can be used by using the \texttt{kapower3} command. The CLI looks like this:
+\begin{small}
+\begin{verbatim}
+> kapower3 -h
+Usage: kapower3 [options]
+Contact: kadeploy3-users@lists.gforge.inria.fr
+General options:
+  -d, --debug-mode               Activate the debug mode
+  -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
+  -l, --level VALUE              Level (soft, hard, very_hard)
+  -m, --machine MACHINE          Operate on the given machines
+      --multi-server             Activate the multi-server mode
+  -n, --output-ko-nodes FILENAME File that will contain the nodes on which 
+                                 the operation has not been correctly performed
+  -o, --output-ok-nodes FILENAME File that will contain the nodes on which the
+                                 operation has been correctly performed
+      --off                      Shutdown the nodes
+      --on                       Power on the nodes
+      --status                   Get the status of the nodes
+  -v, --version                  Get the version
+      --no-wait                  Do not wait the end of the power operation
+      --server STRING            Specify the Kadeploy server to use
+  -V, --verbose-level VALUE      Verbose level between 0 to 4
+\end{verbatim}
+\end{small}
+
+\paragraph{Use case 1 - print the power status of some nodes}
+\begin{verbatim}
+> kapower3 --status -m gdx-[25-35].orsay.grid5000.fr -o nodes_up -n nodes_down
+\end{verbatim}
+This command print the power status of the nodes \textit{gdx-25.orsay.grid5000.fr} to \textit{gdx-35.orsay.grid5000.fr}. Furthermore, the list of the powered up nodes is stored in \texttt{nodes\_up} and the list of the powered off nodes is stored in \texttt{nodes\_down}.
+
+\paragraph{Use case 2 - power off some nodes}
+\begin{verbatim}
+> kapower3 --off -f machine_file --server lille
+\end{verbatim}
+This command powers off the nodes nodes contained in the \texttt{machine\_file} file. Since the \texttt{--server} is used, the nodes of a distant site are concerned by the operation ; in this example, the \texttt{lille} site is concerned.
+
+\paragraph{Use case 3 - power on some nodes}
+\begin{verbatim}
+> kapower3 --on -m gdx-25.orsay.grid5000.fr --no-wait
+\end{verbatim}
+This command powers on the node \textit{gdx-25.orsay.grid5000.fr} without waiting the end of the operation to return.
+
+\paragraph{Note for the administrators}
+While using the \texttt{--no-wait} option, Kapower add the \texttt{--no-wait} value to the command line used for the given operation. Thus the underlying power management tool must be able to handle this option if this Kapower option is required.
+
+
 \subsection{Karights}\label{sec:karights}
-Karights can be used by using the \texttt{karights} command (it is designed for administrators in order to allow users to perform deployments). The CLI looks like this:
+Karights can be used by using the \texttt{karights3} command (it is designed for administrators in order to allow users to perform deployments). The CLI looks like this:
 \begin{small}
 \begin{verbatim}
 > karights3 -h
@@ -1145,134 +1325,8 @@ This command removes some rights for a given user.
 \begin{verbatim}
 > karights3 -s -u johnsmith
 \end{verbatim}
-This commands shows the rights given to user.
+This command shows the rights given to user.
 
-\subsection{Kaconsole}\label{sec:kaconsole}
-Karights can be used by using the \texttt{kaconsole} command. It has only one use case that is opening a console on a given node, for instance:
-\begin{verbatim}
-> kaconsole3 -m gdx-25.orsay.grid5000.fr
-\end{verbatim}
-
-Kaconsole can't be used on a node on which a user doesn't have the deployment rights. Furthermore, as soon as the deployments rights are revoked for a user, ever open console is automatically closed.
-
-\subsection{Kastat}\label{sec:kastat}
-Kastat can be used by using the \texttt{kastat} command. The CLI looks like this:
-\begin{small}
-\begin{verbatim}
-> kastat3 -h
-Usage: kastat3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -a, --list-min-retries NB        Print the statistics about the nodes that need several attempts
-  -b, --list-failure-rate          Print the failure rate for the nodes
-  -c, --list-min-failure-rate RATE Print the nodes which have a minimum failure-rate of 
-                                   RATE (0 <= RATE <= 100
-  -d, --list-all                   Print all the information
-  -f, --field FIELD                Only print the given fields (user,hostname,step1,step2,step3,
-                                                           timeout_step1,timeout_step2,timeout_step3,
-                                                           retry_step1,retry_step2,retry_step3,
-                                                           start,
-                                                           step1_duration,step2_duration,step3_duration,
-                                                           env,md5,success,error)
-  -m, --machine MACHINE            Only print information about the given machines
-  -s, --step STEP                  Applies the retry filter on the given steps (1, 2 or 3)
-  -v, --version                    Get the version
-  -x, --date-min DATE              Get the stats from this date (yyyy:mm:dd:hh:mm:ss)
-  -y, --date-max DATE              Get the stats to this date
-      --server STRING              Specify the Kadeploy server to use
-\end{verbatim}
-\end{small}
-
-We present now the use cases. Note that all the commands can be filtered with a period by using the \texttt{-x|--date-min} and \texttt{-y|--date-max} options.
-\paragraph{Use case 1 - get the information about the deployments performed on a node}
-\begin{verbatim}
-> kastat3 -d -m gdx-25.orsay.grid5000.fr
-\end{verbatim}
-This commands prints all the deployment performed on the node \textit{gdx-25.orsay.grid5000.fr}.
-
-\paragraph{Use case 2 - get the information about deployments performed on a range of node}
-\begin{verbatim}
-> kastat3 -d -m gdx-[25-130].orsay.grid5000.fr
-\end{verbatim}
-This commands prints all the deployment performed on the nodes \textit{gdx-25.orsay.grid5000.fr}, \textit{gdx-26.orsay.grid5000.fr}, ..., \textit{gdx-130.orsay.grid5000.fr}.
-
-\paragraph{Use case 3 - print only a subset of the information about the deployments performed}
-\begin{verbatim}
-> kastat3 -d -f hostname -f env -f success
-\end{verbatim}
-This command prints all the deployment performed. Because the \texttt{-f|--field} option is used, only the fields \textit{hostname}, \textit{env}, and \textit{success} are printed. If the option \texttt{-f|--field} is not used, all the fields are printed.
-
-\paragraph{Use case 4 - print the failure rate about the nodes wrt the deployments that occurs between two dates}
-\begin{verbatim}
-> kastat3 -b -x 2009:02:12:08:00:00 -y 2009:02:13:08:00:00
-\end{verbatim}
-This commands prints the failure rate of all the nodes (at least deployed one time) during the period between the 2009/02/12 - 8h00 and the 2009/02/13 - 8h00. The \texttt{-x|--date-min} and \texttt{-y|--date-max} options can be used separately or can be omitted.
-
-\paragraph{Use case 5 - print the information about the nodes that have at least a given failure rate}
-\begin{verbatim}
-> kastat3 -c 25 -x 2009:02:12:08:00:00
-\end{verbatim}
-This commands prints the nodes that have a failure rate of at least 25\% from the 2009/02/12 - 8h00.
-
-\paragraph{Use case 6 - print the information about the nodes that require several retries to deploy correctly}
-\begin{verbatim}
-> kastat3 -a 3 -s 1
-\end{verbatim}
-This commands prints the information about the deployments that requires at least 3 retries in the macro-step 1. If the \texttt{-s|--step} option is not set, the information about the deployments that requires at least 3 retries in any macro-step are printed.
-
-
-\subsection{Kanodes}\label{sec:kanodes}
-Kanodes can be used by using the \texttt{kanodes} command. The CLI looks like this:
-\begin{small}
-\begin{verbatim}
-> kanodes3 -h
-Usage: kanodes3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -d, --get-deploy-state       Get the deploy state of the nodes
-  -f, --file MACHINELIST       Only print information about the given machines (- means stdin)
-  -m, --machine MACHINE        Only print information about the given machines
-  -v, --version                Get the version
-  -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 
-                               operation. If no wid is specified, the information of all
-                               the running worklfows will be dumped
-  -y, --get-yaml-dump          Get the yaml dump
-      --server STRING          Specify the Kadeploy server to use
-\end{verbatim}
-\end{small}
-
-We present now the use cases.
-\paragraph{Use case 1 - print the deployment state of the nodes}
-\begin{verbatim}
-> kanodes3 -d
-\end{verbatim}
-This commands prints the global state of all the nodes managed by a Kadeploy server. The output is as follows 1,2,3,4,5,6, where :
-\begin{itemize}
-\item 1 is the hostname ;
-\item 2 is the deployment state of the node (prod\_env, deployed, deploy\_failed, aborted) ;
-\item 3 is the username who launched the last deployment ;
-\item 4 is the environment name ;
-\item 5 is the environment version ;
-\item 6 is the environment owner.
-\end{itemize}
-
-\paragraph{Use case 2 - print the deployment state of some nodes}
-\begin{verbatim}
-> kanodes3 -d -m gdx-25.orsay.grid5000.fr -m netgdx-[1-30].orsay.grid5000.fr -f machine_file
-\end{verbatim}
-This command prints the global state of the node \textit{gdx-25.orsay.grid5000.fr} the nodes \textit{netgdx-1.orsay.grid5000.fr}, \textit{netgdx-2.orsay.grid5000.fr}, ..., \textit{netgdx-30.orsay.grid5000.fr} and of the nodes listed in the file \texttt{machine\_file}.
-
-\paragraph{Use case 3 - get information about all the current deployment workflows}
-\begin{verbatim}
-> kanodes3 -y
-\end{verbatim}
-This commands prints a YAML output of the deployment state of all the nodes currently in deployment. On the YAML output, the nodes are sorted according to the deployment workflow they belong to.
-
-\paragraph{Use case 4 - get information about a specific deployment workflows}
-\begin{verbatim}
-> kanodes3 -y -w 78
-\end{verbatim}
-This commands prints a YAML output of the deployment state of all the nodes currently in the deployment number 78. The deployment number, or workflow id, can be obtained thanks to a Kadeploy option.
 
 \section{What you should know if you want to do kernel development on deployed nodes}
 Kernel development implies to know what Kadeploy do concerning the boot of the deployed environments.
