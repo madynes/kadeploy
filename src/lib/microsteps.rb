@@ -60,6 +60,10 @@ module MicroStepsLibrary
       @output.verbosel(0, msg)
       @nodes_ok.set_error_msg(msg)
       @nodes_ok.duplicate_and_free(@nodes_ko)
+      @nodes_ko.set.each { |n|
+        n.state = "KO"
+        @config.set_node_state(n.hostname, "", "", "ko")
+      }
     end
 
 
@@ -78,6 +82,7 @@ module MicroStepsLibrary
       if not good_bad_array[1].empty? then
         good_bad_array[1].each { |n|
           @output.verbosel(4, "The node #{n.hostname} has been discarded of the current instance")
+          n.state = "KO"
           @config.set_node_state(n.hostname, "", "", "ko")
           @nodes_ko.push(n)
         }
@@ -1269,6 +1274,10 @@ module MicroStepsLibrary
         @nodes_ok.free
         instance_node_set.set_error_msg("Timeout in the #{step_name} step")
         instance_node_set.add_diff_and_free(@nodes_ko)
+        @nodes_ko.set.each { |node|
+          node.state = "KO"
+          @config.set_node_state(node.hostname, "", "", "ko")
+        }
         return true
       else
         instance_node_set.free()
@@ -2038,8 +2047,7 @@ module MicroStepsLibrary
         }
         cmd = @config.common.set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", @config.exec_specific.vlan).gsub("USER", @config.exec_specific.true_user)
         if (not system(cmd)) then
-          @output.verbosel(0, "Cannot set the VLAN")
-          @nodes_ok.duplicate_and_free(@nodes_ko)
+          failed_microstep("Cannot set the VLAN")
           return false
         end
       else
