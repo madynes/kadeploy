@@ -642,7 +642,7 @@ module ConfigInformation
       end
       if ((not @common.kadeploy_disable_cache) && (not File.exist?(@common.kadeploy_cache_dir))) then
         puts "The #{@common.kadeploy_cache_dir} directory does not exist, let's create it"
-        res = Dir.mkdir(@common.kadeploy_cache_dir, 0700) rescue false
+        res = FileUtils.mkdir_p(@common.kadeploy_cache_dir, :mode=>0700) rescue false
         if res.kind_of? FalseClass then
           puts "The directory cannot be created"
           return false
