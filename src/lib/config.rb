@@ -65,7 +65,7 @@ module ConfigInformation
     # Arguments
     # * kind: tool (kadeploy, kaenv, karights, kastat, kareboot, kaconsole, kanodes)
     # Output
-    # * calls the chack_config method that correspond to the selected tool
+    # * calls the check_config method that correspond to the selected tool
     def check_client_config(kind, exec_specific_config, db, client)
       method = "check_#{kind.split("_")[0]}_config".to_sym
       return send(method, exec_specific_config, db, client)
@@ -91,7 +91,12 @@ module ConfigInformation
           exec_specific_config.node_array.each { |hostname|
             hostname_a = hostname.split(".")
             hostname_in_vlan = "#{hostname_a[0]}#{@common.vlan_hostname_suffix}.#{hostname_a[1..-1].join(".")}".gsub("VLAN_ID", exec_specific_config.vlan)
-            exec_specific_config.ip_in_vlan[hostname] = dns.getaddress(hostname_in_vlan).to_s
+            begin
+              exec_specific_config.ip_in_vlan[hostname] = dns.getaddress(hostname_in_vlan).to_s
+            rescue Resolv::ResolvError
+              Debug::distant_client_error("The node #{hostname_in_vlan} does not exist in DNS", client)
+              return KadeployAsyncError::NODE_NOT_EXIST
+            end
           }
           dns.close
           dns = nil
@@ -2739,7 +2744,7 @@ module ConfigInformation
           (@reboot_window_sleep_time == nil) || (@nodes_check_window == nil) ||
           (@bootloader == nil) || (@purge_deployment_timer == nil) || (@rambin_path == nil) ||
           (@mkfs_options == nil) || (@demolishing_env_threshold == nil) ||
-          (@bt_tracker_ip == nil) || (@bt_download_timeout == nil) || (@almighty_env_users == nil)) then
+          (@almighty_env_users == nil)) then
         puts "Some mandatory fields are missing in the common configuration file"
         return false
       else

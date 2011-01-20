@@ -385,6 +385,7 @@ module MicroStepsLibrary
       node_set.set.each { |node|
         if (node.cmd.instance_variable_get("@#{kind}_#{level}") == nil) then
           node.last_cmd_stderr = "#{level}_#{kind} command is not provided"
+          @output.verbosel(3, "      /!\ No #{level} #{kind} command is defined for these nodes /!\ ")
           no_command_provided_nodes.push(node)
           to_remove.push(node)
         end
