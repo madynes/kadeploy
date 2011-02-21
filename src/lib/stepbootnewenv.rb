@@ -167,6 +167,8 @@ module BootNewEnvironment
             end
             #Here are the micro steps
             result = result && @step.switch_pxe("deploy_to_deployed_env")
+            result = result && @step.umount_deploy_part
+            result = result && @step.mount_deploy_part
             result = result && @step.reboot("kexec", false, false)
             result = result && @step.set_vlan
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
