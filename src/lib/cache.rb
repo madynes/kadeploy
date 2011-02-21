@@ -62,7 +62,7 @@ module Cache
 
   public
 
-  # Clean a cache according an LRU policy
+  # Clean a cache according to an LRU policy
   #
   # Arguments
   # * dir: cache directory
@@ -74,17 +74,21 @@ module Cache
   # * nothing
   def Cache::clean_cache(dir, max_size, time_before_delete, pattern, output)
     no_change = false
+    files_to_exclude = Array.new
     while (get_dir_size_without_sub_dirs(dir, output) > max_size) && (not no_change)
       lru = ""
+      
       begin
         Dir.foreach(dir) { |f|
           full_path = File.join(dir, f)
-          if (((f =~ pattern) == 0) && (not FileTest.directory?(full_path))) then
-            access_time = File.atime(full_path).to_i
-            now = Time.now.to_i
-            #We only delete the file older than a given number of hours
-            if  ((now - access_time) > (60 * 60 * time_before_delete)) && ((lru == "") || (File.atime(lru).to_i > access_time)) then
-              lru = full_path
+          if (!files_to_exclude.include?(full_path)) then
+            if (((f =~ pattern) == 0) && (not FileTest.directory?(full_path))) then
+              access_time = File.atime(full_path).to_i
+              now = Time.now.to_i
+              #We only delete the file older than a given number of hours
+              if  ((now - access_time) > (60 * 60 * time_before_delete)) && ((lru == "") || (File.atime(lru).to_i > access_time)) then
+                lru = full_path
+              end
             end
           end
         }
@@ -92,7 +96,8 @@ module Cache
           begin
             File.delete(lru)
           rescue
-            output.debug_server("Cannot delete the file #{full_path}: #{$!}")
+            output.debug_server("Cannot delete the file #{lru}: #{$!}")
+            files_to_exclude.push(lru);
           end
         else
           no_change = true
