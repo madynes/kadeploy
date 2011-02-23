@@ -79,7 +79,7 @@ module ConfigInformation
           return KadeployAsyncError::NODE_NOT_EXIST
         end
       }
-      
+
       #VLAN
       if (exec_specific_config.vlan != nil) then
         if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
@@ -88,7 +88,7 @@ module ConfigInformation
         else
           dns = Resolv::DNS.new
           exec_specific_config.ip_in_vlan = Hash.new
-          exec_specific_config.node_array.each { |hostname|
+          exec_specific_config.node_set.make_array_of_hostname.each { |hostname|
             hostname_a = hostname.split(".")
             hostname_in_vlan = "#{hostname_a[0]}#{@common.vlan_hostname_suffix}.#{hostname_a[1..-1].join(".")}".gsub("VLAN_ID", exec_specific_config.vlan)
             begin
@@ -160,7 +160,7 @@ module ConfigInformation
           return KarebootAsyncError::NODE_NOT_EXIST
         end
       }
-      
+
       #VLAN
       if (exec_specific_config.vlan != nil) then
         if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
@@ -169,7 +169,7 @@ module ConfigInformation
         else
           dns = Resolv::DNS.new
           exec_specific_config.ip_in_vlan = Hash.new
-          exec_specific_config.node_array.each { |hostname|
+          exec_specific_config.node_set.make_array_of_hostname.each { |hostname|
             hostname_a = hostname.split(".")
             hostname_in_vlan = "#{hostname_a[0]}#{@common.vlan_hostname_suffix}.#{hostname_a[1..-1].join(".")}".gsub("VLAN_ID", exec_specific_config.vlan)
             exec_specific_config.ip_in_vlan[hostname] = dns.getaddress(hostname_in_vlan).to_s
