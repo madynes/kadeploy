@@ -710,7 +710,7 @@ module ConfigInformation
       if File.readable?(file) then
         @cluster_specific[cluster].group_of_nodes[command] = Array.new
         IO.readlines(file).each { |line|
-          @cluster_specific[cluster].group_of_nodes[command].push(line.chomp.split(","))
+          @cluster_specific[cluster].group_of_nodes[command].push(line.strip.split(","))
         }
         return true
       else
@@ -726,7 +726,7 @@ module ConfigInformation
     # * return true in case of success, false otherwise
     def load_cluster_specific_config_files
       IO.readlines(CLUSTER_CONFIGURATION_FILE).each { |c|
-        cluster = c.chomp
+        cluster = c.strip
         if (not (/^#/ =~ cluster)) && (not (/\A\s*\Z/ =~ cluster)) then
           cluster_file = SPECIFIC_CONFIGURATION_FILE_PREFIX + cluster
           if not File.readable?(cluster_file) then
@@ -1027,7 +1027,7 @@ module ConfigInformation
     # * nothing
     def load_version
       line = IO.readlines(VERSION_FILE)
-      @common.version = line[0].chomp
+      @common.version = line[0].strip
     end
 
     # Replace the substrings HOSTNAME_FQDN and HOSTNAME_SHORT in a string by a value
@@ -1136,7 +1136,7 @@ module ConfigInformation
                 error("Invalid hostname: #{hostname}")
                 return false
               else
-                exec_specific.node_array.push(hostname.chomp)
+                exec_specific.node_array.push(hostname.strip)
               end
             }
           else
@@ -1149,7 +1149,7 @@ module ConfigInformation
                   error("Invalid hostname: #{hostname}")
                   return false
                 else
-                  exec_specific.node_array.push(hostname.chomp)
+                  exec_specific.node_array.push(hostname.strip)
                 end
               }
             end
@@ -1182,7 +1182,7 @@ module ConfigInformation
             error("Invalid hostname: #{hostname}")
             return false
           else
-            exec_specific.node_array.push(hostname.chomp)
+            exec_specific.node_array.push(hostname.strip)
           end
         }
         opt.on("--multi-server", "Activate the multi-server mode") {
@@ -1704,7 +1704,7 @@ module ConfigInformation
                 error("Invalid hostname: #{hostname}")
                 return false
               else
-                exec_specific.node_list.push(hostname.chomp)
+                exec_specific.node_list.push(hostname.strip)
               end
             }
           else
@@ -1717,7 +1717,7 @@ module ConfigInformation
                   error("Invalid hostname: #{hostname}")
                   return false
                 end
-                exec_specific.node_list.push(hostname.chomp)
+                exec_specific.node_list.push(hostname.strip)
               }
             end
           end
@@ -2012,7 +2012,7 @@ module ConfigInformation
                 error("Invalid hostname: #{hostname}")
                 return false
               else
-                exec_specific.node_list.push(hostname.chomp)
+                exec_specific.node_list.push(hostname.strip)
               end
             }
           else
@@ -2025,7 +2025,7 @@ module ConfigInformation
                   error("Invalid hostname: #{hostname}")
                   return false
                 end
-                exec_specific.node_list.push(hostname.chomp)
+                exec_specific.node_list.push(hostname.strip)
               }
             end
           end
@@ -2164,7 +2164,7 @@ module ConfigInformation
                 error("Invalid hostname: #{hostname}")
                 return false
               else
-                exec_specific.node_array.push(hostname.chomp)
+                exec_specific.node_array.push(hostname.strip)
               end
             }
           else
@@ -2177,7 +2177,7 @@ module ConfigInformation
                   error("Invalid hostname: #{hostname}")
                   return false
                 else
-                  exec_specific.node_array.push(hostname.chomp)
+                  exec_specific.node_array.push(hostname.strip)
                 end
               }
             end
@@ -2536,7 +2536,7 @@ module ConfigInformation
                 error("Invalid hostname: #{hostname}")
                 return false
               else
-                exec_specific.node_array.push(hostname.chomp)
+                exec_specific.node_array.push(hostname.strip)
               end
             }
           else
@@ -2549,7 +2549,7 @@ module ConfigInformation
                   error("Invalid hostname: #{hostname}")
                   return false
                 else
-                  exec_specific.node_array.push(hostname.chomp)
+                  exec_specific.node_array.push(hostname.strip)
                 end
               }
             end
