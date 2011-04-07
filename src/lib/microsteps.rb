@@ -1217,7 +1217,7 @@ module MicroStepsLibrary
       end
       begin
         temp = Tempfile.new("fdisk_#{@cluster}")
-      rescue StandardException
+      rescue StandardError
         failed_microstep("Cannot create the tempfile fdisk_#{@cluster}")
         return false
       end

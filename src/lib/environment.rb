@@ -49,7 +49,7 @@ module EnvironmentManagement
     def load_from_file(file, file_content, almighty_env_users, user, cache_dir, client, record_in_db)
       begin
         temp_env_file = Tempfile.new("env_file")
-      rescue StandardException
+      rescue StandardError
         Debug::distant_client_error("Temporary directory is full on the server side, please contact the administrator", client)
         return false
       end
