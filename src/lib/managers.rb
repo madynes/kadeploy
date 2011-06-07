@@ -656,7 +656,7 @@ module Managers
       @thread_tab = Array.new
       @logger = Debug::Logger.new(@nodeset, @config, @db, 
                                   @config.exec_specific.true_user, @deploy_id, Time.now, 
-                                  @config.exec_specific.environment.name + ":" + @config.exec_specific.environment.version, 
+                                  @config.exec_specific.environment.name + ":" + @config.exec_specific.environment.version.to_s, 
                                   @config.exec_specific.load_env_kind == "file",
                                   syslog_lock)
       @killed = false
