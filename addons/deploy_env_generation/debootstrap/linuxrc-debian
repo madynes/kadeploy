@@ -134,13 +134,13 @@ CMD_PARAM=
 
 if [ $DISK_DRV ]; then
    # for SCSI drives
-   modprobe sd_mod
+   #modprobe sd_mod
    # for ide drives
    echo "Loading specified disk driver: $DISK_DRV"
    modprobe $DISK_DRV
    # order is important for ide drivers in 2.6.pbmatics kernels
-   modprobe ide-disk
-   modprobe ide-generic
+   #modprobe ide-disk
+   #modprobe ide-generic
 fi
 
 #we wait slow disks ...
