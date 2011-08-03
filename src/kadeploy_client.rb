@@ -185,7 +185,7 @@ class KadeployClient
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure
-Socket.do_not_reverse_lookup = true
+Socket.do_not_reverse_lookup =true
 
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
 
@@ -251,7 +251,14 @@ if (exec_specific_config != nil) then
         DRb.start_service(nil, kadeploy_client)
         if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
           content = Regexp.last_match
-          client_host = content[1]
+          hostname = Socket.gethostname
+          client_host = String.new
+          if hostname.include?(client_host) then
+            #It' best to get the FQDN
+            client_host = hostname
+          else
+            client_host = content[1]
+          end
           client_port = content[2]
           cloned_config = exec_specific_config.clone
           cloned_config.node_array = nodes_by_server[server]

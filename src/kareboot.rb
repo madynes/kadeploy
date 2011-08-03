@@ -224,7 +224,14 @@ if (exec_specific_config != nil) then
         DRb.start_service(nil, kareboot_client)
         if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
           content = Regexp.last_match
-          client_host = content[1]
+          hostname = Socket.gethostname
+          client_host = String.new
+          if hostname.include?(client_host) then
+            #It' best to get the FQDN
+            client_host = hostname
+          else
+            client_host = content[1]
+          end
           client_port = content[2]
         else
           puts "The URI #{DRb.uri} is not correct"
