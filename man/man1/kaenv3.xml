@@ -15,7 +15,7 @@
     </author>
     <address>&address;</address>
     <copyright>
-      <year>2008-2010</year>
+      <year>2008-2011</year>
       <holder>INRIA - &firstname; &surname;</holder>
     </copyright>
   </refentryinfo>
@@ -175,7 +175,7 @@
   </refsect1>
   <refsect1>
     <title>AUTHOR</title>
-    <para>Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2010 <email>emmanuel.jeanvoine@inria.fr</email></para>
+    <para>Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011 <email>emmanuel.jeanvoine@inria.fr</email></para>
     <para>CECILL License V2 - http://www.cecill.info</para>
   </refsect1>
 </refentry>
