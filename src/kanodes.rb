@@ -47,7 +47,6 @@ if exec_specific_config != nil then
 
   kanodes_client = KanodesClient.new()
   local = DRb.start_service(nil, kanodes_client)
-  kanodes_client.drb = local
   if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
     content = Regexp.last_match
     hostname = Socket.gethostname
