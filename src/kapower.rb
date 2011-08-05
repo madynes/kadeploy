@@ -80,14 +80,14 @@ if exec_specific_config != nil then
     exec_specific_config.servers.each_pair { |server,info|
       if (server != "default") then
         if (PortScanner::is_open?(info[0], info[1])) then
-          DRb.start_service()
+          distant = DRb.start_service()
           uri = "druby://#{info[0]}:#{info[1]}"
           kadeploy_server = DRbObject.new(nil, uri)
           nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
           if (nodes_known.length > 0) then
             nodes_by_server[server] = nodes_known
           end
-          DRb.stop_service()
+          distant.stop_service()
           break if (remaining_nodes.length == 0)
         else
           puts "The #{server} server is unreachable"
@@ -118,7 +118,7 @@ if exec_specific_config != nil then
     tid_array << Thread.new {
 
       #Connect to the server
-      DRb.start_service()
+      distant = DRb.start_service()
       
       uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
       kadeploy_server = DRbObject.new(nil, uri)
@@ -131,8 +131,8 @@ if exec_specific_config != nil then
         else
           kapower_client = KapowerClient.new(nil, files_ok_nodes, files_ko_nodes)
         end
-        DRb.start_service(nil, kapower_client)
-        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+        local = DRb.start_service(nil, kapower_client)
+        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
           content = Regexp.last_match
           hostname = Socket.gethostname
           client_host = String.new
@@ -147,9 +147,11 @@ if exec_specific_config != nil then
           cloned_config.node_array = nodes_by_server[server]
           kadeploy_server.run("kapower_sync", exec_specific_config, client_host, client_port)
         else
-          puts "The URI #{DRb.uri} is not correct"
+          puts "The URI #{local.uri} is not correct"
         end
+        local.stop_service()
       end
+      distant.stop_service()
     }
   }
   tid_array.each { |tid|

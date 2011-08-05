@@ -166,10 +166,12 @@ class KadeployServer
         n = @config.common.nodes_desc.get_node_by_host(hostname)
         if (n == nil) then
           if (kind == "kadeploy_sync") || (kind == "kareboot_sync") then
-            DRb.start_service("druby://localhost:0")
+            distant = DRb.start_service("druby://localhost:0")
             uri = "druby://#{host}:#{port}"
             client = DRbObject.new(nil, uri)
             client.print("ERROR: The node #{hostname} specified in the PXE singularity file does not exist")
+            distant.stop_service()
+            db.disconnect
             return false
           else
             case kind
@@ -193,26 +195,26 @@ class KadeployServer
         method = "run_#{kind}".to_sym
         return send(method, db, exec_specific_config)
       else
+        db.disconnect
         return nil, res
       end
     else
-      DRb.start_service("druby://localhost:0")
+      distant = DRb.start_service("druby://localhost:0")
       uri = "druby://#{host}:#{port}"
       client = DRbObject.new(nil, uri)
-      
       res = @config.check_client_config(kind, exec_specific_config, db, client)
       if ((res == KarebootAsyncError::NO_ERROR) || (res == KadeployAsyncError::NO_ERROR) || (res == 0)) then
         method = "run_#{kind}".to_sym
-        res = send(method, db, client, exec_specific_config)
+        res = send(method, db, client, exec_specific_config)        
       else
         res = false
       end
-
       db.disconnect
-      client = nil
       exec_specific_config = nil
-      DRb.stop_service()
+      distant.stop_service()
+      client = nil
       GC.start
+
       return res
     end
   end
@@ -771,6 +773,7 @@ class KadeployServer
   # Output
   # * return a reboot id or nil if no reboot has been performed and an error code (0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed)
   def run_kareboot_async(db, exec_specific)
+    db.disconnect #we don't use db here
     finished = [false]
     output = Debug::OutputControl.new(@config.common.verbose_level, 
                                       exec_specific.debug, nil, 
@@ -2305,6 +2308,6 @@ else
                                       Managers::WindowManager.new(config.common.nodes_check_window, 1))
   puts "Launching the Kadeploy RPC server"
   uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
-  DRb.start_service(uri, kadeployServer)
-  DRb.thread.join
+  server = DRb.start_service(uri, kadeployServer)
+  server.thread.join
 end

@@ -52,7 +52,7 @@ exec_specific_config = ConfigInformation::Config.load_kaconsole_exec_specific()
 
 if exec_specific_config != nil then
   #Connect to the server
-  DRb.start_service()
+  distant = DRb.start_service()
   uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
   kadeploy_server = DRbObject.new(nil, uri)
 
@@ -62,8 +62,8 @@ if exec_specific_config != nil then
   end
 
   kaconsole_client = KaconsoleClient.new()
-  DRb.start_service(nil, kaconsole_client)
-  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+  local = DRb.start_service(nil, kaconsole_client)
+  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
     content = Regexp.last_match
     hostname = Socket.gethostname
     client_host = String.new
@@ -75,12 +75,13 @@ if exec_specific_config != nil then
     end
     client_port = content[2]
   else
-    puts "The URI #{DRb.uri} is not correct"
+    puts "The URI #{local.uri} is not correct"
     exit(1)
   end
 
   kadeploy_server.run("kaconsole", exec_specific_config, client_host, client_port)
-  
+  local.stop_service()
+  distant.stop_service()
   exit(0)
 else
   exit(1)
