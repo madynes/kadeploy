@@ -11,6 +11,7 @@ require 'port_scanner'
 
 #Ruby libs
 require 'drb'
+require 'timeout'
 
 class KapowerClient
   @site = nil
@@ -83,9 +84,15 @@ if exec_specific_config != nil then
           distant = DRb.start_service()
           uri = "druby://#{info[0]}:#{info[1]}"
           kadeploy_server = DRbObject.new(nil, uri)
-          nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
-          if (nodes_known.length > 0) then
-            nodes_by_server[server] = nodes_known
+          begin
+            Timeout.timeout(8) {
+              nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
+              if (nodes_known.length > 0) then
+                nodes_by_server[server] = nodes_known
+              end
+            }
+          rescue Timeout::Error
+            puts "Cannot check the nodes on the #{server} server"
           end
           distant.stop_service()
           break if (remaining_nodes.length == 0)
