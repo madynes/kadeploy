@@ -16,6 +16,9 @@ require 'ostruct'
 require 'fileutils'
 require 'resolv'
 
+R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]+\Z/
+R_HTTP = /^http[s]?:\/\//
+
 module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
   COMMANDS_FILE = File.join(CONFIGURATION_FOLDER, "cmd")
@@ -1101,7 +1104,7 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
-          if not (f =~ /^http[s]?:\/\//) then
+          if not (f =~ R_HTTP) then
             if not File.readable?(f) then
               error("The file #{f} does not exist or is not readable")
               return false
@@ -1132,7 +1135,7 @@ module ConfigInformation
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+              if not (R_HOSTNAME =~ hostname.strip) then
                 error("Invalid hostname: #{hostname}")
                 return false
               else
@@ -1145,7 +1148,7 @@ module ConfigInformation
               return false
             else
               IO.readlines(f).sort.uniq.each { |hostname|
-                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                if not (R_HOSTNAME =~ hostname.strip) then
                   error("Invalid hostname: #{hostname}")
                   return false
                 else
@@ -1157,7 +1160,7 @@ module ConfigInformation
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
-            if (f =~ /^http[s]?:\/\//) then
+            if (f =~ R_HTTP) then
               exec_specific.key = f
             else
               if not File.readable?(f) then
@@ -1178,7 +1181,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+          if not (R_HOSTNAME =~ hostname.strip) then
             error("Invalid hostname: #{hostname}")
             return false
           else
@@ -1258,7 +1261,7 @@ module ConfigInformation
         }
         opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
           l.split(",").each { |file|
-            if (file =~ /^http[s]?:\/\//) then
+            if (file =~ R_HTTP) then
               exec_specific.pxe_upload_files.push(file) 
             else
               f = File.expand_path(file)
@@ -1473,7 +1476,7 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
-          if (not (f =~ /^http[s]?:\/\//)) && (not File.readable?(f)) then
+          if (not (f =~ R_HTTP)) && (not File.readable?(f)) then
             error("The file #{f} cannot be read")
             return false
           else
@@ -1700,7 +1703,7 @@ module ConfigInformation
         opt.on("-f", "--file FILE", "Machine file (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+              if not (R_HOSTNAME =~ hostname.strip) then
                 error("Invalid hostname: #{hostname}")
                 return false
               else
@@ -1713,7 +1716,7 @@ module ConfigInformation
               return false
             else
               IO.readlines(f).sort.uniq.each { |hostname|
-                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                if not (R_HOSTNAME =~ hostname.strip) then
                   error("Invalid hostname: #{hostname}")
                   return false
                 end
@@ -1723,11 +1726,11 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
-          if (not (/\A[A-Za-z0-9\[\]\.\-]+\Z/ =~ m)) and (m != "*") then
+          if (not (R_HOSTNAME =~ m.strip)) and (m != "*") then
             error("Invalid hostname: #{m}")
             return false
           end
-          exec_specific.node_list.push(m)
+          exec_specific.node_list.push(m.strip)
         }
         opt.on("-o", "--overwrite-rights", "Overwrite existing rights") {
           exec_specific.overwrite_existing_rights = true
@@ -1872,11 +1875,11 @@ module ConfigInformation
           exec_specific.fields.push(f)
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ m) then
+          if not (R_HOSTNAME =~ m.strip) then
             error("Invalid hostname: #{m}")
             return false
           end
-          exec_specific.node_list.push(m)
+          exec_specific.node_list.push(m.strip)
         }
         opt.on("-s", "--step STEP", "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
           exec_specific.steps.push(s) 
@@ -2008,7 +2011,7 @@ module ConfigInformation
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+              if not (R_HOSTNAME =~ hostname.strip) then
                 error("Invalid hostname: #{hostname}")
                 return false
               else
@@ -2021,7 +2024,7 @@ module ConfigInformation
               return false
             else
               IO.readlines(f).sort.uniq.each { |hostname|
-                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                if not (R_HOSTNAME =~ hostname.strip) then
                   error("Invalid hostname: #{hostname}")
                   return false
                 end
@@ -2031,11 +2034,11 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ m) then
+          if not (R_HOSTNAME =~ m.strip) then
             error("Invalid hostname: #{m}")
             return false
           end
-          exec_specific.node_list.push(m)
+          exec_specific.node_list.push(m.strip)
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
@@ -2160,7 +2163,7 @@ module ConfigInformation
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+              if not (R_HOSTNAME =~ hostname.strip) then
                 error("Invalid hostname: #{hostname}")
                 return false
               else
@@ -2173,7 +2176,7 @@ module ConfigInformation
               return false
             else
               IO.readlines(f).sort.uniq.each { |hostname|
-                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                if not (R_HOSTNAME =~ hostname.strip) then
                   error("Invalid hostname: #{hostname}")
                   return false
                 else
@@ -2185,7 +2188,7 @@ module ConfigInformation
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
-            if (f =~ /^http[s]?:\/\//) then
+            if (f =~ R_HTTP) then
               exec_specific.key = f
             else
               if not File.readable?(f) then
@@ -2214,11 +2217,11 @@ module ConfigInformation
           end
         }   
         opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+          if not (R_HOSTNAME =~ hostname.strip) then
             error("Invalid hostname: #{hostname}")
             return false
           else
-            exec_specific.node_array.push(hostname)
+            exec_specific.node_array.push(hostname.strip)
           end
         }
         opt.on("--multi-server", "Activate the multi-server mode") {
@@ -2276,7 +2279,7 @@ module ConfigInformation
         }
         opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
           l.split(",").each { |file|
-            if (file =~ /^http[s]?:\/\//) then
+            if (file =~ R_HTTP) then
               exec_specific.pxe_upload_files.push(file) 
             else
               f = File.expand_path(file)
@@ -2434,11 +2437,11 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-]+\Z/ =~ hostname) then
+          if not (R_HOSTNAME =~ hostname.strip) then
             error("Invalid hostname: #{hostname}")
             return false
           end
-          exec_specific.node = hostname
+          exec_specific.node = hostname.strip
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
@@ -2532,7 +2535,7 @@ module ConfigInformation
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           if (f == "-") then
             STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+              if not (R_HOSTNAME =~ hostname.strip) then
                 error("Invalid hostname: #{hostname}")
                 return false
               else
@@ -2545,7 +2548,7 @@ module ConfigInformation
               return false
             else
               IO.readlines(f).sort.uniq.each { |hostname|
-                if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+                if not (R_HOSTNAME =~ hostname.strip) then
                   error("Invalid hostname: #{hostname}")
                   return false
                 else
@@ -2564,11 +2567,11 @@ module ConfigInformation
           end
         }   
         opt.on("-m", "--machine MACHINE", "Operate on the given machines") { |hostname|
-          if not (/\A[A-Za-z0-9\.\-\[\]\,]+\Z/ =~ hostname) then
+          if not (R_HOSTNAME =~ hostname.strip) then
             error("Invalid hostname: #{hostname}")
             return false
           else
-            exec_specific.node_array.push(hostname)
+            exec_specific.node_array.push(hostname.strip)
           end
         }
         opt.on("--multi-server", "Activate the multi-server mode") {

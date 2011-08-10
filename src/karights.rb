@@ -35,7 +35,7 @@ if (exec_specific_config != nil) then
     exit(1)
   end
   #Connect to the server
-  DRb.start_service()
+  distant = DRb.start_service()
   uri = "druby://#{exec_specific_config.kadeploy_server}:#{exec_specific_config.kadeploy_server_port}"
   kadeploy_server = DRbObject.new(nil, uri)
 
@@ -45,18 +45,25 @@ if (exec_specific_config != nil) then
   end
 
   karights_client = KarightsClient.new()
-  DRb.start_service(nil, karights_client)
-  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+  local = DRb.start_service(nil, karights_client)
+  if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
     content = Regexp.last_match
-    client_host = content[1]
+    hostname = Socket.gethostname
+    client_host = String.new
+    if hostname.include?(client_host) then
+      #It' best to get the FQDN
+      client_host = hostname
+    else
+      client_host = content[1]
+    end
     client_port = content[2]
   else
-    puts "The URI #{DRb.uri} is not correct"
+    puts "The URI #{local.uri} is not correct"
     exit(1)
   end
-
   res = kadeploy_server.run("karights", exec_specific_config, client_host, client_port)
-  
+  local.stop_service()
+  distant.stop_service()
   exit((res)?0:1)
 else
   exit(1)

@@ -21,7 +21,7 @@ Socket.do_not_reverse_lookup = true
 #Connect to the server
 exec_specific_config = ConfigInformation::Config.load_kapower_exec_specific()
 if (exec_specific_config != nil) then
-  DRb.start_service()
+  distant = DRb.start_service()
   uri = "druby://#{exec_specific_config.servers[exec_specific_config.chosen_server][0]}:#{exec_specific_config.servers[exec_specific_config.chosen_server][1]}"
   kadeploy_server = DRbObject.new(nil, uri)
   
@@ -41,7 +41,7 @@ if (exec_specific_config != nil) then
     puts "You do not have the right to deploy on all the nodes"
   end
 
-  DRb.stop_service()
+  distant.stop_service()
   exec_specific_config = nil
   exit(0)
 else

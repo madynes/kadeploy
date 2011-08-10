@@ -15,6 +15,7 @@ require 'thread'
 require 'drb'
 require 'socket'
 require 'tempfile'
+require 'timeout'
 
 class KadeployClient
   @kadeploy_server = nil
@@ -185,7 +186,7 @@ class KadeployClient
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure
-Socket.do_not_reverse_lookup = true
+Socket.do_not_reverse_lookup =true
 
 exec_specific_config = ConfigInformation::Config.load_kadeploy_exec_specific()
 
@@ -197,14 +198,20 @@ if (exec_specific_config != nil) then
     exec_specific_config.servers.each_pair { |server,info|
       if (server != "default") then
         if (PortScanner::is_open?(info[0], info[1])) then
-          DRb.start_service()
+          distant = DRb.start_service()
           uri = "druby://#{info[0]}:#{info[1]}"
           kadeploy_server = DRbObject.new(nil, uri)
-          nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
-          if (nodes_known.length > 0) then
-            nodes_by_server[server] = nodes_known
+          begin
+            Timeout.timeout(8) {
+              nodes_known,remaining_nodes = kadeploy_server.check_known_nodes(remaining_nodes)
+              if (nodes_known.length > 0) then
+                nodes_by_server[server] = nodes_known
+              end
+            }
+          rescue Timeout::Error
+            puts "Cannot check the nodes on the #{server} server"
           end
-          DRb.stop_service()
+          distant.stop_service()
         else
           puts "The #{server} server is unreachable"
         end
@@ -235,7 +242,7 @@ if (exec_specific_config != nil) then
   nodes_by_server.each_key { |server|
     tid_array << Thread.new {
       #Connect to the server
-      DRb.start_service()
+      distant = DRb.start_service()
       uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
       kadeploy_server = DRbObject.new(nil, uri)
 
@@ -248,18 +255,27 @@ if (exec_specific_config != nil) then
         else
           kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
         end
-        DRb.start_service(nil, kadeploy_client)
-        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ DRb.uri
+        local = DRb.start_service(nil, kadeploy_client)        
+        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
           content = Regexp.last_match
-          client_host = content[1]
+          hostname = Socket.gethostname
+          client_host = String.new
+          if hostname.include?(client_host) then
+            #It' best to get the FQDN
+            client_host = hostname
+          else
+            client_host = content[1]
+          end
           client_port = content[2]
           cloned_config = exec_specific_config.clone
           cloned_config.node_array = nodes_by_server[server]
           kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
         else
-          puts "#{server} server: The URI #{DRb.uri} is not correct"
+          puts "#{server} server: The URI #{local.uri} is not correct"
         end
+        local.stop_service()
       end
+      distant.stop_service()
     }
   }
   tid_array.each { |tid|
