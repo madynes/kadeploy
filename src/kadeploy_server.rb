@@ -134,6 +134,7 @@ class KadeployServer
       rescue
         puts "The client has been probably disconnected..."
       end
+      sock.close
     }
     return port
   end
@@ -205,7 +206,7 @@ class KadeployServer
       res = @config.check_client_config(kind, exec_specific_config, db, client)
       if ((res == KarebootAsyncError::NO_ERROR) || (res == KadeployAsyncError::NO_ERROR) || (res == 0)) then
         method = "run_#{kind}".to_sym
-        res = send(method, db, client, exec_specific_config)        
+        res = send(method, db, client, exec_specific_config, distant)        
       else
         res = false
       end
@@ -214,7 +215,6 @@ class KadeployServer
       distant.stop_service()
       client = nil
       GC.start
-
       return res
     end
   end
@@ -400,7 +400,7 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true
-  def run_kadeploy_sync(db, client, exec_specific)
+  def run_kadeploy_sync(db, client, exec_specific, drb_server)
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new(true)
     config.common = @config.common
@@ -446,6 +446,8 @@ class KadeployServer
           workflow.output.disable_client_output()
           workflow.output.verbosel(3, "Client disconnection")
           workflow.kill()
+          drb_server.stop_service()
+          db.disconnect()
           finished = true
         end
         sleep(1)
@@ -593,7 +595,7 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed, 4 if the ssh key file cannot be grabbed
-  def run_kareboot_sync(db, client, exec_specific)
+  def run_kareboot_sync(db, client, exec_specific, drb_server)
     client_disconnected = false
     finished = false    
 
@@ -740,6 +742,8 @@ class KadeployServer
               output.verbosel(3, " *** Kill a reboot thread")
               Thread.kill(tid)
             }
+            drb_server.stop_service()
+            db.disconnect()
             finished = true
           end
           sleep(1)
@@ -773,7 +777,6 @@ class KadeployServer
   # Output
   # * return a reboot id or nil if no reboot has been performed and an error code (0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed)
   def run_kareboot_async(db, exec_specific)
-    db.disconnect #we don't use db here
     finished = [false]
     output = Debug::OutputControl.new(@config.common.verbose_level, 
                                       exec_specific.debug, nil, 
@@ -784,6 +787,7 @@ class KadeployServer
         exec_specific.check_prod_env && 
         exec_specific.node_set.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
       output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
+      db.disconnect()
       return nil,KarebootAsyncError::DEMOLISHING_ENV
     else
       #We create a new instance of Config with a specific exec_specific part
@@ -921,6 +925,7 @@ class KadeployServer
       else
         reboot_id = nil
       end
+      db.disconnect()
       return reboot_id,error
     end
   end
@@ -961,17 +966,38 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true if everything is ok, false otherwise
-  def run_kastat(db, client, exec_specific)
-    case exec_specific.operation
-    when "list_all"
-      return kastat_list_all(exec_specific, client, db)
-    when "list_retries"
-      return kastat_list_retries(exec_specific, client, db)
-    when "list_failure_rate"
-      return kastat_list_failure_rate(exec_specific, client, db)
-    when "list_min_failure_rate"
-      return kastat_list_failure_rate(exec_specific, client, db)
-    end
+  def run_kastat(db, client, exec_specific, drb_server)
+    finished = false
+    res = nil
+    tid = Thread.new {
+      case exec_specific.operation
+      when "list_all"
+        res = kastat_list_all(exec_specific, client, db)
+      when "list_retries"
+        res = kastat_list_retries(exec_specific, client, db)
+      when "list_failure_rate"
+        res = kastat_list_failure_rate(exec_specific, client, db)
+      when "list_min_failure_rate"
+        res = kastat_list_failure_rate(exec_specific, client, db)
+      else
+      end
+    }
+    Thread.new {
+      while (not finished) do
+        begin
+          client.test()
+        rescue DRb::DRbConnError
+          Thread.kill(tid)
+          drb_server.stop_service()
+          db.disconnect()
+          finished = true
+        end
+          sleep(1)
+      end
+    }
+    tid.join
+    finished = true
+    return res
   end
 
   # Generate some filters for the output according the options
@@ -1174,13 +1200,33 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true if everything is ok, false otherwise
-  def run_kanodes(db, client, exec_specific)
-    case exec_specific.operation
-    when "get_deploy_state"
-      return kanodes_get_deploy_state(exec_specific, client, db)
-    when "get_yaml_dump"
-      return kanodes_get_yaml_dump(exec_specific, client)
-    end
+  def run_kanodes(db, client, exec_specific, drb_server)
+    finished = false
+    res = nil
+    tid = Thread.new {
+      case exec_specific.operation
+      when "get_deploy_state"
+        res = kanodes_get_deploy_state(exec_specific, client, db)
+      when "get_yaml_dump"
+        res = kanodes_get_yaml_dump(exec_specific, client)
+      end
+    }
+    Thread.new {
+      while (not finished) do
+        begin
+          client.test()
+        rescue DRb::DRbConnError
+          Thread.kill(tid)
+          drb_server.stop_service()
+          db.disconnect()
+          finished = true
+        end
+          sleep(1)
+      end
+    }
+    tid.join
+    finished = true
+    return res
   end
   
   # List the deploy information about the nodes
@@ -1283,15 +1329,35 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true if everything is ok, false otherwise
-  def run_karights(db, client, exec_specific)
-    case exec_specific.operation  
-    when "add"
-      return karights_add_rights(exec_specific, client, db)
-    when "delete"
-      return karights_delete_rights(exec_specific, client, db)
-    when "show"
-      return karights_show_rights(exec_specific, client, db)
-    end
+  def run_karights(db, client, exec_specific, drb_server)
+    finished = false
+    res = nil
+    tid = Thread.new {
+      case exec_specific.operation  
+      when "add"
+        res = karights_add_rights(exec_specific, client, db)
+      when "delete"
+        res = karights_delete_rights(exec_specific, client, db)
+      when "show"
+        res = karights_show_rights(exec_specific, client, db)
+      end
+    }
+    Thread.new {
+      while (not finished) do
+        begin
+          client.test()
+        rescue DRb::DRbConnError
+          Thread.kill(tid)
+          drb_server.stop_service()
+          db.disconnect()
+          finished = true
+        end
+        sleep(1)
+      end
+    }
+    tid.join
+    finished = true
+    return res
   end
 
   # Show the rights of a user defined in exec_specific.user
@@ -1455,29 +1521,47 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true if everything is ok, false otherwise
-  def run_kaenv(db, client, exec_specific)
-    case exec_specific.operation
-    when "list"
-      kaenv_list_environments(exec_specific, client, db)
-    when "add"
-      kaenv_add_environment(exec_specific, client, db)
-    when "delete"
-      kaenv_delete_environment(exec_specific, client, db)
-    when "print"
-      kaenv_print_environment(exec_specific, client, db)
-    when "update-tarball-md5"
-      kaenv_update_tarball_md5(exec_specific, client, db)
-    when "update-preinstall-md5"
-      kaenv_update_preinstall_md5(exec_specific, client, db)
-    when "update-postinstalls-md5"
-      kaenv_update_postinstall_md5(exec_specific, client, db)
-    when "remove-demolishing-tag"
-      kaenv_remove_demolishing_tag(exec_specific, client, db)
-    when "set-visibility-tag"
-      kaenv_set_visibility_tag(exec_specific, client, db)
-    when "move-files"
-      kaenv_move_files(exec_specific, client, db)
-    end
+  def run_kaenv(db, client, exec_specific, drb_server)
+    finished = false
+    tid = Thread.new {
+      case exec_specific.operation
+      when "list"
+        kaenv_list_environments(exec_specific, client, db)
+      when "add"
+        kaenv_add_environment(exec_specific, client, db)
+      when "delete"
+        kaenv_delete_environment(exec_specific, client, db)
+      when "print"
+        kaenv_print_environment(exec_specific, client, db)
+      when "update-tarball-md5"
+        kaenv_update_tarball_md5(exec_specific, client, db)
+      when "update-preinstall-md5"
+        kaenv_update_preinstall_md5(exec_specific, client, db)
+      when "update-postinstalls-md5"
+        kaenv_update_postinstall_md5(exec_specific, client, db)
+      when "remove-demolishing-tag"
+        kaenv_remove_demolishing_tag(exec_specific, client, db)
+      when "set-visibility-tag"
+        kaenv_set_visibility_tag(exec_specific, client, db)
+      when "move-files"
+        kaenv_move_files(exec_specific, client, db)
+      end
+    }
+    Thread.new {
+      while (not finished) do
+        begin
+          client.test()
+        rescue DRb::DRbConnError
+            Thread.kill(tid)
+          drb_server.stop_service()
+          db.disconnect()
+          finished = true
+        end
+        sleep(1)
+      end
+    }
+    tid.join
+    finished = true
   end
 
   # List the environments of a user defined in exec_specific.user
@@ -2052,13 +2136,17 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true if everything is ok, false otherwise  
-  def run_kaconsole(db, client, exec_specific)
+  def run_kaconsole(db, client, exec_specific, drb_server)
+    res = false
     set = Nodes::NodeSet.new
     set.push(exec_specific.node)
     part = @config.cluster_specific[exec_specific.node.cluster].block_device + @config.cluster_specific[exec_specific.node.cluster].deploy_part
     if (CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) then
       pid = fork {
-        client.connect_console(exec_specific.node.cmd.console)
+        begin
+          client.connect_console(exec_specific.node.cmd.console)
+        rescue DRb::DRbConnError
+        end
       }
       state = "running"
       while ((CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) &&
@@ -2073,14 +2161,17 @@ class KadeployServer
         }
       end
       if (state == "running") then
-        client.kill_console()
+        client.kill_console()        
         Debug::distant_client_print("Console killed", client)
         ProcessManagement::killall(pid)
       end
+      res = true
     else
-      return false
+      res = false
     end
-    return true
+    db.disconnect()
+    drb_server.stop_service()
+    return res
   end
 
 
@@ -2096,18 +2187,15 @@ class KadeployServer
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return true if everything is ok, false otherwise  
-  def run_kapower_sync(db, client, exec_specific)
+  def run_kapower_sync(db, client, exec_specific, drb_server)
     client_disconnected = false
     finished = false    
-
     ret = 0
-
     if (exec_specific.verbose_level != "") then
       vl = exec_specific.verbose_level
     else
       vl = @config.common.verbose_level
     end
-
     output = Debug::OutputControl.new(vl, exec_specific.debug, client, exec_specific.true_user, -1, 
                                       @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
 
@@ -2152,6 +2240,8 @@ class KadeployServer
             output.disable_client_output()
             output.verbosel(3, "Client disconnection")
             client_disconnected = true
+            drb_server.stop_service()
+            db.disconnect()
             tid_array.each { |tid|
               output.verbosel(3, " *** Kill a power operation thread")
               Thread.kill(tid)

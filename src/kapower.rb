@@ -66,6 +66,15 @@ class KapowerClient
       file_ko.close
     end
   end
+
+  # Test method to check that the client is still there (RPC)
+  #
+  # Arguments
+  # * nothing
+  # Output
+  # * nothing
+  def test
+  end
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure

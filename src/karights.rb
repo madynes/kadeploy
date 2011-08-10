@@ -61,8 +61,8 @@ if (exec_specific_config != nil) then
     puts "The URI #{local.uri} is not correct"
     exit(1)
   end
-  local.stop_service()
   res = kadeploy_server.run("karights", exec_specific_config, client_host, client_port)
+  local.stop_service()
   distant.stop_service()
   exit((res)?0:1)
 else
