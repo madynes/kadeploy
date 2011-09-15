@@ -271,6 +271,8 @@ if (exec_specific_config != nil) then
         system("cat #{file.path} >> #{exec_specific_config.nodes_ok_file}")
       }
     end
+  end
+  if (exec_specific_config.nodes_ko_file != "") then
     File.delete(exec_specific_config.nodes_ko_file) if File.exist?(exec_specific_config.nodes_ko_file)
     if (not files_ko_nodes.empty?) then
       files_ko_nodes.each { |file|
