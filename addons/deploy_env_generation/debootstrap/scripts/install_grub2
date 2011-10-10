@@ -48,6 +48,6 @@ fi
 
 
 
-cp $MENU_GRUB $DEST$MENU_GRUB
+cp $MENU_GRUB $DEST/$MENU_GRUB
 
 exit $RETVAL
