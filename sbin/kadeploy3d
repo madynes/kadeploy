@@ -30,9 +30,22 @@ fi
 unset http_proxy
 source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
 
+# Launch an ssh agent (useful when deploying from production environment)
+tmp=`tempfile`
+ssh-agent > $tmp
+source $tmp
+ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
+rm $tmp
+
 ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" &
 PID=$!
 trap Exit_handler_term TERM
 trap Exit_handler_kill KILL
 
 wait
+
+# Clean the ssh agent stuff
+kill -SIGKILL $SSH_AGENT_PID
+rm -rf `dirname $SSH_AUTH_SOCK`
+
+exit 0
