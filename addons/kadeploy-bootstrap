@@ -13,17 +13,12 @@ def g5k?
   `hostname --fqdn`.chomp =~ /grid5000.fr$/
 end
 
-USAGE           = "Usage: #{$0} [options] <deploykernels_directory>"
+USAGE           = "Usage: #{$0} [options] <deploykernels_directory> <envs_directory>"
 
 SSH_KEYS        = ["#{ENV['HOME']}/.ssh/id_dsa", "#{ENV['HOME']}/.ssh/id_rsa"]
 HTTP_PROXY      = 'http://proxy:3128/'
 if g5k?
   DEB_REPOSITORY = 'http://apt.grid5000.fr/kadeploy'
-  G5K_ENVS = [
-    'squeeze-x64-base',
-    #'squeeze-x64-min',
-    #'squeeze-x64-big'
-  ]
   G5K_API       = 'https://api.grid5000.fr/2.0'
   G5K_POSTINSTALLS_PATH = '/grid5000/preinstalls/'
 else
@@ -960,12 +955,13 @@ rescue OptionParser::InvalidOption => e
   msg(e.to_s,MSG_ERROR,true)
 end
 
-if ARGV.size < 1
+if ARGV.size < 2
   msg(USAGE)
   exit 1
 end
 
 # Checking kernels directory
+msg("=== Gathering kernels information",MSG_INFO)
 msg("invalid directory '#{ARGV[0]}'",MSG_ERROR,true) unless File.directory?(ARGV[0])
 deplkernelfiles = Dir.entries(ARGV[0])
 deplkernelfiles.delete('.')
@@ -983,11 +979,56 @@ vmlinuzfiles.each do |vmlinuzfile|
     :vmlinuz => File.join(ARGV[0],vmlinuzfile),
     :initrd => initrdfile
   }
+	msg("#{$deplkernels[name][:name]}:",MSG_INFO)
+	msg("  vmlinuz: #{$deplkernels[name][:vmlinuz]}",MSG_INFO)
+	msg("  initrd: #{$deplkernels[name][:initrd]}",MSG_INFO)
 end
 
 msg("no valid deploiement kernel found in #{ARGV[0]}",MSG_ERROR,true) if $deplkernels.empty?
 
+# Checking envs directory
+msg("=== Gathering environments information",MSG_INFO)
+msg("invalid directory '#{ARGV[1]}'",MSG_ERROR,true) unless File.directory?(ARGV[1])
+envfiles = Dir.entries(ARGV[1])
+envfiles.delete('.')
+envfiles.delete('..')
+envfiles.each do |env|
+	$kaenvs[env] = {}
+	$kaenvs[env][:name] = File.basename(env,'.dsc')
+	$kaenvs[env][:dscfile] = File.join(CFG_KADEPLOY_ENVS_DESC_PATH,File.basename(env))
+	tmp = File.new(File.join(ARGV[1],env)).read
+	tmp.each do |line|
+		if line =~ /^\s*tarball\s*:\s*([^ |]+)\|\S+\s*$/
+			$kaenvs[env][:tarball] = Regexp.last_match(1)
+		elsif line =~ /^\s*postinstall\s*:\s*([^ |]+)\|([^ |]+)\|(.*)$/
+			$kaenvs[env][:postinstall] = {}
+			$kaenvs[env][:postinstall][:file] = Regexp.last_match(1)
+			$kaenvs[env][:postinstall][:filetype] = Regexp.last_match(2)
+			$kaenvs[env][:postinstall][:args] = Regexp.last_match(3)
+		elsif line.strip != '###' and !line.strip.empty?
+			$kaenvs[env][:desc] = [] unless $kaenvs[env][:desc]
+			$kaenvs[env][:desc] << line
+		end
+	end
+	msg("#{$kaenvs[env][:name]}:",MSG_INFO)
+	if $kaenvs[env][:tarball] and File.exist?($kaenvs[env][:tarball])
+		msg("  tarball: #{$kaenvs[env][:tarball]}",MSG_INFO)
+	else
+		msg("can't find env #{env} tarball",MSG_WARNING)
+		$kaenvs.delete(env)
+	end
+	if $kaenvs[env][:postinstall]
+		if File.exist?($kaenvs[env][:postinstall][:file])
+			msg("  postinstall: #{$kaenvs[env][:postinstall][:file]}",MSG_INFO) \
+		else
+			msg("can't find env #{env} postinstall",MSG_WARNING)
+			$kaenvs.delete(env)
+		end
+	end
+end
 
+
+# Checking node list
 if options[:node_list]
 	nodelist_file = options[:node_list]
 elsif (ENV['GOOD_NODES'])
@@ -1078,7 +1119,20 @@ end
 
 $kanodes.values.collect! do |v|
   v[:fqdn] = "#{v[:name]}.#{DOMAIN}"
-  tmp = v[:basename].split('.')[0]
+	tmp = nil
+	begin
+		addr = IPAddr.new(v[:basename])
+		# if nodename is an IP address
+		if addr.ipv4?
+			v[:ipv4] = v[:basename]
+		else
+			msg("Using IPv6 address for node '#{v[:basename]}', which is currently not supported",MSG_ERROR,true)
+		end
+		tmp = v[:basename]
+	rescue ArgumentError
+		# else if nodename is domain name
+		tmp = v[:basename].split('.')[0]
+	end
   v[:basenodename] = tmp
 
   if g5k?
@@ -1128,38 +1182,6 @@ $clusters.values.collect! do |v|
 
   msg("  net driver: #{v[:drivers][:network]}",MSG_INFO)
   msg("  disk driver: #{v[:drivers][:disk]}",MSG_INFO)
-end
-
-msg("=== Gathering environements information",MSG_INFO)
-if g5k?
-  G5K_ENVS.each do |env|
-    $kaenvs[env] = {}
-    $kaenvs[env][:name] = env
-    $kaenvs[env][:dscfile] = File.join(CFG_KADEPLOY_ENVS_DESC_PATH,"#{env}.dsc")
-    tmp = `kaenv3 -u deploy -p #{env}`.chomp
-    tmp.each do |line|
-      if line =~ /^\s*tarball\s*:\s*([^ |]+)\|\S+\s*$/
-        $kaenvs[env][:tarball] = Regexp.last_match(1)
-      elsif line =~ /^\s*postinstall\s*:\s*([^ |]+)\|([^ |]+)\|(.*)$/
-        $kaenvs[env][:postinstall] = {}
-        $kaenvs[env][:postinstall][:file] = Regexp.last_match(1)
-        $kaenvs[env][:postinstall][:filetype] = Regexp.last_match(2)
-        $kaenvs[env][:postinstall][:args] = Regexp.last_match(3)
-      elsif line.strip != '###' and !line.strip.empty?
-        $kaenvs[env][:desc] = [] unless $kaenvs[env][:desc]
-        $kaenvs[env][:desc] << line
-      end
-    end
-    msg("#{$kaenvs[env][:name]}:",MSG_INFO)
-    if $kaenvs[env][:tarball]
-      msg("  tarball: #{$kaenvs[env][:tarball]}",MSG_INFO)
-    else
-      msg("can't find env #{env} tarball",MSG_WARNING)
-      $kaenvs.delete(env)
-    end
-    msg("  postinstall: #{$kaenvs[env][:postinstall][:file]}",MSG_INFO) \
-      if $kaenvs[env][:postinstall]
-  end
 end
 
 
