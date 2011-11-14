@@ -1349,9 +1349,13 @@ sshgw.ssh(server,'root') do |session|
   msg('Updating resolv.conf files',MSG_INFO)
   tempfile(cfg_resolvconf()) {|path| scp(server,path,CFG_RESOLVCONF_FILE)}
 
-  $kanodes.each do |name,hash|
-    next if name == :dns
-    sexec(session,"scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null #{CFG_RESOLVCONF_FILE} root@#{hash[:ipv4]}:#{CFG_RESOLVCONF_FILE}")
+  excls = []
+  excls << $kanodes[:dns][:ipv4]
+  select_type($kanodes,:SERVER).each do |node|
+		unless excls.include?(node[:ipv4])
+			sexec(session,"scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null #{CFG_RESOLVCONF_FILE} root@#{node[:ipv4]}:#{CFG_RESOLVCONF_FILE}")
+			excls << node[:ipv4]
+		end
   end
 
   msg('Destroying HTTP proxy SSH tunnel',MSG_INFO)
@@ -1453,7 +1457,7 @@ sshgw.ssh(server,'root') do |session|
   excls << $kanodes[:dhcp][:ipv4]
   Net::SSH::Multi.start do |bcastsession|
     bcastsession.via kavlan_gw(), ENV['USER']
-    $kanodes.each do |name,node|
+		select_type($kanodes,:SERVER).each do |node|
       unless excls.include?(node[:ipv4])
         bcastsession.use "root@#{node[:ipv4]}"
         excls << node[:ipv4]
