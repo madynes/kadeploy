@@ -918,7 +918,7 @@ optparse = OptionParser.new(USAGE) do |opts|
   		exit
 	end
 	
-	opts.on( '-n', '--node-list <nodelist_file>', 'Specify a file containing the list of the nodes to be installed' ) do |n|
+	opts.on( '-f', '--node-list <nodelist_file>', 'Specify a file containing the list of the nodes to be installed' ) do |n|
   	options[:node_list] = n
 	end
 	
