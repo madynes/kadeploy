@@ -1,0 +1,5 @@
+Several versions of Kastafior are provided, depending on the version of TakTuk you use.
+
+TakTuk <= 3.6.1 -> kastafior-0.1
+3.6.2 <= TakTuk < 3.7 -> kastafior-0.2
+TakTuk >= 3.7 -> kastafior-0.3
