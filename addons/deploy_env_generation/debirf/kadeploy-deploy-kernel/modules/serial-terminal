@@ -1,0 +1,29 @@
+#!/bin/bash -e
+
+# debirf module: serial-terminal
+# add serial terminal
+#
+# The debirf scripts were written by
+# Jameson Rollins <jrollins@fifthhorseman.net>
+# and
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>.
+#
+# They are Copyright 2007, and are all released under the GPL,
+# version 3 or later.
+
+INITTAB="$DEBIRF_ROOT/etc/inittab"
+TTY="ttyS0"
+
+# make the device node, just to be sure it's there.
+debirf_exec mknod /dev/ttyS0 c 4 64
+#debirf_exec mknod /dev/ttyS0 c 4 65
+#debirf_exec mknod /dev/ttyS0 c 4 66
+
+if grep "$TTY" "$INITTAB" | grep -q -v "^[:space:]*#" ; then
+    echo "inittab already has terminal on $TTY."
+else
+    cat <<EOF >> "$INITTAB"
+# debirf: added serial console output:
+T0:23:respawn:/sbin/getty -L ttyS0 115200 vt100
+EOF
+fi

@@ -1,0 +1,50 @@
+#!/bin/bash -e
+#
+# debirf module: kadeploy-addons
+#
+# The debirf scripts were written by
+# Jameson Rollins <jrollins@fifthhorseman.net>
+# and
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>.
+#
+# They are Copyright 2007, and are all released under the GPL,
+# version 3 or later.
+#
+# This module has been added by
+# Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+
+
+echo "Configure some stuffs for Kadeploy"
+mkdir -p $DEBIRF_ROOT/mnt/dest
+mkdir -p $DEBIRF_ROOT/rambin
+mkdir -p $DEBIRF_ROOT/mnt/tmp
+mkdir -p $DEBIRF_ROOT/usr/local/bin
+
+cp $DEBIRF_BUILDD/kadeploy_specific/scripts/* $DEBIRF_ROOT/usr/local/bin
+chmod +x $DEBIRF_ROOT/usr/local/bin/*
+
+cat > $DEBIRF_ROOT/etc/rc.local <<EOF
+#!/bin/sh -e
+
+ifup eth0=dhcp
+(while true; do nc -l -p 25300; done) &
+
+. /var/lib/dhcpcd/dhcpcd-eth0.info
+# set hostname and its resolution
+echo "\${HOSTNAME}.\${DNSDOMAIN}" > /etc/hostname
+echo "\${IPADDR} \${HOSTNAME}.\${DNSDOMAIN} \${HOSTNAME}" >> /etc/hosts
+# configure DNS with dhcp info
+echo "search \${DNSDOMAIN/,/ }" > /etc/resolv.conf #maybe "," is not the separator
+for ns in \${DNSSERVERS}
+do
+    echo "nameserver \$ns" >> /etc/resolv.conf
+done
+
+exit 0
+EOF
+
+mkdir -p $DEBIRF_ROOT/root/.ssh
+cat $DEBIRF_BUILDD/kadeploy_specific/ssh/id_deploy.pub >> $DEBIRF_ROOT/root/.ssh/authorized_keys
+mkdir -p $DEBIRF_ROOT/etc/kadeploy3/keys
+cp $DEBIRF_BUILDD/kadeploy_specific/ssh/id_deploy $DEBIRF_ROOT/etc/kadeploy3/keys/
+

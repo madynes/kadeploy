@@ -1,0 +1,17 @@
+#!/bin/sh -e
+#
+# debirf module: z2_lighten
+#
+# The debirf scripts were written by
+# Jameson Rollins <jrollins@fifthhorseman.net>
+# and
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>.
+#
+# They are Copyright 2007, and are all released under the GPL,
+# version 3 or later.
+#
+# This module has been added by
+# Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+
+cd $DEBIRF_ROOT/usr/share
+find -maxdepth 1 -mindepth 1 -type d ! -iname 'perl*' ! -iname 'locale' -exec rm -rf '{}' \+
