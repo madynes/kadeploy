@@ -290,7 +290,7 @@ module ConfigInformation
       exec_specific.load_env_arg = String.new
       exec_specific.load_env_content = String.new
       exec_specific.env_version = nil #By default we load the latest version
-      exec_specific.user = USER #By default, we use the current user
+      exec_specific.user = nil
       exec_specific.true_user = USER
       exec_specific.block_device = String.new
       exec_specific.deploy_part = String.new
@@ -1442,7 +1442,7 @@ module ConfigInformation
       exec_specific.file = String.new
       exec_specific.file_content = String.new
       exec_specific.env_name = String.new
-      exec_specific.user = USER #By default, we use the current user
+      exec_specific.user = nil
       exec_specific.true_user = USER #By default, we use the current user
       exec_specific.visibility_tag = String.new
       exec_specific.show_all_version = false
@@ -2096,7 +2096,7 @@ module ConfigInformation
       exec_specific.node_array = Array.new
       exec_specific.check_prod_env = false
       exec_specific.true_user = USER
-      exec_specific.user = USER
+      exec_specific.user = nil
       exec_specific.load_env_kind = "db"
       exec_specific.env_arg = String.new
       exec_specific.environment = EnvironmentManagement::Environment.new

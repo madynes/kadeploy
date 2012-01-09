@@ -269,11 +269,9 @@ module EnvironmentManagement
     # * client: DRb handler to client
     # Output
     # * returns true if the environment can be loaded, false otherwise
-    def load_from_db(name, version, user, true_user, dbh, client)
-      mask_private_env = false
-      if (true_user != user) then
-        mask_private_env = true
-      end
+    def load_from_db(name, version, specified_user, true_user, dbh, client)
+      user = specified_user ? specified_user : true_user
+      mask_private_env = true_user != user
       if (version == nil) then
         if mask_private_env then
           query = "SELECT * FROM environments WHERE name=\"#{name}\" \
@@ -309,7 +307,7 @@ module EnvironmentManagement
       end
       
       #If no environment is found for the user, we check the public environments
-      if (true_user == user) then
+      if (specified_user == nil) then
         if (version  == nil) then
           query = "SELECT * FROM environments WHERE name=\"#{name}\" \
                                               AND user<>\"#{user}\" \
