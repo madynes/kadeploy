@@ -1574,7 +1574,8 @@ class KadeployServer
   # * print the environments of a given user
   def kaenv_list_environments(exec_specific, client, db)
     env = EnvironmentManagement::Environment.new
-    if (exec_specific.user == "*") then #we show the environments of all the users
+    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
+    if (user == "*") then #we show the environments of all the users
       if (exec_specific.show_all_version == false) then
         if (exec_specific.version != "") then
           query = "SELECT * FROM environments WHERE version=\"#{exec_specific.version}\" \
@@ -1596,27 +1597,25 @@ class KadeployServer
       end
     else
       #If the user wants to print the environments of another user, private environments are not shown
-      if (exec_specific.user != exec_specific.true_user) then
-        mask_private_env = true
-      end
+      mask_private_env = exec_specific.true_user != user
       if (exec_specific.show_all_version == false) then
         if (exec_specific.version != "") then
           if mask_private_env then
             query = "SELECT * FROM environments \
-                              WHERE user=\"#{exec_specific.user}\" \
+                              WHERE user=\"#{user}\" \
                               AND version=\"#{exec_specific.version}\" \
                               AND visibility<>\"private\" \
                               ORDER BY user,name"
           else
             query = "SELECT * FROM environments \
-                              WHERE (user=\"#{exec_specific.user}\" AND version=\"#{exec_specific.version}\") \
-                              OR (user<>\"#{exec_specific.user}\" AND version=\"#{exec_specific.version}\" AND visibility=\"public\") \
+                              WHERE (user=\"#{user}\" AND version=\"#{exec_specific.version}\") \
+                              OR (user<>\"#{user}\" AND version=\"#{exec_specific.version}\" AND visibility=\"public\") \
                               ORDER BY user,name"
           end
         else
           if mask_private_env then
             query = "SELECT * FROM environments e1\
-                              WHERE e1.user=\"#{exec_specific.user}\" \
+                              WHERE e1.user=\"#{user}\" \
                               AND e1.visibility<>\"private\" \
                               AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
                                                                      WHERE e2.name=e1.name \
@@ -1626,25 +1625,25 @@ class KadeployServer
                               ORDER BY e1.user,e1.name"
           else
             query = "SELECT * FROM environments e1\
-                              WHERE (e1.user=\"#{exec_specific.user}\" \
-                              OR (e1.user<>\"#{exec_specific.user}\" AND e1.visibility=\"public\")) \
+                              WHERE (e1.user=\"#{user}\" \
+                              OR (e1.user<>\"#{user}\" AND e1.visibility=\"public\")) \
                               AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
                                                                      WHERE e2.name=e1.name \
                                                                      AND e2.user=e1.user \
-                                                                     AND (e2.user=\"#{exec_specific.user}\" \
-                                                                     OR (e2.user<>\"#{exec_specific.user}\" AND e2.visibility=\"public\")) \
+                                                                     AND (e2.user=\"#{user}\" \
+                                                                     OR (e2.user<>\"#{user}\" AND e2.visibility=\"public\")) \
                                                                      GROUP BY e2.user,e2.name) \
                               ORDER BY e1.user,e1.name"
           end
         end
       else
         if mask_private_env then
-          query = "SELECT * FROM environments WHERE user=\"#{exec_specific.user}\" \
+          query = "SELECT * FROM environments WHERE user=\"#{user}\" \
                                               AND visibility<>\"private\" \
                                               ORDER BY name,version"
         else
-          query = "SELECT * FROM environments WHERE user=\"#{exec_specific.user}\" \
-                                              OR (user<>\"#{exec_specific.user}\" AND visibility=\"public\") \  
+          query = "SELECT * FROM environments WHERE user=\"#{user}\" \
+                                              OR (user<>\"#{user}\" AND visibility=\"public\") \  
                                               ORDER BY user,name,version"
 
         end
@@ -1740,7 +1739,7 @@ class KadeployServer
     if (exec_specific.version != "") then
       version = exec_specific.version
     else
-      version = _get_max_version(db, exec_specific.env_name, exec_specific.user, exec_specific.true_user)
+      version = _get_max_version(db, exec_specific.env_name, exec_specific.true_user, exec_specific.true_user)
     end
     query = "DELETE FROM environments WHERE name=\"#{exec_specific.env_name}\" \
                                       AND version=\"#{version}\" \
@@ -1763,37 +1762,35 @@ class KadeployServer
   # * print the specified environment that belongs to the specified user
   def kaenv_print_environment(exec_specific, client, db)
     env = EnvironmentManagement::Environment.new
-    mask_private_env = false
+    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
     #If the user wants to print the environments of another user, private environments are not shown
-    if (exec_specific.user != exec_specific.true_user) then
-      mask_private_env = true
-    end
+    mask_private_env = exec_specific.true_user != user
 
     if (exec_specific.show_all_version == false) then
       if (exec_specific.version != "") then
         version = exec_specific.version
       else
-        version = _get_max_version(db, exec_specific.env_name, exec_specific.user, exec_specific.true_user)
+        version = _get_max_version(db, exec_specific.env_name, user, exec_specific.true_user)
       end
       if mask_private_env then
         query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{exec_specific.user}\" \
+                                            AND user=\"#{user}\" \
                                             AND version=\"#{version}\" \
                                             AND visibility<>\"private\""
       else
         query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{exec_specific.user}\" \
+                                            AND user=\"#{user}\" \
                                             AND version=\"#{version}\""
       end
     else
       if mask_private_env then
         query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{exec_specific.user}\" \
+                                            AND user=\"#{user}\" \
                                             AND visibility<>\"private\" \
                                             ORDER BY version"
       else
         query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{exec_specific.user}\" \
+                                            AND user=\"#{user}\" \
                                             ORDER BY version"
       end
     end
@@ -1820,10 +1817,6 @@ class KadeployServer
   def _get_max_version(db, env_name, user, true_user)
     #If the user wants to print the environments of another user, private environments are not shown
     if (user != true_user) then
-      mask_private_env = true
-    end
-
-    if mask_private_env then
       query = "SELECT MAX(version) FROM environments WHERE user=\"#{user}\" \
                                                      AND name=\"#{env_name}\" \
                                                      AND visibility<>\"private\""
@@ -1901,7 +1894,8 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_update_tarball_md5(exec_specific, client, db)
-    _update_tarball_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client) if _allowed_to_update_env?(exec_specific.user, exec_specific.true_user, client)
+    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
+    _update_tarball_md5(db, exec_specific.env_name, exec_specific.version, user, exec_specific.true_user, client) if _allowed_to_update_env?(user, exec_specific.true_user, client)
   end
 
   # Update the md5sum of the preinstall
@@ -1960,7 +1954,8 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_update_preinstall_md5(exec_specific, client, db)
-    _update_preinstall_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client) if _allowed_to_update_env?(exec_specific.user, exec_specific.true_user, client)
+    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
+    _update_preinstall_md5(db, exec_specific.env_name, exec_specific.version, user, exec_specific.true_user, client) if _allowed_to_update_env?(user, exec_specific.true_user, client)
   end
 
   # Update the md5sum of the postinstall files
@@ -2028,7 +2023,8 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_update_postinstall_md5(exec_specific, client, db)
-    _update_postinstall_md5(db, exec_specific.env_name, exec_specific.version, exec_specific.user, exec_specific.true_user, client) if _allowed_to_update_env?(exec_specific.user, exec_specific.true_user, client)
+    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
+    _update_postinstall_md5(db, exec_specific.env_name, exec_specific.version, user, exec_specific.true_user, client) if _allowed_to_update_env?(user, exec_specific.true_user, client)
   end
 
   # Remove the demolishing tag on an environment
@@ -2044,7 +2040,7 @@ class KadeployServer
     if (exec_specific.version != "") then
       version = exec_specific.version
     else
-      version = _get_max_version(db, exec_specific.env_name, exec_specific.user, exec_specific.true_user)
+      version = _get_max_version(db, exec_specific.env_name, exec_specific.true_user, exec_specific.true_user)
     end
     query = "UPDATE environments SET demolishing_env=0 WHERE name=\"#{exec_specific.env_name}\" \
                                                        AND user=\"#{exec_specific.true_user}\" \
@@ -2064,12 +2060,13 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_set_visibility_tag(exec_specific, client, db)
+    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
     if (exec_specific.visibility_tag == "public") && (not @config.common.almighty_env_users.include?(exec_specific.true_user)) then
       Debug::distant_client_print("Only the environment administrators can set the \"public\" tag", client)
     else
       query = "UPDATE environments SET visibility=\"#{exec_specific.visibility_tag}\" \
                                    WHERE name=\"#{exec_specific.env_name}\" \
-                                   AND user=\"#{exec_specific.user}\" \
+                                   AND user=\"#{user}\" \
                                    AND version=\"#{exec_specific.version}\""
       db.run_query(query)
       if (db.get_nb_affected_rows == 0) then
