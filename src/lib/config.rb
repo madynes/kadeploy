@@ -111,10 +111,8 @@ module ConfigInformation
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
         if (allowed_to_deploy) then
-          b = @cluster_specific[cluster].block_device
-          p = @cluster_specific[cluster].deploy_part
-          b = exec_specific_config.block_device if (exec_specific_config.block_device != "")
-          p = exec_specific_config.deploy_part if (exec_specific_config.deploy_part != "")
+          b = (exec_specific_config.block_device != "") ? exec_specific_config.block_device : @cluster_specific[cluster].block_device
+          p = (exec_specific_config.deploy_part != "") ? exec_specific_config.deploy_part : @cluster_specific[cluster].deploy_part
           part = b + p
           allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
                                                                      exec_specific_config.true_user,
@@ -187,10 +185,8 @@ module ConfigInformation
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
         if (allowed_to_deploy) then
-          b = @cluster_specific[cluster].block_device
-          p = @cluster_specific[cluster].deploy_part
-          b = exec_specific_config.block_device if (exec_specific_config.block_device != "")
-          p = exec_specific_config.deploy_part if (exec_specific_config.deploy_part != "")
+          b = (exec_specific_config.block_device != "") ? exec_specific_config.block_device : @cluster_specific[cluster].block_device
+          p = (exec_specific_config.deploy_part != "") ? exec_specific_config.deploy_part : @cluster_specific[cluster].deploy_part
           part = b + p
           allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
                                                                      exec_specific_config.true_user,
