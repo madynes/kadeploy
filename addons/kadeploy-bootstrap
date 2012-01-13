@@ -8,8 +8,9 @@ require 'json'
 require 'tempfile'
 require 'ipaddr'
 require 'yaml'
-require 'optparse'
 require 'uri'
+require 'resolv'
+require 'optparse'
 
 
 def g5k?
@@ -33,6 +34,7 @@ end
 DOMAIN = 'testbed.lan'
 CLUSTER_NAME_SUFIX = '-cluster'
 NODE_NAME_PREFIX = 'node-'
+HOST_NAME_PREFIX = 'host-'
 
 NET_ADMIN_IFACE = 'eth0'
 USE_NET_DRIVER = true
@@ -42,6 +44,8 @@ KVM_GATEWAY = '192.168.0.254'
 # used to get kadeploy debian package on g5k
 KVM_G5K_USER = 'lsarzyniec'
 KVM_G5K_SITE = 'access.nancy.grid5000.fr'
+KVM_PACKAGES = [ 'kvm', 'qemu', 'qemu-kvm' , 'bridge-utils' ]
+KVM_BRIDGE_DEV = 'br0'
 
 DEFAULT_CONSOLE_BAUD_RATE = '38400'
 DEFAULT_CONSOLE_TTY_ID = '0'
@@ -63,7 +67,7 @@ UPDATE_DIR_VAR = 'WORKINGDIR'
 # Kadeploy default config
 CFG_KADEPLOY_USER = 'deploy'
 
-CFG_KADEPLOY_MACROSTEP1 = { 
+CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 2,
   :timeout => 450
@@ -86,15 +90,14 @@ CFG_KADEPLOY_MACROSTEP3 = [
   }
 ]
 
-CFG_KADEPLOY_PARTITION_SWAP_ID = 1
-CFG_KADEPLOY_PARTITION_SWAP_SIZE = '4000M'
-CFG_KADEPLOY_PARTITION_PROD_ID = 2
-CFG_KADEPLOY_PARTITION_PROD_SIZE = '6000M'
-CFG_KADEPLOY_PARTITION_DEPLOY_ID = 3
-CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '6000M'
-CFG_KADEPLOY_PARTITION_TMP_ID = 5
+CFG_KADEPLOY_PARTITION_SWAP_ID = 3
+CFG_KADEPLOY_PARTITION_SWAP_SIZE = '512M'
+CFG_KADEPLOY_PARTITION_PROD_ID = 1
+CFG_KADEPLOY_PARTITION_PROD_SIZE = '128M'
+CFG_KADEPLOY_PARTITION_DEPLOY_ID = 2
+CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '3000M'
+CFG_KADEPLOY_PARTITION_TMP_ID = 4
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
-CFG_KADEPLOY_KVM_DISK_DEVICE = '/dev/hda'
 
 CFG_KADEPLOY_PORT = 25300
 CFG_KADEPLOY_VERBOSE = 3
@@ -105,6 +108,7 @@ CFG_KADEPLOY_SSHKEY_PATH = File.join(CFG_KADEPLOY_CONF_PATH,'keys')
 CFG_KADEPLOY_SSHKEY_DEFAULT = File.join(CFG_KADEPLOY_SSHKEY_PATH,'id_deploy')
 CFG_KADEPLOY_HOSTNAMES_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'hostnames')
 CFG_KADEPLOY_KVM_PROCS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'kvmprocs')
+CFG_KADEPLOY_KVM_HOSTS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'kvmhosts')
 CFG_KADEPLOY_HOSTNAMES_SSHKEY = File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'.ssh_key')
 CFG_KADEPLOY_ENVS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'envs')
 CFG_KADEPLOY_ENVS_IMAGES_PATH = File.join(CFG_KADEPLOY_ENVS_PATH,'images')
@@ -162,7 +166,7 @@ def cfg_kadeploy_conf()
   "deploy_db_login = #{CFG_SQL_USER}\n"\
   "deploy_db_passwd = #{CFG_SQL_PASS_USER}\n"\
   "rights_kind = db\n"\
-  "taktuk_connector = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT}\n"\
+  "taktuk_connector = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
   "taktuk_tree_arity = 0\n"\
   "taktuk_auto_propagate = true\n"\
   "tarball_dest_dir = /tmp\n"\
@@ -228,16 +232,16 @@ CFG_KADEPLOY_PARTITION_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'part
 def cfg_kadeploy_partition_file(cluster)
   # delete partitions
   "d\n1\nd\n2\nd\n3\nd\n4\n"\
-  + # create swap partition
-  "n\np\n#{CFG_KADEPLOY_PARTITION_SWAP_ID}\n\n+#{CFG_KADEPLOY_PARTITION_SWAP_SIZE}\nt\n82\n"\
   + # create prod partition
-  "n\np\n#{CFG_KADEPLOY_PARTITION_PROD_ID}\n\n+#{CFG_KADEPLOY_PARTITION_PROD_SIZE}\nt\n#{CFG_KADEPLOY_PARTITION_PROD_ID}\n83\n"\
+  "n\np\n#{CFG_KADEPLOY_PARTITION_PROD_ID}\n\n+#{CFG_KADEPLOY_PARTITION_PROD_SIZE}\nt\n83\n"\
   + # create deploy partition
   "n\np\n#{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\n\n+#{CFG_KADEPLOY_PARTITION_DEPLOY_SIZE}\nt\n#{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\nPARTTYPE\n"\
+  + # create swap partition
+  "n\np\n#{CFG_KADEPLOY_PARTITION_SWAP_ID}\n\n+#{CFG_KADEPLOY_PARTITION_SWAP_SIZE}\nt\n#{CFG_KADEPLOY_PARTITION_SWAP_ID}\n82\n"\
   + # create tmp partition
-  "n\ne\n\n\nn\n\n\nt\n#{CFG_KADEPLOY_PARTITION_TMP_ID}\n83\n"\
+  "n\np\n\n\nt\n#{CFG_KADEPLOY_PARTITION_TMP_ID}\n83\n"\
   + # write changes
-  "p\nw\n"\
+  "w\n"\
   "\n"
 end
 
@@ -253,17 +257,27 @@ def cfg_kadeploy_kapower_cmd(cmd)
   "ssh #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{ENV['USER']}@#{getgw()} \"kapower3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}` #{cmd}\""
 end
 
-def cfg_kadeploy_kaconsole_cmd()
-  "ssh -t #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{ENV['USER']}@#{getgw()} \"kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`\""
+def cfg_kadeploy_kaconsole_cmd(user=ENV['USER'])
+  "ssh -t #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{user}@#{getgw()} \"kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`\""
 end
 
-def cfg_kadeploy_kvm_cmd(cmd)
+
+def cfg_kadeploy_kvm_cmd(cmd,user='root')
+  host = nil
+	case $mode
+		when :VLANKVM
+      host = "`cat #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,'HOSTNAME_FQDN')}`"
+		when :KVM
+      host = getgw()
+		else
+			msg('Invalid mode',MSG_ERROR,true)
+	end
   "ssh #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} "\
-  "#{ENV['USER']}@#{getgw()} \"#{cmd}\""
+  "#{user}@#{host} \"#{cmd}\""
 end
 
 def cfg_kadeploy_kvm_ps()
-  "ps -d -f | grep kvm "\
+  "ps -d -f | grep kvm | grep -v grep "\
   "| grep '\\-name `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`'"\
   "| sort | head -n 1 | sed \'s/[ \\t]\\+/ /g\' | sed \'s/^[ \\t]\\+//g\' "\
 end
@@ -297,7 +311,7 @@ def cfg_kadeploy_power_on_cmd()
 	case $mode
 		when :KAVLAN
       ret = cfg_kadeploy_kapower_cmd('--on')
-		when :KVM
+		when :KVM, :VLANKVM
       ret = "#{cfg_kadeploy_kvm_cmd("$(#{cfg_kadeploy_kvm_procs_get_params()}) &>/dev/null &")} "\
         "&& #{cfg_kadeploy_kvm_procs_cache_update(true)}"
 		else
@@ -311,7 +325,7 @@ def cfg_kadeploy_power_off_cmd()
 	case $mode
 		when :KAVLAN
       ret = cfg_kadeploy_kapower_cmd('--off')
-		when :KVM
+		when :KVM, :VLANKVM
       ret = "#{cfg_kadeploy_kvm_cmd("kill $(#{cfg_kadeploy_kvm_procs_get_pid()}) &>/dev/null")}"
 		else
 			msg('Unknown mode',MSG_ERROR,true)
@@ -324,7 +338,7 @@ def cfg_kadeploy_power_status_cmd()
 	case $mode
 		when :KAVLAN
       ret = cfg_kadeploy_kapower_cmd('--status')
-		when :KVM
+		when :KVM, :VLANKVM
       ret = "test -n \"$(#{cfg_kadeploy_kvm_procs_get()})\" "\
        "&& echo HOSTNAME_FQDN : ON "\
        "|| echo HOSTNAME_FQDN : OFF"
@@ -339,7 +353,7 @@ def cfg_kadeploy_console_cmd()
 	case $mode
 		when :KAVLAN
       ret = cfg_kadeploy_kaconsole_cmd()
-		when :KVM
+		when :KVM, :VLANKVM
       ret = "ssh -t #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} root@HOSTNAME_FQDN"
 		else
 			msg('Unknown mode',MSG_ERROR,true)
@@ -352,25 +366,55 @@ def cfg_kadeploy_reboot_cmd()
 end
 
 def cfg_kadeploy_disk_device()
+  CFG_KADEPLOY_DISK_DEVICE
+end
+
+def cfg_kadeploy_deploy_kernel_imgpath(cluster)
   ret = ''
-	case $mode
-		when :KAVLAN
-      ret = CFG_KADEPLOY_DISK_DEVICE
-		when :KVM
-      ret = CFG_KADEPLOY_KVM_DISK_DEVICE
+	case $deploysendmeth
+		when :HTTP
+      ret = "http://#{$kanodes[:www][:ipv4]}/#{File.join(CFG_HTTP_KERNELS_PATH,File.basename(cluster[:kernel][:vmlinuz]))}"
+		when :TFTP
+      ret = File.basename(cluster[:kernel][:vmlinuz])
 		else
-			msg('Unknown mode',MSG_ERROR,true)
+			msg('Unknown deploy env sending method',MSG_ERROR,true)
 	end
   ret
 end
 
+def cfg_kadeploy_deploy_kernel(cluster)
+  "#{cfg_kadeploy_deploy_kernel_imgpath(cluster)}"
+end
+
+def cfg_kadeploy_deploy_initrd_imgpath(cluster)
+  ret = ''
+	case $deploysendmeth
+		when :HTTP
+      ret = "http://#{$kanodes[:www][:ipv4]}/#{File.join(CFG_HTTP_KERNELS_PATH,File.basename(cluster[:kernel][:initrd]))}"
+		when :TFTP
+      ret = File.basename(cluster[:kernel][:initrd])
+		else
+			msg('Unknown deploy env sending method',MSG_ERROR,true)
+	end
+  ret
+end
+
+def cfg_kadeploy_deploy_initrd(cluster)
+  "#{cfg_kadeploy_deploy_initrd_imgpath(cluster)} "\
+  "#{USE_NET_DRIVER ? "ETH_DRV=#{cluster[:drivers][:network]} " : ''}"\
+  "ETH_DEV=#{$netiface} "\
+  "#{USE_DISK_DRIVER ? "DISK_DRV=#{cluster[:drivers][:disk]} " : ''}"\
+  "console=tty#{DEFAULT_CONSOLE_TTY_ID} "\
+  "console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8 "\
+  "ramdisk_size=#{DEFAULT_RAMDISK_SIZE} "\
+  "rw noapic init=/linuxrc"
+end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
-  "deploy_kernel = #{File.basename(cluster[:kernel][:vmlinuz])}\n"\
-  + # >>> TODO: UPDATE
-  "deploy_initrd = #{File.basename(cluster[:kernel][:initrd])} #{USE_NET_DRIVER ? "ETH_DRV=#{cluster[:drivers][:network]} " : ''}ETH_DEV=#{$netiface} #{USE_DISK_DRIVER ? "DISK_DRV=#{cluster[:drivers][:disk]} " : ''}console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8 ramdisk_size=#{DEFAULT_RAMDISK_SIZE} rw noapic init=/linuxrc\n"\
+  "deploy_kernel = #{cfg_kadeploy_deploy_kernel(cluster)}\n"\
+  "deploy_initrd = #{cfg_kadeploy_deploy_initrd(cluster)}\n"\
   "block_device = #{cfg_kadeploy_disk_device()}\n"\
   "prod_part = #{CFG_KADEPLOY_PARTITION_PROD_ID}\n"\
   "deploy_part = #{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\n"\
@@ -427,6 +471,20 @@ def cfg_tftp()
 end
 
 
+# HTTP default config
+CFG_HTTP_KERNELS_PATH = 'kernels/'
+
+
+# Apache2 default config
+CFG_APACHE_CONF_FILE = '/etc/apache2/apache2.conf'
+CFG_APACHE_SERVER_PATH = '/var/www'
+CFG_APACHE_KERNELS_PATH = File.join(CFG_APACHE_SERVER_PATH,CFG_HTTP_KERNELS_PATH)
+
+def cfg_apache()
+  ''
+end
+
+
 # PXE default config
 CFG_PXE_DISK='hd0'
 CFG_PXE_PART=3
@@ -435,6 +493,7 @@ CFG_PXE_BOOTFILES = [
   'chain.c32',
   'mboot.c32',
   'pxelinux.0',
+  'gpxelinux.0',
 ]
 CFG_PXE_CONFIG_PATH = File.join(CFG_TFTP_PATH,CFG_TFTP_PXECONFIG_DIR)
 CFG_PXE_KERNELS_PATH = File.join(CFG_TFTP_PATH,CFG_TFTP_KERNELS_DIR)
@@ -559,6 +618,8 @@ end
 # DHCP default config
 CFG_DHCP_CONF_FILE='/etc/dhcp/dhcpd.conf'
 CFG_DHCP_PXE_MAGIC='F1:00:74:7E'
+CFG_DHCP_PXECLIENT='gpxelinux.0'
+
 def cfg_dhcp_node(node)
   "  host #{node[:fqdn]} {\n"\
   "    hardware ethernet #{node[:mac]};\n"\
@@ -608,7 +669,7 @@ def cfg_dhcp()
   + # PXE class
   "class \"PXE\" {\n"\
 	"  match if substring(option vendor-class-identifier, 0, 9) = \"PXEClient\";\n"\
-  "  filename \"pxelinux.0\";\n"\
+  "  filename \"#{CFG_DHCP_PXECLIENT}\";\n"\
   "  option vendor-class-identifier \"PXEClient\";\n"\
   "  vendor-option-space PXE;\n"\
 	"  option PXE.mtftp-ip 0.0.0.0;\n"\
@@ -752,6 +813,20 @@ def cfg_mysql()
   "key_buffer = 16M\n"
 end
 
+# Debian networking system
+
+CFG_NETWORKING_CONF_FILE = '/etc/network/interfaces'
+
+def cfg_networking_bridge(ifname,macaddr)
+  "auto lo\n"\
+  "iface lo inet loopback\n\n"\
+  "iface #{ifname} inet manual\n\n"\
+  "auto #{KVM_BRIDGE_DEV}\n"\
+  "iface #{KVM_BRIDGE_DEV} inet dhcp\n"\
+  "  bridge_ports #{ifname}\n"\
+  "bridge_hw #{macaddr}\n"
+end
+
 
 
 
@@ -772,6 +847,7 @@ $deplkernels = {}
 $stunnels = {}
 $hostscache = {}
 $network = {}
+$deploysendmeth = :HTTP
 
 options = {}
 
@@ -798,7 +874,7 @@ def kavlan_gw()
 end
 
 def kavlan_node(name)
-  "#{name.split('.')[0]}-#{kavlan_gw()}"
+  "#{name.split('.')[0].split("-#{kavlan_gw()}")[0]}-#{kavlan_gw()}"
 end
 
 def kvm_gw()
@@ -808,7 +884,7 @@ end
 def getgw()
 	ret = nil
 	case $mode
-		when :KAVLAN
+		when :KAVLAN, :VLANKVM
 			ret = kavlan_gw()
 		when :KVM
 			ret = kvm_gw()
@@ -821,7 +897,7 @@ end
 def getnode(name)
 	ret = nil
 	case $mode
-		when :KAVLAN
+		when :KAVLAN, :VLANKVM
 			ret = kavlan_node(name)
 		when :KVM
 			ret = name
@@ -983,7 +1059,7 @@ end
 def apt_cmd(session,shcmd,aptcmd,aptopts,params='')
 	aptproxy = nil
 	case $mode
-		when :KAVLAN
+		when :KAVLAN, :VLANKVM
 			aptproxy = 'Acquire::http::Proxy=\"http://localhost:3128\"'
 		when :KVM
 			aptproxy = ''
@@ -1051,7 +1127,7 @@ end
 
 def scp(dsthost,srcfile,dstfile)
 	case $mode
-		when :KAVLAN
+		when :KAVLAN, :VLANKVM
 			randport=get_open_port()
 			cmd="ssh #{SSH_OPTIONS} -N -L #{randport}:#{dsthost}:22 -i #{$sshkeyfile} #{ENV['USER']}@#{getgw()} &>/dev/null & echo $!"
 			msg(cmd) if $debug
@@ -1128,18 +1204,19 @@ def tempfile(content)
   tmp.unlink
 end
 
-def http_tunnel(host,session)
+def http_tunnel(host,session, verbose=true)
+  host = host[:basename] if host.is_a?(Hash)
 	case $mode
-		when :KAVLAN
-			msg('Creating HTTP proxy SSH tunnel',MSG_INFO)
+		when :KAVLAN, :VLANKVM
+			msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
 			ssh_tunnel_create(session,HTTP_PROXY_PORT,HTTP_PROXY_ADDR)
 
 			yield
 
-			msg('Destroying HTTP proxy SSH tunnel',MSG_INFO)
-			ssh_tunnel_destroy(session,3128,getnode(host[:basename]))
+			msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
+			ssh_tunnel_destroy(session,3128,getnode(host))
 		when :KVM
-			msg('Creating HTTP proxy SSH tunnel',MSG_INFO)
+			msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
 			tmp = sexec(session,'route -n')
 			msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
 			gateway = nil
@@ -1160,7 +1237,7 @@ def http_tunnel(host,session)
 
 			yield
 
-			msg('Destroying HTTP proxy SSH tunnel',MSG_INFO)
+			msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
 			sexec(session,'route del default')
 			sexec(session,"route add default gw #{gateway} dev #{iface}") if gateway
 		else
@@ -1188,7 +1265,7 @@ end
 
 def kadeploy_tunnel(host,session)
 	case $mode
-		when :KAVLAN
+		when :KAVLAN, :VLANKVM
 			msg('Creating tunnel to kadeploy repository',MSG_INFO)
 			sexec(session,"sed -i -e '/^.*#{DEB_REPOSITORY.gsub('/','\/')}.*$/d' /etc/apt/sources.list")
 			sexec(session,"echo 'deb #{DEB_REPOSITORY} / ' >> /etc/apt/sources.list")
@@ -1233,13 +1310,13 @@ def select_type(hash,type)
 end
 
 options[:node_list]   = nil
+options[:host_list]   = nil
 options[:debpackages] = []
 options[:gempackages] = []
 options[:git]         = nil
 options[:ssh_key]     = nil
 options[:version]     = nil
 options[:daemon_kadeploy] = nil
-options[:resolv] 			= false
 options[:update_file] = nil
 $debug				        = false
 $netiface 						= NET_ADMIN_IFACE
@@ -1252,8 +1329,12 @@ optparse = OptionParser.new(USAGE) do |opts|
   		exit
 	end
 
-	opts.on( '-f', '--node-list <nodelist_file>', 'Specify a file containing the list of the nodes to be installed' ) do |n|
+	opts.on( '-f', '--deploy-node-list <nodelist_file>', 'Specify a file containing the list of the nodes that should be deployed' ) do |n|
   	options[:node_list] = n
+	end
+
+	opts.on( '-F', '--hosts-node-list <nodelist_file>', 'Specify a file containing the list of the hosting nodes (VLAN hostnames) to be used when using the VLAN-KVM mode (see --vlan-kvm)' ) do |n|
+  	options[:host_list] = n
 	end
 
 	opts.on( '-k', '--ssh-key [<ssh_key_file>]', 'Specify the path of the ssh private key to use' ) do |k|
@@ -1262,6 +1343,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-K', '--kvm', 'Use KVM nodes instead of deployed ones in kavlan (default)' ) do |k|
 		$mode = :KVM
+	end
+
+	opts.on( '-M', '--vlan-kvm', 'Use KVM nodes in a kavlan' ) do |k|
+		$mode = :VLANKVM
 	end
 
 	opts.on( '-g', '--git [<git_hash|git_tag>]', "Specify a specific version to install from git repository (if not specified, taking the last revision). Some packages are installed on one of the nodes in order to build the debian package (See `apt-get build-dep kadeploy-server` + deb: #{})" ) do |n|
@@ -1280,12 +1365,12 @@ optparse = OptionParser.new(USAGE) do |opts|
   	$netiface = i
 	end
 
-	opts.on( '-d', '--kadeploy-daemon <node_address>', 'Specify which node should be used as kadeploy daemon (default: first node)' ) do |d|
-  	options[:daemon_kadeploy] = d || nil
+	opts.on( '-T', '--use-tftp', "Use TFTP protocol to send the minimal deployment image (default: HTTP)" ) do
+    $deploysendmeth = :TFTP
 	end
 
-	opts.on( '-x', '--toggle-resolv', 'Toggle hostname resolution considering the current mode (default in KAVLAN mode: enabled, default in KVN mode: disabled)' ) do |d|
-  	options[:resolv] = true
+	opts.on( '-d', '--kadeploy-daemon <node_address>', 'Specify which node should be used as kadeploy daemon (default: first node)' ) do |d|
+  	options[:daemon_kadeploy] = d || nil
 	end
 
 	opts.on( '', '--debug', 'Verbose display of every instruction sent' ) do
@@ -1304,17 +1389,6 @@ end
 if ARGV.size < 2
   msg(USAGE)
   exit 1
-end
-
-if options[:resolv]
-	case $mode
-		when :KAVLAN
-			options[:resolv] = false
-		when :KVM
-			options[:resolv] = true
-		else
-			msg('Unknown mode',MSG_ERROR,true)
-	end
 end
 
 if options[:ssh_key]
@@ -1409,7 +1483,7 @@ vmlinuzfiles.each do |vmlinuzfile|
 	msg("  initrd: #{$deplkernels[name][:initrd]}",MSG_INFO)
 end
 
-msg("no valid deploiement kernel found in #{ARGV[0]}",MSG_ERROR,true) if $deplkernels.empty?
+msg("no valid deployment kernel found in #{ARGV[0]}",MSG_ERROR,true) if $deplkernels.empty?
 
 # Checking envs directory
 msg("=== Gathering environments information",MSG_INFO)
@@ -1456,16 +1530,85 @@ envfiles.each do |env|
 	end
 end
 
+# Kavlan
+case $mode
+	when :KAVLAN, :VLANKVM
+		$kavlan_id = `kavlan --show-vlan-id`
+		if $?.success? and !$kavlan_id.empty?
+			begin
+				Integer($kavlan_id)
+			rescue ArgumentError
+				msg("kavlan not set",MSG_ERROR,true)
+			else
+				$kavlan_id = $kavlan_id.to_i
+			end
+		else
+			msg("kavlan not set",MSG_ERROR,true)
+		end
+
+		# Disabling DHCP in kavlan
+		`kavlan --disable-dhcp`
+	when :KVM
+	else
+		msg('Unknown mode',MSG_ERROR,true)
+end
+
 
 # Checking node list
-if options[:node_list]
-	nodelist_file = options[:node_list]
-elsif (ENV['GOOD_NODES'])
-	nodelist_file = ENV['GOOD_NODES']
-elsif (ENV['OAR_NODEFILE'])
-	nodelist_file = ENV['OAR_NODEFILE']
+if $mode == :KAVLAN
+  if options[:node_list]
+    nodelist_file = options[:node_list]
+  elsif (ENV['GOOD_NODES'])
+    nodelist_file = ENV['GOOD_NODES']
+  elsif (ENV['OAR_NODEFILE'])
+    nodelist_file = ENV['OAR_NODEFILE']
+  end
 else
-  msg("nodelist parameter not set",MSG_ERROR,true)
+  nodelist_file = options[:node_list] || nil
+end
+
+msg("nodelist parameter not set (see -f option)",MSG_ERROR,true) if !nodelist_file or nodelist_file.empty?
+
+if $mode == :VLANKVM
+  if options[:host_list]
+    hostlist_file = options[:host_list]
+  elsif (ENV['GOOD_NODES'])
+    hostlist_file = ENV['GOOD_NODES']
+  elsif (ENV['OAR_NODEFILE'])
+    hostlist_file = ENV['OAR_NODEFILE']
+  else
+    msg("hostlist parameter not set (see -F option)",MSG_ERROR,true)
+  end
+
+	File.open(hostlist_file, 'r') do |f|
+  count = 1
+  f.each do |line|
+    tmp = line.strip
+    begin
+      #tmp = getnode(tmp)
+      tmpip = Resolv.getaddress(getnode(tmp))
+      unless $kanodes[tmp.to_sym]
+        $kanodes[tmp.to_sym] = {}
+        $kanodes[tmp.to_sym][:name] = "#{HOST_NAME_PREFIX}#{count}"
+        $kanodes[tmp.to_sym][:basename] = tmp
+        $kanodes[tmp.to_sym][:ipv4] = tmpip
+        $kanodes[tmp.to_sym][:type] = :HOST
+        count += 1
+      end
+    rescue Resolv::ResolvError, ArgumentError
+      msg("Invalid address for host node '#{tmp}', ignoring",MSG_WARNING)
+      $kanodes.delete(tmp.to_sym)
+    end
+    begin
+      addr = IPAddr.new(tmp)
+      msg('host nodes should be specified by hostname, ignoring',MSG_WARNING)
+      $kanodes.delete(tmp.to_sym)
+    rescue ArgumentError
+    end
+  end
+  end
+else
+  msg("using hostlist parameter with non compatible mode (VLAN-KVM only), ignoring",MSG_WARNING) if options[:host_list]
 end
 
 begin
@@ -1473,18 +1616,21 @@ begin
   f.each do |line|
     case $mode
     when :KAVLAN
-        $allnodes << line.strip unless $allnodes.include?(line.strip)
-    when :KVM
+      $allnodes << line.strip unless $allnodes.include?(line.strip)
+    when :KVM, :VLANKVM
       tmp = line.strip.split
       name = tmp[0].strip
       unless $allnodes.include?(name)
         $allnodes << name
         $kanodes[name.to_sym] = {}
         $kanodes[name.to_sym][:basename] = name
+        $kanodes[name.to_sym][:name] = name
+        $kanodes[name.to_sym][:type] = :NODE if $mode == :VLANKVM
         if tmp[1]
-          if IPAddr.new(tmp[1]).ipv4?
+          begin
+            Resolv.getaddress(tmp[1])
             $kanodes[name.to_sym][:ipv4] = tmp[1].strip
-          else
+          rescue Resolv::ResolvError, ArgumentError
             msg("Invalid IP address for node '#{name}', ignoring",MSG_WARNING)
             $allnodes.delete(name)
             $kanodes.delete(name.to_sym)
@@ -1502,6 +1648,39 @@ begin
           $allnodes.delete(name)
           $kanodes.delete(name.to_sym)
         end
+
+        if $mode == :VLANKVM
+          if tmp[3]
+            begin
+              tmpip = Resolv.getaddress(tmp[3])
+
+              match = nil
+              select_type($kanodes,:HOST).each do |node|
+                if node[:ipv4] == tmpip \
+                or node[:basename] == tmp[3] \
+                or node[:basename].split('.')[0] == tmp[3].split('.')[0]
+                  match = node
+                  break
+                end
+              end
+
+              if match
+                $kanodes[name.to_sym][:host] = match
+              else
+                msg("Host machine address '#{tmp[3]}' not found in host list",MSG_ERROR,true)
+              end
+            rescue Resolv::ResolvError, ArgumentError
+              msg("invalid host machine address '#{tmp[3]}', ignoring",MSG_WARNING)
+              $allnodes.delete(name)
+              $kanodes.delete(name.to_sym)
+            end
+
+          else
+            msg("No host machine address for node '#{name}', ignoring",MSG_WARNING)
+            $allnodes.delete(name)
+            $kanodes.delete(name.to_sym)
+          end
+        end
       end
     else
       msg('Unknown mode',MSG_ERROR,true)
@@ -1512,8 +1691,13 @@ rescue Errno::ENOENT
 	msg("File '#{nodelist_file}' not found",MSG_ERROR,true)
 end
 
+
 msg("nodelist parameter empty",MSG_ERROR,true) if $allnodes.empty?
 $allnodes.sort!
+
+if $mode == :VLANKVM
+  msg("hostlist parameter empty",MSG_ERROR,true) if select_type($kanodes,:HOST).empty?
+end
 
 deplnodes = $allnodes.dup
 
@@ -1525,9 +1709,23 @@ else
       kaserver = $allnodes[0]
     when :KVM
       msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
+    when :VLANKVM
+      tmp = select_type($kanodes,:HOST)[0]
+      tmp[:type] = :SERVER
+      kaserver = tmp[:basename]
     else
       msg('Unknown mode',MSG_ERROR,true)
   end
+end
+
+
+unless $mode == :KVM
+	begin
+		addr = IPAddr.new(kaserver)
+    msg('Kadeploy daemon should be specified by hostname (see -d option)',MSG_ERROR,true)
+	rescue ArgumentError
+    kaserver = kaserver.split("-#{getgw().split('.')[0]}").join
+	end
 end
 
 case $mode
@@ -1545,14 +1743,30 @@ case $mode
       end
     end
   when :KVM
-    tmp = $kanodes.select { |n,h| h[:ipv4] == kaserver }.collect { |v| v[0] }
+    begin
+      kaserverip = Resolv.getaddress(kaserver)
+    rescue Resolv::ResolvError
+      msg("invalid Kadeploy daemon hostname '#{kaserver}'",MSG_ERROR,true)
+    end
+    tmp = $kanodes.select { |n,h| h[:ipv4] == kaserverip }.collect { |v| v[0] }
     unless tmp.nil?
       msg("Kadeploy daemon is present in <nodes_file>",MSG_WARNING)
       tmp.each do |nodetmp|
-        $kanodes.delete(nodetmp)
         deplnodes.delete(nodetmp.to_s)
       end
     end
+  when :VLANKVM
+    begin
+      kaserverip = Resolv.getaddress(getnode(kaserver))
+    rescue Resolv::ResolvError
+      msg("invalid Kadeploy daemon hostname '#{kaserver}'",MSG_ERROR,true)
+    end
+    tmp = $kanodes.select { |n,h| h[:basename] =~ /^#{kaserver}/ or h[:ipv4] == kaserverip }.collect { |v| v[0] }
+    tmp.each do |nodetmp|
+      deplnodes.delete(nodetmp.to_s)
+      $kanodes[nodetmp][:type] = :SERVER
+    end
+
   else
     msg('Unknown mode',MSG_ERROR,true)
 end
@@ -1560,38 +1774,51 @@ end
 $kanodes[:kadeploy] = {}
 $kanodes[:kadeploy][:name] = 'kadeploy'
 $kanodes[:kadeploy][:basename] = kaserver
+$kanodes[:kadeploy][:ipv4] = kaserverip || nil
 $kanodes[:kadeploy][:type] = :SERVER
 
 # >>> TODO: Add options
 $kanodes[:dns] = {}
 $kanodes[:dns][:name] = 'dns'
-$kanodes[:dns][:basename] = kaserver
+$kanodes[:dns][:basename] = $kanodes[:kadeploy][:basename]
+$kanodes[:dns][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:dns][:type] = :SERVER
 
 $kanodes[:tftp] = {}
 $kanodes[:tftp][:name] = 'tftp'
 $kanodes[:tftp][:basename] = kaserver
+$kanodes[:tftp][:basename] = $kanodes[:kadeploy][:basename]
+$kanodes[:tftp][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:tftp][:type] = :SERVER
 
 $kanodes[:dhcp] = {}
 $kanodes[:dhcp][:name] = 'dhcp'
-$kanodes[:dhcp][:basename] = kaserver
+$kanodes[:dhcp][:basename] = $kanodes[:kadeploy][:basename]
+$kanodes[:dhcp][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:dhcp][:type] = :SERVER
 
 $kanodes[:sql] = {}
 $kanodes[:sql][:name] = 'sql'
-$kanodes[:sql][:basename] = kaserver
+$kanodes[:sql][:basename] = $kanodes[:kadeploy][:basename]
+$kanodes[:sql][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:sql][:type] = :SERVER
+
+$kanodes[:www] = {}
+$kanodes[:www][:name] = 'www'
+$kanodes[:www][:basename] = $kanodes[:kadeploy][:basename]
+$kanodes[:www][:ipv4] = $kanodes[:kadeploy][:ipv4]
+$kanodes[:www][:type] = :SERVER
 
 $kanodes[:frontend] = {}
 $kanodes[:frontend][:name] = 'frontend'
-$kanodes[:frontend][:basename] = kaserver
+$kanodes[:frontend][:basename] = $kanodes[:kadeploy][:basename]
+$kanodes[:frontend][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:frontend][:type] = :SERVER
 
 
 msg('deploy nodelist empty',MSG_WARNING) if deplnodes.empty?
 
-# Naming deploiement nodes
+# Naming deployment nodes
 tmp = 1
 deplnodes.each do |node|
   name = "#{NODE_NAME_PREFIX}#{tmp}"
@@ -1605,9 +1832,7 @@ deplnodes.each do |node|
     $kanodes[name.to_sym] = $kanodes[node.to_sym].dup
     $kanodes[name.to_sym][:name] = name
     $kanodes[name.to_sym][:type] = :NODE
-    $kanodes.delete(node.to_sym)
-  else
-    msg('Unknown mode',MSG_ERROR,true)
+    $kanodes[name.to_sym][:basename] = node.strip
   end
 
   tmp += 1
@@ -1632,7 +1857,7 @@ $kanodes.values.collect! do |v|
 	end
   v[:basenodename] = tmp
 
-  if g5k?
+  if $mode == :KAVLAN and g5k?
     cluster = tmp.split('-')[0]
   else
     cluster = 'default'
@@ -1654,12 +1879,12 @@ $clusters.values.collect! do |v|
   v[:kernel] = $deplkernels[$deplkernels.keys[0]]
   msg("  kernel: #{v[:kernel][:name]}",MSG_INFO)
   v[:drivers] = {}
-  if g5k?
+  if $mode == :KAVLAN and g5k?
     tmp = nil
     begin
       tmp = JSON.parse(RestClient.get(G5K_API + "/grid5000/sites/#{$site.split('.')[0]}/clusters/#{v[:basename]}/nodes/#{v[:nodes][0][:basenodename]}"))
     rescue Exception
-      msg('can\'t gather g5k api information',MSG_WARNING)
+      msg("can't gather g5k api information (#{tmp})",MSG_WARNING)
     end
     unless !tmp or tmp.empty?
       v[:drivers][:network] = tmp['network_adapters'].select do |na|
@@ -1674,34 +1899,11 @@ $clusters.values.collect! do |v|
       msg("cluster #{v[:basename]} preinstall file not found in '#{G5K_POSTINSTALLS_PATH}'",MSG_WARNING)
     end
   end
-  v[:drivers][:network] = DEFAULT_NET_DRIVER unless v[:drivers][:network] 
-  v[:drivers][:disk] = DEFAULT_DISK_DRIVER unless v[:drivers][:disk] 
+  v[:drivers][:network] = DEFAULT_NET_DRIVER unless v[:drivers][:network]
+  v[:drivers][:disk] = DEFAULT_DISK_DRIVER unless v[:drivers][:disk]
 
   msg("  net driver: #{v[:drivers][:network]}",MSG_INFO)
   msg("  disk driver: #{v[:drivers][:disk]}",MSG_INFO)
-end
-
-
-case $mode
-	when :KAVLAN
-		$kavlan_id = `kavlan --show-vlan-id`
-		if $?.success? and !$kavlan_id.empty?
-			begin
-				Integer($kavlan_id)
-			rescue ArgumentError
-				msg("kavlan not set",MSG_ERROR,true)
-			else
-				$kavlan_id = $kavlan_id.to_i
-			end
-		else
-			msg("kavlan not set",MSG_ERROR,true)
-		end
-
-		# Disabling DHCP in kavlan
-		`kavlan --disable-dhcp`
-	when :KVM
-	else
-		msg('Unknown mode',MSG_ERROR,true)
 end
 
 
@@ -1714,7 +1916,7 @@ rescue Errno::ENOENT
   msg("user public key file '#{$sshkeyfile}.pub' not found",MSG_WARNING)
 else
   tmp = sexec(gwsession,"grep '#{pubkey}' ~#{ENV['USER']}/.ssh/authorized_keys; true;")[0]
-   sexec(gwsession,"echo '#{pubkey}' >> ~#{ENV['USER']}/.ssh/authorized_keys") if !tmp or tmp.empty?
+  sexec(gwsession,"echo '#{pubkey}' >> ~#{ENV['USER']}/.ssh/authorized_keys") if !tmp or tmp.empty?
 end
 
 server=$kanodes[:dns]
@@ -1729,12 +1931,12 @@ sshgw.ssh(servername,'root') do |session|
   msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
   defaultiface = nil
   tmp.each do |line|
-    if line =~ /^(\S+)\s+0\.0\.0\.0\s+(\S+)\s+.+$/ 
+    if line =~ /^(\S+)\s+0\.0\.0\.0\s+(\S+)\s+.+$/
       $network[:ipv4] = Regexp.last_match(1)
       $network[:mask] = Regexp.last_match(2)
       $network[:ipaddr] = IPAddr.new("#{$network[:ipv4]}/#{$network[:mask]}")
       $network[:broadcast] = ($network[:ipaddr] | (~$network[:ipaddr].instance_variable_get(:@mask_addr) & IPAddr::IN4MASK)).to_s
-    elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/ 
+    elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/
       $network[:gateway] = Regexp.last_match(1)
       defaultiface = Regexp.last_match(2)
     end
@@ -1749,31 +1951,53 @@ sshgw.ssh(servername,'root') do |session|
     msg("  broadcast: #{$network[:broadcast]}",MSG_INFO)
   end
   msg('can\'t find default network iface',MSG_ERROR,true) if !defaultiface or defaultiface.empty?
-  
 
-	if $mode == :KAVLAN
+  msg('Gathering DNS server IPv4/MAC addresses',MSG_INFO)
+  tmp = sexec(session,"ifconfig #{defaultiface}")
+  msg('can\'t ifconfig default network iface',MSG_ERROR,true) if !tmp or tmp.empty?
+  mac = nil
+  ipv4 = nil
+  tmp.each do |line|
+    if line.include?('HWaddr')
+      mac = line.split('HWaddr')[1].strip.split[0]
+    elsif line.include?('inet addr:')
+      ipv4 = line.split('inet addr:')[1].strip.split[0]
+    end
+  end
+  msg("can\'t collect IPv4/MAC on #{$kanodes[:dns][:basename]}",MSG_ERROR,true) \
+    if !mac or !ipv4 or mac.empty? or ipv4.empty?
+
+  msg('Updating nodes IPv4/MAC addresses',MSG_INFO)
+  $kanodes.values.each do |node|
+    if node == :dns or node[:basename].split('.')[0] == $kanodes[:dns][:basename].split('.')[0]
+      node[:mac] = mac
+      node[:ipv4] = ipv4
+    end
+  end
+
+	if $mode == :KAVLAN or $mode == :VLANKVM
     http_tunnel(server,session) do
       msg('Updating debian packages list',MSG_INFO)
       apt_update(session)
 
       msg('Getting nodes IPv4/MAC addresses',MSG_INFO)
       apt_install(session,'syslinux')
-      $kanodes.values.each do |node|
-        if node == :dns or node[:basename] == $kanodes[:dns][:basename]
-          tmp = sexec(session,"ifconfig #{defaultiface}")
-          msg('can\'t ifconfig default network iface',MSG_ERROR,true) if !tmp or tmp.empty?
-          tmp.each do |line|
-            if line.include?('HWaddr')
-              node[:mac] = line.split('HWaddr')[1].strip.split[0]
-            elsif line.include?('inet addr:')
-              node[:ipv4] = line.split('inet addr:')[1].strip.split[0]
-            end
-          end
-        else
+
+      nodes=[]
+	    if $mode == :KAVLAN
+        nodes = $kanodes.values
+      else
+        nodes = select_type($kanodes,:HOST)
+      end
+
+      nodes.each do |node|
+        if !node[:ipv4]
           tmp = sexec(session,"gethostip -d #{getnode(node[:basename])}")[0]
           msg("can't get '#{node[:basename]}' IPv4 address",MSG_ERROR,true) if !tmp or tmp.empty?
           node[:ipv4] = tmp
+        end
 
+        if !node[:mac]
           tmp = sexec(session,"ping -c 1 #{node[:ipv4]} &>/dev/null; arp -n | grep #{node[:ipv4]}")[0]
           msg("can't resolv '#{node[:basename]}' MAC address",MSG_ERROR,true) if !tmp or tmp.empty?
           node[:mac] = tmp.split[2].chomp
@@ -1806,7 +2030,7 @@ sshgw.ssh(servername,'root') do |session|
 
 
 		msg('Configuring DNS server',MSG_INFO)
-		
+
 
 		tempfile(cfg_dns_master()) {|path| scp(servername,path,cfg_bind_master_file())}
 		sexec(session,"chown bind #{cfg_bind_master_file()}")
@@ -1837,7 +2061,14 @@ sshgw.ssh(servername,'root') do |session|
 
 		excls = []
 		excls << $kanodes[:dns][:ipv4]
-		select_type($kanodes,:SERVER).each do |node|
+
+    nodes=[]
+    if $mode == :VLANKVM
+      nodes = select_type($kanodes,:SERVER) + select_type($kanodes,:HOST)
+    else
+      nodes = select_type($kanodes,:SERVER)
+    end
+		nodes.each do |node|
 			unless excls.include?(node[:ipv4])
 				sexec(session,"scp -r #{SSH_OPTIONS} #{CFG_RESOLVCONF_FILE} root@#{node[:ipv4]}:#{CFG_RESOLVCONF_FILE}")
 				excls << node[:ipv4]
@@ -1854,7 +2085,7 @@ servername=getnode(server[:basename])
 msg('=== Setting up TFTP server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
-  
+
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
 		apt_update(session)
@@ -1880,13 +2111,16 @@ sshgw.ssh(servername,'root') do |session|
 			sexec(session,"ln -f #{tmp[0]} #{CFG_TFTP_PATH}")
 		end
 
-		msg('Installing deploiement kernels',MSG_INFO)
-		sexec(session,"mkdir -p #{CFG_PXE_KERNELS_PATH}")
-		$deplkernels.each do |name,kernel|
-			msg("  Installing kernel #{name}",MSG_INFO)
-			scp(servername,kernel[:vmlinuz],CFG_PXE_KERNELS_PATH)
-			scp(servername,kernel[:initrd],CFG_PXE_KERNELS_PATH)
-		end
+    sexec(session,"mkdir -p #{CFG_PXE_KERNELS_PATH}")
+
+    if $deploysendmeth == :TFTP
+      msg('Sending deployment kernels',MSG_INFO)
+      $deplkernels.each do |name,kernel|
+        msg("\t#{name}",MSG_INFO)
+        scp(servername,kernel[:vmlinuz],CFG_PXE_KERNELS_PATH)
+        scp(servername,kernel[:initrd],CFG_PXE_KERNELS_PATH)
+      end
+    end
 
 		msg('Creating pxelinux configs',MSG_INFO)
 		sexec(session,"mkdir -p #{CFG_PXE_CONFIG_PATH}")
@@ -1912,13 +2146,52 @@ end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
 msg("",MSG_INFO)
 
+if $deploysendmeth == :HTTP
+
+  server=$kanodes[:www]
+  servername=getnode(server[:basename])
+  msg('=== Setting up HTTP server',MSG_INFO)
+  sshgw.ssh(servername,'root') do |session|
+    msg("Connected to #{server[:basename]}",MSG_INFO)
+
+    http_tunnel(server,session) do
+      msg('Updating debian packages list',MSG_INFO)
+      apt_update(session)
+
+      msg('Installing HTTP server',MSG_INFO)
+      apt_install(session,'apache2')
+      sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
+      sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
+      sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
+
+      msg('Configuring HTTP server',MSG_INFO)
+      #tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+      sexec(session,'service apache2 restart')
+
+      msg('Sending deployment kernels',MSG_INFO)
+      sexec(session,"mkdir -p #{CFG_APACHE_KERNELS_PATH}")
+      sexec(session,"chmod 755 #{CFG_APACHE_KERNELS_PATH}")
+      $deplkernels.each do |name,kernel|
+        msg("\t#{name}",MSG_INFO)
+        scp(servername,kernel[:vmlinuz],CFG_APACHE_KERNELS_PATH)
+        scp(servername,kernel[:initrd],CFG_APACHE_KERNELS_PATH)
+      end
+
+      sexec(session,"chmod -R 755 #{CFG_APACHE_KERNELS_PATH}")
+
+    end
+  end
+  msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
+  msg("",MSG_INFO)
+
+end
 
 server=$kanodes[:dhcp]
 servername=getnode(server[:basename])
 msg('=== Setting up DHCP server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
-  
+
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
 		apt_update(session)
@@ -1936,12 +2209,21 @@ sshgw.ssh(servername,'root') do |session|
 		excls << $kanodes[:dhcp][:ipv4]
 		Net::SSH::Multi.start do |bcastsession|
 			bcastsession.via getgw(), ENV['USER']
-			select_type($kanodes,:SERVER).each do |node|
+
+      nodes=[]
+      if $mode == :VLANKVM
+        nodes = select_type($kanodes,:SERVER) + select_type($kanodes,:HOST)
+      else
+        nodes = select_type($kanodes,:SERVER)
+      end
+
+      nodes.each do |node|
 				unless excls.include?(node[:ipv4])
 					bcastsession.use "root@#{node[:ipv4]}"
 					excls << node[:ipv4]
 				end
 			end
+
 			bcastsession.exec('service networking restart &>/dev/null')
 		end
 	end
@@ -1955,7 +2237,7 @@ servername=getnode(server[:basename])
 msg('=== Setting up SQL server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
-  
+
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
 		apt_update(session)
@@ -1970,7 +2252,7 @@ sshgw.ssh(servername,'root') do |session|
 		#sexec("cat #{CFG_MYSQL_CONF_FILE} | sed -e '/bind-address/d' > #{tmp}; mv -f #{tmp} #{CFG_MYSQL_CONF_FILE}")
 		tempfile(cfg_mysql()) {|path| scp(servername,path,CFG_MYSQL_CONF_FILE)}
 		sexec(session,'service mysql restart')
-		
+
 		msg('Creating Kadeploy database',MSG_INFO)
 		tmp = sexec(session,'tempfile')[0]
 		msg('can\'t get temporary file',MSG_ERROR,true) if !tmp or tmp.empty?
@@ -1990,7 +2272,7 @@ servername=getnode(server[:basename])
 msg('=== Setting up Kadeploy server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
-  
+
 	kadeploy_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
 		apt_update(session)
@@ -2015,9 +2297,13 @@ sshgw.ssh(servername,'root') do |session|
 		sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH}")
 		sexec(session,"mkdir -p #{CFG_KADEPLOY_PREINSTALLS_PATH}")
 		sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_PREINSTALLS_PATH}")
-    if $mode == :KVM
+    if $mode == :KVM or $mode == :VLANKVM
       sexec(session,"mkdir -p #{CFG_KADEPLOY_KVM_PROCS_PATH}")
       sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_PROCS_PATH}")
+      if $mode == :VLANKVM
+        sexec(session,"mkdir -p #{CFG_KADEPLOY_KVM_HOSTS_PATH}")
+        sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_HOSTS_PATH}")
+      end
     end
 
 		msg('Copying clusters postinstall files',MSG_INFO)
@@ -2069,9 +2355,10 @@ sshgw.ssh(servername,'root') do |session|
 		select_type($kanodes,:NODE).each do |node|
 			sexec(session,"echo '#{node[:fqdn]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:basename])}")
 			sexec(session,"echo '#{node[:basename]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:fqdn])}")
+      sexec(session,"echo '#{node[:host][:ipv4]}' > #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,node[:fqdn])}") if $mode == :VLANKVM
 		end
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_PATH}")
-
+    sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_HOSTS_PATH}") if $mode == :VLANKVM
 
 		msg('Configuring Kadeploy server',MSG_INFO)
 		tempfile(cfg_kadeploy_conf()) {|path| scp(servername,path,CFG_KADEPLOY_CONF_CONF_FILE)}
@@ -2122,6 +2409,54 @@ end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
 msg("",MSG_INFO)
 
+=begin
+
+if $mode == :VLANKVM
+  msg('=== Setting up host nodes for KVM',MSG_INFO)
+  msg("Installing KVM packages",MSG_INFO)
+  select_type($kanodes,:HOST).each do |node|
+    sshgw.ssh(getnode(node[:basename]),'root') do |session|
+      http_tunnel(node,session,false) do
+        apt_install(session,KVM_PACKAGES * ' ')
+      end
+    end
+    msg("\t#{node[:name]} (#{node[:basename]}) ok",MSG_INFO)
+  end
+
+  msg("Configuring network bridges",MSG_INFO)
+  select_type($kanodes,:HOST).each do |node|
+    sshgw.ssh(getnode(node[:basename]),'root') do |session|
+      tmp = sexec(session,"ifconfig -a -s | grep '^#{KVM_BRIDGE_DEV}.*$'; true")
+      # Creating the bridge
+      if !tmp or tmp.empty?
+        # Getting default interface name
+        tmp = sexec(session,'route -n')
+        msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
+        defaultiface = nil
+        tmp.each do |line|
+          if line =~ /^0\.0\.0\.0\s+\S+\s+.+\s+(\S+)\s*$/
+            defaultiface = Regexp.last_match(1)
+          end
+        end
+
+        if !defaultiface or defaultiface.empty?
+          msg("can't get default iface, using #{NET_ADMIN_IFACE}",MSG_WARNING)
+          defaultiface = NET_ADMIN_IFACE
+        end
+
+        tempfile(cfg_networking_bridge(defaultiface,node[:mac])) do |path|
+          scp(getnode(node[:basename]),path,CFG_NETWORKING_CONF_FILE)
+        end
+
+        sexec(session,'service networking restart &>/dev/null')
+      end
+    end
+    msg("\t#{node[:name]} (#{node[:basename]}) ok",MSG_INFO)
+  end
+  msg("",MSG_INFO)
+end
+
+=end
 
 server=$kanodes[:frontend]
 servername=getnode(server[:basename])
@@ -2157,7 +2492,7 @@ sshgw.ssh(servername,'root') do |session|
 		sexec(session,"ssh-keygen -f #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity')} -N '' -C '#{CFG_FRONTEND_USER}@#{server[:fqdn]}'")
 		sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity')}")
 		sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity.pub')}")
-		
+
 		msg("Copying user public key",MSG_INFO)
 		begin
 			pubkey = File.open("#{$sshkeyfile}.pub",'r').read

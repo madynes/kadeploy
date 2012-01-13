@@ -1,0 +1,31 @@
+#!/usr/bin/ruby
+
+require 'socket'
+require 'resolv'
+
+VM_RAM = '512M'
+VM_NET_MODEL = 'e1000'
+
+def cmd(cmd,critical=true)
+  ret = `#{cmd}`
+  if critical and !$?.success?
+    puts "error when executing '#{cmd}': #{ret}"
+    exit 1
+  end
+  ret
+end
+
+myip=Resolv.getaddress(Socket.gethostname)
+
+count=0
+ARGF.each do |line|
+  if line =~ /\s*(\S+)\s+(\S+)\s+(\S+)\s+#{myip}\s*/
+    vmname = Regexp.last_match(1)
+    vmip = Regexp.last_match(2)
+    vmmac = Regexp.last_match(3)
+    cmd("kvm -net nic,macaddr=#{vmmac},model=#{VM_NET_MODEL},vlan=0 -net tap -boot n -m #{VM_RAM} -name #{vmname} -vnc localhost:#{count} &>/dev/null &")
+    puts "Started #{vmname} (mac:#{vmmac})"
+    count += 1
+  end
+end
+
