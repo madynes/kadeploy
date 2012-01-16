@@ -1,0 +1,41 @@
+#!/bin/bash
+
+KIND=$1
+ROOT=$2
+GRUBPART=$3
+MNT=$4
+LINE1=$5
+LINE2=$6
+LINE3=$7
+
+MENU_GRUB=/boot/grub/menu.lst
+
+rm -f $MENU_GRUB
+
+MSG="timeout=1\n"
+MSG=$MSG"default=0\n"
+
+case $KIND in
+    "linux")
+	MSG=$MSG"title\t Linux\n"
+	MSG=$MSG"root\t ("$GRUBPART")\n"
+	MSG=$MSG"kernel\t "$LINE1" root="$ROOT"\n"
+	[ "$LINE2" != "none" ] && MSG=$MSG"initrd\t "$LINE2"\n"
+	;;
+    "xen")
+	MSG=$MSG"title\t Xen\n"
+	MSG=$MSG"root\t ("$GRUBPART")\n"
+	MSG=$MSG"kernel\t "$LINE1"\n"
+	MSG=$MSG"module\t "$LINE2"\n"
+	[ "$LINE2" != "none" ] && MSG=$MSG"module\t "$LINE3"\n"
+	;;
+    *)
+	echo "Invalid kind of system"
+	exit 1
+esac
+echo -e $MSG > $MENU_GRUB
+
+/sbin/grub-install $ROOT --root-directory=$MNT
+/sbin/grub-install --recheck $ROOT --root-directory=$MNT
+
+cp $MENU_GRUB $MNT/boot/grub/grub.conf
