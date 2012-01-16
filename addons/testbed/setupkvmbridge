@@ -1,0 +1,96 @@
+#!/usr/bin/ruby
+
+require 'tempfile'
+
+BRIDGE_DEV = 'br0'
+ADMIN_IFACE = 'eth0'
+NETWORKING_CONF_FILE = '/etc/network/interfaces'
+KVM_PACKAGES = [ 'kvm', 'qemu', 'qemu-kvm' , 'bridge-utils' ]
+
+EXCL_DEVS = [ BRIDGE_DEV,'lo' ]
+
+def cfg_networking_bridge(ifname,macaddr)
+  "auto lo\n"\
+  "iface lo inet loopback\n\n"\
+  "iface #{ifname} inet manual\n\n"\
+  "auto #{BRIDGE_DEV}\n"\
+  "iface #{BRIDGE_DEV} inet dhcp\n"\
+  "  bridge_ports #{ifname}\n"\
+  "bridge_hw #{macaddr}\n\n"
+end
+
+def cmd(cmd,critical=true)
+  ret = `#{cmd}`
+  if critical and !$?.success?
+    puts "error when executing '#{cmd}': #{ret}"
+    exit 1
+  end
+  ret
+end
+
+cmd("apt-get update -q")
+cmd("apt-get install -q --yes --force-yes #{KVM_PACKAGES.join(' ')}")
+
+tmp = cmd("ifconfig -a -s")
+
+ifaces=[]
+tmp.each do |line|
+  unless line =~ /^\s*Iface.*$/
+    ifaces << line.split()[0]
+  end
+end
+
+# Creating the bridge
+if !ifaces.include?(BRIDGE_DEV) or ifaces.empty?
+  ifaces -= EXCL_DEVS
+
+  # Getting default interface name
+  tmp = cmd("route -n")
+  if !tmp or tmp.empty?
+    puts 'can\'t get route informations'
+    exit 1
+  end
+
+  defaultiface = nil
+  tmp.each do |line|
+    if line =~ /^0\.0\.0\.0\s+\S+\s+.+\s+(\S+)\s*$/
+      defaultiface = Regexp.last_match(1)
+    end
+  end
+
+  if !defaultiface or defaultiface.empty?
+    puts "can't get default iface, using #{ADMIN_IFACE}"
+    defaultiface = ADMIN_IFACE
+  end
+
+  tmp = cmd("ifconfig #{defaultiface}")
+  if !tmp or tmp.empty?
+    puts 'can\'t ifconfig default network iface'
+    exit 1
+  end
+
+  mac = nil
+  #ipv4 = nil
+  tmp.each do |line|
+    if line.include?('HWaddr')
+      mac = line.split('HWaddr')[1].strip.split[0]
+    #elsif line.include?('inet addr:')
+    #  ipv4 = line.split('inet addr:')[1].strip.split[0]
+    end
+  end
+
+  ifaces.delete(defaultiface)
+
+  ifaces.each do |iface|
+    cmd("ifconfig #{iface} down")
+  end
+
+  tmp = Tempfile.new('networking')
+  tmp.write(cfg_networking_bridge(defaultiface,mac))
+  tmp.close
+  cmd("cp -f #{tmp.path} #{NETWORKING_CONF_FILE}")
+  tmp.unlink
+
+  cmd("service networking restart &>/dev/null")
+end
+
