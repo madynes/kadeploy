@@ -33,8 +33,9 @@ ifup eth0=dhcp
 # set hostname and its resolution
 echo "\${HOSTNAME}.\${DNSDOMAIN}" > /etc/hostname
 echo "\${IPADDR} \${HOSTNAME}.\${DNSDOMAIN} \${HOSTNAME}" >> /etc/hosts
+/bin/hostname "\${HOSTNAME}.\${DNSDOMAIN}" 
 # configure DNS with dhcp info
-echo "search \${DNSDOMAIN/,/ }" > /etc/resolv.conf #maybe "," is not the separator
+echo "search \${DNSDOMAIN}" > /etc/resolv.conf
 for ns in \${DNSSERVERS}
 do
     echo "nameserver \$ns" >> /etc/resolv.conf
@@ -47,4 +48,4 @@ mkdir -p $DEBIRF_ROOT/root/.ssh
 cat $DEBIRF_BUILDD/kadeploy_specific/ssh/id_deploy.pub >> $DEBIRF_ROOT/root/.ssh/authorized_keys
 mkdir -p $DEBIRF_ROOT/etc/kadeploy3/keys
 cp $DEBIRF_BUILDD/kadeploy_specific/ssh/id_deploy $DEBIRF_ROOT/etc/kadeploy3/keys/
-
+chmod 400 $DEBIRF_ROOT/etc/kadeploy3/keys/id_deploy
