@@ -893,6 +893,17 @@ module MicroStepsLibrary
                                                             instance_thread)
     end
 
+    def install_grub_on_nodes(kind, instance_thread)
+      case @config.common.grub
+      when "grub1"
+        return install_grub1_on_nodes(kind, instance_thread)
+      when "grub2"
+        return install_grub2_on_nodes(kind, instance_thread)
+      else
+        failed_microstep("#{@config.common.grub} is not a valid Grub choice")
+        return false
+      end
+    end
 
     # Send a tarball with Taktuk and uncompress it on the nodes
     #
@@ -1841,9 +1852,9 @@ module MicroStepsLibrary
         else
           case @config.exec_specific.environment.environment_kind
           when "linux"
-            return install_grub2_on_nodes("linux", instance_thread)
+            return install_grub_on_nodes("linux", instance_thread)
           when "xen"
-#            return install_grub2_on_nodes("xen", instance_thread)
+#            return install_grub_on_nodes("xen", instance_thread)
             @output.verbosel(3, "   Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
             return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
                                               @config.exec_specific.environment.initrd,

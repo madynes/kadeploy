@@ -632,6 +632,8 @@ module ConfigInformation
               @common.vlan_hostname_suffix = val
             when "set_vlan_cmd"
               @common.set_vlan_cmd = val
+            when "grub"
+              @common.grub = val
             end
           end
         end
@@ -665,6 +667,11 @@ module ConfigInformation
       #tftp config directory
       if not File.exist?(File.join(@common.tftp_repository, @common.tftp_cfg)) then
         puts "The #{File.join(@common.tftp_repository, @common.tftp_cfg)} directory does not exist"
+        return false
+      end
+      #Grub config
+      if (@common.grub != 'grub1') && (@common.grub != 'grub2') then
+        puts 'Invalid Grub value, only grub1 and grub2 values are allowed'
         return false
       end
       return true
@@ -2698,6 +2705,7 @@ module ConfigInformation
     attr_accessor :async_end_of_power_hook
     attr_accessor :vlan_hostname_suffix
     attr_accessor :set_vlan_cmd
+    attr_accessor :grub
 
     # Constructor of CommonConfig
     #
@@ -2715,6 +2723,7 @@ module ConfigInformation
       @async_end_of_power_hook = ""
       @vlan_hostname_suffix = ""
       @set_vlan_cmd = ""
+      @grub = "grub2"
     end
 
     # Check if all the fields of the common configuration file are filled
