@@ -423,7 +423,7 @@ def cfg_kadeploy_specific_conf(cluster)
   + # Kareboot
   "timeout_reboot_classical = 250\n"\
   "timeout_reboot_kexec = 100\n"\
-  "cmd_soft_reboot = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f >/dev/null &\"\n"\
+  "cmd_soft_reboot = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\"\n"\
   "cmd_hard_reboot = #{cfg_kadeploy_reboot_cmd()}\n"\
   + # Kapower
   "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
