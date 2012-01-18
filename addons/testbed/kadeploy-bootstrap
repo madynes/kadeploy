@@ -73,7 +73,7 @@ CFG_KADEPLOY_MACROSTEP1 = {
   :timeout => 450
 }
 CFG_KADEPLOY_MACROSTEP2 = {
-  :name => 'BroadcastEnv|BroadcastEnvChain',
+  :name => 'BroadcastEnv|BroadcastEnvKastafior',
   :retries => 1,
   :timeout => 900
 }
@@ -446,6 +446,9 @@ def cfg_kadeploy_specific_conf(cluster)
   #cmd_very_hard_power_off = /usr/sbin/pdumix -n HOSTNAME_FQDN -d
   #cmd_soft_power_on = /usr/sbin/pdumix -n HOSTNAME_FQDN -u
 end
+
+# kastafior default config
+CFG_KASTAFIOR_BIN_FILE = '/usr/bin/kastafior'
 
 # frontend default config
 CFG_FRONTEND_USER = 'testuser'
@@ -1320,6 +1323,7 @@ options[:debpackages] = []
 options[:gempackages] = []
 options[:git]         = nil
 options[:ssh_key]     = nil
+options[:kastafior]     = nil
 options[:version]     = nil
 options[:daemon_kadeploy] = nil
 options[:update_file] = nil
@@ -1342,7 +1346,11 @@ optparse = OptionParser.new(USAGE) do |opts|
   	options[:host_list] = n
 	end
 
-	opts.on( '-k', '--ssh-key [<ssh_key_file>]', 'Specify the path of the ssh private key to use' ) do |k|
+	opts.on( '-k', '--kastafior <kastafior_file>', 'Use a specific version of kastafior' ) do |k|
+  	options[:kastafior] = k
+	end
+
+	opts.on( '-i', '--ssh-key [<ssh_key_file>]', 'Specify the path of the ssh private key to use' ) do |k|
   	options[:ssh_key] = k
 	end
 
@@ -1350,7 +1358,7 @@ optparse = OptionParser.new(USAGE) do |opts|
 		$mode = :KVM
 	end
 
-	opts.on( '-M', '--vlan-kvm', 'Use KVM nodes in a kavlan' ) do |k|
+	opts.on( '-V', '--vlan-kvm', 'Use KVM nodes in a kavlan' ) do |k|
 		$mode = :VLANKVM
 	end
 
@@ -1395,6 +1403,8 @@ if ARGV.size < 2
   msg(USAGE)
   exit 1
 end
+
+msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true) if options[:kastafior] and !File.exists?(options[:kastafior])
 
 if options[:ssh_key]
   if File.exists?(options[:ssh_key])
@@ -2332,6 +2342,11 @@ sshgw.ssh(servername,'root') do |session|
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_ENVS_IMAGES_PATH}")
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_ENVS_DESC_PATH}")
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH}")
+
+    if options[:kastafior]
+      msg('Installing Kastafior',MSG_INFO)
+			scp(servername,options[:kastafior],CFG_KASTAFIOR_BIN_FILE)
+    end
 
 		msg('Installing Kadeploy server/client',MSG_INFO)
 		apt_install(session,['kadeploy-server','kadeploy-client'])
