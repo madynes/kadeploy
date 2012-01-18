@@ -6,7 +6,6 @@ require 'resolv'
 VM_RAM = '512M'
 VM_NET_MODEL = 'e1000'
 VM_FS = '8G'
-VM_FS_TYPE = 'scsi'
 
 def cmd(cmd,critical=true)
   ret = `#{cmd}`
@@ -28,7 +27,7 @@ ARGF.each do |line|
     vmmac = Regexp.last_match(3)
     file = cmd("mktemp --tmpdir #{vmname}_XXXXXXXX.rawfs").chomp
     cmd("qemu-img create -f raw #{file} #{VM_FS}")
-    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac},model=#{VM_NET_MODEL} -net tap -boot n -m #{VM_RAM} -drive file=#{file},if=#{VM_FS_TYPE} -name #{vmname} -curses")
+    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac},model=#{VM_NET_MODEL} -net tap -boot n -m #{VM_RAM} -drive file=#{file} -name #{vmname} -curses")
     puts "Started #{vmname} (mac:#{vmmac})"
   end
 end
