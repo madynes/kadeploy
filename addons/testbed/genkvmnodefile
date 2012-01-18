@@ -148,7 +148,7 @@ hosts.each do |host|
   iters = options[:nodesnb]
   while iters > 0 do
     unless exclips.include?(iterip)
-      puts "#{NODENAME_PREFIX}#{count} #{int2ipv4(iterip)} #{int2mac(itermac)} #{host[:hostname]}"
+      puts "#{NODENAME_PREFIX}#{count} #{int2ipv4(iterip)} #{int2mac(itermac)} #{host[:ipv4str]}"
       count += 1
       itermac += 1
       iters -= 1
