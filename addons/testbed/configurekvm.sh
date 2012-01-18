@@ -36,19 +36,61 @@ fi
 
 network=`dig +short $(head -n 1 $hostfile)`
 
-taktuk -s -n -l root -f $hostfile broadcast exec [ rm -f $TMP_SSH_KEY ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast exec [ rm -f /tmp/`basename $SCRIPT_BRIDGE` ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` $USER kavlan-`kavlan -V` ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast exec [ rm -f $TMP_SSH_KEY ] 1>/dev/null
 
+echo "Configuring `kavlan -l | wc -l` nodes" >&2
+echo "" >&2
+
+echo 'Copying ssh key and script files' >&2
+stime=`date +%s`
+taktuk -s -n -l root -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null
+let stime=`date +%s`-stime
+
+if [ $? -ne 0 ]
+then
+  echo '  Failed!' >&2
+  exit 1
+else
+  echo "... done in ${stime} seconds" >&2
+fi
+
+echo 'Configuring bridges' >&2
+stime=`date +%s`
+taktuk -s -n -l root -f $hostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` $USER kavlan-`kavlan -V` ] 1>/dev/null && \
+let stime=`date +%s`-stime
+
+if [ $? -ne 0 ]
+then
+  echo '  Failed!' >&2
+  exit 1
+else
+  echo "... done in ${stime} seconds" >&2
+fi
+
+echo 'Creating nodefile' >&2
 nodefile=`tempfile`
 $SCRIPT_GENNODES ${network}/$NETWORK_CIDR -f $hostfile -n $nbkvms > $nodefile
-taktuk -s -n -l root -f $hostfile broadcast exec [ rm -f /tmp/`basename $SCRIPT_LAUNCH` ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] 1>/dev/null && \
+
+if [ $? -ne 0 ]
+then
+  echo '  Failed!' >&2
+  exit 1
+else
+  echo '... done' >&2
+fi
+
+echo 'Launching KVMS' >&2
+stime=`date +%s`
 taktuk -s -n -l root -f $hostfile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_LAUNCH` ] \; broadcast input file [ $nodefile ] 1>/dev/null && \
-taktuk -s -n -l root -f $hostfile broadcast exec [ 'test $(ps aux | grep kvm | grep -v grep | grep SCREEN | wc -l) -eq $nbkvms || cat - \| i'"/tmp/`basename $SCRIPT_LAUNCH`" ] \; broadcast input file [ $nodefile ] 1>/dev/null
+let stime=`date +%s`-stime
+
+if [ $? -ne 0 ]
+then
+  echo '  Failed!' >&2
+  exit 1
+else
+  echo "... done in ${stime} seconds" >&2
+fi
+#taktuk -s -n -l root -f $hostfile broadcast exec [ 'test $(ps aux | grep kvm | grep -v grep | grep SCREEN | wc -l) -eq $nbkvms || cat - \| i'"/tmp/`basename $SCRIPT_LAUNCH`" ] \; broadcast input file [ $nodefile ] 1>/dev/null
 
 cat $nodefile
 rm $nodefile
@@ -58,4 +100,6 @@ then
   rm $hostfile
 fi
 
+echo "" >&2
 echo "Kadeploy daemon: `kavlan -l | sort -n | head -n 1` (dont forget to use -d option with the bootstrap script)" >&2
+
