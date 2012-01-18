@@ -23,21 +23,23 @@ if [ -n "$2" ]
 then
   if [ -e $2 ]
   then
-    hostfile=$2
+    hosts=`cat $2 | sort -n`
   else
     echo file not found $2
     exit 1
   fi
 else
-  tmphostfile=1
-  hostfile=`tempfile`
-  kavlan -l | sort -n | sed -e '1d' > $hostfile
+  hosts=`kavlan -l | sort -n`
 fi
 
-network=`dig +short $(head -n 1 $hostfile)`
+kadaemon=`echo "$hosts" | head -n 1`
+network=`dig +short $kadaemon`
+
+hostfile=`tempfile`
+echo "$hosts" | sed -e '1d' > $hostfile
 
 
-echo "Configuring `kavlan -l | wc -l` nodes" >&2
+echo "Configuring `cat $hostfile | wc -l` nodes" >&2
 echo "" >&2
 
 echo 'Copying ssh key and script files' >&2
@@ -95,11 +97,8 @@ fi
 cat $nodefile
 rm $nodefile
 
-if [ -n "$tmphostfile" ]
-then
-  rm $hostfile
-fi
+rm $hostfile
 
 echo "" >&2
-echo "Kadeploy daemon: `kavlan -l | sort -n | head -n 1` (dont forget to use -d option with the bootstrap script)" >&2
+echo "Kadeploy daemon: $kadaemon (dont forget to use -d option with the bootstrap script)" >&2
 
