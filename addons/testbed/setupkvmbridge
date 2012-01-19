@@ -4,6 +4,8 @@ require 'tempfile'
 
 USAGE = "Usage: #{$0} <gateway_user> <gateway_address> [<ssh_key_path>]"
 
+INSTALL_PACKAGES = false
+
 PROXY_ADDR = 'proxy'
 PROXY_PORT = '3128'
 SSH_KEY = '/tmp/identity'
@@ -30,7 +32,7 @@ def cmd(cmd,critical=true)
   ret
 end
 
-SSH_TUNNEL_TIMEOUT=20
+SSH_TUNNEL_TIMEOUT=60
 def ssh_tunnel(gwuser,gwhost,dstport,dsthost,srcport=nil,srchost=nil)
   srcport = dstport unless srcport
 
@@ -74,29 +76,31 @@ def cfg_networking_bridge(ifname,macaddr)
   "bridge_hw #{macaddr}\n\n"
 end
 
-if ARGV.size < 2
-  puts USAGE
-  exit 1
-end
+if INSTALL_PACKAGES
+  if ARGV.size < 2
+    puts USAGE
+    exit 1
+  end
 
-if !ARGV[2] or ARGV[2].empty?
-  $sshkeyfile = SSH_KEY
-else
-  $sshkeyfile = SSH_KEY
-end
+  if !ARGV[2] or ARGV[2].empty?
+    $sshkeyfile = SSH_KEY
+  else
+    $sshkeyfile = ARGV[2]
+  end
 
-unless File.exists?($sshkeyfile)
-  puts "file not found '#{$sshkeyfile}'"
-  exit 1
-end
+  unless File.exists?($sshkeyfile)
+    puts "file not found '#{$sshkeyfile}'"
+    exit 1
+  end
 
-tmp = cmd("grep '^deb' #{APT_REPO_CONF_FILE} | grep #{APT_REPO_URL} | grep #{APT_REPO_VARIANT}; true")
+  tmp = cmd("grep '^deb' #{APT_REPO_CONF_FILE} | grep #{APT_REPO_URL} | grep #{APT_REPO_VARIANT}; true")
 
-cmd("echo 'deb #{APT_REPO_URL} #{APT_REPO_VARIANT} main contrib non-free' >> #{APT_REPO_CONF_FILE}") if !tmp or tmp.empty?
+  cmd("echo 'deb #{APT_REPO_URL} #{APT_REPO_VARIANT} main contrib non-free' >> #{APT_REPO_CONF_FILE}") if !tmp or tmp.empty?
 
-ssh_tunnel(ARGV[0],ARGV[1],PROXY_PORT,PROXY_ADDR,PROXY_PORT) do
-  cmd("apt-get #{APT_OPTIONS} update -q")
-  cmd("apt-get #{APT_OPTIONS} install -t #{APT_REPO_VARIANT} -q --yes --force-yes #{KVM_PACKAGES.join(' ')}")
+  ssh_tunnel(ARGV[0],ARGV[1],PROXY_PORT,PROXY_ADDR,PROXY_PORT) do
+    cmd("DEBIAN_FRONTEND=noninteractive apt-get #{APT_OPTIONS} update -q")
+    cmd("DEBIAN_FRONTEND=noninteractive apt-get #{APT_OPTIONS} install -t #{APT_REPO_VARIANT} -q --yes --force-yes #{KVM_PACKAGES.join(' ')}")
+  end
 end
 
 tmp = cmd("ifconfig -a -s")
