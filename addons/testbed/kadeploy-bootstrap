@@ -185,8 +185,8 @@ def cfg_kadeploy_conf()
   "log_to_db = true\n"\
   "dbg_to_syslog = true\n"\
   "dbg_to_syslog_level = 3\n"\
-  "reboot_window = 80\n"\
-  "reboot_window_sleep_time = 10\n"\
+  "reboot_window = 200\n"\
+  "reboot_window_sleep_time = 8\n"\
   "nodes_check_window = 100\n"\
   "bootloader = chainload_pxe\n"\
   "purge_deployment_timer = 900\n"\
@@ -470,7 +470,7 @@ def cfg_tftp()
   "TFTP_USERNAME=\"#{CFG_TFTP_USER}\"\n"\
   "TFTP_DIRECTORY=\"#{CFG_TFTP_PATH}\"\n"\
   "TFTP_ADDRESS=\"0.0.0.0:69\"\n"\
-  "TFTP_OPTIONS=\"-l -s -c\"\n"
+  "TFTP_OPTIONS=\"-v -l -s -c\"\n"
 end
 
 
@@ -989,13 +989,13 @@ def ssh_tunnel_create(session,dstport,dsthost,srcport=nil,srchost=nil)
     # Copying ssh private key on gateway
     scp(srchost,$sshkeyfile,'.ssh/')
     # Kill already existing process listening on srcport
-    tmp = sexec(session,"lsof -i4 | grep LISTEN | grep localhost:#{srcport}",false,false)[0]
+    tmp = sexec(session,"lsof -i4 -n | grep LISTEN | grep 127.0.0.1:#{srcport}",false,false)[0]
     if tmp and !tmp.empty?
       msg("A process is already listening on port #{srcport}, trying to kill it",MSG_WARNING)
       sexec(session,"kill #{tmp.chomp.split[1]}")
       time_start = Time.now
       begin
-        tmp = sexec(session,"lsof -i4 | grep LISTEN | grep localhost:#{srcport}",false,false)[0]
+        tmp = sexec(session,"lsof -i4 -n | grep LISTEN | grep 127.0.0.1:#{srcport}",false,false)[0]
         sexec(session,"kill -9 #{tmp.chomp.split[1]}") if (Time.now - time_start) > SSH_TUNNEL_TIMEOUT
         msg("Killing process that listen on #{srchost}:#{srcport} failed",MSG_ERROR,true) if Time.now - time_start > SSH_TUNNEL_TIMEOUT
         sleep(0.1)
@@ -1015,7 +1015,7 @@ def ssh_tunnel_create(session,dstport,dsthost,srcport=nil,srchost=nil)
 #    $stunnels["#{srchost}:#{srcport}"][:thread].run
     time_start = Time.now
     begin
-      tmp = sexec(session,"lsof -i4 | grep LISTEN | grep localhost:#{srcport}",false,false)[0]
+      tmp = sexec(session,"lsof -i4 -n | grep LISTEN | grep 127.0.0.1:#{srcport}",false,false)[0]
       sleep(0.1)
       msg("SSH tunnel creation on #{srchost}:#{srcport} failed",MSG_ERROR,true) if Time.now - time_start > SSH_TUNNEL_TIMEOUT
     end while !tmp or tmp.empty?
@@ -1144,7 +1144,7 @@ def scp(dsthost,srcfile,dstfile)
 
 			time_start = Time.now
 			begin
-				tmp = `lsof -i4 | grep LISTEN | grep localhost:#{randport}`
+				tmp = `lsof -i4 -n | grep LISTEN | grep 127.0.0.1:#{randport}`
 				sleep(0.1)
 				msg("SSH tunnel creation on localhost:#{randport} failed",MSG_ERROR,true) \
 					if Time.now - time_start > 4
@@ -1404,7 +1404,11 @@ if ARGV.size < 2
   exit 1
 end
 
-msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true) if options[:kastafior] and !File.exists?(options[:kastafior])
+if options[:kastafior] and !File.exists?(options[:kastafior])
+  msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true)
+else
+  options[:kastafior] = File.expand_path(options[:kastafior])
+end
 
 if options[:ssh_key]
   if File.exists?(options[:ssh_key])
@@ -2013,7 +2017,7 @@ sshgw.ssh(servername,'root') do |session|
         end
 
         if !node[:mac]
-          tmp = sexec(session,"ping -c 1 #{node[:ipv4]} &>/dev/null; arp -n | grep #{node[:ipv4]}")[0]
+          tmp = sexec(session,"ping -c 1 #{node[:ipv4]} &>/dev/null; arp -n | grep '^#{node[:ipv4]} '")[0]
           msg("can't resolv '#{node[:basename]}' MAC address",MSG_ERROR,true) if !tmp or tmp.empty?
           node[:mac] = tmp.split[2].chomp
         end
@@ -2141,14 +2145,19 @@ sshgw.ssh(servername,'root') do |session|
 		sexec(session,"mkdir -p #{CFG_PXE_CONFIG_PATH}")
 		#apt_install(session,'syslinux')
 		tempfile(cfg_pxe()) do |path|
+			scp(servername,path,File.join(CFG_PXE_CONFIG_PATH,'default'))
+=begin
+      tmpcmd = ''
 			select_type($kanodes,:NODE).each do |node|
 				#tmp = sexec(session,"gethostip -x #{node[:fqdn]}")[0]
 				#msg("gethostip failed for '#{node[:fqdn]}', aborting",MSG_ERROR,true) \
 				#  if !tmp or tmp.empty?
+
 				tmp = IPAddr.new(node[:ipv4]).instance_variable_get(:@addr).to_s(16).upcase
-				scp(servername,path,File.join(CFG_PXE_CONFIG_PATH,tmp))
+        tmpcmp += "cp #{File.join(CFG_PXE_CONFIG_PATH,'default')} #{File.join(CFG_PXE_CONFIG_PATH,tmp)}; "
 			end
-			scp(servername,path,File.join(CFG_PXE_CONFIG_PATH,'default'))
+      sexec(session,tmpcmd)
+=end
 		end
 
 		sexec(session,"chown #{CFG_TFTP_USER}:#{CFG_TFTP_USER} -R #{CFG_TFTP_PATH}")
@@ -2220,6 +2229,7 @@ sshgw.ssh(servername,'root') do |session|
 
 		msg('Reloading network interfaces',MSG_INFO)
 		sexec(session,'service networking restart &>/dev/null')
+=begin
 		excls = []
 		excls << $kanodes[:dhcp][:ipv4]
 		Net::SSH::Multi.start do |bcastsession|
@@ -2241,6 +2251,7 @@ sshgw.ssh(servername,'root') do |session|
 
 			bcastsession.exec('service networking restart &>/dev/null')
 		end
+=end
 	end
 end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
@@ -2372,11 +2383,14 @@ sshgw.ssh(servername,'root') do |session|
 		msg('Setting up hostnames hack',MSG_INFO)
 		scp(servername,$sshkeyfile,CFG_KADEPLOY_HOSTNAMES_SSHKEY)
 		sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_SSHKEY}")
+
+    tmpcmds = []
 		select_type($kanodes,:NODE).each do |node|
-			sexec(session,"echo '#{node[:fqdn]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:basename])}")
-			sexec(session,"echo '#{node[:basename]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:fqdn])}")
-      sexec(session,"echo '#{node[:host][:ipv4]}' > #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,node[:fqdn])}") if $mode == :VLANKVM
+			tmpcmds << "echo '#{node[:fqdn]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:basename])}"
+			tmpcmds << "echo '#{node[:basename]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:fqdn])}"
+      tmpcmds << "echo '#{node[:host][:ipv4]}' > #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,node[:fqdn])}" if $mode == :VLANKVM
 		end
+    sexec(session,tmpcmds.join(';'))
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_PATH}")
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_HOSTS_PATH}") if $mode == :VLANKVM
 
@@ -2419,9 +2433,11 @@ sshgw.ssh(servername,'root') do |session|
 		end
 
 		msg('Set rights for frontend user',MSG_INFO)
+    tmpcmds = []
 		select_type($kanodes,:NODE).each do |node|
-			sexec(session,"karights3 --overwrite-rights -a -m #{node[:fqdn]} -p #{cfg_kadeploy_disk_device()}#{CFG_KADEPLOY_PARTITION_DEPLOY_ID} -u #{CFG_FRONTEND_USER}");
+			tmpcmds << "-m #{node[:fqdn]}"
 		end
+    sexec(session,"karights3 --overwrite-rights -a #{tmpcmds.join(' ')} -p #{cfg_kadeploy_disk_device()}#{CFG_KADEPLOY_PARTITION_DEPLOY_ID} -u #{CFG_FRONTEND_USER}")
 
 		msg('Removing configuration related packages',MSG_INFO)
 		#apt_remove(session,'kadeploy-client')
