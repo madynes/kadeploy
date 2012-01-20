@@ -5,6 +5,7 @@ require 'tempfile'
 USAGE = "Usage: #{$0} <gateway_user> <gateway_address> [<ssh_key_path>]"
 
 INSTALL_PACKAGES = false
+CONFIG_KVM_SCRIPTS = false
 
 PROXY_ADDR = 'proxy'
 PROXY_PORT = '3128'
@@ -18,10 +19,61 @@ APT_REPO_CONF_FILE = '/etc/apt/sources.list'
 KVM_PACKAGES = [ 'kvm', 'qemu', 'qemu-kvm' , 'bridge-utils', 'screen' ]
 BRIDGE_DEV = 'br0'
 ADMIN_IFACE = 'eth0'
-NETWORKING_CONF_FILE = '/etc/network/interfaces'
+NET_MTU = '1450'
 
 EXCL_DEVS = [ BRIDGE_DEV,'lo' ]
 
+NETWORKING_CONF_FILE = '/etc/network/interfaces'
+def cfg_networking_bridge(ifname,macaddr)
+  "auto lo\n"\
+  "iface lo inet loopback\n\n"\
+  "iface #{ifname} inet manual\n\n"\
+  "auto #{BRIDGE_DEV}\n"\
+  "iface #{BRIDGE_DEV} inet dhcp\n"\
+  "  bridge_ports #{ifname}\n"\
+  "  bridge_stp      off\n"\
+  "  bridge_maxwait  0\n"\
+  "  bridge_fd       0\n"\
+  "pre-up ifconfig #{ifname} mtu #{NET_MTU}\n"\
+  "bridge_hw #{macaddr}\n\n"
+end
+
+KVM_IFUP_CONF_FILE = '/etc/kvm/kvm-ifup'
+def cfg_kvm_ifup()
+  "#! /bin/sh\n"\
+  "# Script to bring a network (tap) device for qemu-kvm up\n"\
+  "# The idea is to add the tap device to the same bridge\n"\
+  "# as we have default routing to.\n"\
+  "# in order to be able to find brctl\n"\
+  "PATH=$PATH:/sbin:/usr/sbin\n"\
+  "ip=$(which ip)\n"\
+  "if [ -n \"$ip\" ]; then\n"\
+  "  ip link set \"$1\" mtu #{NET_MTU} up\n"\
+  "else\n"\
+  "  ifconfig \"$1\" 0.0.0.0 mtu #{NET_MTU} up\n"\
+  "fi\n"\
+  "brctl=$(which brctl)\n"\
+  "if [ ! \"$ip\" -o ! \"$brctl\" ]; then\n"\
+  "  echo \"W: $0: not doing any bridge processing: ip or brctl utility not found\" >&2\n"\
+  "  exit 0\n"\
+  "fi\n"\
+  "switch=$(ip route ls | \\\n"\
+  "  awk '/^default / {\n"\
+  "    for(i=0;i<NF;i++) { if ($i == \"dev\") { print $(i+1); next; } }\n"\
+  "  }'\n"\
+  ")\n"\
+  "# only add the interface to default-route bridge if we\n"\
+  "# have such interface (with default route) and if that\n"\
+  "# interface is actually a bridge.\n"\
+  "# It is possible to have several default routes too\n"\
+  "for br in $switch; do\n"\
+  "  if [ -d /sys/class/net/$br/bridge/. ]; then\n"\
+  "    brctl addif $br \"$1\"\n"\
+  "    exit	# exit with status of brctl\n"\
+  "  fi\n"\
+  "done\n"\
+  "echo \"W: $0: no bridge for guest interface found\" >&2\n"
+end
 
 def cmd(cmd,critical=true)
   ret = `#{cmd}`.split("\n")
@@ -63,18 +115,6 @@ def ssh_tunnel(gwuser,gwhost,dstport,dsthost,srcport=nil,srchost=nil)
   cmd("kill #{tunpid}")
 end
 
-def cfg_networking_bridge(ifname,macaddr)
-  "auto lo\n"\
-  "iface lo inet loopback\n\n"\
-  "iface #{ifname} inet manual\n\n"\
-  "auto #{BRIDGE_DEV}\n"\
-  "iface #{BRIDGE_DEV} inet dhcp\n"\
-  "  bridge_ports #{ifname}\n"\
-  "  bridge_stp      off\n"\
-  "  bridge_maxwait  0\n"\
-  "  bridge_fd       0\n"\
-  "bridge_hw #{macaddr}\n\n"
-end
 
 if INSTALL_PACKAGES
   if ARGV.size < 2
@@ -155,6 +195,14 @@ if !ifaces.include?(BRIDGE_DEV) or ifaces.empty?
 
   ifaces.each do |iface|
     cmd("ifconfig #{iface} down")
+  end
+
+  if CONFIG_KVM_SCRIPTS
+    tmp = Tempfile.new('kvm-ifup')
+    tmp.write(cfg_kvm_ifup())
+    tmp.close
+    cmd("cp -f #{tmp.path} #{KVM_IFUP_CONF_FILE}")
+    tmp.unlink
   end
 
   tmp = Tempfile.new('networking')

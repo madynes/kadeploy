@@ -51,7 +51,7 @@ echo "" >&2
 
 echo 'Copying ssh key and script files' >&2
 stime=`date +%s`
-taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ]
+taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null
 #ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null"
 let stime=`date +%s`-stime
 
