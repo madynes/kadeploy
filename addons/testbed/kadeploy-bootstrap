@@ -72,7 +72,7 @@ CFG_KADEPLOY_SOFT_REBOOT = false
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 2,
-  :timeout => 450
+  :timeout => 600
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
@@ -423,6 +423,8 @@ def cfg_kadeploy_deploy_initrd(cluster)
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 600
+
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
   "deploy_kernel = #{cfg_kadeploy_deploy_kernel(cluster)}\n"\
@@ -433,7 +435,7 @@ def cfg_kadeploy_specific_conf(cluster)
   "tmp_part = #{CFG_KADEPLOY_PARTITION_TMP_ID}\n"\
   "swap_part = #{CFG_KADEPLOY_PARTITION_SWAP_ID}\n"\
   + # Kareboot
-  "timeout_reboot_classical = 250\n"\
+  "timeout_reboot_classical = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
   "timeout_reboot_kexec = 100\n"\
   "cmd_soft_reboot = #{cfg_kadeploy_soft_reboot_cmd()}\n"\
   "cmd_hard_reboot = #{cfg_kadeploy_hard_reboot_cmd()}\n"\
