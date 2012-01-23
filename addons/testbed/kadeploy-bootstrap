@@ -493,12 +493,59 @@ CFG_HTTP_KERNELS_PATH = 'kernels/'
 
 
 # Apache2 default config
-CFG_APACHE_CONF_FILE = '/etc/apache2/apache2.conf'
+CFG_APACHE_CONF_PATH = '/etc/apache2'
+CFG_APACHE_CONF_FILE = File.join(CFG_APACHE_CONF_PATH,'apache2.conf')
 CFG_APACHE_SERVER_PATH = '/var/www'
 CFG_APACHE_KERNELS_PATH = File.join(CFG_APACHE_SERVER_PATH,CFG_HTTP_KERNELS_PATH)
 
 def cfg_apache()
-  ''
+  "#ServerRoot \"/etc/apache2\"\n"\
+  "LockFile ${APACHE_LOCK_DIR}/accept.lock\n"\
+  "PidFile ${APACHE_PID_FILE}\n"\
+  "Timeout 300\n\n"\
+  "KeepAlive On\n"\
+  "MaxKeepAliveRequests 100\n"\
+  "KeepAliveTimeout 15\n\n"\
+  "<IfModule mpm_worker_module>\n"\
+      "ServerLimit          256\n"\
+      "StartServers         8\n"\
+      "MinSpareThreads      32\n"\
+      "MaxSpareThreads      128 \n"\
+      "ThreadLimit          128\n"\
+      "ThreadsPerChild      32\n"\
+      "MaxClients           4096\n"\
+      "MaxRequestsPerChild  256\n"\
+  "</IfModule>\n\n"\
+  "User ${APACHE_RUN_USER}\n"\
+  "Group ${APACHE_RUN_GROUP}\n\n"\
+  "DefaultType text/plain\n\n"\
+  "HostnameLookups Off\n\n"\
+  "ErrorLog ${APACHE_LOG_DIR}/error.log\n"\
+  "LogLevel warn\n\n"\
+  "Include mods-enabled/*.load\n"\
+  "Include mods-enabled/*.conf\n\n"\
+  "Include ports.conf\n\n"\
+  "LogFormat \"%v:%p %h %l %u %t \\\"%r\\\" %>s %O \\\"%{Referer}i\\\" \\\"%{User-Agent}i\\\"\" vhost_combined\n"\
+  "LogFormat \"%h %l %u %t \\\"%r\\\" %>s %O \\\"%{Referer}i\\\" \\\"%{User-Agent}i\\\"\" combined\n"\
+  "LogFormat \"%h %l %u %t \\\"%r\\\" %>s %O\" common\n"\
+  "LogFormat \"%{Referer}i -> %U\" referer\n"\
+  "LogFormat \"%{User-agent}i\" agent\n\n"\
+  "Include sites-enabled/\n"
+end
+
+CFG_APACHE_MODS_CONF_PATH = File.join(CFG_APACHE_CONF_PATH,'mods-enabled')
+
+CFG_APACHE_SITES_CONF_PATH = File.join(CFG_APACHE_CONF_PATH,'sites-enabled')
+CFG_APACHE_SITES_CONF_FILE = File.join(CFG_APACHE_SITES_CONF_PATH,'000-default')
+def cfg_apache_site()
+  "<VirtualHost *:80>\n"\
+  "  DocumentRoot #{CFG_APACHE_SERVER_PATH}\n"\
+  "  <Directory #{CFG_APACHE_SERVER_PATH}/>\n"\
+  "    Options FollowSymLinks\n"\
+  "    AllowOverride All\n"\
+  "  </Directory>\n"\
+  "  CustomLog ${APACHE_LOG_DIR}/access.log combined\n"\
+  "</VirtualHost>\n"
 end
 
 
@@ -891,12 +938,12 @@ def msg(str, type=nil, quit=false)
   exit 1 if quit
 end
 
-def kavlan_gw()
-  "kavlan-#{$kavlan_id}#{$site.empty? ? '' : ".#{$site}"}"
+def kavlan_gw(suffix=true)
+  "kavlan-#{$kavlan_id}#{$site.empty? or !suffix ? '' : ".#{$site}"}"
 end
 
 def kavlan_node(name)
-  "#{name.split('.')[0].split("-#{kavlan_gw()}")[0]}-#{kavlan_gw()}"
+  "#{name.split('.')[0].split("-#{kavlan_gw(false)}")[0]}-#{kavlan_gw()}"
 end
 
 def kvm_gw()
@@ -2197,13 +2244,16 @@ if $deploysendmeth == :HTTP
       apt_update(session)
 
       msg('Installing HTTP server',MSG_INFO)
-      apt_install(session,'apache2')
+      apt_install(session,['apache2','apache2-mpm-worker'])
       sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
       sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
       sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
 
       msg('Configuring HTTP server',MSG_INFO)
-      #tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+      sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
+      sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
+      tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+      tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
       sexec(session,'service apache2 restart')
 
       msg('Sending deployment kernels',MSG_INFO)

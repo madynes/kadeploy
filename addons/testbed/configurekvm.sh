@@ -10,7 +10,7 @@ SSH_OPTIONS='-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o P
 
 NETWORK_CIDR=20
 
-if [ $# -lt 2 ]
+if [ $# -lt 3 ]
 then
   echo "usage: $0 <nb_kvm_per_host> <network_address> <hostlist>"
   exit 1
