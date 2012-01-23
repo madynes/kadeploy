@@ -163,7 +163,7 @@ def cfg_kadeploy_conf()
   "tftp_images_max_size = 600\n"\
   "tftp_cfg = #{CFG_TFTP_PXECONFIG_DIR}\n"\
   "db_kind = mysql\n"\
-  "deploy_db_host = #{$kanodes[:sql][:fqdn]}\n"\
+  "deploy_db_host = #{$services[:sql][:fqdn]}\n"\
   "deploy_db_name = #{CFG_SQL_DB}\n"\
   "deploy_db_login = #{CFG_SQL_USER}\n"\
   "deploy_db_passwd = #{CFG_SQL_PASS_USER}\n"\
@@ -385,7 +385,7 @@ def cfg_kadeploy_deploy_kernel_imgpath(cluster)
   ret = ''
 	case $deploysendmeth
 		when :HTTP
-      ret = "http://#{$kanodes[:www][:ipv4]}/#{File.join(CFG_HTTP_KERNELS_PATH,File.basename(cluster[:kernel][:vmlinuz]))}"
+      ret = "http://#{$services[:www][:fqdn]}/#{File.join(CFG_HTTP_KERNELS_PATH,File.basename(cluster[:kernel][:vmlinuz]))}"
 		when :TFTP
       ret = File.basename(cluster[:kernel][:vmlinuz])
 		else
@@ -402,7 +402,7 @@ def cfg_kadeploy_deploy_initrd_imgpath(cluster)
   ret = ''
 	case $deploysendmeth
 		when :HTTP
-      ret = "http://#{$kanodes[:www][:ipv4]}/#{File.join(CFG_HTTP_KERNELS_PATH,File.basename(cluster[:kernel][:initrd]))}"
+      ret = "http://#{$services[:www][:fqdn]}/#{File.join(CFG_HTTP_KERNELS_PATH,File.basename(cluster[:kernel][:initrd]))}"
 		when :TFTP
       ret = File.basename(cluster[:kernel][:initrd])
 		else
@@ -436,7 +436,7 @@ def cfg_kadeploy_specific_conf(cluster)
   "swap_part = #{CFG_KADEPLOY_PARTITION_SWAP_ID}\n"\
   + # Kareboot
   "timeout_reboot_classical = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
-  "timeout_reboot_kexec = 100\n"\
+  "timeout_reboot_kexec = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
   "cmd_soft_reboot = #{cfg_kadeploy_soft_reboot_cmd()}\n"\
   "cmd_hard_reboot = #{cfg_kadeploy_hard_reboot_cmd()}\n"\
   + # Kapower
@@ -581,9 +581,10 @@ def cfg_dns_masknb()
   4 - (IPAddr.new($network[:mask]).to_i.to_s(2).count('1') / 8)
 end
 
-def cfg_dns_master_node(node)
+def cfg_dns_master_node(node,name=nil)
   nodecfg = "#{node[:name]}      IN    A    #{node[:ipv4]}\n"
   nodecfg += "#{node[:name]}.#{node[:cluster][:name]}      IN    A    #{node[:ipv4]}\n" if node[:type] == :NODE
+  nodecfg += "#{node[:server_type]}      IN    A    #{node[:ipv4]}\n" if node[:server_type]
   nodecfg
 end
 
@@ -909,6 +910,7 @@ $srchost = `hostname --fqdn`.strip
 
 $mode = :KAVLAN
 $allnodes=[]
+$services={}
 $kanodes={}
 $kaenvs={}
 $clusters={}
@@ -1378,8 +1380,14 @@ def select_type(hash,type)
   hash.select { |n,h| h[:type] == type }.collect { |v| v[1] }
 end
 
+def select_server_type(hash,type)
+  arr = hash.select { |n,h| h[:type] == :SERVER }.collect { |v| v[1] }
+  arr.select { |h| h[:server_type] == type }
+end
+
 options[:node_list]   = nil
 options[:host_list]   = nil
+options[:www_list]   = nil
 options[:debpackages] = []
 options[:gempackages] = []
 options[:git]         = nil
@@ -1405,6 +1413,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-F', '--hosts-node-list <nodelist_file>', 'Specify a file containing the list of the hosting nodes (VLAN hostnames) to be used when using the VLAN-KVM mode (see --vlan-kvm)' ) do |n|
   	options[:host_list] = n
+	end
+
+	opts.on( '-w', '--www-node-list <nodelist_file>', 'Specify a file containing the list of nodes to use as HTTP server' ) do |n|
+  	options[:www_list] = n
 	end
 
 	opts.on( '-k', '--kastafior <kastafior_file>', 'Use a specific version of kastafior' ) do |k|
@@ -1546,6 +1558,7 @@ deplkernelfiles = Dir.entries(ARGV[0])
 deplkernelfiles.delete('.')
 deplkernelfiles.delete('..')
 vmlinuzfiles = deplkernelfiles.select{ |filename| filename.include?('vmlinuz') }
+count = 1
 vmlinuzfiles.each do |vmlinuzfile|
   initrdfile = File.join(ARGV[0],vmlinuzfile.gsub(/vmlinuz/,'initrd'))
   unless File.exist?(initrdfile)
@@ -1553,6 +1566,7 @@ vmlinuzfiles.each do |vmlinuzfile|
     next
   end
   name = vmlinuzfile.gsub(/vmlinuz/,'').gsub(/--/,'-')
+  name = "kernel-#{count}" if name.empty?
   $deplkernels[name] = {
     :name => name,
     :vmlinuz => File.join(ARGV[0],vmlinuzfile),
@@ -1561,6 +1575,7 @@ vmlinuzfiles.each do |vmlinuzfile|
 	msg("#{$deplkernels[name][:name]}:",MSG_INFO)
 	msg("  vmlinuz: #{$deplkernels[name][:vmlinuz]}",MSG_INFO)
 	msg("  initrd: #{$deplkernels[name][:initrd]}",MSG_INFO)
+  count += 1
 end
 
 msg("no valid deployment kernel found in #{ARGV[0]}",MSG_ERROR,true) if $deplkernels.empty?
@@ -1660,6 +1675,8 @@ if $mode == :VLANKVM
     msg("hostlist parameter not set (see -F option)",MSG_ERROR,true)
   end
 
+  msg("file not found '#{hostlist_file}'",MSG_ERROR,true) unless File.exists?(hostlist_file)
+
 	File.open(hostlist_file, 'r') do |f|
   count = 1
   f.each do |line|
@@ -1673,6 +1690,42 @@ if $mode == :VLANKVM
         $kanodes[tmp.to_sym][:basename] = tmp
         $kanodes[tmp.to_sym][:ipv4] = tmpip
         $kanodes[tmp.to_sym][:type] = :HOST
+        count += 1
+      end
+    rescue Resolv::ResolvError, ArgumentError
+      msg("Invalid address for host node '#{tmp}', ignoring",MSG_WARNING)
+      $kanodes.delete(tmp.to_sym)
+    end
+    begin
+      addr = IPAddr.new(tmp)
+      msg('host nodes should be specified by hostname, ignoring',MSG_WARNING)
+      $kanodes.delete(tmp.to_sym)
+    rescue ArgumentError
+    end
+  end
+  end
+else
+  msg("using hostlist parameter with non compatible mode (VLAN-KVM only), ignoring",MSG_WARNING) if options[:host_list]
+end
+
+if options[:www_list]
+  msg("file not found '#{options[:www_list]}'",MSG_ERROR,true) unless File.exists?(options[:www_list])
+
+	File.open(options[:www_list], 'r') do |f|
+  count = 1
+  f.each do |line|
+    tmp = line.strip
+    begin
+      #tmp = getnode(tmp)
+      tmpip = Resolv.getaddress(getnode(tmp))
+      name = "www-#{count}"
+      unless $kanodes[name.to_sym]
+        $kanodes[tmp.to_sym] = {}
+        $kanodes[tmp.to_sym][:name] = name
+        $kanodes[tmp.to_sym][:basename] = tmp
+        $kanodes[tmp.to_sym][:ipv4] = tmpip
+        $kanodes[tmp.to_sym][:type] = :SERVER
+        $kanodes[tmp.to_sym][:server_type] = :www
         count += 1
       end
     rescue Resolv::ResolvError, ArgumentError
@@ -1851,46 +1904,70 @@ case $mode
     msg('Unknown mode',MSG_ERROR,true)
 end
 
+$services[:kadeploy] = {}
+$services[:kadeploy][:name] = 'kadeploy'
+$services[:kadeploy][:fqdn] = "#{$services[:kadeploy][:name]}.#{DOMAIN}"
 $kanodes[:kadeploy] = {}
-$kanodes[:kadeploy][:name] = 'kadeploy'
+$kanodes[:kadeploy][:name] = $services[:kadeploy][:name]
 $kanodes[:kadeploy][:basename] = kaserver
 $kanodes[:kadeploy][:ipv4] = kaserverip || nil
 $kanodes[:kadeploy][:type] = :SERVER
 
 # >>> TODO: Add options
+$services[:dns] = {}
+$services[:dns][:name] = 'dns'
+$services[:dns][:fqdn] = "#{$services[:dns][:name]}.#{DOMAIN}"
 $kanodes[:dns] = {}
-$kanodes[:dns][:name] = 'dns'
+$kanodes[:dns][:name] = $services[:dns][:name]
 $kanodes[:dns][:basename] = $kanodes[:kadeploy][:basename]
 $kanodes[:dns][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:dns][:type] = :SERVER
 
+$services[:tftp] = {}
+$services[:tftp][:name] = 'tftp'
+$services[:tftp][:fqdn] = "#{$services[:tftp][:name]}.#{DOMAIN}"
 $kanodes[:tftp] = {}
-$kanodes[:tftp][:name] = 'tftp'
+$kanodes[:tftp][:name] = $services[:tftp][:name]
 $kanodes[:tftp][:basename] = kaserver
 $kanodes[:tftp][:basename] = $kanodes[:kadeploy][:basename]
 $kanodes[:tftp][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:tftp][:type] = :SERVER
 
+$services[:dhcp] = {}
+$services[:dhcp][:name] = 'dhcp'
+$services[:dhcp][:fqdn] = "#{$services[:dhcp][:name]}.#{DOMAIN}"
 $kanodes[:dhcp] = {}
-$kanodes[:dhcp][:name] = 'dhcp'
+$kanodes[:dhcp][:name] = $services[:dhcp][:name]
 $kanodes[:dhcp][:basename] = $kanodes[:kadeploy][:basename]
 $kanodes[:dhcp][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:dhcp][:type] = :SERVER
 
+$services[:sql] = {}
+$services[:sql][:name] = 'sql'
+$services[:sql][:fqdn] = "#{$services[:sql][:name]}.#{DOMAIN}"
 $kanodes[:sql] = {}
-$kanodes[:sql][:name] = 'sql'
+$kanodes[:sql][:name] = $services[:sql][:name]
 $kanodes[:sql][:basename] = $kanodes[:kadeploy][:basename]
 $kanodes[:sql][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:sql][:type] = :SERVER
 
-$kanodes[:www] = {}
-$kanodes[:www][:name] = 'www'
-$kanodes[:www][:basename] = $kanodes[:kadeploy][:basename]
-$kanodes[:www][:ipv4] = $kanodes[:kadeploy][:ipv4]
-$kanodes[:www][:type] = :SERVER
+$services[:www] = {}
+$services[:www][:name] = 'www'
+$services[:www][:fqdn] = "#{$services[:www][:name]}.#{DOMAIN}"
+unless options[:www_list]
+  $kanodes[:www] = {}
+  $kanodes[:www][:name] = $services[:www][:name]
+  $kanodes[:www][:basename] = $kanodes[:kadeploy][:basename]
+  $kanodes[:www][:ipv4] = $kanodes[:kadeploy][:ipv4]
+  $kanodes[:www][:type] = :SERVER
+  $kanodes[:www][:server_type] = :www
+end
 
+$services[:frontend] = {}
+$services[:frontend][:name] = 'frontend'
+$services[:frontend][:fqdn] = "#{$services[:frontend][:name]}.#{DOMAIN}"
 $kanodes[:frontend] = {}
-$kanodes[:frontend][:name] = 'frontend'
+$kanodes[:frontend][:name] = $services[:frontend][:name]
 $kanodes[:frontend][:basename] = $kanodes[:kadeploy][:basename]
 $kanodes[:frontend][:ipv4] = $kanodes[:kadeploy][:ipv4]
 $kanodes[:frontend][:type] = :SERVER
@@ -2233,45 +2310,45 @@ msg("",MSG_INFO)
 
 if $deploysendmeth == :HTTP
 
-  server=$kanodes[:www]
-  servername=getnode(server[:basename])
-  msg('=== Setting up HTTP server',MSG_INFO)
-  sshgw.ssh(servername,'root') do |session|
-    msg("Connected to #{server[:basename]}",MSG_INFO)
+  msg('=== Setting up HTTP server(s)',MSG_INFO)
+  select_server_type($kanodes,:www).each do |server|
+    servername=getnode(server[:basename])
+    sshgw.ssh(servername,'root') do |session|
+      msg("Connected to #{server[:basename]}",MSG_INFO)
 
-    http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
-      apt_update(session)
+      http_tunnel(server,session) do
+        msg('Updating debian packages list',MSG_INFO)
+        apt_update(session)
 
-      msg('Installing HTTP server',MSG_INFO)
-      apt_install(session,['apache2','apache2-mpm-worker'])
-      sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
-      sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
-      sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
+        msg('Installing HTTP server',MSG_INFO)
+        apt_install(session,['apache2','apache2-mpm-worker'])
+        sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
+        sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
+        sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
 
-      msg('Configuring HTTP server',MSG_INFO)
-      sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
-      sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
-      tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
-      tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
-      sexec(session,'service apache2 restart')
+        msg('Configuring HTTP server',MSG_INFO)
+        sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
+        sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
+        tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+        tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
+        sexec(session,'service apache2 restart')
 
-      msg('Sending deployment kernels',MSG_INFO)
-      sexec(session,"mkdir -p #{CFG_APACHE_KERNELS_PATH}")
-      sexec(session,"chmod 755 #{CFG_APACHE_KERNELS_PATH}")
-      $deplkernels.each do |name,kernel|
-        msg("\t#{name}",MSG_INFO)
-        scp(servername,kernel[:vmlinuz],CFG_APACHE_KERNELS_PATH)
-        scp(servername,kernel[:initrd],CFG_APACHE_KERNELS_PATH)
+        msg('Sending deployment kernels',MSG_INFO)
+        sexec(session,"mkdir -p #{CFG_APACHE_KERNELS_PATH}")
+        sexec(session,"chmod 755 #{CFG_APACHE_KERNELS_PATH}")
+        $deplkernels.each do |name,kernel|
+          msg("\t#{name}",MSG_INFO)
+          scp(servername,kernel[:vmlinuz],CFG_APACHE_KERNELS_PATH)
+          scp(servername,kernel[:initrd],CFG_APACHE_KERNELS_PATH)
+        end
+
+        sexec(session,"chmod -R 755 #{CFG_APACHE_KERNELS_PATH}")
+
       end
-
-      sexec(session,"chmod -R 755 #{CFG_APACHE_KERNELS_PATH}")
-
     end
+    msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
+    msg("",MSG_INFO)
   end
-  msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
-  msg("",MSG_INFO)
-
 end
 
 server=$kanodes[:dhcp]
