@@ -67,6 +67,8 @@ UPDATE_DIR_VAR = 'WORKINGDIR'
 # Kadeploy default config
 CFG_KADEPLOY_USER = 'deploy'
 
+CFG_KADEPLOY_SOFT_REBOOT = false
+
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 2,
@@ -361,8 +363,18 @@ def cfg_kadeploy_console_cmd()
   ret
 end
 
-def cfg_kadeploy_reboot_cmd()
+def cfg_kadeploy_hard_reboot_cmd()
   "#{cfg_kadeploy_power_off_cmd()} && #{cfg_kadeploy_power_on_cmd()}"
+end
+
+def cfg_kadeploy_soft_reboot_cmd()
+  ret = ''
+  if CFG_KADEPLOY_SOFT_REBOOT
+    ret = "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\""
+  else
+    ret = '/bin/false'
+  end
+  ret
 end
 
 def cfg_kadeploy_disk_device()
@@ -423,8 +435,8 @@ def cfg_kadeploy_specific_conf(cluster)
   + # Kareboot
   "timeout_reboot_classical = 250\n"\
   "timeout_reboot_kexec = 100\n"\
-  "cmd_soft_reboot = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\"\n"\
-  "cmd_hard_reboot = #{cfg_kadeploy_reboot_cmd()}\n"\
+  "cmd_soft_reboot = #{cfg_kadeploy_soft_reboot_cmd()}\n"\
+  "cmd_hard_reboot = #{cfg_kadeploy_hard_reboot_cmd()}\n"\
   + # Kapower
   "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
   "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\

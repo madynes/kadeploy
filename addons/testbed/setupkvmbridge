@@ -19,7 +19,7 @@ APT_REPO_CONF_FILE = '/etc/apt/sources.list'
 KVM_PACKAGES = [ 'kvm', 'qemu', 'qemu-kvm' , 'bridge-utils', 'screen' ]
 BRIDGE_DEV = 'br0'
 ADMIN_IFACE = 'eth0'
-NET_MTU = '1450'
+NET_MTU = '1500'
 
 EXCL_DEVS = [ BRIDGE_DEV,'lo' ]
 
