@@ -10,9 +10,9 @@ SSH_OPTIONS='-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o P
 
 NETWORK_CIDR=20
 
-if [ $# -lt 3 ]
+if [ $# -lt 4 ]
 then
-  echo "usage: $0 <nb_kvm_per_host> <network_address> <hostlist>"
+  echo "usage: $0 <nb_kvm_per_host> <network_address> <hostlist> <www_server_nb>"
   exit 1
 fi
 
@@ -21,20 +21,27 @@ network=$2
 
 if [ -e $3 ]
 then
-  hosts=`cat $3 | sort -n`
+  hosts="`cat $3 | sort -t- -k 2 -u -n`"
 else
   echo file not found $3
   exit 1
 fi
 
+if [ $4 -le 0 ]
+then
+  echo Invalid parameter $4
+  exit 1
+fi
+nbservers=$4
+let nbservers=nbservers+1
 kadaemon=`echo "$hosts" | head -n 1`
+wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1d'`
 
 #gwuser=$USER
 #gwhost="kavlan-`kavlan -V`"
 
 hostfile=`tempfile`
-echo "$hosts" | sed -e '1d' > $hostfile
-
+echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
 
 echo "Configuring `cat $hostfile | wc -l` nodes" >&2
 echo "" >&2
@@ -53,13 +60,13 @@ echo 'Copying ssh key and script files' >&2
 stime=`date +%s`
 taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null
 #ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null"
-let stime=`date +%s`-stime
 
 if [ $? -ne 0 ]
 then
   echo '  Failed!' >&2
   exit 1
 else
+  let stime=`date +%s`-stime
   echo "... done in ${stime} seconds" >&2
 fi
 
@@ -68,13 +75,13 @@ echo 'Configuring bridges' >&2
 stime=`date +%s`
 taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` ] 1>/dev/null
 #ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` ] 1>/dev/null"
-let stime=`date +%s`-stime
 
 if [ $? -ne 0 ]
 then
   echo '  Failed!' >&2
   exit 1
 else
+  let stime=`date +%s`-stime
   echo "... done in ${stime} seconds" >&2
 fi
 
@@ -96,13 +103,13 @@ echo 'Launching KVMS' >&2
 stime=`date +%s`
 taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_LAUNCH` ] \; broadcast input file [ $nodefile ] 1>/dev/null
 #ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfil broadcast exec [ cat - \| /tmp/`basename $SCRIPT_LAUNCH` ] \; broadcast input file [ $nodefile ] 1>/dev/null"
-let stime=`date +%s`-stime
 
 if [ $? -ne 0 ]
 then
   echo '  Failed!' >&2
   exit 1
 else
+  let stime=`date +%s`-stime
   echo "... done in ${stime} seconds" >&2
 fi
 #taktuk -s -n -l root -f $hostfile broadcast exec [ 'test $(ps aux | grep kvm | grep -v grep | grep SCREEN | wc -l) -eq $nbkvms || cat - \| i'"/tmp/`basename $SCRIPT_LAUNCH`" ] \; broadcast input file [ $nodefile ] 1>/dev/null
@@ -122,4 +129,6 @@ rm $sagentfile
 echo "" >&2
 
 echo "Kadeploy daemon: $kadaemon (dont forget to use -d option with the bootstrap script)" >&2
+echo "www daemons:" >&2
+echo "$wwwservers" >&2
 

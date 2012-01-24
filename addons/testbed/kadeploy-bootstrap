@@ -424,7 +424,7 @@ def cfg_kadeploy_deploy_initrd(cluster)
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 600
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 300
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
