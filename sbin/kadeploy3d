@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -9,11 +9,13 @@
 PID=0
 Exit_handler_kill()
 {
+    ssh-agent -k
     kill -9 $PID
 }
 
 Exit_handler_term()
 {
+    ssh-agent -k
     kill -15 $PID
 }
 
@@ -45,7 +47,7 @@ trap Exit_handler_kill KILL
 wait
 
 # Clean the ssh agent stuff
-kill -SIGKILL $SSH_AGENT_PID
+ssh-agent -k
 rm -rf `dirname $SSH_AUTH_SOCK`
 
 exit 0
