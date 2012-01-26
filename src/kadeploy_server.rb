@@ -1,8 +1,7 @@
 #!/usr/bin/ruby -w
-# -*- coding: utf-8 -*-
 
 # Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -627,10 +626,10 @@ class KadeployServer
         gfm = Managers::GrabFileManager.new(config, output, client, db)
         exec_specific.pxe_upload_files.each { |pxe_file|
           user_prefix = "pxe-#{config.exec_specific.true_user}--"
-          tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
-          local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+          local_pxe_file = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                               tftp_images_path, config.common.tftp_images_max_size, false) then
+                                               File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+                                               config.common.pxe_repository_kernels_max_size, false) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             return 3
           end
@@ -811,10 +810,10 @@ class KadeployServer
         gfm = Managers::GrabFileManager.new(config, output, nil, db)
         exec_specific.pxe_upload_files.each { |pxe_file|
           user_prefix = "pxe-#{config.exec_specific.true_user}-"
-          tftp_images_path = "#{config.common.tftp_repository}/#{config.common.tftp_images_path}"
-          local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+          local_pxe_file = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                               tftp_images_path, config.common.tftp_images_max_size, true) then
+                                               File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+                                               config.common.pxe_repository_kernels_max_size, true) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
           end
