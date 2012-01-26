@@ -16,7 +16,7 @@ TAKTUK_OPTIONS="-s -n -l root -o status -R connector=2 -R error=2"
 
 if [ $# -lt 2 ]
 then
-  echo "usage: $0 <nb_kvm_per_host> <network_address> <hostlist> <www_server_nb>"
+  echo "usage: $0 <nb_kvm_per_host> <hostlist> [<www_server_nb>]" >&2
   exit 1
 fi
 
@@ -26,24 +26,40 @@ if [ -e $2 ]
 then
   hosts="`cat $2`"
 else
-  echo file not found $2
+  echo file not found $2 >&2
   exit 1
 fi
 
 nbnodes=`echo "$hosts" | wc -l`
-let nbservers=nbnodes/BW_PER_WWW+2
+
+if [ $# -ge 3 ] && [ $3 -gt 0 ]
+then
+  tmp=$3
+  let nbservers=tmp+1
+else
+  let nbservers=nbnodes/BW_PER_WWW+2
+fi
+
 kadaemon=`echo "$hosts" | head -n 1`
 wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1d'`
 
 network=`dig +short $kadaemon`
 if [ $? -ne 0 ]
 then
-  echo 'Failed to get network'
+  echo 'Failed to get network' >&2
   exit 1
 fi
 
 hostfile=`tempfile`
 echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
+
+nbhosts=`cat $hostfile | wc -l`
+if [ $nbhosts -le 0 ]
+then
+  echo 'No nodes left to host VMs' >&2
+  exit 1
+fi
+
 
 echo "Configuring `cat $hostfile | wc -l` nodes" >&2
 echo "" >&2
