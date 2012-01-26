@@ -1,44 +1,46 @@
 #!/bin/bash
 
+BW_PER_WWW=120
+NETWORK_CIDR=20
+
 SSH_KEY=~/.ssh/id_rsa
 TMP_SSH_KEY=/tmp/identity
 
 SCRIPT_BRIDGE=./setupkvmbridge
 SCRIPT_LAUNCH=./launchkvms
 SCRIPT_GENNODES=./genkvmnodefile
-SSH_OPTIONS='-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
 
-NETWORK_CIDR=20
+SSH_CONNECTOR='ssh -A -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
+TAKTUK_OUTPUT='"$host: $line\n"'
+TAKTUK_OPTIONS="-s -n -l root -o status -R connector=2 -R error=2"
 
-if [ $# -lt 4 ]
+if [ $# -lt 2 ]
 then
   echo "usage: $0 <nb_kvm_per_host> <network_address> <hostlist> <www_server_nb>"
   exit 1
 fi
 
 nbkvms=$1
-network=$2
 
-if [ -e $3 ]
+if [ -e $2 ]
 then
-  hosts="`cat $3 | sort -t- -k 2 -u -n`"
+  hosts="`cat $2`"
 else
-  echo file not found $3
+  echo file not found $2
   exit 1
 fi
 
-if [ $4 -le 0 ]
-then
-  echo Invalid parameter $4
-  exit 1
-fi
-nbservers=$4
-let nbservers=nbservers+1
+nbnodes=`echo "$hosts" | wc -l`
+let nbservers=nbnodes/BW_PER_WWW+2
 kadaemon=`echo "$hosts" | head -n 1`
 wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1d'`
 
-#gwuser=$USER
-#gwhost="kavlan-`kavlan -V`"
+network=`dig +short $kadaemon`
+if [ $? -ne 0 ]
+then
+  echo 'Failed to get network'
+  exit 1
+fi
 
 hostfile=`tempfile`
 echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
@@ -53,43 +55,24 @@ source $sagentfile 1>/dev/null
 ssh-add $SSH_KEY &>/dev/null
 echo "" >&2
 
-#gwhostfile=`ssh -A $SSH_OPTIONS ${gwuser}@$gwhost 'tempfile'`
-#scp $hostfile ${gwuser}@${gwhost}:$gwhostfile
-
 echo 'Copying ssh key and script files' >&2
 stime=`date +%s`
-taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null
-#ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 1>/dev/null"
+taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] 2>&1 | grep -v Warning >&2
 
-if [ $? -ne 0 ]
-then
-  echo '  Failed!' >&2
-  exit 1
-else
-  let stime=`date +%s`-stime
-  echo "... done in ${stime} seconds" >&2
-fi
+let stime=`date +%s`-stime
+echo "... done in ${stime} seconds" >&2
 
 
 echo 'Configuring bridges' >&2
 stime=`date +%s`
-taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` ] 1>/dev/null
-#ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` ] 1>/dev/null"
+taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostfile broadcast exec [ /tmp/`basename $SCRIPT_BRIDGE` ] 2>&1 | grep -v Warning >&2
 
-if [ $? -ne 0 ]
-then
-  echo '  Failed!' >&2
-  exit 1
-else
-  let stime=`date +%s`-stime
-  echo "... done in ${stime} seconds" >&2
-fi
+let stime=`date +%s`-stime
+echo "... done in ${stime} seconds" >&2
 
 echo 'Creating nodefile' >&2
 nodefile=`tempfile`
 $SCRIPT_GENNODES ${network}/$NETWORK_CIDR -f $hostfile -n $nbkvms > $nodefile
-#gwnodefile=`ssh -A $SSH_OPTIONS ${gwuser}@$gwhost 'tempfile'`
-#scp $nodefile ${gwuser}@${gwhost}:$gwnodefile
 
 if [ $? -ne 0 ]
 then
@@ -101,34 +84,24 @@ fi
 
 echo 'Launching KVMS' >&2
 stime=`date +%s`
-taktuk -s -n -l root -c "ssh -A $SSH_OPTIONS" -f $hostfile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_LAUNCH` ] \; broadcast input file [ $nodefile ] 1>/dev/null
-#ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "taktuk -s -n -l root -c 'ssh -A $SSH_OPTIONS' -f $gwhostfil broadcast exec [ cat - \| /tmp/`basename $SCRIPT_LAUNCH` ] \; broadcast input file [ $nodefile ] 1>/dev/null"
+taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostfile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_LAUNCH` ] \; broadcast input file [ $nodefile ] 2>&1 | grep -v Warning >&2
 
-if [ $? -ne 0 ]
-then
-  echo '  Failed!' >&2
-  exit 1
-else
-  let stime=`date +%s`-stime
-  echo "... done in ${stime} seconds" >&2
-fi
-#taktuk -s -n -l root -f $hostfile broadcast exec [ 'test $(ps aux | grep kvm | grep -v grep | grep SCREEN | wc -l) -eq $nbkvms || cat - \| i'"/tmp/`basename $SCRIPT_LAUNCH`" ] \; broadcast input file [ $nodefile ] 1>/dev/null
+let stime=`date +%s`-stime
+echo "... done in ${stime} seconds" >&2
 
 cat $nodefile
 
 echo "" >&2
 echo "Cleaning temporary files" >&2
 rm $nodefile
-#ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "rm $gwnodefile"
 
 rm $hostfile
-#ssh -A $SSH_OPTIONS ${gwuser}@$gwhost "rm $gwhostfile"
 
 ssh-agent -k 1>/dev/null
 rm $sagentfile
 echo "" >&2
 
-echo "Kadeploy daemon: $kadaemon (dont forget to use -d option with the bootstrap script)" >&2
+echo "Kadeploy daemon: $kadaemon" >&2
 echo "www daemons:" >&2
 echo "$wwwservers" >&2
 

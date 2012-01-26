@@ -3,14 +3,21 @@
 require 'socket'
 require 'resolv'
 
-VM_RAM = '512M'
-VM_NET_MODEL = 'e1000'
-VM_FS = '8G'
+# Sizes in Mo
+RAM_SIZE = 350
+FS_SIZE = 564
+
+FS_TYPE = 'qcow2'
+FS_FILE = "disk.#{FS_TYPE}"
+#NET_MODEL = 'e1000'
+HOST_FREE_MEM_SIZE = 1024
+
+TMP_DIR = '/tmp/katestbed'
 
 def cmd(cmd,critical=true)
   ret = `#{cmd}`
   if critical and !$?.success?
-    puts "error when executing '#{cmd}': #{ret}"
+    $stderr.puts "error when executing '#{cmd}': #{ret}"
     exit 1
   end
   ret
@@ -18,17 +25,57 @@ end
 
 myip=Resolv.getaddress(Socket.gethostname)
 
+# Cleaning everything
 cmd("killall kvm &>/dev/null; true")
+#cmd("umount #{File.join(TMP_DIR,'*')}; true")
+mounts = cmd('mount')
+mounts.each do |line|
+  if line =~ /^tmpfs\s+on\s+(\S+)\s+type\s+tmpfs.*$/
+    tmp = Regexp.last_match(1)
+    if tmp.include?(TMP_DIR)
+      cmd("umount #{tmp}")
+      cmd("rm -Rf #{tmp}")
+    end
+  end
+end
+cmd("rm -Rf #{TMP_DIR}")
 
+# Get memory info
+meminfo = File.read('/proc/meminfo')
+totmem = nil
+meminfo.each do |line|
+  totmem = Regexp.last_match(1).to_i/1024 if line =~ /^MemTotal:\s*(\S+)\s*.*$/
+end
+
+unless totmem
+  $stderr.puts 'Unavailable to get meminfo'
+  exit 1
+end
+
+maxnodes = (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
+
+cmd("mkdir -p #{TMP_DIR}")
+count = 0
 ARGF.each do |line|
+  if count > maxnodes
+    $stderr.puts 'Too much nodes for this machine'
+    exit 1
+  end
+
   if line =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s+#{myip}\s*$/
     vmname = Regexp.last_match(1)
     vmip = Regexp.last_match(2)
     vmmac = Regexp.last_match(3)
-    file = cmd("mktemp --tmpdir #{vmname}_XXXXXXXX.rawfs").chomp
-    cmd("qemu-img create -f raw #{file} #{VM_FS}")
-    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac},model=#{VM_NET_MODEL} -net tap -boot n -m #{VM_RAM} -drive file=#{file} -name #{vmname} -curses")
-    puts "Started #{vmname} (mac:#{vmmac})"
+
+    fsdir = File.join(TMP_DIR,vmname)
+    cmd("mkdir -p #{fsdir}")
+    cmd("mount -t tmpfs -o size=#{FS_SIZE}M tmpfs #{fsdir}")
+    fsfile = File.join(fsdir,FS_FILE)
+    cmd("rm -f #{fsfile}")
+    cmd("qemu-img create -f #{FS_TYPE} #{fsfile} #{FS_SIZE}M")
+    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac} -net tap -boot n -m #{RAM_SIZE}M -drive file=#{fsfile} -name #{vmname} -curses")
+    #puts "Started #{vmname} (mac:#{vmmac})"
+    count += 1
   end
 end
 

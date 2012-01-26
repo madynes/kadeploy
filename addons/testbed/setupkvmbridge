@@ -78,7 +78,7 @@ end
 def cmd(cmd,critical=true)
   ret = `#{cmd}`.split("\n")
   if critical and !$?.success?
-    puts "error when executing '#{cmd}': #{ret}"
+    $stderr.puts "error when executing '#{cmd}': #{ret}"
     exit 1
   end
   ret
@@ -104,7 +104,7 @@ def ssh_tunnel(gwuser,gwhost,dstport,dsthost,srcport=nil,srchost=nil)
     tmp = cmd("lsof -i4 | grep LISTEN | grep localhost:#{srcport}; true")[0]
     sleep(0.1)
     if Time.now - time_start > SSH_TUNNEL_TIMEOUT
-      puts "SSH tunnel creation on #{srchost}:#{srcport} failed"
+      $stderr.puts "SSH tunnel creation on #{srchost}:#{srcport} failed"
       exit 1
     end
   end while !tmp or tmp.empty?
@@ -118,7 +118,7 @@ end
 
 if INSTALL_PACKAGES
   if ARGV.size < 2
-    puts USAGE
+    $stderr.puts USAGE
     exit 1
   end
 
@@ -129,7 +129,7 @@ if INSTALL_PACKAGES
   end
 
   unless File.exists?($sshkeyfile)
-    puts "file not found '#{$sshkeyfile}'"
+    $stderr.puts "file not found '#{$sshkeyfile}'"
     exit 1
   end
 
@@ -159,7 +159,7 @@ if !ifaces.include?(BRIDGE_DEV) or ifaces.empty?
   # Getting default interface name
   tmp = cmd("route -n")
   if !tmp or tmp.empty?
-    puts 'can\'t get route informations'
+    $stderr.puts 'can\'t get route informations'
     exit 1
   end
 
@@ -177,7 +177,7 @@ if !ifaces.include?(BRIDGE_DEV) or ifaces.empty?
 
   tmp = cmd("ifconfig #{defaultiface}")
   if !tmp or tmp.empty?
-    puts 'can\'t ifconfig default network iface'
+    $stderr.puts 'can\'t ifconfig default network iface'
     exit 1
   end
 

@@ -66,19 +66,19 @@ end
 begin
   optparse.parse!
 rescue OptionParser::InvalidOption => e
-  puts e.to_s
+  $stderr.puts e.to_s
   exit 1
 end
 
 if ARGV.size < 1
-  puts USAGE
+  $stderr.puts USAGE
   exit 1
 end
 
 begin
   networkaddr = IPAddr.new(ARGV[0])
 rescue ArgumentError
-  puts "invalid network '#{ARGV[0]}'"
+  $stderr.puts "invalid network '#{ARGV[0]}'"
   exit 1
 end
 
@@ -89,7 +89,7 @@ elsif (ENV['GOOD_NODES'])
 elsif (ENV['OAR_NODEFILE'])
   hostlist_file = ENV['OAR_NODEFILE']
 else
-  puts "hostlist parameter not set (see -f option)"
+  $stderr.puts "hostlist parameter not set (see -f option)"
   exit 1
 end
 
@@ -101,7 +101,7 @@ begin
     end
   end
 rescue Errno::ENOENT
-	puts "File '#{nodelist_file}' not found"
+	$stderr.puts "File '#{nodelist_file}' not found"
   exit 1
 end
 
@@ -119,7 +119,7 @@ hostlist.each do |host|
     hostip = Resolv.getaddress(hostname)
     tmp = ipv42int(hostip)
     unless networkaddr.include?(IPAddr.new(hostip))
-      puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
+      $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
       exit 1
     end
 
@@ -130,13 +130,13 @@ hostlist.each do |host|
     }
     exclips << tmp
   rescue
-    puts "invalid address '#{hostname}'"
+    $stderr.puts "invalid address '#{hostname}'"
     exit 1
   end
 end
 
 if hosts.empty?
-  puts "hostlist parameter empty"
+  $stderr.puts "hostlist parameter empty"
   exit 1
 end
 
