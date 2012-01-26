@@ -1,6 +1,5 @@
-# -*- coding: undecided -*-
 # Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -707,7 +706,7 @@ module MicroStepsLibrary
       }
       must_extract = false
       archive = @config.exec_specific.environment.tarball["file"]
-      dest_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+      dest_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
       files.each { |file|
         if not (File.exist?(File.join(dest_dir, @config.exec_specific.prefix_in_cache + File.basename(file)))) then
           must_extract = true
@@ -1370,55 +1369,51 @@ module MicroStepsLibrary
     # Output
     # * return true if the operation has been performed correctly, false otherwise
     def ms_switch_pxe(instance_thread, step, pxe_profile_msg = "")
+      get_nodes = lambda { |check_vlan|
+        @nodes_ok.set.collect { |node|
+          if check_vlan && (@config.exec_specific.vlan != nil) then 
+            { 'hostname' => node.hostname, 'ip' => @config.exec_specific.ip_in_vlan[node.hostname] }
+          else
+            { 'hostname' => node.hostname, 'ip' => node.ip }
+          end
+        }
+      }
+
       case step
       when "prod_to_deploy_env"
-        if not PXEOperations::set_pxe_for_linux(@nodes_ok.make_array_of_ip,   
-                                                @config.cluster_specific[@cluster].deploy_kernel,
-                                                "",
-                                                @config.cluster_specific[@cluster].deploy_initrd,
-                                                "",
-                                                @config.common.tftp_repository,
-                                                @config.common.tftp_images_path,
-                                                @config.common.tftp_cfg,
-                                                @config.cluster_specific[@cluster].pxe_header) then
+        nodes = get_nodes.call(false)
+        if not @config.common.pxe.set_pxe_for_linux(nodes,
+                                                    @config.cluster_specific[@cluster].deploy_kernel,
+                                                    @config.cluster_specific[@cluster].deploy_kernel_args,
+                                                    @config.cluster_specific[@cluster].deploy_initrd,
+                                                    "",
+                                                    @config.cluster_specific[@cluster].pxe_header) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
           return false
         end
       when "prod_to_nfsroot_env"
-        if not PXEOperations::set_pxe_for_nfsroot(@nodes_ok.make_array_of_ip,
-                                                  @config.cluster_specific[@cluster].nfsroot_kernel,
-                                                  @config.cluster_specific[@cluster].nfsroot_params,
-                                                  @config.common.tftp_repository,
-                                                  @config.common.tftp_images_path,
-                                                  @config.common.tftp_cfg,
-                                                  @config.cluster_specific[@cluster].pxe_header) then
+        nodes = get_nodes.call(falpse)
+        if not @config.common.pxe.set_pxe_for_nfsroot(nodes,
+                                                      @config.cluster_specific[@cluster].nfsroot_kernel,
+                                                      @config.cluster_specific[@cluster].nfsroot_params,
+                                                      @config.cluster_specific[@cluster].pxe_header) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_nfsroot operation")
           return false
         end
       when "set_pxe"
-        if not PXEOperations::set_pxe_for_custom(@nodes_ok.make_array_of_ip,
-                                                 pxe_profile_msg,
-                                                 @config.common.tftp_repository,
-                                                 @config.common.tftp_cfg,
-                                                 @config.exec_specific.pxe_profile_singularities) then
+        nodes = get_nodes.call(false)
+        if not @config.common.pxe.set_pxe_for_custom(nodes,
+                                                     pxe_profile_msg,
+                                                     @config.exec_specific.pxe_profile_singularities) then
           @output.verbosel(0, "Cannot perform the set_pxe_for_custom operation")
           return false
         end
       when "deploy_to_deployed_env"
-        array_of_ip = Array.new
-        if (@config.exec_specific.vlan == nil) then
-          array_of_ip = @nodes_ok.make_array_of_ip
-        else
-          @nodes_ok.make_array_of_hostname.each { |hostname|
-            array_of_ip.push(@config.exec_specific.ip_in_vlan[hostname])
-          }
-        end
+        nodes = get_nodes.call(true)
         if (@config.exec_specific.pxe_profile_msg != "") then
-          if not PXEOperations::set_pxe_for_custom(array_of_ip,
-                                                   @config.exec_specific.pxe_profile_msg,
-                                                   @config.common.tftp_repository,
-                                                   @config.common.tftp_cfg,
-                                                   @config.exec_specific.pxe_profile_singularities) then
+          if not @config.common.pxe.set_pxe_for_custom(nodes,
+                                                       @config.exec_specific.pxe_profile_msg,
+                                                       @config.exec_specific.pxe_profile_singularities) then
             @output.verbosel(0, "Cannot perform the set_pxe_for_custom operation")
             return false
           end
@@ -1429,7 +1424,7 @@ module MicroStepsLibrary
             when "linux"
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
-              images_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+              images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
                 @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
                 return false
@@ -1440,15 +1435,12 @@ module MicroStepsLibrary
                   return false
                 end
               end
-              if not PXEOperations::set_pxe_for_linux(array_of_ip,
-                                                      kernel,
-                                                      get_kernel_params(),
-                                                      initrd,
-                                                      get_deploy_part_str(),
-                                                      @config.common.tftp_repository,
-                                                      @config.common.tftp_images_path,
-                                                      @config.common.tftp_cfg,
-                                                      @config.cluster_specific[@cluster].pxe_header) then
+              if not @config.common.pxe.set_pxe_for_linux(nodes,
+                                                          kernel,
+                                                          get_kernel_params(),
+                                                          initrd,
+                                                          get_deploy_part_str(),
+                                                          @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
                 return false
               end
@@ -1456,7 +1448,7 @@ module MicroStepsLibrary
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
-              images_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+              images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
                 @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
                 return false
@@ -1471,40 +1463,34 @@ module MicroStepsLibrary
                 @output.verbosel(0, "Cannot touch #{File.join(images_dir, hypervisor)}")
                 return false
               end
-              if not PXEOperations::set_pxe_for_xen(array_of_ip,
-                                                    hypervisor,
-                                                    @config.exec_specific.environment.hypervisor_params,
-                                                    kernel,
-                                                    get_kernel_params(),
-                                                    initrd,
-                                                    get_deploy_part_str(),
-                                                    @config.common.tftp_repository,
-                                                    @config.common.tftp_images_path,
-                                                    @config.common.tftp_cfg,
-                                                    @config.cluster_specific[@cluster].pxe_header) then
+              if not @config.common.pxe.set_pxe_for_xen(nodes,
+                                                        hypervisor,
+                                                        @config.exec_specific.environment.hypervisor_params,
+                                                        kernel,
+                                                        get_kernel_params(),
+                                                        initrd,
+                                                        get_deploy_part_str(),
+                                                        @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end
             end
-            Cache::clean_cache(File.join(@config.common.tftp_repository, @config.common.tftp_images_path),
-                               @config.common.tftp_images_max_size * 1024 * 1024,
+            Cache::clean_cache(File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+                               @config.common.pxe_repository_kernels_max_size * 1024 * 1024,
                                1,
                                /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/,
                                @output)
           when "chainload_pxe"
             if (@config.exec_specific.environment.environment_kind != "xen") then
-              PXEOperations::set_pxe_for_chainload(array_of_ip,
-                                                   get_deploy_part_num(),
-                                                   @config.common.tftp_repository,
-                                                   @config.common.tftp_images_path,
-                                                   @config.common.tftp_cfg,
-                                                   @config.cluster_specific[@cluster].pxe_header)
+              @config.common.pxe.set_pxe_for_chainload(nodes,
+                                                       get_deploy_part_num(),
+                                                       @config.cluster_specific[@cluster].pxe_header)
             else
               # @output.verbosel(3, "Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
-              images_dir = File.join(@config.common.tftp_repository, @config.common.tftp_images_path)
+              images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
                 @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
                 return false
@@ -1519,22 +1505,19 @@ module MicroStepsLibrary
                 @output.verbosel(0, "Cannot touch #{File.join(images_dir, hypervisor)}")
                 return false
               end
-              if not PXEOperations::set_pxe_for_xen(array_of_ip,
-                                                    hypervisor,
-                                                    @config.exec_specific.environment.hypervisor_params,
-                                                    kernel,
-                                                    get_kernel_params(),
-                                                    initrd,
-                                                    get_deploy_part_str(),
-                                                    @config.common.tftp_repository,
-                                                    @config.common.tftp_images_path,
-                                                    @config.common.tftp_cfg,
-                                                    @config.cluster_specific[@cluster].pxe_header) then
+              if not @config.common.pxe.set_pxe_for_xen(nodes,
+                                                        hypervisor,
+                                                        @config.exec_specific.environment.hypervisor_params,
+                                                        kernel,
+                                                        get_kernel_params(),
+                                                        initrd,
+                                                        get_deploy_part_str(),
+                                                        @config.cluster_specific[@cluster].pxe_header) then
                 @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
                 return false
               end
-              Cache::clean_cache(File.join(@config.common.tftp_repository, @config.common.tftp_images_path),
-                                 @config.common.tftp_images_max_size * 1024 * 1024,
+              Cache::clean_cache(File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+                                 @config.common.pxe_repository_kernels_max_size * 1024 * 1024,
                                  1,
                                  /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
                                  @output)

@@ -1,8 +1,9 @@
 verbose_level = 3
-tftp_repository = /var/lib/tftpboot
-tftp_images_path = kernels
-tftp_images_max_size = 200
-tftp_cfg = pxelinux.cfg
+pxe_kind = PXElinux
+pxe_repository = /var/lib/tftpboot
+pxe_repository_kernels = kernels
+pxe_repository_kernels_max_size = 200
+pxe_export = /
 db_kind = mysql
 deploy_db_host = g5kdev
 deploy_db_name = deploy

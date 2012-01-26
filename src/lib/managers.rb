@@ -1,5 +1,5 @@
 # Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -934,12 +934,14 @@ module Managers
         if not @config.exec_specific.pxe_upload_files.empty? then
           @config.exec_specific.pxe_upload_files.each { |pxe_file|
             user_prefix = "pxe-#{@config.exec_specific.true_user}--"
-            tftp_images_path = "#{@config.common.tftp_repository}/#{@config.common.tftp_images_path}"
-            local_pxe_file = "#{tftp_images_path}/#{user_prefix}#{File.basename(pxe_file)}"
+            local_pxe_file = File.join(@config.common.pxe_repository, 
+                                       @common.pxe_repository_kernels,
+                                       "#{user_prefix}#{File.basename(pxe_file)}")
             begin
-              if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file",
-                                                   user_prefix, tftp_images_path, 
-                                                   @config.common.tftp_images_max_size, async) then
+              if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
+                                                   File.join(@config.common.pxe_repository,
+                                                             @common.pxe_repository_kernels), 
+                                                   @config.common.pxe_repository_kernels_max_size, async) then
                 @async_file_error = FetchFileError::INVALID_PXE_FILE if async
                 return false
               end
