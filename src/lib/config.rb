@@ -1,5 +1,5 @@
 # Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
+# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
@@ -51,6 +51,7 @@ module ConfigInformation
         if (sanity_check() == true) then
           @common = CommonConfig.new
           res = load_common_config_file
+          
           @cluster_specific = Hash.new
           res = res && load_cluster_specific_config_files
           res = res && load_nodes_config_file
@@ -423,14 +424,21 @@ module ConfigInformation
                 puts "Invalid verbose level"
                 return false
               end
-            when "tftp_repository"
-              @common.tftp_repository = val
-            when "tftp_images_path"
-              @common.tftp_images_path = val
-            when "tftp_cfg"
-              @common.tftp_cfg = val
-            when "tftp_images_max_size"
-              @common.tftp_images_max_size = val.to_i
+            when "pxe_kind"
+              if val =~ /\A(PXElinux|GPXElinux|IPXE)\Z/ then              
+                @common.pxe_kind = val
+              else
+                puts "Invalid PXE kind, allowed values are PXElinux, GPXElinux or IPXE"
+                return false
+              end
+            when "pxe_export"
+              @common.pxe_export = val
+            when "pxe_repository"         
+              @common.pxe_repository = val
+            when "pxe_repository_kernels"         
+              @common.pxe_repository_kernels = val
+            when "pxe_repository_kernels_max_size"
+              @common.pxe_repository_kernels_max_size = val.to_i
             when "db_kind"
               @common.db_kind = val
             when "deploy_db_host"
@@ -641,9 +649,9 @@ module ConfigInformation
       if not @common.check_all_fields_filled() then
         return false
       end
-      #tftp directory
-      if not File.exist?(@common.tftp_repository) then
-        puts "The #{@common.tftp_repository} directory does not exist"
+      #PXE repository
+      if not File.exist?(@common.pxe_repository) then
+        puts "The #{@common.pxe_repository} directory does not exist"
         return false
       end
       if ((not @common.kadeploy_disable_cache) && (not File.exist?(@common.kadeploy_cache_dir))) then
@@ -659,16 +667,21 @@ module ConfigInformation
           return false
         end
       end
-      #tftp image directory
-      if not File.exist?(File.join(@common.tftp_repository, @common.tftp_images_path)) then
-        puts "The #{File.join(@common.tftp_repository, @common.tftp_images_path)} directory does not exist"
+      #PXE kernels directory
+      if (@common.pxe_kind != 'GPXElinux') then
+        #if we use GPXElinux, the kernels are not supposed to be located in the PXE repository
+        if not File.exist?(File.join(@common.pxe_repository, @common.pxe_repository_kernels)) then
+          puts "The #{File.join(@common.pxe_repository, @common.pxe_repository_kernels)} directory does not exist"
+          return false
+        end
+      end
+      #PXE config directory
+      if not File.exist?(File.join(@common.pxe_repository, 'pxelinux.cfg')) then
+        puts "The #{File.join(@common.pxe_repository, 'pxelinux.cfg')} directory does not exist"
         return false
       end
-      #tftp config directory
-      if not File.exist?(File.join(@common.tftp_repository, @common.tftp_cfg)) then
-        puts "The #{File.join(@common.tftp_repository, @common.tftp_cfg)} directory does not exist"
-        return false
-      end
+
+      @common.pxe = PXEOperations::PXEFactory(@common.pxe_kind, @common.pxe_repository, @common.pxe_repository_kernels, @common.pxe_export)
       #Grub config
       if (@common.grub != 'grub1') && (@common.grub != 'grub2') then
         puts 'Invalid Grub value, only grub1 and grub2 values are allowed'
@@ -755,6 +768,8 @@ module ConfigInformation
                 case attr
                 when "deploy_kernel"
                   @cluster_specific[cluster].deploy_kernel = val
+                when "deploy_kernel_args"
+                  @cluster_specific[cluster].deploy_kernel_args = val
                 when "deploy_initrd"
                   @cluster_specific[cluster].deploy_initrd = val
                 when "block_device"
@@ -1262,7 +1277,7 @@ module ConfigInformation
             }
           end
         }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will be prefixed with \"pxe-$username-\" ") { |l|
           l.split(",").each { |file|
             if (file =~ R_HTTP) then
               exec_specific.pxe_upload_files.push(file) 
@@ -2280,7 +2295,7 @@ module ConfigInformation
             }
           end
         }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the \"tftp_images_path\" directory. Those files will be prefixed with \"pxe-$username-\" ") { |l|
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will be prefixed with \"pxe-$username-\" ") { |l|
           l.split(",").each { |file|
             if (file =~ R_HTTP) then
               exec_specific.pxe_upload_files.push(file) 
@@ -2656,10 +2671,12 @@ module ConfigInformation
   
   class CommonConfig
     attr_accessor :verbose_level
-    attr_accessor :tftp_repository
-    attr_accessor :tftp_images_path
-    attr_accessor :tftp_cfg
-    attr_accessor :tftp_images_max_size
+    attr_accessor :pxe
+    attr_accessor :pxe_kind
+    attr_accessor :pxe_export
+    attr_accessor :pxe_repository
+    attr_accessor :pxe_repository_kernels
+    attr_accessor :pxe_repository_kernels_max_size
     attr_accessor :db_kind
     attr_accessor :deploy_db_host
     attr_accessor :deploy_db_name
@@ -2724,6 +2741,7 @@ module ConfigInformation
       @vlan_hostname_suffix = ""
       @set_vlan_cmd = ""
       @grub = "grub2"
+      @pxe_repository_kernels = "kernels"
     end
 
     # Check if all the fields of the common configuration file are filled
@@ -2738,8 +2756,9 @@ module ConfigInformation
         a = eval i
         puts "Warning: " + i + err_msg if (a == nil)
       }
-      if ((@verbose_level == nil) || (@tftp_repository == nil) || (@tftp_images_path == nil) || (@tftp_cfg == nil) ||
-          (@tftp_images_max_size == nil) || (@db_kind == nil) || (@deploy_db_host == nil) || (@deploy_db_name == nil) ||
+
+      if ((@verbose_level == nil) || (@pxe_kind == nil) || (@pxe_export == nil) || (@pxe_repository == nil) ||
+          (@pxe_repository_kernels_max_size == nil) || (@db_kind == nil) || (@deploy_db_host == nil) || (@deploy_db_name == nil) ||
           (@deploy_db_login == nil) || (@deploy_db_passwd == nil) || (@rights_kind == nil) || (@nodes_desc == nil) ||
           (@taktuk_connector == nil) ||
           (@taktuk_tree_arity == nil) || (@taktuk_auto_propagate == nil) || (@tarball_dest_dir == nil) ||
@@ -2764,6 +2783,7 @@ module ConfigInformation
   
   class ClusterSpecificConfig
     attr_accessor :deploy_kernel
+    attr_accessor :deploy_kernel_args
     attr_accessor :deploy_initrd
     attr_accessor :block_device
     attr_accessor :deploy_part
@@ -2805,6 +2825,7 @@ module ConfigInformation
     def initialize
       @workflow_steps = Array.new
       @deploy_kernel = nil
+      @deploy_kernel_args = ""
       @deploy_initrd = nil
       @block_device = nil
       @deploy_part = nil
@@ -2848,6 +2869,7 @@ module ConfigInformation
     def duplicate_but_steps(dest, workflow_steps)
       dest.workflow_steps = workflow_steps
       dest.deploy_kernel = @deploy_kernel.clone
+      dest.deploy_kernel_args = @deploy_kernel_args.clone
       dest.deploy_initrd = @deploy_initrd.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
@@ -2892,6 +2914,7 @@ module ConfigInformation
         dest.workflow_steps[i] = @workflow_steps[i].clone
       }
       dest.deploy_kernel = @deploy_kernel.clone
+      dest.deploy_kernel_args = @deploy_kernel_args.clone
       dest.deploy_initrd = @deploy_initrd.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
