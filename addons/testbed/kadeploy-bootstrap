@@ -387,7 +387,7 @@ def cfg_kadeploy_soft_reboot_cmd()
   if CFG_KADEPLOY_SOFT_REBOOT
     ret = "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\""
   else
-    ret = '/bin/false'
+    ret = cfg_kadeploy_hard_reboot_cmd()
   end
   ret
 end
@@ -424,6 +424,7 @@ def cfg_kadeploy_specific_conf(cluster)
   "timeout_reboot_kexec = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
   "cmd_soft_reboot = #{cfg_kadeploy_soft_reboot_cmd()}\n"\
   "cmd_hard_reboot = #{cfg_kadeploy_hard_reboot_cmd()}\n"\
+  "cmd_very_hard_reboot = /bin/false\n"\
   + # Kapower
   "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
   "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
@@ -702,6 +703,7 @@ def cfg_dhcp()
   "use-host-decl-names on;\n\n"\
   "log-facility local7;\n\n"\
   + # PXE class options
+=begin
   "option space PXE;\n"\
   "option PXE.mtftp-ip code 1 = ip-address;\n"\
   "option PXE.mtftp-cport code 2 = unsigned integer 16;\n"\
@@ -719,20 +721,16 @@ def cfg_dhcp()
   "site-option-space \"pxelinux\";\n"\
   "option pxelinux.magic #{CFG_DHCP_PXE_MAGIC};\n"\
   "option pxelinux.reboottime 30;\n\n"\
-=begin
   # PXE class
   "class \"PXE\" {\n"\
 	  "match if substring(option vendor-class-identifier, 0, 9) = \"PXEClient\";\n"\
-=end
-  "  if exists user-class and option user-class = \"iPXE\" {\n"\
-  "    filename=concat(\"http://#{$kanodes[:kadeploy][:ipv4]}/\",host-decl-name);\n"\
-  "  } else {\n"\
-  "    filename \"#{CFG_DHCP_PXE_CLIENT}\";\n"\
-  "  }\n"\
+
+
   "  option vendor-class-identifier \"PXEClient\";\n"\
   "  vendor-option-space PXE;\n"\
 	"  option PXE.mtftp-ip 0.0.0.0;\n"\
-=begin
+
+
   "}\n\n"\
 
   + # Experiments network
@@ -744,6 +742,11 @@ def cfg_dhcp()
   "  option domain-name \"#{DOMAIN}\";\n"\
   "  option domain-name-servers #{$kanodes[:dns][:ipv4]};\n"\
   + # Kadeploy server
+  "  if exists user-class and option user-class = \"iPXE\" {\n"\
+  "    filename=concat(\"http://#{$kanodes[:kadeploy][:ipv4]}/\",host-decl-name);\n"\
+  "  } else {\n"\
+  "    filename \"#{CFG_DHCP_PXE_CLIENT}\";\n"\
+  "  }\n"\
   "  next-server #{$kanodes[:tftp][:ipv4]};\n\n"\
   + # Deploiement nodes
   ""\
@@ -1395,6 +1398,12 @@ end
 def select_server_type(hash,type)
   arr = hash.select { |n,h| h[:type] == :SERVER }.collect { |v| v[1] }
   arr.select { |h| h[:server_type] == type }
+end
+
+def set_arp_cache(session)
+  sexec(session,'sysctl -w net.ipv4.neigh.default.gc_thresh1=1024')
+  sexec(session,'sysctl -w net.ipv4.neigh.default.gc_thresh2=4096')
+  sexec(session,'sysctl -w net.ipv4.neigh.default.gc_thresh3=16384')
 end
 
 options[:node_list]   = nil
@@ -2190,6 +2199,9 @@ msg('=== Setting up DNS server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
 
+  msg("Tuning ARP cache size",MSG_INFO)
+  set_arp_cache(session)
+
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
 		apt_update(session)
@@ -2249,62 +2261,14 @@ msg("Disconnected from #{server[:basename]}",MSG_INFO)
 msg("",MSG_INFO)
 
 
-if $deploysendmeth == :HTTP
-  msg('=== Setting up HTTP server(s)',MSG_INFO)
-  select_server_type($kanodes,:www).each do |server|
-    servername=getnode(server[:basename])
-    sshgw.ssh(servername,'root') do |session|
-      msg("Connected to #{server[:basename]}",MSG_INFO)
-
-      http_tunnel(server,session) do
-        msg('Updating debian packages list',MSG_INFO)
-        apt_update(session)
-
-        msg('Installing HTTP server',MSG_INFO)
-        apt_install(session,['apache2','apache2-mpm-worker'])
-        sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
-        sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
-        sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
-
-        msg('Configuring HTTP server',MSG_INFO)
-        sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
-        sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
-        tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
-        tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
-        sexec(session,'service apache2 restart')
-
-        msg('Sending deployment kernels',MSG_INFO)
-        sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-        sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-        $deplkernels.each do |name,kernel|
-          msg("\t#{name}",MSG_INFO)
-          scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-          scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-        end
-
-        sexec(session,"chmod -R 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-
-        msg('Installing PXE bootfiles',MSG_INFO)
-        apt_install(session,'syslinux-common')
-        CFG_PXE_BOOTFILES.each do |bootfile|
-          tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
-          msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
-            MSG_ERROR,true) if !tmp or tmp.empty? or !tmp[0] or tmp[0].empty?
-          sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
-        end
-
-      end
-    end
-    msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
-    msg("",MSG_INFO)
-  end
-end
-
 server=$kanodes[:dhcp]
 servername=getnode(server[:basename])
 msg('=== Setting up DHCP server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
+
+  msg("Tuning ARP cache size",MSG_INFO)
+  set_arp_cache(session)
 
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
@@ -2388,6 +2352,9 @@ servername=getnode(server[:basename])
 msg('=== Setting up Kadeploy server',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
+
+  msg("Tuning ARP cache size",MSG_INFO)
+  set_arp_cache(session)
 
 	kadeploy_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
@@ -2613,6 +2580,62 @@ sshgw.ssh(servername,'root') do |session|
 end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
 msg("",MSG_INFO)
+
+
+if $deploysendmeth == :HTTP
+  msg('=== Setting up HTTP server(s)',MSG_INFO)
+  select_server_type($kanodes,:www).each do |server|
+    servername=getnode(server[:basename])
+    sshgw.ssh(servername,'root') do |session|
+
+      msg("Tuning ARP cache size",MSG_INFO)
+      set_arp_cache(session)
+
+      msg("Connected to #{server[:basename]}",MSG_INFO)
+
+      http_tunnel(server,session) do
+        msg('Updating debian packages list',MSG_INFO)
+        apt_update(session)
+
+        msg('Installing HTTP server',MSG_INFO)
+        apt_install(session,['apache2','apache2-mpm-worker'])
+        sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
+        sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
+        sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
+
+        msg('Configuring HTTP server',MSG_INFO)
+        sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
+        sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
+        tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+        tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
+        sexec(session,'service apache2 restart')
+
+        msg('Sending deployment kernels',MSG_INFO)
+        sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+        sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+        $deplkernels.each do |name,kernel|
+          msg("\t#{name}",MSG_INFO)
+          scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+          scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+        end
+
+        sexec(session,"chmod -R 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+
+        msg('Installing PXE bootfiles',MSG_INFO)
+        apt_install(session,'syslinux-common')
+        CFG_PXE_BOOTFILES.each do |bootfile|
+          tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
+          msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
+            MSG_ERROR,true) if !tmp or tmp.empty? or !tmp[0] or tmp[0].empty?
+          sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
+        end
+
+      end
+    end
+    msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
+    msg("",MSG_INFO)
+  end
+end
 
 
 =begin
