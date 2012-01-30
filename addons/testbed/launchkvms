@@ -27,6 +27,8 @@ myip=Resolv.getaddress(Socket.gethostname)
 
 # Cleaning everything
 cmd("killall kvm &>/dev/null; true")
+sleep(2)
+
 #cmd("umount #{File.join(TMP_DIR,'*')}; true")
 mounts = cmd('mount')
 mounts.each do |line|
