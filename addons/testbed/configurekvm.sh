@@ -3,6 +3,8 @@
 BW_PER_WWW=120
 NETWORK_CIDR=20
 
+TMP_DIR="${HOME}/.kabootstrapfiles/"
+
 SSH_KEY=~/.ssh/id_rsa
 TMP_SSH_KEY=/tmp/identity
 
@@ -40,6 +42,9 @@ else
   let nbservers=nbnodes/BW_PER_WWW+2
 fi
 
+rm -Rf $TMP_DIR
+mkdir -p $TMP_DIR
+
 kadaemon=`echo "$hosts" | head -n 1`
 wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1d'`
 
@@ -50,8 +55,11 @@ then
   exit 1
 fi
 
-hostfile=`tempfile`
+hostfile=`tempfile --directory $TMP_DIR`
 echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
+
+wwwfile=`tempfile --directory $TMP_DIR`
+echo "$wwwservers" > $wwwfile
 
 nbhosts=`cat $hostfile | wc -l`
 if [ $nbhosts -le 0 ]
@@ -87,7 +95,7 @@ let stime=`date +%s`-stime
 echo "... done in ${stime} seconds" >&2
 
 echo 'Creating nodefile' >&2
-nodefile=`tempfile`
+nodefile=`tempfile --directory $TMP_DIR`
 $SCRIPT_GENNODES ${network}/$NETWORK_CIDR -f $hostfile -n $nbkvms > $nodefile
 
 if [ $? -ne 0 ]
@@ -109,15 +117,17 @@ cat $nodefile
 
 echo "" >&2
 echo "Cleaning temporary files" >&2
-rm $nodefile
 
-rm $hostfile
+#rm $nodefile
+#rm $hostfile
+#rm $wwwfile
 
 ssh-agent -k 1>/dev/null
 rm $sagentfile
 echo "" >&2
 
-echo "Kadeploy daemon: $kadaemon" >&2
-echo "www daemons:" >&2
+echo "Kadeploy node: $kadaemon" >&2
+echo "www nodes:" >&2
 echo "$wwwservers" >&2
 
+echo "kabootstrap options: -V -d $kadaemon -w $wwwfile -f $nodefile -F $hostfile" >&2
