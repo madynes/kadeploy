@@ -436,6 +436,7 @@ def cfg_kadeploy_specific_conf(cluster)
   + # >>> TODO: UPDATE
   "partition_creation_kind = fdisk\n"\
   "pxe_header = #{CFG_PXE_HEADER.gsub("\n",'\n')}\n"\
+  "use_ip_to_deploy = true\n"\
   + #Automata description
   "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1)}\n"\
   "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP2)}\n"\
@@ -524,6 +525,13 @@ def cfg_apache_site()
   "  </Directory>\n"\
   "  CustomLog ${APACHE_LOG_DIR}/access.log combined\n"\
   "</VirtualHost>\n"
+end
+
+
+# NFS default config
+CFG_NFS_EXPORT_CONF_FILE = '/etc/exports'
+def cfg_nfs_exports(path)
+  "#{path} *(ro,no_root_squash,subtree_check)\n"
 end
 
 
@@ -743,7 +751,7 @@ def cfg_dhcp()
   "  option domain-name-servers #{$kanodes[:dns][:ipv4]};\n"\
   + # Kadeploy server
   "  if exists user-class and option user-class = \"iPXE\" {\n"\
-  "    filename=concat(\"http://#{$kanodes[:kadeploy][:ipv4]}/\",host-decl-name);\n"\
+  "    filename=concat(\"http://#{$services[:www][:fqdn]}/\",host-decl-name);\n"\
   "  } else {\n"\
   "    filename \"#{CFG_DHCP_PXE_CLIENT}\";\n"\
   "  }\n"\
@@ -2539,25 +2547,26 @@ sshgw.ssh(servername,'root') do |session|
       tempfile(cfg_tftp()) {|path| scp(servername,path,CFG_TFTP_CONF_FILE)}
       sexec(session,'service tftpd-hpa restart')
 
-      msg('Sending deployment kernels',MSG_INFO)
-      $deplkernels.each do |name,kernel|
-        msg("\t#{name}",MSG_INFO)
-        scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-        scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-      end
-
       msg('Removing configuration related packages',MSG_INFO)
       apt_remove(session,['debconf-utils'])
     when :HTTP
-      msg('Installing HTTP server',MSG_INFO)
-      apt_install(session,['apache2','apache2-mpm-worker'])
+      msg('Installing NFS server',MSG_INFO)
+      apt_install(session,'nfs-server')
+      msg('Configuring NFS server',MSG_INFO)
+      sexec(session,"rm -Rf #{cfg_pxe_path()}")
+      sexec(session,"mkdir -p #{cfg_pxe_path()}")
+      tempfile(cfg_nfs_exports(cfg_pxe_path())) {|path| scp(servername,path,CFG_NFS_EXPORT_CONF_FILE)}
+      sexec(session,'exportfs -ar')
 
-      msg('Configuring HTTP server',MSG_INFO)
-      sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
-      sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
-      tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
-      tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
-      sexec(session,'service apache2 restart')
+      #msg('Installing HTTP server',MSG_INFO)
+      #apt_install(session,['apache2','apache2-mpm-worker'])
+
+      #msg('Configuring HTTP server',MSG_INFO)
+      #sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
+      #sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
+      #tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+      #tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
+      #sexec(session,'service apache2 restart')
     end
 
     msg('Installing PXE bootfiles',MSG_INFO)
@@ -2569,11 +2578,22 @@ sshgw.ssh(servername,'root') do |session|
       sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
     end
 
+    sexec(session,"rm -Rf #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    msg('Sending deployment kernels',MSG_INFO)
+    $deplkernels.each do |name,kernel|
+      msg("\t#{name}",MSG_INFO)
+      scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+      scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+    end
+
     msg('Creating pxelinux configs',MSG_INFO)
     sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_PROFILES_DIR)}")
     tempfile(cfg_pxe()) do |path|
       scp(servername,path,File.join(cfg_pxe_path(CFG_PXE_PROFILES_DIR),'default'))
     end
+
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} -R #{cfg_pxe_path()}")
     sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
 	end
@@ -2599,6 +2619,7 @@ if $deploysendmeth == :HTTP
 
         msg('Installing HTTP server',MSG_INFO)
         apt_install(session,['apache2','apache2-mpm-worker'])
+        sexec(session,"umount -f #{CFG_APACHE_SERVER_PATH}; true")
         sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
         sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
         sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
@@ -2610,26 +2631,31 @@ if $deploysendmeth == :HTTP
         tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
         sexec(session,'service apache2 restart')
 
-        msg('Sending deployment kernels',MSG_INFO)
-        sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-        sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-        $deplkernels.each do |name,kernel|
-          msg("\t#{name}",MSG_INFO)
-          scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-          scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-        end
+        msg('Installing NFS client',MSG_INFO)
+        apt_install(session,'nfs-common')
 
-        sexec(session,"chmod -R 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+        msg('Mounting NFS directory',MSG_INFO)
+        sexec(session,"mount -t nfs #{$kanodes[:kadeploy][:ipv4]}:#{cfg_pxe_path()} #{CFG_APACHE_SERVER_PATH}")
 
-        msg('Installing PXE bootfiles',MSG_INFO)
-        apt_install(session,'syslinux-common')
-        CFG_PXE_BOOTFILES.each do |bootfile|
-          tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
-          msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
-            MSG_ERROR,true) if !tmp or tmp.empty? or !tmp[0] or tmp[0].empty?
-          sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
-        end
+        #msg('Sending deployment kernels',MSG_INFO)
+        #sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+        #sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+        #$deplkernels.each do |name,kernel|
+        #  msg("\t#{name}",MSG_INFO)
+        #  scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+        #  scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+        #end
 
+        #sexec(session,"chmod -R 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+
+        #msg('Installing PXE bootfiles',MSG_INFO)
+        #apt_install(session,'syslinux-common')
+        #CFG_PXE_BOOTFILES.each do |bootfile|
+        #  tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
+        #  msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
+        #    MSG_ERROR,true) if !tmp or tmp.empty? or !tmp[0] or tmp[0].empty?
+        #  sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
+        #end
       end
     end
     msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
