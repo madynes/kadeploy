@@ -3,6 +3,7 @@
 require 'ipaddr'
 require 'resolv'
 require 'optparse'
+require 'yaml'
 
 USAGE = "Usage: #{$0} [options] <network_address>\n"\
 "Note: the network the nodes should take their IP into (CIDR or /mask notation : 10.0.0.0/24 or 10.0.0.0/255.255.255.0)"
@@ -45,7 +46,6 @@ end
 
 options = {}
 
-options[:nodesnb] = NODENB
 options[:host_list] = nil
 
 optparse = OptionParser.new(USAGE) do |opts|
@@ -58,12 +58,8 @@ optparse = OptionParser.new(USAGE) do |opts|
   	options[:host_list] = h
 	end
 
-	opts.on( '-x', '--exclude-list <nodelist_file>', 'Specify a file containing the list of server that IP should not be affected to VMs' ) do |h|
+	opts.on( '-e', '--exclude-list <nodelist_file>', 'Specify a file containing a list of nodes that IP should be excluded from the pool of IPs used for the VMs' ) do |h|
   	options[:excl_list] = h
-	end
-
-	opts.on( '-n', '--nodes <number>', "The number of nodes per hosts (default: #{NODENB})" ) do |n|
-  	options[:nodesnb] = n.to_i
 	end
 end
 
@@ -99,26 +95,24 @@ end
 
 hostlist = []
 begin
-	File.open(hostlist_file, 'r') do |f|
-    f.each do |line|
-      hostlist << line.strip unless hostlist.include?(line.strip)
-    end
-  end
+  hostlist = YAML.load_file(hostlist_file)
 rescue Errno::ENOENT
 	$stderr.puts "File '#{nodelist_file}' not found"
   exit 1
 end
 
 excllist = []
-begin
-	File.open(options[:excl_list] , 'r') do |f|
-    f.each do |line|
-      excllist << line.strip unless excllist.include?(line.strip)
+if options[:excl_list]
+  begin
+    File.open(options[:excl_list] , 'r') do |f|
+      f.each do |line|
+        excllist << line.strip unless excllist.include?(line.strip)
+      end
     end
+  rescue Errno::ENOENT
+    $stderr.puts "File '#{excllist_file}' not found"
+    exit 1
   end
-rescue Errno::ENOENT
-	$stderr.puts "File '#{excllist_file}' not found"
-  exit 1
 end
 
 hosts = []
@@ -129,32 +123,45 @@ exclips = [
   ipv42int(tmp.last.to_s)
 ]
 
-parselist = Proc.new do |list,genhosts|
-  list.each do |host|
-    begin
-      hostname = host
-      hostip = Resolv.getaddress(hostname)
-      tmp = ipv42int(hostip)
-      unless networkaddr.include?(IPAddr.new(hostip))
-        $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
-        exit 1
-      end
-
-      hosts << {
-        :hostname => hostname,
-        :ipv4str => hostip,
-        :ipv4int => tmp
-      } if genhosts
-      exclips << tmp
-    rescue
-      $stderr.puts "invalid address '#{hostname}'"
+excllist.each do |host|
+  begin
+    hostname = host
+    hostip = Resolv.getaddress(hostname)
+    tmp = ipv42int(hostip)
+    unless networkaddr.include?(IPAddr.new(hostip))
+      $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
       exit 1
     end
+
+    exclips << tmp
+  rescue
+    $stderr.puts "invalid address '#{hostname}'"
+    exit 1
   end
 end
 
-parselist.call(hostlist,true)
-parselist.call(excllist,false)
+hostlist.each_pair do |host,nbnodes|
+  begin
+    hostname = host
+    hostip = Resolv.getaddress(hostname)
+    tmp = ipv42int(hostip)
+    unless networkaddr.include?(IPAddr.new(hostip))
+      $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
+      exit 1
+    end
+
+    hosts << {
+      :hostname => hostname,
+      :ipv4str => hostip,
+      :ipv4int => tmp,
+      :nbnodes => nbnodes
+    }
+    exclips << tmp
+  rescue
+    $stderr.puts "invalid address '#{hostname}'"
+    exit 1
+  end
+end
 
 if hosts.empty?
   $stderr.puts "hostlist parameter empty"
@@ -166,7 +173,7 @@ itermac = mac2int(MACADDR_START_VAL)
 
 count=1
 hosts.each do |host|
-  iters = options[:nodesnb]
+  iters = host[:nbnodes]
   while iters > 0 do
     unless exclips.include?(iterip)
       puts "#{NODENAME_PREFIX}#{count} #{int2ipv4(iterip)} #{int2mac(itermac)} #{host[:ipv4str]}"

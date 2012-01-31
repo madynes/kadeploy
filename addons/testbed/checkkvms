@@ -1,0 +1,40 @@
+#!/usr/bin/ruby
+
+require 'socket'
+require 'resolv'
+
+# Sizes in Mo
+RAM_SIZE = 350
+FS_SIZE = 564
+
+FS_TYPE = 'qcow2'
+FS_FILE = "disk.#{FS_TYPE}"
+#NET_MODEL = 'e1000'
+HOST_FREE_MEM_SIZE = 1024
+
+TMP_DIR = '/tmp/katestbed'
+
+def cmd(cmd,critical=true)
+  ret = `#{cmd}`
+  if critical and !$?.success?
+    $stderr.puts "error when executing '#{cmd}': #{ret}"
+    exit 1
+  end
+  ret
+end
+
+myip=Resolv.getaddress(Socket.gethostname)
+
+# Get memory info
+meminfo = File.read('/proc/meminfo')
+totmem = nil
+meminfo.each do |line|
+  totmem = Regexp.last_match(1).to_i/1024 if line =~ /^MemTotal:\s*(\S+)\s*.*$/
+end
+
+unless totmem
+  $stderr.puts 'Unavailable to get meminfo'
+  exit 1
+end
+
+puts (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
