@@ -3,7 +3,7 @@
 BW_PER_WWW=120
 NETWORK_CIDR=20
 
-TMP_DIR="${HOME}/.kabootstrapfiles/"
+TMP_DIR="${HOME}/.kabootstrapfiles"
 
 SSH_KEY=~/.ssh/id_rsa
 TMP_SSH_KEY=/tmp/identity
@@ -12,7 +12,7 @@ SCRIPT_BRIDGE=./setupkvmbridge
 SCRIPT_LAUNCH=./launchkvms
 SCRIPT_GENNODES=./genkvmnodefile
 
-SSH_CONNECTOR='ssh -A -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
+SSH_CONNECTOR='ssh -A -q -o ConnectTimeout=8 -o SetupTimeOut=16 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
 TAKTUK_OUTPUT='"$host: $line\n"'
 TAKTUK_OPTIONS="-s -n -l root -o status -R connector=2 -R error=2"
 
@@ -37,16 +37,18 @@ nbnodes=`echo "$hosts" | wc -l`
 if [ $# -ge 3 ] && [ $3 -gt 0 ]
 then
   tmp=$3
-  let nbservers=tmp+1
+  let nbservers=tmp+3
 else
-  let nbservers=nbnodes/BW_PER_WWW+2
+  let nbservers=nbnodes/BW_PER_WWW+4
 fi
 
 rm -Rf $TMP_DIR
 mkdir -p $TMP_DIR
 
-kadaemon=`echo "$hosts" | head -n 1`
-wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1d'`
+kadaemon=`echo "$hosts" | sed -n '1p'`
+dnsdaemon=`echo "$hosts" | sed -n '2p'`
+dhcpdaemon=`echo "$hosts" | sed -n '3p'`
+wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1,3d'`
 
 network=`dig +short $kadaemon`
 if [ $? -ne 0 ]
@@ -55,10 +57,10 @@ then
   exit 1
 fi
 
-hostfile=`tempfile --directory $TMP_DIR`
+hostfile=${TMP_DIR}/hostfile
 echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
 
-wwwfile=`tempfile --directory $TMP_DIR`
+wwwfile=${TMP_DIR}/wwwfile
 echo "$wwwservers" > $wwwfile
 
 nbhosts=`cat $hostfile | wc -l`
@@ -94,9 +96,14 @@ taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostf
 let stime=`date +%s`-stime
 echo "... done in ${stime} seconds" >&2
 
+exclfile=`tempfile`
+echo "$hosts" | sed -n "1,${nbservers}p" > $exclfile
+
 echo 'Creating nodefile' >&2
-nodefile=`tempfile --directory $TMP_DIR`
-$SCRIPT_GENNODES ${network}/$NETWORK_CIDR -f $hostfile -n $nbkvms > $nodefile
+nodefile=${TMP_DIR}/nodefile
+$SCRIPT_GENNODES ${network}/$NETWORK_CIDR -f $hostfile -e $exclfile -n $nbkvms > $nodefile
+
+rm $exclfile
 
 if [ $? -ne 0 ]
 then
@@ -127,7 +134,9 @@ rm $sagentfile
 echo "" >&2
 
 echo "Kadeploy node: $kadaemon" >&2
+echo "DNS node: $dnsdaemon" >&2
+echo "DHCP node: $dhcpdaemon" >&2
 echo "www nodes:" >&2
 echo "$wwwservers" >&2
 
-echo "kabootstrap options: -V -d $kadaemon -w $wwwfile -f $nodefile -F $hostfile" >&2
+echo "kabootstrap options: -V -d $kadaemon -a $dnsdaemon -b $dhcpdaemon -w $wwwfile -f $nodefile -F $hostfile" >&2

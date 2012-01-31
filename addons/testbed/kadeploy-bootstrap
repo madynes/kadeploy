@@ -204,8 +204,8 @@ def cfg_kadeploy_conf()
   "log_to_db = true\n"\
   "dbg_to_syslog = true\n"\
   "dbg_to_syslog_level = 3\n"\
-  "reboot_window = 200\n"\
-  "reboot_window_sleep_time = 8\n"\
+  "reboot_window = 150\n"\
+  "reboot_window_sleep_time = 10\n"\
   "nodes_check_window = 100\n"\
   "bootloader = chainload_pxe\n"\
   "purge_deployment_timer = 900\n"\
@@ -409,7 +409,7 @@ def cfg_kadeploy_deploy_kernel_args(cluster)
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 500
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 200
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
@@ -429,7 +429,7 @@ def cfg_kadeploy_specific_conf(cluster)
   "cmd_very_hard_reboot = /bin/false\n"\
   + # Kapower
   "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
-  "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
+  "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=12 -o SetupTimeOut=16 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
   "cmd_hard_power_off = #{cfg_kadeploy_power_off_cmd()}\n"\
   "cmd_power_status = #{cfg_kadeploy_power_status_cmd()}\n"\
   + # Kaconsole
@@ -1490,6 +1490,14 @@ optparse = OptionParser.new(USAGE) do |opts|
   	options[:daemon_kadeploy] = d || nil
 	end
 
+	opts.on( '-a', '--dns-daemon <node_address>', 'Specify which node should be used as dns daemon (default: same as kadeploy one)' ) do |d|
+  	options[:daemon_dns] = d || nil
+	end
+
+	opts.on( '-b', '--dhcp-daemon <node_address>', 'Specify which node should be used as dhcp daemon (default: same as kadeploy one)' ) do |d|
+  	options[:daemon_dhcp] = d || nil
+	end
+
 	opts.on( '', '--debug', 'Verbose display of every instruction sent' ) do
   	$debug = true
 	end
@@ -1750,7 +1758,21 @@ if options[:www_list]
       #tmp = getnode(tmp)
       tmpip = Resolv.getaddress(getnode(tmp))
       name = "www-#{count}"
-      unless $kanodes[name.to_sym]
+      match = nil
+      select_type($kanodes,:HOST).each do |node|
+        if node[:ipv4] == tmpip \
+        or node[:basename] == tmp \
+        or node[:basename].split('.')[0] == tmp.split('.')[0]
+          match = node
+          msg("www host node '#{node[:basename]}' found in hostlist, using it as www",MSG_WARNING)
+          node[:type] = :SERVER
+          node[:name] = name
+          node[:server_type] = :www
+          count += 1
+          break
+        end
+      end
+      if !$kanodes[name.to_sym] and !match
         $kanodes[tmp.to_sym] = {}
         $kanodes[tmp.to_sym][:name] = name
         $kanodes[tmp.to_sym][:basename] = tmp
@@ -1771,8 +1793,6 @@ if options[:www_list]
     end
   end
   end
-else
-  msg("using hostlist parameter with non compatible mode (VLAN-KVM only), ignoring",MSG_WARNING) if options[:host_list]
 end
 
 begin
@@ -1882,59 +1902,81 @@ else
   end
 end
 
-
-unless $mode == :KVM
-	begin
-		addr = IPAddr.new(kaserver)
-    msg('Kadeploy daemon should be specified by hostname (see -d option)',MSG_ERROR,true)
-	rescue ArgumentError
-    kaserver = kaserver.split("-#{getgw().split('.')[0]}").join
-	end
+if options[:daemon_dns]
+  dnsserver = options[:daemon_dns].strip
+else
+  dnsserver = kaserver
 end
 
-case $mode
-  when :KAVLAN
-    if deplnodes.include?(kaserver)
-      deplnodes.delete(kaserver)
-    else
-      tmp = deplnodes.select { |node| node =~ /^#{kaserver}/ }
-      if tmp.empty?
-        msg("Kadeploy daemon not present in <nodes_file>",MSG_WARNING)
-      else
-        msg("Kadeploy daemon '#{kaserver}' assumed to be '#{tmp[0]}' (which is present in <nodes_file>)",MSG_WARNING)
-        kaserver = tmp[0]
-        deplnodes.delete(kaserver)
-      end
-    end
-  when :KVM
+if options[:daemon_dhcp]
+  dhcpserver = options[:daemon_dhcp].strip
+else
+  dhcpserver = kaserver
+end
+
+check_server = Proc.new do |server, servername|
+  unless $mode == :KVM
     begin
-      kaserverip = Resolv.getaddress(kaserver)
-    rescue Resolv::ResolvError
-      msg("invalid Kadeploy daemon hostname '#{kaserver}'",MSG_ERROR,true)
+      addr = IPAddr.new(server)
+      msg("#{name} daemon should be specified by hostname",MSG_ERROR,true)
+    rescue ArgumentError
+      server = server.split("-#{getgw().split('.')[0]}").join
     end
-    tmp = $kanodes.select { |n,h| h[:ipv4] == kaserverip }.collect { |v| v[0] }
-    unless tmp.nil?
-      msg("Kadeploy daemon is present in <nodes_file>",MSG_WARNING)
+  end
+
+  serverip = nil
+  case $mode
+    when :KAVLAN
+      if deplnodes.include?(server)
+        deplnodes.delete(server)
+      else
+        tmp = deplnodes.select { |node| node =~ /^#{server}/ }
+        if tmp.empty?
+          msg("#{servername} daemon not present in <nodes_file>",MSG_WARNING)
+        else
+          msg("#{servername} daemon '#{server}' assumed to be '#{tmp[0]}' (which is present in <nodes_file>)",MSG_WARNING)
+          server = tmp[0]
+          deplnodes.delete(server)
+        end
+      end
+    when :KVM
+      begin
+        serverip = Resolv.getaddress(server)
+      rescue Resolv::ResolvError
+        msg("invalid #{servername} daemon hostname '#{server}'",MSG_ERROR,true)
+      end
+      tmp = $kanodes.select { |n,h| h[:ipv4] == serverip }.collect { |v| v[0] }
+      unless tmp.nil?
+        msg("#{servername} daemon is present in <nodes_file>",MSG_WARNING)
+        tmp.each do |nodetmp|
+          deplnodes.delete(nodetmp.to_s)
+        end
+      end
+    when :VLANKVM
+      begin
+        serverip = Resolv.getaddress(getnode(server))
+      rescue Resolv::ResolvError
+        msg("invalid #{servername} daemon hostname '#{server}'",MSG_ERROR,true)
+      end
+      tmp = $kanodes.select { |n,h| h[:basename] =~ /^#{server}/ or h[:ipv4] == serverip }.collect { |v| v[0] }
       tmp.each do |nodetmp|
         deplnodes.delete(nodetmp.to_s)
+        $kanodes.delete(nodetmp) unless $kanodes[nodetmp][:name] == servername
+        $kanodes[nodetmp][:type] = :SERVER
       end
-    end
-  when :VLANKVM
-    begin
-      kaserverip = Resolv.getaddress(getnode(kaserver))
-    rescue Resolv::ResolvError
-      msg("invalid Kadeploy daemon hostname '#{kaserver}'",MSG_ERROR,true)
-    end
-    tmp = $kanodes.select { |n,h| h[:basename] =~ /^#{kaserver}/ or h[:ipv4] == kaserverip }.collect { |v| v[0] }
-    tmp.each do |nodetmp|
-      deplnodes.delete(nodetmp.to_s)
-      $kanodes[nodetmp][:type] = :SERVER
-    end
 
-  else
-    msg('Unknown mode',MSG_ERROR,true)
+    else
+      msg('Unknown mode',MSG_ERROR,true)
+  end
+  [ server.split('.')[0], serverip ]
 end
 
+kaserver,kaserverip = check_server.call(kaserver,'kadeploy')
+dnsserver,dnsserverip = check_server.call(dnsserver,'dns')
+dhcpserver,dhcpserverip = check_server.call(dhcpserver,'dhcp')
+
+
+msg("=== Servers",MSG_INFO)
 $services[:kadeploy] = {}
 $services[:kadeploy][:name] = 'kadeploy'
 $services[:kadeploy][:fqdn] = "#{$services[:kadeploy][:name]}.#{DOMAIN}"
@@ -1943,6 +1985,8 @@ $kanodes[:kadeploy][:name] = $services[:kadeploy][:name]
 $kanodes[:kadeploy][:basename] = kaserver
 $kanodes[:kadeploy][:ipv4] = kaserverip || nil
 $kanodes[:kadeploy][:type] = :SERVER
+msg("  Kadeploy: #{$kanodes[:kadeploy][:basename]}",MSG_INFO)
+
 
 # >>> TODO: Add options
 $services[:dns] = {}
@@ -1950,9 +1994,10 @@ $services[:dns][:name] = 'dns'
 $services[:dns][:fqdn] = "#{$services[:dns][:name]}.#{DOMAIN}"
 $kanodes[:dns] = {}
 $kanodes[:dns][:name] = $services[:dns][:name]
-$kanodes[:dns][:basename] = $kanodes[:kadeploy][:basename]
-$kanodes[:dns][:ipv4] = $kanodes[:kadeploy][:ipv4]
+$kanodes[:dns][:basename] = dnsserver
+$kanodes[:dns][:ipv4] = dnsserverip || nil
 $kanodes[:dns][:type] = :SERVER
+msg("  DNS: #{$kanodes[:dns][:basename]}",MSG_INFO)
 
 $services[:tftp] = {}
 $services[:tftp][:name] = 'tftp'
@@ -1969,9 +2014,10 @@ $services[:dhcp][:name] = 'dhcp'
 $services[:dhcp][:fqdn] = "#{$services[:dhcp][:name]}.#{DOMAIN}"
 $kanodes[:dhcp] = {}
 $kanodes[:dhcp][:name] = $services[:dhcp][:name]
-$kanodes[:dhcp][:basename] = $kanodes[:kadeploy][:basename]
-$kanodes[:dhcp][:ipv4] = $kanodes[:kadeploy][:ipv4]
+$kanodes[:dhcp][:basename] = dhcpserver
+$kanodes[:dhcp][:ipv4] = dhcpserverip || nil
 $kanodes[:dhcp][:type] = :SERVER
+msg("  DHCP: #{$kanodes[:dhcp][:basename]}",MSG_INFO)
 
 $services[:sql] = {}
 $services[:sql][:name] = 'sql'
@@ -2061,6 +2107,7 @@ $kanodes.values.collect! do |v|
   v[:cluster] = $clusters[cluster]
 end
 
+
 msg("=== Gathering cluster#{$clusters.size > 1 ? 's' : ''} information",MSG_INFO)
 $clusters.values.collect! do |v|
   msg("#{v[:basename]}:",MSG_INFO)
@@ -2093,7 +2140,6 @@ $clusters.values.collect! do |v|
   msg("  net driver: #{v[:drivers][:network]}",MSG_INFO)
   msg("  disk driver: #{v[:drivers][:disk]}",MSG_INFO)
 end
-
 
 Net::SSH.start(getgw(), ENV['USER'], :keys => $sshkeyfile) do |gwsession|
 sshgw = Net::SSH::Gateway.new(getgw(), ENV['USER'], :keys => $sshkeyfile)
@@ -2175,7 +2221,7 @@ sshgw.ssh(servername,'root') do |session|
 	    if $mode == :KAVLAN
         nodes = $kanodes.values
       else
-        nodes = select_type($kanodes,:HOST)
+        nodes = select_type($kanodes,:SERVER) + select_type($kanodes,:HOST)
       end
 
       nodes.each do |node|
@@ -2291,8 +2337,8 @@ sshgw.ssh(servername,'root') do |session|
 		tempfile(cfg_dhcp()) {|path| scp(servername,path,CFG_DHCP_CONF_FILE)}
 		sexec(session,'service isc-dhcp-server restart')
 
-		msg('Reloading network interfaces',MSG_INFO)
-		sexec(session,'service networking restart &>/dev/null')
+		#msg('Reloading network interfaces',MSG_INFO)
+		#sexec(session,'service networking restart &>/dev/null')
 =begin
 		excls = []
 		excls << $kanodes[:dhcp][:ipv4]
@@ -2585,6 +2631,7 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"rm -Rf #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
     sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
     sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
     msg('Sending deployment kernels',MSG_INFO)
     $deplkernels.each do |name,kernel|
       msg("\t#{name}",MSG_INFO)
@@ -2598,7 +2645,7 @@ sshgw.ssh(servername,'root') do |session|
       scp(servername,path,File.join(cfg_pxe_path(CFG_PXE_PROFILES_DIR),'default'))
     end
 
-    sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} -R #{cfg_pxe_path()}")
+    sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{cfg_pxe_path()}")
     sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
 	end
 end

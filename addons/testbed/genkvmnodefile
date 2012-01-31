@@ -58,6 +58,10 @@ optparse = OptionParser.new(USAGE) do |opts|
   	options[:host_list] = h
 	end
 
+	opts.on( '-x', '--exclude-list <nodelist_file>', 'Specify a file containing the list of server that IP should not be affected to VMs' ) do |h|
+  	options[:excl_list] = h
+	end
+
 	opts.on( '-n', '--nodes <number>', "The number of nodes per hosts (default: #{NODENB})" ) do |n|
   	options[:nodesnb] = n.to_i
 	end
@@ -105,6 +109,18 @@ rescue Errno::ENOENT
   exit 1
 end
 
+excllist = []
+begin
+	File.open(options[:excl_list] , 'r') do |f|
+    f.each do |line|
+      excllist << line.strip unless excllist.include?(line.strip)
+    end
+  end
+rescue Errno::ENOENT
+	$stderr.puts "File '#{excllist_file}' not found"
+  exit 1
+end
+
 hosts = []
 tmp = networkaddr.to_range
 exclips = [
@@ -113,27 +129,32 @@ exclips = [
   ipv42int(tmp.last.to_s)
 ]
 
-hostlist.each do |host|
-  begin
-    hostname = host
-    hostip = Resolv.getaddress(hostname)
-    tmp = ipv42int(hostip)
-    unless networkaddr.include?(IPAddr.new(hostip))
-      $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
+parselist = Proc.new do |list,genhosts|
+  list.each do |host|
+    begin
+      hostname = host
+      hostip = Resolv.getaddress(hostname)
+      tmp = ipv42int(hostip)
+      unless networkaddr.include?(IPAddr.new(hostip))
+        $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
+        exit 1
+      end
+
+      hosts << {
+        :hostname => hostname,
+        :ipv4str => hostip,
+        :ipv4int => tmp
+      } if genhosts
+      exclips << tmp
+    rescue
+      $stderr.puts "invalid address '#{hostname}'"
       exit 1
     end
-
-    hosts << {
-      :hostname => hostname,
-      :ipv4str => hostip,
-      :ipv4int => tmp
-    }
-    exclips << tmp
-  rescue
-    $stderr.puts "invalid address '#{hostname}'"
-    exit 1
   end
 end
+
+parselist.call(hostlist,true)
+parselist.call(excllist,false)
 
 if hosts.empty?
   $stderr.puts "hostlist parameter empty"
