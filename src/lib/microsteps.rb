@@ -117,13 +117,23 @@ module MicroStepsLibrary
     # * cmd: command to execute on nodes_ok
     # * taktuk_connector: specifies the connector to use with Taktuk
     # * instance_thread: thread id of the current thread
+    # * window: WindowManager instance, eventually used to launch the command
     # Output
     # * return true if the command has been successfully ran on one node at least, false otherwise
-    def parallel_exec_command_wrapper(cmd, taktuk_connector, instance_thread)
+    def parallel_exec_command_wrapper(cmd, taktuk_connector, instance_thread, window = nil)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
-      classify_nodes(po.execute(cmd))
+
+      if window then
+        callback = Proc.new { |ns|
+          po = ParallelOperations::ParallelOps.new(ns, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
+          classify_nodes(po.execute(cmd))
+        }
+        window.launch_on_node_set(node_set, &callback)
+      else
+        po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
+        classify_nodes(po.execute(cmd))
+      end
       return (not @nodes_ok.empty?)
     end
 
@@ -1572,7 +1582,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the reboot has been successfully performed, false otherwise
     def ms_reboot_from_deploy_env(instance_thread)
-      return parallel_exec_command_wrapper("/usr/local/bin/reboot_detach", @config.common.taktuk_connector, instance_thread)
+      return parallel_exec_command_wrapper("/usr/local/bin/reboot_detach", @config.common.taktuk_connector, instance_thread, @reboot_window)
     end
 
     # Perform a power operation on the current set of nodes_ok
