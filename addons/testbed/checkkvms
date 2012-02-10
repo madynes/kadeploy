@@ -50,4 +50,4 @@ nbvm = (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
 
 maxvms = (MAX_VM_PER_CORE * totcores)
 
-puts (nbvm <= maxvms ? nbvm : maxvms)
+puts (nbvm <= maxvms ? nbvm : maxvms).to_i

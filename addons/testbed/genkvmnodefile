@@ -145,10 +145,12 @@ hostlist.each_pair do |host,nbnodes|
     hostname = host
     hostip = Resolv.getaddress(hostname)
     tmp = ipv42int(hostip)
+=begin
     unless networkaddr.include?(IPAddr.new(hostip))
       $stderr.puts "host IP of '#{host}' (#{hostip}) not included in network #{ARGV[0]}"
       exit 1
     end
+=end
 
     hosts << {
       :hostname => hostname,
