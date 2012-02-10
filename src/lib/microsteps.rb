@@ -992,7 +992,7 @@ module MicroStepsLibrary
       when "ddbz2"
         cmd = "bzip2 -cd > #{deploy_part}"
       else
-        @output.verbosel(0, "The #{tarball_kind} archive kind is not supported")
+        failed_microstep("The #{tarball_kind} archive kind is not supported")
         return false
       end
 
@@ -1398,7 +1398,7 @@ module MicroStepsLibrary
                                                     @config.cluster_specific[@cluster].deploy_initrd,
                                                     "",
                                                     @config.cluster_specific[@cluster].pxe_header) then
-          @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
+          failed_microstep("Cannot perform the set_pxe_for_linux operation")
           return false
         end
       when "prod_to_nfsroot_env"
@@ -1407,7 +1407,7 @@ module MicroStepsLibrary
                                                       @config.cluster_specific[@cluster].nfsroot_kernel,
                                                       @config.cluster_specific[@cluster].nfsroot_params,
                                                       @config.cluster_specific[@cluster].pxe_header) then
-          @output.verbosel(0, "Cannot perform the set_pxe_for_nfsroot operation")
+          failed_microstep("Cannot perform the set_pxe_for_nfsroot operation")
           return false
         end
       when "set_pxe"
@@ -1415,7 +1415,7 @@ module MicroStepsLibrary
         if not @config.common.pxe.set_pxe_for_custom(nodes,
                                                      pxe_profile_msg,
                                                      @config.exec_specific.pxe_profile_singularities) then
-          @output.verbosel(0, "Cannot perform the set_pxe_for_custom operation")
+          failed_microstep("Cannot perform the set_pxe_for_custom operation")
           return false
         end
       when "deploy_to_deployed_env"
@@ -1424,7 +1424,7 @@ module MicroStepsLibrary
           if not @config.common.pxe.set_pxe_for_custom(nodes,
                                                        @config.exec_specific.pxe_profile_msg,
                                                        @config.exec_specific.pxe_profile_singularities) then
-            @output.verbosel(0, "Cannot perform the set_pxe_for_custom operation")
+            failed_microstep("Cannot perform the set_pxe_for_custom operation")
             return false
           end
         else
@@ -1436,12 +1436,12 @@ module MicroStepsLibrary
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
-                @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
+                failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
                 return false
               end
               if (@config.exec_specific.environment.initrd != nil) then
                 if not system("touch -a #{File.join(images_dir, initrd)}") then
-                  @output.verbosel(0, "Cannot touch #{File.join(images_dir, initrd)}")
+                  failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
                   return false
                 end
               end
@@ -1451,7 +1451,7 @@ module MicroStepsLibrary
                                                           initrd,
                                                           get_deploy_part_str(),
                                                           @config.cluster_specific[@cluster].pxe_header) then
-                @output.verbosel(0, "Cannot perform the set_pxe_for_linux operation")
+                failed_microstep("Cannot perform the set_pxe_for_linux operation")
                 return false
               end
             when "xen"
@@ -1460,17 +1460,17 @@ module MicroStepsLibrary
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
               images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
-                @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
+                failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
                 return false
               end
               if (@config.exec_specific.environment.initrd != nil) then
                 if not system("touch -a #{File.join(images_dir, initrd)}") then
-                  @output.verbosel(0, "Cannot touch #{File.join(images_dir, initrd)}")
+                  failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
                   return false
                 end
               end
               if not system("touch -a #{File.join(images_dir, hypervisor)}") then
-                @output.verbosel(0, "Cannot touch #{File.join(images_dir, hypervisor)}")
+                failed_microstep("Cannot touch #{File.join(images_dir, hypervisor)}")
                 return false
               end
               if not @config.common.pxe.set_pxe_for_xen(nodes,
@@ -1481,7 +1481,7 @@ module MicroStepsLibrary
                                                         initrd,
                                                         get_deploy_part_str(),
                                                         @config.cluster_specific[@cluster].pxe_header) then
-                @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
+                failed_microstep("Cannot perform the set_pxe_for_xen operation")
                 return false
               end
             end
@@ -1502,17 +1502,17 @@ module MicroStepsLibrary
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
               images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
-                @output.verbosel(0, "Cannot touch #{File.join(images_dir, kernel)}")
+                failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
                 return false
               end
               if (@config.exec_specific.environment.initrd != nil) then
                 if not system("touch -a #{File.join(images_dir, initrd)}") then
-                  @output.verbosel(0, "Cannot touch #{File.join(images_dir, initrd)}")
+                  failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
                   return false
                 end
               end
               if not system("touch -a #{File.join(images_dir, hypervisor)}") then
-                @output.verbosel(0, "Cannot touch #{File.join(images_dir, hypervisor)}")
+                failed_microstep("Cannot touch #{File.join(images_dir, hypervisor)}")
                 return false
               end
               if not @config.common.pxe.set_pxe_for_xen(nodes,
@@ -1523,7 +1523,7 @@ module MicroStepsLibrary
                                                         initrd,
                                                         get_deploy_part_str(),
                                                         @config.cluster_specific[@cluster].pxe_header) then
-                @output.verbosel(0, "Cannot perform the set_pxe_for_xen operation")
+                failed_microstep("Cannot perform the set_pxe_for_xen operation")
                 return false
               end
               Cache::clean_cache(File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
@@ -1859,7 +1859,7 @@ module MicroStepsLibrary
           end
         end
       else
-        @output.verbosel(0, "Invalid bootloader value: #{@config.common.bootloader}")
+        failed_microstep("Invalid bootloader value: #{@config.common.bootloader}")
         return false
       end
     end
