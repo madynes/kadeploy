@@ -151,6 +151,7 @@ module ParallelOperations
       @nodes.set.each { |node|
         node.last_cmd_exit_status = "0"
         node.last_cmd_stderr = ""
+        node.last_cmd_stdout = ""
       }
     end
 
@@ -164,6 +165,8 @@ module ParallelOperations
       @nodes.set.each { |node|
         node.last_cmd_exit_status = "256"
         node.last_cmd_stderr = "Unreachable"
+        node.last_cmd_stdout = ""
+        
       }
     end
 
@@ -176,6 +179,7 @@ module ParallelOperations
     def init_nodes_state_before_wait_nodes_after_reboot_command
       @nodes.set.each { |node|
         node.last_cmd_stderr = "Unreachable after the reboot"
+        node.last_cmd_stdout = ""
         node.state = "KO"
       }
     end
