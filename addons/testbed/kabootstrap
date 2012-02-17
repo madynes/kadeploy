@@ -678,10 +678,11 @@ end
 # Resolv.conf default config
 CFG_RESOLVCONF_FILE = '/etc/resolv.conf'
 
-def cfg_resolvconf()
+def cfg_resolvconf(forward=nil)
   "domain #{DOMAIN}\n"\
   "search #{DOMAIN}\n"\
-  "nameserver #{$kanodes[:dns][:ipv4]}\n"
+  "nameserver #{$kanodes[:dns][:ipv4]}\n"\
+  + (forward ? "nameserver #{$network[:dns]}\n" : '')
 end
 
 
@@ -938,6 +939,7 @@ $deplkernels = {}
 $stunnels = {}
 $hostscache = {}
 $network = {}
+$gateway = nil
 $deploysendmeth = :HTTP
 
 options = {}
@@ -965,7 +967,13 @@ def kavlan_gw(suffix=true)
 end
 
 def kavlan_node(name)
-  "#{name.split('.')[0].split("-#{kavlan_gw(false)}")[0]}-#{kavlan_gw()}"
+  ret = ''
+  tmp = name.split('.')[0]
+  if tmp.split('-').size > 2
+    ret = name
+  else
+    ret = "#{tmp.split("-#{kavlan_gw(false)}")[0]}-#{getgw()}"
+  end
 end
 
 def kvm_gw()
@@ -974,14 +982,18 @@ end
 
 def getgw()
 	ret = nil
-	case $mode
-		when :KAVLAN, :VLANKVM
-			ret = kavlan_gw()
-		when :KVM
-			ret = kvm_gw()
-		else
-			msg('Unknown mode',MSG_ERROR,true)
-	end
+  if $gateway
+    ret = $gateway
+  else
+    case $mode
+      when :KAVLAN, :VLANKVM
+        ret = kavlan_gw()
+      when :KVM
+        ret = kvm_gw()
+      else
+        msg('Unknown mode',MSG_ERROR,true)
+    end
+  end
 	ret
 end
 
@@ -1436,7 +1448,7 @@ options[:host_list]   = nil
 options[:www_list]   = nil
 options[:debpackages] = []
 options[:gempackages] = []
-options[:git]         = nil
+options[:gateway]         = nil
 options[:ssh_key]     = nil
 options[:kastafior]     = nil
 options[:version]     = nil
@@ -1444,6 +1456,7 @@ options[:daemon_kadeploy] = nil
 options[:update_file] = nil
 options[:daemon_config] = nil
 options[:network] = nil
+options[:dns_forward] = nil
 
 $debug				        = false
 $netiface 						= NET_ADMIN_IFACE
@@ -1484,8 +1497,8 @@ optparse = OptionParser.new(USAGE) do |opts|
 		$mode = :VLANKVM
 	end
 
-	opts.on( '-g', '--git [<git_hash|git_tag>]', "Specify a specific version to install from git repository (if not specified, taking the last revision). Some packages are installed on one of the nodes in order to build the debian package (See `apt-get build-dep kadeploy-server` + deb: #{})" ) do |n|
-  	options[:git] = n || :git_last
+	opts.on( '-g', '--gateway <address>', "Specify the gateway to use to contact the nodes" ) do |g|
+  	options[:gateway] = g
 	end
 
 	opts.on( '-u', '--update <updatefile>', "Update kadeploy files (the YAML update file should contain the local path for keys {#{UPDATE_PATH_CHECK.keys * ','}} to be bind on kadeploy server)" ) do |u|
@@ -1514,6 +1527,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-b', '--dhcp-daemon <node_address>', 'Specify which node should be used as dhcp daemon (default: same as kadeploy one)' ) do |d|
   	options[:daemon_dhcp] = d || nil
+	end
+
+	opts.on( '-c', '--dns-forward <address>', 'Specify the DNS server to forward the requests to (default: the gateway of the network)' ) do |d|
+  	options[:dns_forward] = d
 	end
 
 	opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes should be used as daemon in a YAML file with properties "host" and "newip" given for each services' ) do |d|
@@ -1546,6 +1563,23 @@ if options[:kastafior] and !File.exists?(options[:kastafior])
   msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true)
 else
   options[:kastafior] = File.expand_path(options[:kastafior])
+end
+
+if options[:gateway]
+  begin
+    addr = IPAddr.new(options[:gateway])
+    msg('gatewat should be specified by hostname',MSG_ERROR,true)
+  rescue ArgumentError
+  end
+  $gateway = options[:gateway]
+end
+
+if options[:dns_forward]
+  begin
+    $network[:dns] = Resolv.getaddress(options[:dns_forward])
+  rescue Resolv::ResolvError, ArgumentError
+    msg("Invalid address for dns forward server '#{tmp}'",MSG_ERROR,true)
+  end
 end
 
 if options[:ssh_key]
@@ -2269,7 +2303,7 @@ sshgw.ssh(servername,'root') do |session|
       $network[:broadcast] = ($network[:ipaddr] | (~$network[:ipaddr].instance_variable_get(:@mask_addr) & IPAddr::IN4MASK)).to_s
     elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/
       $network[:gateway] = Regexp.last_match(1) if $network.empty? or !$network[:gateway]
-      $network[:dns] = Regexp.last_match(1)
+      $network[:dns] = Regexp.last_match(1) unless $network[:dns]
       defaultiface = Regexp.last_match(2)
     end
   end
@@ -2393,7 +2427,7 @@ sshgw.ssh(servername,'root') do |session|
 		sexec(session,'service bind9 restart')
 
 		msg('Updating resolv.conf files',MSG_INFO)
-		tempfile(cfg_resolvconf()) {|path| scp(servername,path,CFG_RESOLVCONF_FILE)}
+		tempfile(cfg_resolvconf(options[:dns_forward])) {|path| scp(servername,path,CFG_RESOLVCONF_FILE)}
 
 		excls = []
 		excls << $kanodes[:dns][:ipv4]

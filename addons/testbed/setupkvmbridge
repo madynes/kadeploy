@@ -34,7 +34,7 @@ def cfg_networking_bridge(ifname,macaddr)
   "  bridge_stp      off\n"\
   "  bridge_maxwait  0\n"\
   "  bridge_fd       0\n"\
-  "pre-up ifconfig #{ifname} mtu #{NET_MTU}\n"\
+  "pre-up ifconfig #{ifname} 0.0.0.0 mtu #{NET_MTU}\n"\
   "bridge_hw #{macaddr}\n\n"
 end
 
