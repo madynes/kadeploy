@@ -681,8 +681,8 @@ CFG_RESOLVCONF_FILE = '/etc/resolv.conf'
 def cfg_resolvconf(forward=nil)
   "domain #{DOMAIN}\n"\
   "search #{DOMAIN}\n"\
-  "nameserver #{$kanodes[:dns][:ipv4]}\n"\
-  + (forward ? "nameserver #{$network[:dns]}\n" : '')
+  "nameserver #{$kanodes[:dns][:ipv4]}\n"
+  #+ (forward ? "nameserver #{$network[:dns]}\n" : '')
 end
 
 
@@ -2434,7 +2434,7 @@ sshgw.ssh(servername,'root') do |session|
 
     nodes=[]
     if $mode == :VLANKVM
-      nodes = select_type($kanodes,:SERVER) + select_type($kanodes,:HOST)
+      nodes = select_type($kanodes,:SERVER) # + select_type($kanodes,:HOST)
     else
       nodes = select_type($kanodes,:SERVER)
     end
@@ -2800,10 +2800,9 @@ msg("",MSG_INFO)
 
 if $deploysendmeth == :HTTP
   msg('=== Setting up HTTP server(s)',MSG_INFO)
-  select_server_type($kanodes,:www).each do |server|
-    servername=getnode(server[:basename])
-    sshgw.ssh(servername,'root') do |session|
 
+  select_server_type($kanodes,:www).each do |server|
+    sshgw.ssh(getnode(server[:basename]),'root') do |session|
       msg("Tuning ARP cache size",MSG_INFO)
       set_arp_cache(session)
 
@@ -2812,10 +2811,9 @@ if $deploysendmeth == :HTTP
       http_tunnel(server,session) do
         msg('Updating debian packages list',MSG_INFO)
         apt_update(session)
-
         msg('Installing HTTP server',MSG_INFO)
         apt_install(session,['apache2','apache2-mpm-worker'])
-        sexec(session,"umount -f #{CFG_APACHE_SERVER_PATH}; true")
+
         sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
         sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
         sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
@@ -2823,13 +2821,16 @@ if $deploysendmeth == :HTTP
         msg('Configuring HTTP server',MSG_INFO)
         sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
         sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
-        tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
-        tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
+
+        tempfile(cfg_apache()) {|path| scp(getnode(server[:basename]),path,CFG_APACHE_CONF_FILE)}
+        tempfile(cfg_apache_site()) {|path| scp(getnode(server[:basename]),path,CFG_APACHE_SITES_CONF_FILE)}
         sexec(session,'service apache2 restart')
 
         if HTTP_OVER_NFS
           msg('Installing NFS client',MSG_INFO)
           apt_install(session,'nfs-common')
+
+          sexec(session,"umount -f #{CFG_APACHE_SERVER_PATH}; true")
 
           msg('Mounting NFS directory',MSG_INFO)
           sexec(session,"mount -t nfs #{$kanodes[:kadeploy][:ipv4]}:#{cfg_pxe_path()} #{CFG_APACHE_SERVER_PATH}")
@@ -2837,10 +2838,11 @@ if $deploysendmeth == :HTTP
           msg('Sending deployment kernels',MSG_INFO)
           sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
           sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+
           $deplkernels.each do |name,kernel|
             msg("\t#{name}",MSG_INFO)
-            scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-            scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+            scp(getnode(server[:basename]),kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+            scp(getnode(server[:basename]),kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
           end
 
           sexec(session,"chmod -R 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
