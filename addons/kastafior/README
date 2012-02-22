@@ -3,3 +3,5 @@ Several versions of Kastafior are provided, depending on the version of TakTuk y
 TakTuk <= 3.6.1 -> kastafior-0.1
 3.6.2 <= TakTuk < 3.7 -> kastafior-0.2
 TakTuk >= 3.7 -> kastafior-0.3
+
+kastafior-0.4 does not depend to any TakTuk version. Furthermore it creates the chain according to the order of the nodes given in the node file and can use non-blocking IO. This is the default version from Kadeploy 3.1-5 (older versions are deprecated and only kept for history).

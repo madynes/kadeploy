@@ -16,6 +16,7 @@ require 'process_management'
 #Ruby libs
 require 'ftools'
 require 'socket'
+require 'tempfile'
 
 module MicroStepsLibrary
   class MicroSteps
@@ -966,22 +967,21 @@ module MicroStepsLibrary
           pr.add(cmd, node)
         }
         pr.run
-        pr.wait
+        pr.wait        
       end
 
-      list = String.new
-      list = "-m #{Socket.gethostname()}"
-    
+      nodefile = Tempfile.new("kastafior-nodefile")
+      nodefile.puts(Socket.gethostname())
       if @config.cluster_specific[@cluster].use_ip_to_deploy then
         @nodes_ok.make_sorted_array_of_nodes.each { |node|
-          list += " -m #{node.ip}"
+          nodefile.puts(node.ip)
         }
       else
         @nodes_ok.make_sorted_array_of_nodes.each { |node|
-          list += " -m #{node.hostname}"
+          nodefile.puts(node.hostname)
         }
       end
-
+      nodefile.close            
       case tarball_kind
       when "tgz"
         cmd = "tar xz -C #{deploy_mount_point}"
@@ -997,9 +997,9 @@ module MicroStepsLibrary
       end
 
       if @config.common.taktuk_auto_propagate then
-        cmd = "kastafior -s -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
+        cmd = "#{@config.common.kastafior} -s -c \\\"#{@config.common.taktuk_connector}\\\"  -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
       else
-        cmd = "kastafior -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -f"
+        cmd = "#{@config.common.kastafior} -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
       end
       c = ParallelRunner::Command.new(cmd)
       c.run

@@ -642,6 +642,8 @@ module ConfigInformation
               @common.set_vlan_cmd = val
             when "grub"
               @common.grub = val
+            when "kastafior"
+              @common.kastafior = val
             end
           end
         end
@@ -2723,6 +2725,7 @@ module ConfigInformation
     attr_accessor :vlan_hostname_suffix
     attr_accessor :set_vlan_cmd
     attr_accessor :grub
+    attr_accessor :kastafior
 
     # Constructor of CommonConfig
     #
@@ -2741,6 +2744,7 @@ module ConfigInformation
       @vlan_hostname_suffix = ""
       @set_vlan_cmd = ""
       @grub = "grub2"
+      @kastafior = "kastafior"
       @pxe_repository_kernels = "kernels"
     end
 
