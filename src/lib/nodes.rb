@@ -181,7 +181,7 @@ module Nodes
     # * returns array of numbers 
     def NodeSet::develop_interval(interval)
       numbers_array =[]
-      if /(\d{1,3})-(\d{1,3})/ =~ interval
+      if /(\d+)-(\d+)/ =~ interval
         content = Regexp.last_match
         if content[1].length == content[2].length
           numbers_array += (content[1] .. content[2]).to_a
@@ -394,13 +394,13 @@ module Nodes
     # Output
     # * returns array of hosts
     def NodeSet::nodes_list_expand(list_factor_hosts)
-      if /\A([A-Za-z\.\-]+[0-9]*[\.\-]*)\[([\d{1,3}\-,\d{1,3}]+)\]([A-Za-z0-9\.\-]*)\Z/ =~ list_factor_hosts
+      if /\A([A-Za-z\.\-]+[0-9]*[\.\-]*)\[([\d+\-,\d+]+)\]([A-Za-z0-9\.\-]*)\Z/ =~ list_factor_hosts
         content = Regexp.last_match
         head = content[1]
         numbers_list = content[2]
         tail = content[3]
       else 
-        if /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.)\[([\d{1,3}\-,\d{1,3}]+)\]\Z/ =~ list_factor_hosts
+        if /\A(\d+\.\d+\.\d+\.)\[([\d+\-,\d+]+)\]\Z/ =~ list_factor_hosts
           content = Regexp.last_match
           head = content[1]
           numbers_list = content[2]
