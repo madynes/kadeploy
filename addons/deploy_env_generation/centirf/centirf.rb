@@ -4,7 +4,7 @@
 NEST = 'nest'
 ROOT = 'root'
 RPM_MIRROR = 'http://ftp.ciril.fr/pub/linux/centos/6.1/os/x86_64/'
-INCLUDES = 'filesystem coreutils setup net-tools grep sed bash perl module-init-tools openssh-clients openssh-server util-linux dhclient bzip2 gzip ctorrent kexec-tools parted.x86_64 busybox grub2 nc tar e2fsprogs grub'
+INCLUDES = 'filesystem coreutils setup net-tools grep sed bash perl module-init-tools openssh-clients openssh-server util-linux dhclient bzip2 gzip kexec-tools parted.x86_64 busybox nc tar e2fsprogs grub yum rpm'
 
 def exec(cmd)
   system(cmd)
@@ -71,9 +71,96 @@ EOF
   exec("chmod 400 #{ROOT}/etc/kadeploy3/keys/*")
 end
 
+TO_REMOVE = [
+             "/usr/share/backgrounds",
+             "/usr/share/wallpapers",
+             "/lib/modules/2.6*/kernel/sound",
+             "/lib/modules/2.6*/kernel/drivers/media",
+             "/lib/modules/2.6*/kernel/drivers/isdn",
+             "/lib/modules/2.6*/kernel/drivers/gpu",
+             "/lib/modules/2.6*/kernel/drivers/usb",
+             "/lib/modules/2.6*/kernel/drivers/uwb",
+             "/lib/modules/2.6*/kernel/drivers/bluetooth",
+             "/lib/modules/2.6*/kernel/drivers/hwmon",
+             "/lib/modules/2.6*/kernel/drivers/watchdog",
+             "/lib/modules/2.6*/kernel/drivers/net/wireless",
+             "/lib/modules/2.6*/kernel/drivers/net/pcmcia",
+             "/lib/modules/2.6*/kernel/drivers/net/wimax",
+             "/lib/modules/2.6*/kernel/drivers/net/usb",
+             "/lib/modules/2.6*/kernel/drivers/net/wan",
+             "/lib/modules/2.6*/kernel/drivers/net/bonding",
+             "/lib/modules/2.6*/kernel/drivers/net/ixgbe",
+             "/lib/modules/2.6*/kernel/drivers/net/mlx4",
+             "/lib/modules/2.6*/kernel/drivers/net/cxgb4",
+             "/lib/modules/2.6*/kernel/drivers/net/can",
+             "/lib/modules/2.6*/kernel/drivers/net/tulip",
+             "/lib/modules/2.6*/kernel/drivers/net/atl1e",
+             "/lib/modules/2.6*/kernel/drivers/net/netxen",
+             "/lib/modules/2.6*/kernel/drivers/net/chelsio",
+             "/lib/modules/2.6*/kernel/drivers/net/qlcnic",
+             "/lib/modules/2.6*/kernel/drivers/net/bna",
+             "/lib/modules/2.6*/kernel/drivers/net/benet",
+             "/lib/modules/2.6*/kernel/drivers/net/bnx2x",
+             "/lib/modules/2.6*/kernel/drivers/net/qlge",
+             "/lib/modules/2.6*/kernel/drivers/net/ixgb*",
+             "/lib/modules/2.6*/kernel/drivers/net/enic",
+             "/lib/modules/2.6*/kernel/drivers/net/atlx",
+             "/lib/modules/2.6*/kernel/drivers/net/clxgb3",
+             "/lib/modules/2.6*/kernel/drivers/net/vxge",
+             "/lib/modules/2.6*/kernel/drivers/net/myri10ge",
+             "/lib/modules/2.6*/kernel/drivers/net/sfc",
+             "/lib/modules/2.6*/kernel/drivers/infiniband",
+             "/lib/modules/2.6*/kernel/drivers/scsi/aacraid",
+             "/lib/modules/2.6*/kernel/drivers/scsi/aic*",
+             "/lib/modules/2.6*/kernel/drivers/scsi/arcmsr",
+             "/lib/modules/2.6*/kernel/drivers/scsi/be2iscsi",
+             "/lib/modules/2.6*/kernel/drivers/scsi/bfa",
+             "/lib/modules/2.6*/kernel/drivers/scsi/cxgbi",
+             "/lib/modules/2.6*/kernel/drivers/scsi/fcoe",
+             "/lib/modules/2.6*/kernel/drivers/scsi/mpt2sas",
+             "/lib/modules/2.6*/kernel/drivers/scsi/mvsas",
+             "/lib/modules/2.6*/kernel/drivers/scsi/sym53c8xx_2",
+             "/lib/modules/2.6*/kernel/drivers/scsi/qla*",
+             "/lib/modules/2.6*/kernel/drivers/scsi/lpfc",
+             "/lib/modules/2.6*/kernel/drivers/scsi/isci",
+             "/lib/modules/2.6*/kernel/drivers/md",
+             "/lib/modules/2.6*/kernel/drivers/i2c",
+             "/lib/modules/2.6*/kernel/drivers/input",
+             "/lib/modules/2.6*/kernel/fs/xfs",
+             "/lib/modules/2.6*/kernel/fs/btrfs",
+             "/lib/modules/2.6*/kernel/fs/gfs2",
+             "/lib/modules/2.6*/kernel/fs/nls",
+             "/lib/modules/2.6*/kernel/fs/cifs",
+             "/lib/modules/2.6*/kernel/fs/udf",
+             "/lib/modules/2.6*/kernel/fs/autofs4",
+             "/lib/modules/2.6*/kernel/fs/nfs",
+             "/lib/modules/2.6*/kernel/fs/jffs2",
+             "/lib/modules/2.6*/kernel/fs/ubifs",
+             "/lib/modules/2.6*/kernel/fs/dlm",
+             "/lib/modules/2.6*/kernel/net/netfilter",
+             "/lib/modules/2.6*/kernel/net/bluetooth",
+             "/lib/modules/2.6*/kernel/net/wireless",
+             "/usr/share/perl5/pod",
+             "/usr/share/perl5/Pod",
+             "/usr/share/hwdata",
+             "/usr/lib64/perl5/auto/Encode/JP",
+             "/usr/lib64/perl5/auto/Encode/CN",
+             "/usr/lib64/perl5/auto/Encode/TW",
+             "/usr/lib64/python2.6/distutils",
+             "/usr/lib64/python2.6/email",
+             "/usr/lib/python2.6/site-packages/yum",
+             "/usr/lib64/python2.6/site-packages/yum",
+             "/boot/initramfs*",
+             "/boot/System.map*",
+            ]
+
 def make_rootfs
   exec("febootstrap -i #{INCLUDES.split(" ").join(" -i ")} centos-6.1 #{ROOT} #{RPM_MIRROR}")
+  # Minimize a bit the febootstrap
   exec("febootstrap-minimize #{ROOT}")
+  TO_REMOVE.each { |entry| exec("rm -rf #{ROOT}/#{entry}") }
+
+  exec("mv #{ROOT}/boot/vmlinuz-* kernel")
 end
 
 def pack_rootfs(dest)
