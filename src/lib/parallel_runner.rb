@@ -44,6 +44,8 @@ module ParallelRunner
         @mystderr.sync = true
         STDOUT.reopen(@mystdout)
         STDERR.reopen(@mystderr)
+        @mystdout.close
+        @mystderr.close
         begin
           exec(@cmd)
         rescue
