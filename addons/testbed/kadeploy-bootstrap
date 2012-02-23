@@ -20,7 +20,7 @@ end
 USAGE           = "Usage: #{$0} [options] <deploykernels_directory> <envs_directory>"
 
 SSH_KEYS        = ["#{ENV['HOME']}/.ssh/id_dsa", "#{ENV['HOME']}/.ssh/id_rsa","#{ENV['HOME']}/.ssh/identity"]
-SSH_OPTIONS			= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
+SSH_OPTIONS			= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o SetupTimeOut=16 -o ConnectionAttempts=3'
 HTTP_PROXY_ADDR   = 'proxy'
 HTTP_PROXY_PORT   = 3128
 #DEB_REPOSITORY   	= 'http://apt.grid5000.fr/kadeploy'
@@ -380,16 +380,22 @@ def cfg_kadeploy_console_cmd()
   ret
 end
 
+def cfg_kadeploy_reboot_cmd()
+  "#{cfg_kadeploy_power_off_cmd()} && sleep 2 && #{cfg_kadeploy_power_on_cmd()}"
+end
+
 def cfg_kadeploy_hard_reboot_cmd()
-  "#{cfg_kadeploy_power_off_cmd()} && #{cfg_kadeploy_power_on_cmd()}"
+  ret = ''
+  ret = "rm -f #{File.join(CFG_KADEPLOY_KVM_PROCS_PATH,'HOSTNAME_FQDN')}; " if $mode == :VLANKVM
+  ret + cfg_kadeploy_reboot_cmd()
 end
 
 def cfg_kadeploy_soft_reboot_cmd()
   ret = ''
   if CFG_KADEPLOY_SOFT_REBOOT
-    ret = "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=2 -o SetupTimeOut=5 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\""
+    ret = "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\""
   else
-    ret = cfg_kadeploy_hard_reboot_cmd()
+    ret = cfg_kadeploy_reboot_cmd()
   end
   ret
 end
@@ -429,7 +435,7 @@ def cfg_kadeploy_specific_conf(cluster)
   "cmd_very_hard_reboot = /bin/false\n"\
   + # Kapower
   "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
-  "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -o ConnectTimeout=12 -o SetupTimeOut=16 -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
+  "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
   "cmd_hard_power_off = #{cfg_kadeploy_power_off_cmd()}\n"\
   "cmd_power_status = #{cfg_kadeploy_power_status_cmd()}\n"\
   + # Kaconsole
