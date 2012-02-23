@@ -3,6 +3,9 @@
 require 'socket'
 require 'resolv'
 
+# Constraints
+MAX_VM_PER_CORE = 3
+
 # Sizes in Mo
 RAM_SIZE = 350
 FS_SIZE = 564
@@ -37,4 +40,14 @@ unless totmem
   exit 1
 end
 
-puts (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
+cpuinfo = File.read('/proc/cpuinfo')
+totcores = 0
+cpuinfo.each do |line|
+  totcores += 1 if line =~ /^processor\s*:\s*\S+.*$/
+end
+
+nbvm = (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
+
+maxvms = (MAX_VM_PER_CORE * totcores)
+
+puts (nbvm <= maxvms ? nbvm : maxvms)
