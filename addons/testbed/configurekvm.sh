@@ -1,27 +1,28 @@
 #!/bin/bash
 
 BW_PER_WWW=120
-NETWORK_CIDR=20
+NETWORK_DEFAULT_CIDR=20
 
-TMP_DIR="${HOME}/.kabootstrapfiles"
+TMP_DIR="${HOME}/.kabootstrap"
 
 SSH_KEY=~/.ssh/id_rsa
 TMP_SSH_KEY=/tmp/identity
 
 SCRIPT_CHECK=./checkkvms
+SCRIPT_SERVICE=./setupserviceip
 SCRIPT_BRIDGE=./setupkvmbridge
 SCRIPT_LAUNCH=./launchkvms
 SCRIPT_GENNODES=./genkvmnodefile
 
 HOSTS_CONF=config.yml
 
-SSH_CONNECTOR='ssh -A -q -o ConnectTimeout=8 -o SetupTimeOut=16 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
+SSH_CONNECTOR='ssh -A -q -o ConnectTimeout=8 -o SetupTimeOut=16 -o ConnectionAttempts=3 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey'
 TAKTUK_OUTPUT='"$host: $line\n"'
 TAKTUK_OPTIONS="-s -n -l root -o status -R connector=2 -R error=2"
 
 if [ $# -lt 1 ]
 then
-  echo "usage: $0 <hostlist> [<www_server_nb>]"
+  echo "usage: $0 <hostlist> [<www_server_nb>] [<network_addr>]"
   exit 1
 fi
 
@@ -51,12 +52,75 @@ dnsdaemon=`echo "$hosts" | sed -n '2p'`
 dhcpdaemon=`echo "$hosts" | sed -n '3p'`
 wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1,3d'`
 
-network=`dig +short $kadaemon`
-if [ $? -ne 0 ]
+servicefile=${TMP_DIR}/servicefile
+echo "$hosts" | head -n $nbservers > $servicefile
+
+if [ $# -ge 3 ] && [ -n "$3" ]
 then
-  echo 'Failed to get network'
-  exit 1
+  network=$3
+  newnet=1
+else
+  network=`dig +short $kadaemon`/$NETWORK_DEFAULT_CIDR
+  if [ $? -ne 0 ]
+  then
+    echo 'Failed to get network'
+    exit 1
+  fi
 fi
+
+exclfile=`tempfile`
+serviceyamlfile=${TMP_DIR}/service.yml
+
+tmp=`echo $network | cut -d '/' -f 1`
+tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+
+echo '---' > $serviceyamlfile
+echo 'kadeploy:' >> $serviceyamlfile
+echo "  host: ${kadaemon}" >> $serviceyamlfile
+if [ -n "$newnet" ]
+then
+  echo "  newip: ${tmp}" >> $serviceyamlfile
+  echo $tmp >> $exclfile
+  tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+else
+  echo $kadaemon >> $exclfile
+fi
+
+echo 'dns:' >> $serviceyamlfile
+echo "  host: ${dnsdaemon}" >> $serviceyamlfile
+if [ -n "$newnet" ]
+then
+  echo "  newip: ${tmp}" >> $serviceyamlfile
+  echo $tmp >> $exclfile
+  tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+else
+  echo $dnsdaemon >> $exclfile
+fi
+
+echo 'dhcp:' >> $serviceyamlfile
+echo "  host: ${dhcpdaemon}" >> $serviceyamlfile
+if [ -n "$newnet" ]
+then
+  echo "  newip: ${tmp}" >> $serviceyamlfile
+  echo $tmp >> $exclfile
+  tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+else
+  echo $dhcpdaemon >> $exclfile
+fi
+
+echo 'www:' >> $serviceyamlfile
+for wwwdaemon in `echo $wwwservers`
+do
+  echo "  - host: ${wwwdaemon}" >> $serviceyamlfile
+  if [ -n "$newnet" ]
+  then
+    echo "    newip: ${tmp}" >> $serviceyamlfile
+    echo $tmp >> $exclfile
+    tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+  else
+    echo $wwwdaemon >> $exclfile
+  fi
+done
 
 hostfile=${TMP_DIR}/hostfile
 echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
@@ -72,9 +136,6 @@ then
 fi
 
 
-echo "Configuring `cat $hostfile | wc -l` nodes"
-echo ""
-
 echo "Configuring ssh agent"
 sagentfile=`tempfile`
 ssh-agent > $sagentfile
@@ -86,9 +147,26 @@ echo ""
 echo 'Copying ssh key and script files'
 stime=`date +%s`
 taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostfile broadcast put [ $SSH_KEY ] [ $TMP_SSH_KEY ] \; broadcast put [ $SCRIPT_LAUNCH ] [ /tmp ] \; broadcast put [ $SCRIPT_BRIDGE ] [ /tmp ] \; broadcast put [ $SCRIPT_CHECK ] [ /tmp ] 2>&1 | grep -v Warning
+taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $servicefile broadcast put [ $SCRIPT_SERVICE ] [ /tmp ] 2>&1 | grep -v Warning
 
 let stime=`date +%s`-stime
 echo "... done in ${stime} seconds"
+
+
+if [ -n "$newnet" ]
+then
+  echo ""
+  echo "Configuring `cat $servicefile | wc -l` service hosts"
+  stime=`date +%s`
+  taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $servicefile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_SERVICE` $network ] \; broadcast input file [ $serviceyamlfile ] 2>&1 | grep -v Warning
+
+  let stime=`date +%s`-stime
+  echo "... done in ${stime} seconds"
+fi
+
+
+echo ""
+echo "Configuring `cat $hostfile | wc -l` KVM hosts"
 
 
 echo 'Gathering nodes information'
@@ -108,12 +186,10 @@ taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostf
 let stime=`date +%s`-stime
 echo "... done in ${stime} seconds"
 
-exclfile=`tempfile`
-echo "$hosts" | sed -n "1,${nbservers}p" > $exclfile
 
 echo 'Creating nodefile'
 nodefile=${TMP_DIR}/nodefile
-$SCRIPT_GENNODES ${network}/$NETWORK_CIDR -f $hostyamlfile -e $exclfile > $nodefile
+$SCRIPT_GENNODES $network -f $hostyamlfile -e $exclfile > $nodefile
 
 rm $exclfile
 
@@ -149,4 +225,9 @@ echo "DHCP node: $dhcpdaemon"
 echo "www nodes:"
 echo "$wwwservers"
 
-echo "kabootstrap options: -V -d $kadaemon -a $dnsdaemon -b $dhcpdaemon -w $wwwfile -f $nodefile -F $hostfile"
+if [ -n "$newnet" ]
+then
+  echo "kabootstrap options: -V -n $network -s $serviceyamlfile -f $nodefile -F $hostfile"
+else
+  echo "kabootstrap options: -V -d $kadaemon -a $dnsdaemon -b $dhcpdaemon -w $wwwfile -f $nodefile -F $hostfile"
+fi

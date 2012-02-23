@@ -1,0 +1,107 @@
+#!/usr/bin/ruby
+
+require 'tempfile'
+require 'resolv'
+require 'yaml'
+require 'ipaddr'
+
+USAGE = "Usage: #{$0} <network_address>\nService YAML file need to be given as stdin"
+
+NETNICID=1
+ADMIN_IFACE='eth0'
+
+NETWORKING_CONF_FILE = '/etc/network/interfaces'
+def cfg_networking(ifname,addr,mask)
+  "auto lo\n"\
+  "iface lo inet loopback\n\n"\
+  "auto #{ifname}\n"\
+  "iface #{ifname} inet dhcp\n\n"\
+  "auto #{ifname}:#{NETNICID}\n"\
+  "iface #{ifname}:#{NETNICID} inet static\n"\
+  "  address #{addr}\n"\
+  "  netmask #{mask}\n"
+end
+
+def cmd(cmd,critical=true)
+  ret = `#{cmd}`.split("\n")
+  if critical and !$?.success?
+    $stderr.puts "error when executing '#{cmd}': #{ret}"
+    exit 1
+  end
+  ret
+end
+
+
+
+begin
+  hash=YAML.load(STDIN.read)
+rescue Errno::ENOENT
+	$stderr.puts "Invalid YAML stdin"
+  exit 1
+end
+hosts = []
+hash.each_pair do |k,v|
+  if v.is_a?(Array)
+    v.each { |vv| hosts << vv }
+  else
+    hosts << v
+  end
+end
+
+curaddr=`hostname -i`.strip
+addr=nil
+hosts.each do |host|
+  addr = host['newip'] if Resolv.getaddress(host['host']) == curaddr
+end
+
+unless addr
+  $stderr.puts 'Address not found in service_file'
+  exit 1
+end
+
+net=nil
+begin
+  net = IPAddr.new(ARGV[0])
+rescue ArgumentError
+  $stderr.puts "Invalid network_address #{ARGV[0]}"
+  exit 1
+end
+mask = IPAddr.new(net.instance_variable_get(:@mask_addr),Socket::AF_INET).to_s
+
+
+tmp = cmd("ifconfig -a -s")
+
+ifaces=[]
+tmp.each do |line|
+  unless line =~ /^\s*Iface.*$/
+    ifaces << line.split()[0]
+  end
+end
+
+# Getting default interface name
+tmp = cmd("route -n")
+if !tmp or tmp.empty?
+  $stderr.puts 'can\'t get route informations'
+  exit 1
+end
+
+defaultiface = nil
+tmp.each do |line|
+  if line =~ /^0\.0\.0\.0\s+\S+\s+.+\s+(\S+)\s*$/
+    defaultiface = Regexp.last_match(1)
+  end
+end
+
+if !defaultiface or defaultiface.empty?
+  $stderr.puts "can't get default iface, using #{ADMIN_IFACE}"
+  defaultiface = ADMIN_IFACE
+end
+
+tmp = Tempfile.new('networking')
+tmp.write(cfg_networking(defaultiface,addr,mask))
+tmp.close
+cmd("cp -f #{tmp.path} #{NETWORKING_CONF_FILE}")
+tmp.unlink
+
+cmd("service networking restart &>/dev/null")
+
