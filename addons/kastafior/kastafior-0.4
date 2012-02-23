@@ -217,7 +217,7 @@ if ($nested == 0)
     }
     $str_kasta_args =  "\"$str_kasta_args\"";
 
-    my $cmd = 'taktuk -n -o status -o output '.$taktuk_args.' -f '.$nodefile.' b e [ "sed -n \"/\$(hostname)/{n;p}\" >/tmp/next" ]\\; b input file [ '.$nodefile.' ]';
+    my $cmd = 'taktuk -n -o status -o output '.$taktuk_args.' -f '.$nodefile.' b e [ "sed -n \"/\$([ -r /tmp/kastafior_hostname ] && cat /tmp/kastafior_hostname || hostname)/{n;p}\" >/tmp/next" ]\\; b input file [ '.$nodefile.' ]';
     exit(1) if (system($cmd) != 0);
 
     my $taktuk_cmd = "taktuk -o status -o output='\$rank.\":\".\$line.\"\\n\"' $taktuk_args -f $nodefile";

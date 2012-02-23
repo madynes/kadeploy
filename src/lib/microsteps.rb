@@ -960,14 +960,29 @@ module MicroStepsLibrary
     # * return true if the operation is correctly performed, false otherwise
     def send_tarball_and_uncompress_with_kastafior(tarball_file, tarball_kind, deploy_mount_point, deploy_part, instance_thread)
       if @config.cluster_specific[@cluster].use_ip_to_deploy then
-        pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
-        @nodes_ok.set.each { |node|
-          kastafior_hostname = node.ip
-          cmd = "#{@config.common.taktuk_connector} #{node.ip} \"echo #{node.ip} > /tmp/kastafior_hostname\""
-          pr.add(cmd, node)
+        callback = Proc.new { |ns|
+          pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+          ns.set.each { |node|
+            kastafior_hostname = node.ip
+            cmd = "#{@config.common.taktuk_connector} #{node.ip} \"echo #{node.ip} > /tmp/kastafior_hostname\""
+            pr.add(cmd, node)
+          }
+          pr.run
+          pr.wait
+          classify_nodes(pr.get_results)
         }
-        pr.run
-        pr.wait        
+        node_set = Nodes::NodeSet.new
+        @nodes_ok.duplicate_and_free(node_set)
+        @reboot_window.launch_on_node_set(node_set, &callback)        
+
+        begin
+          File.open("/tmp/kastafior_hostname", "w") { |f|
+            f.puts(Socket.gethostname())
+          }
+        rescue => e
+          failed_microstep("Cannot write the kastafior hostname file on server: #{e}")
+          return false
+        end
       end
 
       nodefile = Tempfile.new("kastafior-nodefile")
