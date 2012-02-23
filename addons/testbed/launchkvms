@@ -3,6 +3,9 @@
 require 'socket'
 require 'resolv'
 
+# Files
+IPXE_ISO_FILE='/root/ipxe.iso'
+
 # Sizes in Mo
 RAM_SIZE = 350
 FS_SIZE = 564
@@ -42,28 +45,9 @@ mounts.each do |line|
 end
 cmd("rm -Rf #{TMP_DIR}")
 
-# Get memory info
-meminfo = File.read('/proc/meminfo')
-totmem = nil
-meminfo.each do |line|
-  totmem = Regexp.last_match(1).to_i/1024 if line =~ /^MemTotal:\s*(\S+)\s*.*$/
-end
-
-unless totmem
-  $stderr.puts 'Unavailable to get meminfo'
-  exit 1
-end
-
-maxnodes = (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
-
 cmd("mkdir -p #{TMP_DIR}")
 count = 0
 ARGF.each do |line|
-  if count > maxnodes
-    $stderr.puts 'Too much nodes for this machine'
-    exit 1
-  end
-
   if line =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s+#{myip}\s*$/
     vmname = Regexp.last_match(1)
     vmip = Regexp.last_match(2)
@@ -75,7 +59,7 @@ ARGF.each do |line|
     fsfile = File.join(fsdir,FS_FILE)
     cmd("rm -f #{fsfile}")
     cmd("qemu-img create -f #{FS_TYPE} #{fsfile} #{FS_SIZE}M")
-    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac} -net tap -boot n -m #{RAM_SIZE}M -drive file=#{fsfile} -name #{vmname} -curses")
+    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac} -net tap -boot d -cdrom #{IPXE_ISO_FILE} -m #{RAM_SIZE}M -drive file=#{fsfile} -name #{vmname} -curses")
     #puts "Started #{vmname} (mac:#{vmmac})"
     count += 1
   end
