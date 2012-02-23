@@ -1014,7 +1014,7 @@ module MicroStepsLibrary
       if @config.common.taktuk_auto_propagate then
         cmd = "#{@config.common.kastafior} -s -c \\\"#{@config.common.taktuk_connector}\\\"  -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
       else
-        cmd = "#{@config.common.kastafior} -c \\\"#{@config.common.taktuk_connector}\\\" #{list} -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
+        cmd = "#{@config.common.kastafior} -c \\\"#{@config.common.taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
       end
       c = ParallelRunner::Command.new(cmd)
       c.run
