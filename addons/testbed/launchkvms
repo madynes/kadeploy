@@ -30,19 +30,24 @@ myip=Resolv.getaddress(Socket.gethostname)
 
 # Cleaning everything
 cmd("killall kvm &>/dev/null; true")
-sleep(2)
+sleep(4)
 
 #cmd("umount #{File.join(TMP_DIR,'*')}; true")
 mounts = cmd('mount')
+threads = []
 mounts.each do |line|
   if line =~ /^tmpfs\s+on\s+(\S+)\s+type\s+tmpfs.*$/
     tmp = Regexp.last_match(1)
     if tmp.include?(TMP_DIR)
-      cmd("umount #{tmp}")
-      cmd("rm -Rf #{tmp}")
+      threads << Thread.new(tmp) do |dir|
+        cmd("umount #{dir}")
+        sleep(1)
+        cmd("rm -Rf #{dir}")
+      end
     end
   end
 end
+threads.each { |thread| thread.join }
 cmd("rm -Rf #{TMP_DIR}")
 
 cmd("mkdir -p #{TMP_DIR}")
@@ -60,6 +65,7 @@ ARGF.each do |line|
     cmd("rm -f #{fsfile}")
     cmd("qemu-img create -f #{FS_TYPE} #{fsfile} #{FS_SIZE}M")
     cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac} -net tap -boot d -cdrom #{IPXE_ISO_FILE} -m #{RAM_SIZE}M -drive file=#{fsfile} -name #{vmname} -curses")
+    sleep(0.3)
     #puts "Started #{vmname} (mac:#{vmmac})"
     count += 1
   end
