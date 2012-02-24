@@ -395,7 +395,7 @@ def cfg_kadeploy_soft_reboot_cmd()
   if CFG_KADEPLOY_SOFT_REBOOT
     ret = "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\""
   else
-    ret = cfg_kadeploy_reboot_cmd()
+    ret = "#{cfg_kadeploy_reboot_cmd()} &>/dev/null </dev/null &"
   end
   ret
 end
@@ -642,6 +642,7 @@ end
 # Bind9 default config
 CFG_BIND_PATH='/etc/bind'
 CFG_BIND_NAMED_FILE = File.join(CFG_BIND_PATH,'named.conf')
+CFG_BIND_CUSTOM_FILE = File.join(CFG_BIND_PATH,'named.conf.custom')
 CFG_BIND_CONFIG_FILE_PREFIX = File.join(CFG_BIND_PATH,'db.')
 
 def cfg_bind_reverse_domain()
@@ -657,6 +658,18 @@ def cfg_bind_master_file()
 end
 
 def cfg_bind(dnsfwd)
+  options = ''
+  unless $subnetworks.empty?
+    options += "  sortlist {\n"
+    $subnetworks.each_value do |subnet|
+      options += "    {\n"
+      options += "      { #{subnet[:ipaddr].to_s}/#{subnet[:cidr]}; };\n"
+      options += "      { #{subnet[:ipaddr].to_s}/#{subnet[:cidr]}; };\n"
+      options += "    };\n"
+    end
+    options += "  };\n"
+  end
+
   "zone \"#{DOMAIN}\" {\n"\
   "  type master;\n"\
   "  file \"#{cfg_bind_master_file()}\";\n"\
@@ -670,6 +683,8 @@ def cfg_bind(dnsfwd)
     "  forwarders {\n"\
     "    #{dnsfwd};\n"\
     "  };\n"\
+    + options +
+    "#{($configs[:bind] ? "  include \"#{CFG_BIND_CUSTOM_FILE}\";\n" : '')}"\
     "};\n"\
   )}"
 end
@@ -939,8 +954,10 @@ $deplkernels = {}
 $stunnels = {}
 $hostscache = {}
 $network = {}
+$subnetworks = {}
 $gateway = nil
 $deploysendmeth = :HTTP
+$configs = {}
 
 options = {}
 
@@ -1455,8 +1472,9 @@ options[:version]     = nil
 options[:daemon_kadeploy] = nil
 options[:update_file] = nil
 options[:daemon_config] = nil
-options[:network] = nil
+options[:network_config] = nil
 options[:dns_forward] = nil
+options[:dns_config] = nil
 
 $debug				        = false
 $netiface 						= NET_ADMIN_IFACE
@@ -1533,12 +1551,16 @@ optparse = OptionParser.new(USAGE) do |opts|
   	options[:dns_forward] = d
 	end
 
-	opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes should be used as daemon in a YAML file with properties "host" and "newip" given for each services' ) do |d|
+	opts.on( '-e', '--dns-config <file>', 'Option file to add to DNS (bind9) config (added in "options { }" of named.conf)' ) do |d|
+  	options[:dns_config] = d
+	end
+
+	opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes should be used as daemon in a YAML file with fields "host" and "newip" given for each services' ) do |d|
   	options[:daemon_config] = d || nil
 	end
 
-	opts.on( '-n', '--network <network_address>', 'The network that should be used for the testbed in CIDR notation (default: the network hosts are currently in)' ) do |n|
-  	options[:network] = n
+	opts.on( '-n', '--network-config <network_config_file>', 'The network configuration that should be used for the testbed. Need to be a YAML file with fields "network" and "subnetworks" (list of "name","address"). Subnetworks are only used to optimise services configuration, they are not created/routed. Address have to be in CIDR notation (default: the network hosts are currently in)' ) do |n|
+  	options[:network_config] = n
 	end
 
 	opts.on( '', '--debug', 'Verbose display of every instruction sent' ) do
@@ -1559,10 +1581,12 @@ if ARGV.size < 2
   exit 1
 end
 
-if options[:kastafior] and !File.exists?(options[:kastafior])
-  msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true)
-else
-  options[:kastafior] = File.expand_path(options[:kastafior])
+if options[:kastafior]
+  if File.exists?(options[:kastafior])
+    options[:kastafior] = File.expand_path(options[:kastafior])
+  else
+    msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true)
+  end
 end
 
 if options[:gateway]
@@ -1582,6 +1606,14 @@ if options[:dns_forward]
   end
 end
 
+if options[:dns_config]
+  if File.exists?(options[:dns_config])
+    $configs[:bind] = File.read(options[:dns_config])
+  else
+    msg("file #{options[:dns_config]} not found",MSG_ERROR,true)
+  end
+end
+
 if options[:ssh_key]
   if File.exists?(options[:ssh_key])
     $sshkeyfile = options[:ssh_key]
@@ -1597,18 +1629,51 @@ else
   end
 end
 
-if options[:network] and $mode != :KVM
+if options[:network_config] and $mode != :KVM
+  struct = nil
   begin
-    tmp = IPAddr.new(options[:network])
+    struct = YAML.load_file(options[:network_config])
   rescue ArgumentError
-    msg("invalid network address '#{options[:network]}'",MSG_ERROR,true)
+    msg("Invalid YAML file '#{options[:network_config]}'",MSG_ERROR,true)
+  end
+  msg("Invalid YAML file '#{options[:network_config]}'",MSG_ERROR,true) \
+    unless struct
+
+  if struct['network']
+    begin
+      tmp = IPAddr.new(struct['network'])
+      $network[:ipaddr] = tmp
+      $network[:ipv4] = tmp.to_s
+      $network[:mask] = IPAddr.new(tmp.instance_variable_get(:@mask_addr),Socket::AF_INET).to_s
+      $network[:broadcast] = (tmp | (~tmp.instance_variable_get(:@mask_addr) & IPAddr::IN4MASK)).to_s
+      $network[:gateway] = (tmp | (~tmp.instance_variable_get(:@mask_addr) - 1 & IPAddr::IN4MASK)).to_s
+    rescue ArgumentError
+      msg("invalid network address '#{options[:network]}'",MSG_ERROR,true)
+    end
+  else
+    msg("field 'network' not found in YAML file",MSG_ERROR,true)
   end
 
-  $network[:ipaddr] = tmp
-  $network[:ipv4] = tmp.to_s
-  $network[:mask] = IPAddr.new(tmp.instance_variable_get(:@mask_addr),Socket::AF_INET).to_s
-  $network[:broadcast] = (tmp | (~tmp.instance_variable_get(:@mask_addr) & IPAddr::IN4MASK)).to_s
-  $network[:gateway] = (tmp | (~tmp.instance_variable_get(:@mask_addr) - 1 & IPAddr::IN4MASK)).to_s
+  if struct['subnetworks']
+    struct['subnetworks'].each do |subnet|
+      begin
+        name = subnet['name']
+        tmp = subnet['address'].split('/')
+        msg("subnet address '#{subnet['address']}' not in CIDR notation",MSG_ERROR,true) unless tmp.size == 2
+        if $subnetworks[name.to_sym]
+          msg("already declared subnetwork '#{name}', ignoring",MSG_WARNING)
+        else
+          $subnetworks[name.to_sym] = {}
+          $subnetworks[name.to_sym][:name] = name
+          $subnetworks[name.to_sym][:ipaddr] = IPAddr.new(tmp[0])
+          $subnetworks[name.to_sym][:cidr] = tmp[1].to_i
+        end
+      rescue ArgumentError
+        msg("invalid network address '#{subnet['address']}'",MSG_ERROR,true)
+      end
+    end
+  end
+
 end
 
 $update_paths = {}
@@ -2316,6 +2381,10 @@ sshgw.ssh(servername,'root') do |session|
     msg("  gateway: #{$network[:gateway]}",MSG_INFO)
     msg("  broadcast: #{$network[:broadcast]}",MSG_INFO)
     msg("  dns: #{$network[:dns]}",MSG_INFO)
+    msg("  subnetworks:",MSG_INFO)
+    $subnetworks.each_value do |subnet|
+      msg("    #{subnet[:name]}: #{subnet[:ipaddr]}/#{subnet[:cidr]}",MSG_INFO)
+    end
   end
   msg('can\'t find default network iface',MSG_ERROR,true) if !defaultiface or defaultiface.empty?
 
@@ -2422,6 +2491,13 @@ sshgw.ssh(servername,'root') do |session|
 		tempfile(cfg_bind((tmp != $kanodes[:dns][:ipv4] ? tmp : ''))) do |path|
 			scp(servername,path,CFG_BIND_NAMED_FILE)
 		end
+
+
+    if $configs[:bind]
+      tempfile($configs[:bind]) { |path| scp(servername,path,CFG_BIND_CUSTOM_FILE) }
+		  sexec(session,"chown bind #{CFG_BIND_CUSTOM_FILE}")
+    end
+
 		sexec(session,"chown bind #{CFG_BIND_NAMED_FILE}")
 
 		sexec(session,'service bind9 restart')

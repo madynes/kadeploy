@@ -1,0 +1,71 @@
+#!/usr/bin/ruby
+
+require 'yaml'
+require 'ipaddr'
+require 'rubygems'
+require 'ipaddress'
+
+USAGE="usage: #{$0} <yaml_sitesfile> <servicefile>"
+
+
+$sites = {}
+
+begin
+  struct = YAML.load_file(ARGV[0])
+  if struct['subnetworks'] and struct['subnetworks'].is_a?(Array)
+    struct['subnetworks'].each do |subnet|
+      name = subnet['name']
+      if $sites[name]
+        $stderr.puts "multiple definition of site '#{name}', ignoring"
+      else
+        $sites[name] = {}
+        $sites[name][:addr] = IPAddress.parse(subnet['address'])
+      end
+    end
+  else
+    $stderr.puts 'cannot find \'subnetwork\' field in YAML file'
+    exit 1
+  end
+rescue ArgumentError
+  $stderr.puts "invalid ip #{subnet['address']}"
+  exit 1
+rescue Errno::ENOENT
+  $stderr.puts "File '#{ARGV[0]}' not found"
+  exit 1
+end
+
+begin
+  File.open(ARGV[1], 'r') do |f|
+    f.each do |tmp|
+      begin
+        IPAddr.new(tmp)
+        $stderr.puts "server must be specified by hostnames"
+        exit 1
+      rescue ArgumentError
+      end
+
+      affected = false
+      $sites.each_pair do |name,val|
+        if tmp.include?(name)
+          val[:servers] = [] unless val[:servers]
+          val[:servers] << tmp.chomp
+          affected = true
+        end
+      end
+      $stderr.puts "server '#{tmp}' not affected to any site, ignoring" unless affected
+    end
+  end
+rescue Errno::ENOENT
+  $stderr.puts "File '#{ARGV[1]}' not found"
+  exit 1
+end
+
+$sites.each_value do |val|
+  if val[:servers]
+    tmp = IPAddr.new(val[:addr].first.to_s)
+    val[:servers].each do |server|
+      puts "#{server}:#{tmp.to_s}"
+      tmp = tmp.succ
+    end
+  end
+end

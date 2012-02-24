@@ -12,6 +12,9 @@ SCRIPT_CHECK=./checkkvms
 SCRIPT_SERVICE=./setupserviceip
 SCRIPT_BRIDGE=./setupkvmbridge
 SCRIPT_LAUNCH=./launchkvms
+
+SCRIPT_GETNETWORK=./getkvmnetwork
+SCRIPT_GETTESTBEDIP=./gettestbedip
 SCRIPT_GENNODES=./genkvmnodefile
 
 HOSTS_CONF=config.yml
@@ -71,39 +74,50 @@ fi
 exclfile=`tempfile`
 serviceyamlfile=${TMP_DIR}/service.yml
 
+networkyamlfile=${TMP_DIR}/network.yml
+$SCRIPT_GETNETWORK $network > $networkyamlfile
+
+serviceips=`$SCRIPT_GETTESTBEDIP $networkyamlfile $servicefile`
+
 tmp=`echo $network | cut -d '/' -f 1`
 tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
 
 echo '---' > $serviceyamlfile
 echo 'kadeploy:' >> $serviceyamlfile
-echo "  host: ${kadaemon}" >> $serviceyamlfile
+tmp=`echo "$serviceips" | grep $kadaemon`
+echo "  host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
+
 if [ -n "$newnet" ]
 then
-  echo "  newip: ${tmp}" >> $serviceyamlfile
-  echo $tmp >> $exclfile
-  tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+  ip=`echo $tmp | cut -d ':' -f 2`
+  echo "  newip: $ip" >> $serviceyamlfile
+  echo $ip >> $exclfile
 else
   echo $kadaemon >> $exclfile
 fi
 
 echo 'dns:' >> $serviceyamlfile
-echo "  host: ${dnsdaemon}" >> $serviceyamlfile
+tmp=`echo "$serviceips" | grep $dnsdaemon`
+echo "  host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
+
 if [ -n "$newnet" ]
 then
-  echo "  newip: ${tmp}" >> $serviceyamlfile
-  echo $tmp >> $exclfile
-  tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+  ip=`echo $tmp | cut -d ':' -f 2`
+  echo "  newip: $ip" >> $serviceyamlfile
+  echo $ip >> $exclfile
 else
   echo $dnsdaemon >> $exclfile
 fi
 
 echo 'dhcp:' >> $serviceyamlfile
-echo "  host: ${dhcpdaemon}" >> $serviceyamlfile
+tmp=`echo "$serviceips" | grep $dhcpdaemon`
+echo "  host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
+
 if [ -n "$newnet" ]
 then
-  echo "  newip: ${tmp}" >> $serviceyamlfile
-  echo $tmp >> $exclfile
-  tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+  ip=`echo $tmp | cut -d ':' -f 2`
+  echo "  newip: $ip" >> $serviceyamlfile
+  echo $ip >> $exclfile
 else
   echo $dhcpdaemon >> $exclfile
 fi
@@ -111,12 +125,14 @@ fi
 echo 'www:' >> $serviceyamlfile
 for wwwdaemon in `echo $wwwservers`
 do
-  echo "  - host: ${wwwdaemon}" >> $serviceyamlfile
+  tmp=`echo "$serviceips" | grep $wwwdaemon`
+  echo "  - host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
+
   if [ -n "$newnet" ]
   then
-    echo "    newip: ${tmp}" >> $serviceyamlfile
-    echo $tmp >> $exclfile
-    tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+    ip=`echo $tmp | cut -d ':' -f 2`
+    echo "    newip: $ip" >> $serviceyamlfile
+    echo $ip >> $exclfile
   else
     echo $wwwdaemon >> $exclfile
   fi
@@ -189,7 +205,7 @@ echo "... done in ${stime} seconds"
 
 echo 'Creating nodefile'
 nodefile=${TMP_DIR}/nodefile
-$SCRIPT_GENNODES $network -f $hostyamlfile -e $exclfile > $nodefile
+$SCRIPT_GENNODES $networkyamlfile -f $hostyamlfile -e $exclfile > $nodefile
 
 rm $exclfile
 
@@ -227,7 +243,7 @@ echo "$wwwservers"
 
 if [ -n "$newnet" ]
 then
-  echo "kabootstrap options: -V -n $network -s $serviceyamlfile -f $nodefile -F $hostfile"
+  echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -f $nodefile -F $hostfile"
 else
-  echo "kabootstrap options: -V -d $kadaemon -a $dnsdaemon -b $dhcpdaemon -w $wwwfile -f $nodefile -F $hostfile"
+  echo "kabootstrap options: -V -g `hostname` -d $kadaemon -a $dnsdaemon -b $dhcpdaemon -w $wwwfile -f $nodefile -F $hostfile"
 fi
