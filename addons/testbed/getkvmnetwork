@@ -1,0 +1,43 @@
+#!/usr/bin/ruby
+
+require 'ipaddr'
+require 'rubygems'
+require 'ipaddress'
+
+USAGE="usage: #{$0} <network_addr>"
+
+
+$sites = {
+  'bordeaux' => nil,
+  'grenoble' => nil,
+  'lille' => nil,
+  'lyon' => nil,
+  'nancy' => nil,
+  'rennes' => nil,
+  'toulouse' => nil,
+  'sophia' => nil,
+  'reims' => nil,
+  'luxembourg' => nil,
+}
+
+begin
+  $network = IPAddress.parse(ARGV[0])
+rescue ArgumentError
+  $stderr.puts "invalid ip #{ARGV[0]}"
+  exit 1
+end
+
+networks = $network.split($sites.size)
+count = 0
+$sites.each_key do |name|
+  $sites[name] = networks[count]
+  count += 1
+end
+
+puts '---'
+puts "network: #{$network.to_string}"
+puts 'subnetworks:'
+$sites.each_pair do |name,val|
+  puts "  - name : #{name}"
+  puts "    address : #{val.to_string}"
+end
