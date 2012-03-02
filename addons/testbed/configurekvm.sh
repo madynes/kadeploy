@@ -245,5 +245,5 @@ if [ -n "$newnet" ]
 then
   echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -f $nodefile -F $hostfile"
 else
-  echo "kabootstrap options: -V -g `hostname` -d $kadaemon -a $dnsdaemon -b $dhcpdaemon -w $wwwfile -f $nodefile -F $hostfile"
+  echo "kabootstrap options: -V -g `hostname` -s $serviceyamlfile -f $nodefile -F $hostfile"
 fi
