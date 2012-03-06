@@ -15,20 +15,18 @@ require 'optparse'
 require 'ostruct'
 require 'fileutils'
 require 'resolv'
+require 'yaml'
 
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]+\Z/
 R_HTTP = /^http[s]?:\/\//
 
 module ConfigInformation
   CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
-  COMMANDS_FILE = File.join(CONFIGURATION_FOLDER, "cmd")
-  NODES_FILE = File.join(CONFIGURATION_FOLDER, "nodes")
   VERSION_FILE = File.join(CONFIGURATION_FOLDER, "version")
-  COMMON_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "conf")
-  CLUSTER_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "clusters")
-  CLIENT_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "client_conf")
-  SPECIFIC_CONFIGURATION_FILE_PREFIX = File.join(CONFIGURATION_FOLDER, "specific_conf_")
-  PARTITION_FILE_PREFIX = File.join(CONFIGURATION_FOLDER, "partition_file_")
+  SERVER_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "server_conf.yml")
+  CLIENT_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "client_conf.yml")
+  CLUSTERS_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "clusters.yml")
+  COMMANDS_FILE = File.join(CONFIGURATION_FOLDER, "cmd.yml")
   USER = `id -nu`.chomp
   CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
 
@@ -50,11 +48,9 @@ module ConfigInformation
       if not empty then
         if (sanity_check() == true) then
           @common = CommonConfig.new
-          res = load_common_config_file
-          
+          res = load_server_config_file
           @cluster_specific = Hash.new
-          res = res && load_cluster_specific_config_files
-          res = res && load_nodes_config_file
+          res = res && load_clusters_config_file
           res = res && load_commands
           res = res && load_version
           raise "Problem in configuration" if not res
@@ -383,17 +379,12 @@ module ConfigInformation
     # Output
     # * return true if the installation is correct, false otherwise
     def sanity_check()
-      if not File.readable?(COMMON_CONFIGURATION_FILE) then
-        puts "The #{COMMON_CONFIGURATION_FILE} file cannot be read"
+      if not File.readable?(SERVER_CONFIGURATION_FILE) then
+        puts "The #{SERVER_CONFIGURATION_FILE} file cannot be read"
         return false
       end
-      if not File.readable?(CLUSTER_CONFIGURATION_FILE) then
-        puts "The #{CLUSTER_CONFIGURATION_FILE} file cannot be read"
-        return false
-      end
-      #configuration node file
-      if not File.readable?(NODES_FILE) then
-        puts "The #{NODES_FILE} file cannot be read"
+      if not File.readable?(CLUSTERS_CONFIGURATION_FILE) then
+        puts "The #{CLUSTERS_CONFIGURATION_FILE} file cannot be read"
         return false
       end
       if not File.readable?(VERSION_FILE) then
@@ -409,245 +400,250 @@ module ConfigInformation
     # * nothing
     # Output
     # * return true in case of success, false otherwise
-    def load_common_config_file
-      IO.readlines(COMMON_CONFIGURATION_FILE).each { |line|
-        if not (/^#/ =~ line) then #we ignore commented lines
-          if /(.+)\ \=\ (.+)/ =~ line then
-            content = Regexp.last_match
-            attr = content[1]
-            val = content[2].strip
-            case attr
-            when "verbose_level"
-              if val =~ /\A[0-4]\Z/ then
-                @common.verbose_level = val.to_i
-              else
-                puts "Invalid verbose level"
+    def load_server_config_file
+      begin
+        config = YAML.load_file(SERVER_CONFIGURATION_FILE)
+      rescue ArgumentError
+        puts "Invalid YAML file '#{SERVER_CONFIGURATION_FILE}'"
+        return false
+      rescue Errno::ENOENT
+        puts "File not found '#{SERVER_CONFIGURATION_FILE}'"
+        return false
+      end
+
+      config.each_pair do |attr,val|
+        val = val.to_s
+        case attr
+        when "verbose_level"
+          if val =~ /\A[0-4]\Z/ then
+            @common.verbose_level = val.to_i
+          else
+            puts "Invalid verbose level"
+            return false
+          end
+        when "pxe_kind"
+          if val =~ /\A(PXElinux|GPXElinux|IPXE)\Z/ then
+            @common.pxe_kind = val
+          else
+            puts "Invalid PXE kind, allowed values are PXElinux, GPXElinux or IPXE"
+            return false
+          end
+        when "pxe_export"
+          @common.pxe_export = val
+        when "pxe_repository"
+          @common.pxe_repository = val
+        when "pxe_repository_kernels"
+          @common.pxe_repository_kernels = val
+        when "pxe_repository_kernels_max_size"
+          @common.pxe_repository_kernels_max_size = val.to_i
+        when "db_kind"
+          @common.db_kind = val
+        when "deploy_db_host"
+          @common.deploy_db_host = val
+        when "deploy_db_name"
+          @common.deploy_db_name = val
+        when "deploy_db_login"
+          @common.deploy_db_login = val
+        when "deploy_db_passwd"
+          @common.deploy_db_passwd = val
+        when "rights_kind"
+          @common.rights_kind = val
+        when "taktuk_connector"
+          @common.taktuk_connector = val
+        when "taktuk_tree_arity"
+          @common.taktuk_tree_arity = val.to_i
+        when "taktuk_auto_propagate"
+          if val =~ /\A(true|false)\Z/
+            @common.taktuk_auto_propagate = (val == "true")
+          else
+            puts "Invalid value for the taktuk_auto_propagate field"
+            return false
+          end
+        when "tarball_dest_dir"
+          @common.tarball_dest_dir = val
+        when "kadeploy_server"
+          @common.kadeploy_server = val
+        when "kadeploy_server_port"
+          @common.kadeploy_server_port = val.to_i
+        when "kadeploy_tcp_buffer_size"
+          @common.kadeploy_tcp_buffer_size = val.to_i
+        when "kadeploy_cache_dir"
+          if (val == "no_cache") then
+            @common.kadeploy_disable_cache = true
+            #We set a default value since it is used by the Bittorrent implemantation
+            @common.kadeploy_cache_dir = "/tmp"
+          else
+            @common.kadeploy_cache_dir = val
+          end
+        when "kadeploy_cache_size"
+          @common.kadeploy_cache_size = val.to_i
+        when "max_preinstall_size"
+          @common.max_preinstall_size = val.to_i
+        when "max_postinstall_size"
+          @common.max_postinstall_size = val.to_i 
+        when "ssh_port"
+          if val =~ /\A\d+\Z/ then
+            @common.ssh_port = val
+          else
+            puts "Invalid value for SSH port"
+            return false
+          end
+        when "test_deploy_env_port"
+          if val =~ /\A\d+\Z/ then
+            @common.test_deploy_env_port = val
+          else
+            puts "Invalid value for the test_deploy_env_port field"
+            return false
+          end
+        when "environment_extraction_dir"
+          @common.environment_extraction_dir = val
+        when "log_to_file"
+          @common.log_to_file = val
+          if File.exist?(@common.log_to_file) then
+            if not File.file?(@common.log_to_file) then
+              puts "The log file #{@common.log_to_file} is not a regular file"
+              return false
+            else
+              if not File.writable?(@common.log_to_file) then
+                puts "The log file #{@common.log_to_file} is not writable"
                 return false
               end
-            when "pxe_kind"
-              if val =~ /\A(PXElinux|GPXElinux|IPXE)\Z/ then              
-                @common.pxe_kind = val
-              else
-                puts "Invalid PXE kind, allowed values are PXElinux, GPXElinux or IPXE"
-                return false
-              end
-            when "pxe_export"
-              @common.pxe_export = val
-            when "pxe_repository"         
-              @common.pxe_repository = val
-            when "pxe_repository_kernels"         
-              @common.pxe_repository_kernels = val
-            when "pxe_repository_kernels_max_size"
-              @common.pxe_repository_kernels_max_size = val.to_i
-            when "db_kind"
-              @common.db_kind = val
-            when "deploy_db_host"
-              @common.deploy_db_host = val
-            when "deploy_db_name"
-              @common.deploy_db_name = val
-            when "deploy_db_login"
-              @common.deploy_db_login = val
-            when "deploy_db_passwd"
-              @common.deploy_db_passwd = val
-            when "rights_kind"
-              @common.rights_kind = val
-            when "taktuk_connector"
-              @common.taktuk_connector = val
-            when "taktuk_tree_arity"
-              @common.taktuk_tree_arity = val.to_i
-            when "taktuk_auto_propagate"
-              if val =~ /\A(true|false)\Z/
-                @common.taktuk_auto_propagate = (val == "true")
-              else
-                puts "Invalid value for the taktuk_auto_propagate field"
-                return false
-              end
-            when "tarball_dest_dir"
-              @common.tarball_dest_dir = val
-            when "kadeploy_server"
-              @common.kadeploy_server = val
-            when "kadeploy_server_port"
-              @common.kadeploy_server_port = val.to_i
-            when "kadeploy_tcp_buffer_size"
-              @common.kadeploy_tcp_buffer_size = val.to_i
-            when "kadeploy_cache_dir"
-              if (val == "no_cache") then
-                @common.kadeploy_disable_cache = true
-                #We set a default value since it is used by the Bittorrent implemantation
-                @common.kadeploy_cache_dir = "/tmp"
-              else
-                @common.kadeploy_cache_dir = val
-              end
-            when "kadeploy_cache_size"
-              @common.kadeploy_cache_size = val.to_i
-            when "max_preinstall_size"
-              @common.max_preinstall_size = val.to_i
-            when "max_postinstall_size"
-              @common.max_postinstall_size = val.to_i 
-            when "ssh_port"
-              if val =~ /\A\d+\Z/ then
-                @common.ssh_port = val
-              else
-                puts "Invalid value for SSH port"
-                return false
-              end
-            when "test_deploy_env_port"
-              if val =~ /\A\d+\Z/ then
-                @common.test_deploy_env_port = val
-              else
-                puts "Invalid value for the test_deploy_env_port field"
-                return false
-              end
-            when "environment_extraction_dir"
-              @common.environment_extraction_dir = val
-            when "log_to_file"
-              @common.log_to_file = val
-              if File.exist?(@common.log_to_file) then
-                if not File.file?(@common.log_to_file) then
-                  puts "The log file #{@common.log_to_file} is not a regular file"
-                  return false
-                else
-                  if not File.writable?(@common.log_to_file) then
-                    puts "The log file #{@common.log_to_file} is not writable"
-                    return false
-                  end
-                end
-              else
-                begin
-                  FileUtils.touch(@common.log_to_file)
-                rescue
-                  puts "Cannot write the log file: #{@common.log_to_file}"
-                  return false
-                end
-              end
-            when "log_to_syslog"
-              if val =~ /\A(true|false)\Z/ then
-                @common.log_to_syslog = (val == "true")
-              else
-                puts "Invalid value for the log_to_syslog field"
-                return false
-              end
-            when "log_to_db"
-              if val =~ /\A(true|false)\Z/ then
-                @common.log_to_db = (val == "true")
-              else
-                puts "Invalid value for the log_to_db field"
-                return false
-              end
-            when "dbg_to_syslog"
-              if val =~ /\A(true|false)\Z/ then
-                @common.dbg_to_syslog = (val == "true")
-              else
-                puts "Invalid value for the dbg_to_syslog field"
-                return false
-              end
-            when "dbg_to_syslog_level"
-              if val =~ /\A[0-4]\Z/ then
-                @common.dbg_to_syslog_level = val.to_i
-              else
-                puts "Invalid value for the dbg_to_syslog_level field"
-                return false
-              end
-            when "reboot_window"
-              if val =~ /\A\d+\Z/ then
-                @common.reboot_window = val.to_i
-              else
-                puts "Invalid value for the reboot_window field"
-                return false
-              end
-            when "reboot_window_sleep_time"
-              if val =~ /\A\d+\Z/ then
-                @common.reboot_window_sleep_time = val.to_i
-              else
-                puts "Invalid value for the reboot_window_sleep_time field"
-                return false
-              end
-            when "nodes_check_window"
-              if val =~ /\A\d+\Z/ then
-                @common.nodes_check_window = val.to_i
-              else
-                puts "Invalid value for the nodes_check_window field"
-                return false
-              end
-            when "bootloader"
-              if val =~ /\A(chainload_pxe|pure_pxe)\Z/
-                @common.bootloader = val
-              else
-                puts "#{val} is an invalid entry for bootloader, only the chainload_pxe and pure_pxe values are allowed."
-                return false
-              end
-            when "purge_deployment_timer"
-              if val =~ /\A\d+\Z/ then
-                @common.purge_deployment_timer = val.to_i
-              else
-                puts "Invalid value for the purge_deployment_timer field"
-                return false
-              end
-            when "rambin_path"
-              @common.rambin_path = val
-            when "mkfs_options"
-              #mkfs_options = type1@opts|type2@opts....
-              if val =~ /\A\w+@.+(|\w+|.+)*\Z/ then
-                @common.mkfs_options = Hash.new
-                val.split("|").each { |entry|
-                  fstype = entry.split("@")[0]
-                  opts = entry.split("@")[1]
-                  @common.mkfs_options[fstype] = opts
-                }
-              else
-                puts "Wrong entry for mkfs_options"
-                return false
-              end
-            when "demolishing_env_threshold"
-              if val =~ /\A\d+\Z/ then
-                @common.demolishing_env_threshold = val.to_i
-              else
-                puts "Invalid value for the demolishing_env_threshold field"
-                return false
-              end
-            when "demolishing_env_auto_tag"
-              if val =~ /\A(true|false)\Z/ then
-                @common.demolishing_env_auto_tag = (val == "true")
-              else
-                puts "Invalid value for the demolishing_env_auto_tag field"
-                return false
-              end
-            when "bt_tracker_ip"
-              if val =~ /\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/ then
-                @common.bt_tracker_ip = val
-              else
-                puts "Invalid value for the bt_tracker_ip field"
-                return false
-              end
-            when "bt_download_timeout"
-              if val =~ /\A\d+\Z/ then
-                @common.bt_download_timeout = val.to_i
-              else
-                puts "Invalid value for the bt_download_timeout field"
-                return false
-              end
-            when "almighty_env_users"
-              if val =~ /\A\w+(,\w+)*\Z/ then
-                @common.almighty_env_users = val.split(",")
-              end
-            when "async_end_of_deployment_hook"
-              @common.async_end_of_deployment_hook = val
-            when "async_end_of_reboot_hook"
-              @common.async_end_of_reboot_hook = val
-            when "async_end_of_power_hook"
-              @common.async_end_of_power_hook = val
-            when "vlan_hostname_suffix"
-              @common.vlan_hostname_suffix = val
-            when "set_vlan_cmd"
-              @common.set_vlan_cmd = val
-            when "grub"
-              @common.grub = val
-            when "kastafior"
-              @common.kastafior = val
+            end
+          else
+            begin
+              FileUtils.touch(@common.log_to_file)
+            rescue
+              puts "Cannot write the log file: #{@common.log_to_file}"
+              return false
             end
           end
+        when "log_to_syslog"
+          if val =~ /\A(true|false)\Z/ then
+            @common.log_to_syslog = (val == "true")
+          else
+            puts "Invalid value for the log_to_syslog field"
+            return false
+          end
+        when "log_to_db"
+          if val =~ /\A(true|false)\Z/ then
+            @common.log_to_db = (val == "true")
+          else
+            puts "Invalid value for the log_to_db field"
+            return false
+          end
+        when "dbg_to_syslog"
+          if val =~ /\A(true|false)\Z/ then
+            @common.dbg_to_syslog = (val == "true")
+          else
+            puts "Invalid value for the dbg_to_syslog field"
+            return false
+          end
+        when "dbg_to_syslog_level"
+          if val =~ /\A[0-4]\Z/ then
+            @common.dbg_to_syslog_level = val.to_i
+          else
+            puts "Invalid value for the dbg_to_syslog_level field"
+            return false
+          end
+        when "reboot_window"
+          if val =~ /\A\d+\Z/ then
+            @common.reboot_window = val.to_i
+          else
+            puts "Invalid value for the reboot_window field"
+            return false
+          end
+        when "reboot_window_sleep_time"
+          if val =~ /\A\d+\Z/ then
+            @common.reboot_window_sleep_time = val.to_i
+          else
+            puts "Invalid value for the reboot_window_sleep_time field"
+            return false
+          end
+        when "nodes_check_window"
+          if val =~ /\A\d+\Z/ then
+            @common.nodes_check_window = val.to_i
+          else
+            puts "Invalid value for the nodes_check_window field"
+            return false
+          end
+        when "bootloader"
+          if val =~ /\A(chainload_pxe|pure_pxe)\Z/
+            @common.bootloader = val
+          else
+            puts "#{val} is an invalid entry for bootloader, only the chainload_pxe and pure_pxe values are allowed."
+            return false
+          end
+        when "purge_deployment_timer"
+          if val =~ /\A\d+\Z/ then
+            @common.purge_deployment_timer = val.to_i
+          else
+            puts "Invalid value for the purge_deployment_timer field"
+            return false
+          end
+        when "rambin_path"
+          @common.rambin_path = val
+        when "mkfs_options"
+          #mkfs_options = type1@opts|type2@opts....
+          if val =~ /\A\w+@.+(|\w+|.+)*\Z/ then
+            @common.mkfs_options = Hash.new
+            val.split("|").each { |entry|
+              fstype = entry.split("@")[0]
+              opts = entry.split("@")[1]
+              @common.mkfs_options[fstype] = opts
+            }
+          else
+            puts "Wrong entry for mkfs_options"
+            return false
+          end
+        when "demolishing_env_threshold"
+          if val =~ /\A\d+\Z/ then
+            @common.demolishing_env_threshold = val.to_i
+          else
+            puts "Invalid value for the demolishing_env_threshold field"
+            return false
+          end
+        when "demolishing_env_auto_tag"
+          if val =~ /\A(true|false)\Z/ then
+            @common.demolishing_env_auto_tag = (val == "true")
+          else
+            puts "Invalid value for the demolishing_env_auto_tag field"
+            return false
+          end
+        when "bt_tracker_ip"
+          if val =~ /\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/ then
+            @common.bt_tracker_ip = val
+          else
+            puts "Invalid value for the bt_tracker_ip field"
+            return false
+          end
+        when "bt_download_timeout"
+          if val =~ /\A\d+\Z/ then
+            @common.bt_download_timeout = val.to_i
+          else
+            puts "Invalid value for the bt_download_timeout field"
+            return false
+          end
+        when "almighty_env_users"
+          if val =~ /\A\w+(,\w+)*\Z/ then
+            @common.almighty_env_users = val.split(",")
+          end
+        when "async_end_of_deployment_hook"
+          @common.async_end_of_deployment_hook = val
+        when "async_end_of_reboot_hook"
+          @common.async_end_of_reboot_hook = val
+        when "async_end_of_power_hook"
+          @common.async_end_of_power_hook = val
+        when "vlan_hostname_suffix"
+          @common.vlan_hostname_suffix = val
+        when "set_vlan_cmd"
+          @common.set_vlan_cmd = val
+        when "grub"
+          @common.grub = val
+        when "kastafior"
+          @common.kastafior = val
         end
-      }
+      end
+
       if not @common.check_all_fields_filled() then
         return false
       end
@@ -700,22 +696,36 @@ module ConfigInformation
     # * return an Hash that contains the servers info
     def Config.load_client_config_file
       servers = Hash.new
-      IO.readlines(CLIENT_CONFIGURATION_FILE).each { |line|
-        if not (/^#/ =~ line) then #we ignore commented lines
-          if /\A(default)\ \=\ (\w+)\Z/ =~ line then
-            content = Regexp.last_match
-            shortcut = content[2]
-            servers["default"] = shortcut
-          end
-          if /\A(\w+)\ \=\ ([\w.-]+):(\d+)\Z/ =~ line then
-            content = Regexp.last_match
-            shortcut = content[1]
-            host = content[2]
-            port = content[3]
-            servers[shortcut] = [host, port]
+
+      begin
+        config = YAML.load_file(CLIENT_CONFIGURATION_FILE)
+      rescue ArgumentError
+        puts "Invalid YAML file '#{CLIENT_CONFIGURATION_FILE}'"
+        raise "Problem in configuration"
+      rescue Errno::ENOENT
+        puts "File not found '#{CLIENT_CONFIGURATION_FILE}'"
+        raise "Problem in configuration"
+      end
+
+      config.each_pair do |attr,val|
+        if attr == 'default'
+          servers['default'] = val
+        else
+          tmp = val.split(':')
+          if tmp.size != 2
+            puts "Servers should be specified as 'hostname:port' in client config file"
+            raise "Problem in configuration"
+          else
+            servers[attr] = [ tmp[0], tmp[1] ]
           end
         end
-      }
+      end
+
+      if servers.empty?
+        puts "No server specified"
+        raise "Problem in configuration"
+      end
+
       return servers
     end
 
@@ -745,216 +755,299 @@ module ConfigInformation
     # * nothing
     # Output
     # * return true in case of success, false otherwise
-    def load_cluster_specific_config_files
-      IO.readlines(CLUSTER_CONFIGURATION_FILE).each { |c|
-        cluster = c.strip
-        if (not (/^#/ =~ cluster)) && (not (/\A\s*\Z/ =~ cluster)) then
-          cluster_file = SPECIFIC_CONFIGURATION_FILE_PREFIX + cluster
-          if not File.readable?(cluster_file) then
-            puts "The #{cluster_file} file cannot be read"
-            return false
-          end
-          partition_file = PARTITION_FILE_PREFIX + cluster
-          if not File.readable?(partition_file) then
-            puts "The #{partition_file} file cannot be read"
-            return false
-          end
-          @cluster_specific[cluster] = ClusterSpecificConfig.new
-          @cluster_specific[cluster].partition_file = partition_file
-          IO.readlines(cluster_file).each { |line|
-            if not (/^#/ =~ line) then #we ignore commented lines
-              if /(.+)\ \=\ (.+)/ =~ line then
-                content = Regexp.last_match
-                attr = content[1]
-                val = content[2].strip
-                case attr
-                when "deploy_kernel"
-                  @cluster_specific[cluster].deploy_kernel = val
-                when "deploy_kernel_args"
-                  @cluster_specific[cluster].deploy_kernel_args = val
-                when "deploy_initrd"
-                  @cluster_specific[cluster].deploy_initrd = val
-                when "block_device"
-                  @cluster_specific[cluster].block_device = val
-                when "deploy_part"
-                  @cluster_specific[cluster].deploy_part = val
-                when "prod_part"
-                  @cluster_specific[cluster].prod_part = val
-                when "tmp_part"
-                  @cluster_specific[cluster].tmp_part = val
-                when "swap_part"
-                  @cluster_specific[cluster].swap_part = val
-                when "workflow_steps"
-                  @cluster_specific[cluster].workflow_steps = val
-                when "timeout_reboot_classical"
-                  n = 1
-                  begin
-                    timeout = eval(val).to_i
-                    @cluster_specific[cluster].timeout_reboot_classical = val
-                  rescue
-                    puts "Invalid value for the timeout_reboot_classical field in the #{cluster} config file"
-                    return false
-                  end
-                when "timeout_reboot_kexec"
-                  n = 1
-                  begin
-                    timeout = eval(val).to_i
-                    @cluster_specific[cluster].timeout_reboot_kexec = val
-                  rescue
-                    puts "Invalid value for the timeout_reboot_kexec field in the #{cluster} config file"
-                    return false
-                  end
-                when "cmd_soft_reboot"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_soft_reboot = tmp[0]
-                  (return false if not add_group_of_nodes("soft_reboot", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_hard_reboot"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_hard_reboot = tmp[0]
-                  (return false if not add_group_of_nodes("hard_reboot", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_very_hard_reboot"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_very_hard_reboot = tmp[0]
-                  (return false if not add_group_of_nodes("very_hard_reboot", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_console"
-                  @cluster_specific[cluster].cmd_console = val
-                when "cmd_soft_power_off"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_soft_power_off = tmp[0]
-                  (return false if not add_group_of_nodes("soft_power_off", tmp[1], cluster)) if (tmp[1] != nil)
-                  when "cmd_hard_power_off"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_hard_power_off = tmp[0]
-                  (return false if not add_group_of_nodes("hard_power_off", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_very_hard_power_off"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_very_hard_power_off = tmp[0]
-                  (return false if not add_group_of_nodes("very_hard_power_off", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_soft_power_on"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_soft_power_on = tmp[0]
-                  (return false if not add_group_of_nodes("soft_power_on", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_hard_power_on"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_hard_power_on = tmp[0]
-                  (return false if not add_group_of_nodes("hard_power_on", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_very_hard_power_on"
-                  tmp = val.split(",")
-                  @cluster_specific[cluster].cmd_very_hard_power_on = tmp[0]
-                  (return false if not add_group_of_nodes("very_hard_power_on", tmp[1], cluster)) if (tmp[1] != nil)
-                when "cmd_power_status"
-                  @cluster_specific[cluster].cmd_power_status = val
-                when "drivers"
-                  val.split(",").each { |driver|
-                    @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
-                    @cluster_specific[cluster].drivers.push(driver)
-                  }
-                when "pxe_header"
-                  @cluster_specific[cluster].pxe_header = val.gsub("\\n","\n")
-                when "kernel_params"
-                  @cluster_specific[cluster].kernel_params = val
-                when "nfsroot_kernel"
-                  @cluster_specific[cluster].nfsroot_kernel = val
-                when "nfsroot_params"
-                  @cluster_specific[cluster].nfsroot_params = val
-                when "admin_pre_install"
-                  #filename|kind|script,filename|kind|script,...
-                  if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-                    @cluster_specific[cluster].admin_pre_install = Array.new
-                    val.split(",").each { |tmp|
-                      val = tmp.split("|")
-                      entry = Hash.new
-                      entry["file"] = val[0]
-                      entry["kind"] = val[1]
-                      entry["script"] = val[2]
-                      @cluster_specific[cluster].admin_pre_install.push(entry)
-                    }
-                  elsif val =~ /\A(no_pre_install)\Z/ then
-                    @cluster_specific[cluster].admin_pre_install = nil
-                  else
-                    puts "Invalid value for the admin_pre_install field in the #{cluster} config file"
-                    return false
-                  end
-                when "admin_post_install"
-                  #filename|tgz|script,filename|tgz|script,...
-                  if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-                    @cluster_specific[cluster].admin_post_install = Array.new
-                    val.split(",").each { |tmp|
-                      val = tmp.split("|")
-                      entry = Hash.new
-                      entry["file"] = val[0]
-                      entry["kind"] = val[1]
-                      entry["script"] = val[2]
-                      @cluster_specific[cluster].admin_post_install.push(entry)
-                    }
-                  elsif val =~ /\A(no_post_install)\Z/ then
-                    @cluster_specific[cluster].admin_post_install = nil
-                  else
-                    puts "Invalid value for the admin_post_install field in the #{cluster} config file"
-                    return false
-                  end
-                when "macrostep"
-                  macrostep_name = val.split("|")[0]
-                  microstep_list = val.split("|")[1]
-                  tmp = Array.new
-                  microstep_list.split(",").each { |instance_infos|
-                    instance_name = instance_infos.split(":")[0]
-                    instance_max_retries = instance_infos.split(":")[1].to_i
-                    instance_timeout = instance_infos.split(":")[2].to_i
-                    tmp.push([instance_name, instance_max_retries, instance_timeout])
-                  }
-                  @cluster_specific[cluster].workflow_steps.push(MacroStep.new(macrostep_name, tmp))
-                when "partition_creation_kind"
-                  if val =~ /\A(fdisk|parted)\Z/ then
-                    @cluster_specific[cluster].partition_creation_kind = val
-                  else
-                    puts "Invalid value for the partition_creation_kind in the #{cluster} config file. Expected values are fdisk or parted"
-                    return false
-                  end
-                when "use_ip_to_deploy"
-                  if val =~ /\A(true|false)\Z/ then
-                    @cluster_specific[cluster].use_ip_to_deploy = (val == "true")
-                  else
-                    puts "Invalid value for the use_ip_to_deploy field in the #{cluster} config file. Expected values are true or false"
-                    return false
-                  end
-                end
-              end
-            end
-          }
-          if @cluster_specific[cluster].check_all_fields_filled(cluster) == false then
-            return false
-          end
-          #admin_pre_install file
-          if (cluster_specific[cluster].admin_pre_install != nil) then
-            @cluster_specific[cluster].admin_pre_install.each { |entry|
-              if not File.exist?(entry["file"]) then
-                puts "The admin_pre_install file #{entry["file"]} does not exist"
-                return false
-              else
-                if ((entry["kind"] != "tgz") && (entry["kind"] != "tbz2")) then
-                  puts "Only tgz and tbz2 file kinds are allowed for preinstall files"
-                  return false
-                end
-              end
-            }
-          end
-          #admin_post_install file
-          if (@cluster_specific[cluster].admin_post_install != nil) then
-            @cluster_specific[cluster].admin_post_install.each { |entry|
-              if not File.exist?(entry["file"]) then
-                puts "The admin_post_install file #{entry["file"]} does not exist"
-                return false
-              else
-                if ((entry["kind"] != "tgz") && (entry["kind"] != "tbz2")) then
-                  puts "Only tgz and tbz2 file kinds are allowed for postinstall files"
-                  return false
-                end
-              end
-            }
-          end          
+    def load_clusters_config_file
+      begin
+        config = YAML.load_file(CLUSTERS_CONFIGURATION_FILE)
+      rescue ArgumentError
+        puts "Invalid YAML file '#{CLUSTERS_CONFIGURATION_FILE}'"
+        return false
+      rescue Errno::ENOENT
+        puts "File not found '#{CLUSTERS_CONFIGURATION_FILE}'"
+        return false
+      end
+
+      unless config.is_a?(Hash)
+        puts "Wrong file format, you should use YAML Hashes"
+        return false
+      end
+
+      config.each_pair do |clname,clconfig|
+        cluster_file = clconfig['conf_file']
+        if not File.readable?(cluster_file) then
+          puts "The #{cluster_file} file cannot be read"
+          return false
         end
-      }
+
+        partition_file = clconfig['partition_file']
+        if not File.readable?(partition_file) then
+          puts "The #{partition_file} file cannot be read"
+          return false
+        end
+
+        @cluster_specific[clname] = ClusterSpecificConfig.new
+        @cluster_specific[clname].partition_file = partition_file
+
+        return false unless load_cluster_specific_config_file(clname,cluster_file)
+
+        clconfig['nodes'].each do |node|
+          if node['name'] and !node['name'].empty?
+            if ['address'] and !node['address'].empty?
+              if node['name'] =~ /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\Z/ \
+              and node['address'] =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\Z/
+
+                hostnames = Nodes::NodeSet::nodes_list_expand(node['name'])
+                addresses = Nodes::NodeSet::nodes_list_expand(node['address'])
+
+                if (hostnames.to_a.length == addresses.to_a.length) then
+                  for i in (0 ... hostnames.to_a.length)
+                    name = hostnames[i]
+                    address = addresses[i]
+                    @common.nodes_desc.push(Nodes::Node.new(
+                      name, address, clname, generate_commands(name, clname)
+                    ))
+                  end
+                else
+                  puts line
+                  puts "Incoherent number of hostnames and IP addresses"
+                  return false
+                end
+              else
+                begin
+                  @common.nodes_desc.push(Nodes::Node.new(
+                      node['name'],
+                      node['address'],
+                      clname,
+                      generate_commands(node['name'], clname)
+                  ))
+                rescue ArgumentError
+                  puts "Invalid address '#{node['address']}'"
+                  return false
+                end
+              end
+            else
+              puts "Node 'address' description field missing"
+              return false
+            end
+          else
+            puts "Node 'name' description field missing"
+            return false
+          end
+        end
+      end
+
+      if @common.nodes_desc.empty? then
+        puts "The nodes list is empty"
+        return false
+      else
+        return true
+      end
+    end
+
+    def load_cluster_specific_config_file(cluster, conf_file)
+      unless @cluster_specific[cluster]
+        puts "Internal error, cluster '' not declared"
+        return false
+      end
+
+      begin
+        config = YAML.load_file(conf_file)
+      rescue ArgumentError
+        puts "Invalid YAML file '#{conf_file}'"
+        return false
+      rescue Errno::ENOENT
+        puts "Cluster configuration file not found '#{conf_file}'"
+        return false
+      end
+
+      config.each_pair do |attr,val|
+        val = val.to_s
+
+        case attr
+        when "deploy_kernel"
+          @cluster_specific[cluster].deploy_kernel = val
+        when "deploy_kernel_args"
+          @cluster_specific[cluster].deploy_kernel_args = val
+        when "deploy_initrd"
+          @cluster_specific[cluster].deploy_initrd = val
+        when "block_device"
+          @cluster_specific[cluster].block_device = val
+        when "deploy_part"
+          @cluster_specific[cluster].deploy_part = val
+        when "prod_part"
+          @cluster_specific[cluster].prod_part = val
+        when "tmp_part"
+          @cluster_specific[cluster].tmp_part = val
+        when "swap_part"
+          @cluster_specific[cluster].swap_part = val
+        when "workflow_steps"
+          @cluster_specific[cluster].workflow_steps = val
+        when "timeout_reboot_classical"
+          n = 1
+          begin
+            timeout = eval(val).to_i
+            @cluster_specific[cluster].timeout_reboot_classical = val
+          rescue
+            puts "Invalid value for the timeout_reboot_classical field in the #{cluster} config file"
+            return false
+          end
+        when "timeout_reboot_kexec"
+          n = 1
+          begin
+            timeout = eval(val).to_i
+            @cluster_specific[cluster].timeout_reboot_kexec = val
+          rescue
+            puts "Invalid value for the timeout_reboot_kexec field in the #{cluster} config file"
+            return false
+          end
+        when "cmd_soft_reboot"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_soft_reboot = tmp[0]
+          (return false if not add_group_of_nodes("soft_reboot", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_hard_reboot"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_hard_reboot = tmp[0]
+          (return false if not add_group_of_nodes("hard_reboot", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_very_hard_reboot"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_very_hard_reboot = tmp[0]
+          (return false if not add_group_of_nodes("very_hard_reboot", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_console"
+          @cluster_specific[cluster].cmd_console = val
+        when "cmd_soft_power_off"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_soft_power_off = tmp[0]
+          (return false if not add_group_of_nodes("soft_power_off", tmp[1], cluster)) if (tmp[1] != nil)
+          when "cmd_hard_power_off"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_hard_power_off = tmp[0]
+          (return false if not add_group_of_nodes("hard_power_off", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_very_hard_power_off"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_very_hard_power_off = tmp[0]
+          (return false if not add_group_of_nodes("very_hard_power_off", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_soft_power_on"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_soft_power_on = tmp[0]
+          (return false if not add_group_of_nodes("soft_power_on", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_hard_power_on"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_hard_power_on = tmp[0]
+          (return false if not add_group_of_nodes("hard_power_on", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_very_hard_power_on"
+          tmp = val.split(",")
+          @cluster_specific[cluster].cmd_very_hard_power_on = tmp[0]
+          (return false if not add_group_of_nodes("very_hard_power_on", tmp[1], cluster)) if (tmp[1] != nil)
+        when "cmd_power_status"
+          @cluster_specific[cluster].cmd_power_status = val
+        when "drivers"
+          val.split(",").each { |driver|
+            @cluster_specific[cluster].drivers = Array.new if (@cluster_specific[cluster].drivers == nil)
+            @cluster_specific[cluster].drivers.push(driver)
+          }
+        when "pxe_header"
+          @cluster_specific[cluster].pxe_header = val.gsub("\\n","\n")
+        when "kernel_params"
+          @cluster_specific[cluster].kernel_params = val
+        when "nfsroot_kernel"
+          @cluster_specific[cluster].nfsroot_kernel = val
+        when "nfsroot_params"
+          @cluster_specific[cluster].nfsroot_params = val
+        when "admin_pre_install"
+          #filename|kind|script,filename|kind|script,...
+          if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
+            @cluster_specific[cluster].admin_pre_install = Array.new
+            val.split(",").each { |tmp|
+              val = tmp.split("|")
+              entry = Hash.new
+              entry["file"] = val[0]
+              entry["kind"] = val[1]
+              entry["script"] = val[2]
+              @cluster_specific[cluster].admin_pre_install.push(entry)
+            }
+          elsif val =~ /\A(no_pre_install)\Z/ then
+            @cluster_specific[cluster].admin_pre_install = nil
+          else
+            puts "Invalid value for the admin_pre_install field in the #{cluster} config file"
+            return false
+          end
+        when "admin_post_install"
+          #filename|tgz|script,filename|tgz|script,...
+          if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
+            @cluster_specific[cluster].admin_post_install = Array.new
+            val.split(",").each { |tmp|
+              val = tmp.split("|")
+              entry = Hash.new
+              entry["file"] = val[0]
+              entry["kind"] = val[1]
+              entry["script"] = val[2]
+              @cluster_specific[cluster].admin_post_install.push(entry)
+            }
+          elsif val =~ /\A(no_post_install)\Z/ then
+            @cluster_specific[cluster].admin_post_install = nil
+          else
+            puts "Invalid value for the admin_post_install field in the #{cluster} config file"
+            return false
+          end
+        when "macrostep"
+          macrostep_name = val.split("|")[0]
+          microstep_list = val.split("|")[1]
+          tmp = Array.new
+          microstep_list.split(",").each { |instance_infos|
+            instance_name = instance_infos.split(":")[0]
+            instance_max_retries = instance_infos.split(":")[1].to_i
+            instance_timeout = instance_infos.split(":")[2].to_i
+            tmp.push([instance_name, instance_max_retries, instance_timeout])
+          }
+          @cluster_specific[cluster].workflow_steps.push(MacroStep.new(macrostep_name, tmp))
+        when "partition_creation_kind"
+          if val =~ /\A(fdisk|parted)\Z/ then
+            @cluster_specific[cluster].partition_creation_kind = val
+          else
+            puts "Invalid value for the partition_creation_kind in the #{cluster} config file. Expected values are fdisk or parted"
+            return false
+          end
+        when "use_ip_to_deploy"
+          if val =~ /\A(true|false)\Z/ then
+            @cluster_specific[cluster].use_ip_to_deploy = (val == "true")
+          else
+            puts "Invalid value for the use_ip_to_deploy field in the #{cluster} config file. Expected values are true or false"
+            return false
+          end
+        end
+      end
+
+      if @cluster_specific[cluster].check_all_fields_filled(cluster) == false then
+        return false
+      end
+      #admin_pre_install file
+      if (@cluster_specific[cluster].admin_pre_install != nil) then
+        @cluster_specific[cluster].admin_pre_install.each { |entry|
+          if not File.exist?(entry["file"]) then
+            puts "The admin_pre_install file #{entry["file"]} does not exist"
+            return false
+          else
+            if ((entry["kind"] != "tgz") && (entry["kind"] != "tbz2")) then
+              puts "Only tgz and tbz2 file kinds are allowed for preinstall files"
+              return false
+            end
+          end
+        }
+      end
+      #admin_post_install file
+      if (@cluster_specific[cluster].admin_post_install != nil) then
+        @cluster_specific[cluster].admin_post_install.each { |entry|
+          if not File.exist?(entry["file"]) then
+            puts "The admin_post_install file #{entry["file"]} does not exist"
+            return false
+          else
+            if ((entry["kind"] != "tgz") && (entry["kind"] != "tbz2")) then
+              puts "Only tgz and tbz2 file kinds are allowed for postinstall files"
+              return false
+            end
+          end
+        }
+      end
+
       return true
     end
 
@@ -1012,32 +1105,33 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_commands
-      commands_file = COMMANDS_FILE
-      if File.readable?(commands_file) then
-        IO.readlines(commands_file).each { |line|
-          if not ((/^#/ =~ line) || (/^$/ =~ line)) then #we ignore commented lines and empty lines
-            if /(.+)\|(.+)\|(.+)/ =~ line then
-              content = Regexp.last_match
-              node = @common.nodes_desc.get_node_by_host(content[1])
-              if (node != nil) then
-                kind = content[2]
-                val = content[3].strip
-                if (node.cmd.instance_variable_defined?("@#{kind}")) then
-                  node.cmd.instance_variable_set("@#{kind}", val)
-                else
-                  puts "Unknown command kind: #{content[2]}"
-                  return false
-                end
-              else
-                puts "The node #{content[1]} does not exist"
-                return false
-              end
+      begin
+        config = YAML.load_file(COMMANDS_FILE)
+      rescue ArgumentError
+        puts "Invalid YAML file '#{COMMANDS_FILE}'"
+        return false
+      rescue Errno::ENOENT
+        return true
+      end
+
+      return true unless config
+
+      config.each_pair do |nodename,commands|
+        node = @common.nodes_desc.get_node_by_host(nodename)
+
+        if (node != nil) then
+          commands.each_pair do |kind,val|
+            if (node.cmd.instance_variable_defined?("@#{kind}")) then
+              node.cmd.instance_variable_set("@#{kind}", val)
             else
-              puts "Wrong format for commands file: #{line}"
+              puts "Unknown command kind: #{content[2]}"
               return false
             end
           end
-        }
+        else
+          puts "The node #{content[1]} does not exist"
+          return false
+        end
       end
       return true
     end
