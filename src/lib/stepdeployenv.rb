@@ -167,6 +167,7 @@ module SetDeploymentEnvironnment
             end
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
+            result = result && @step.set_vlan("DEFAULT")
             result = result && @step.reboot("soft", first_attempt)
             result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  timeout)
@@ -232,6 +233,7 @@ module SetDeploymentEnvironnment
             end
             #Here are the micro steps
             result = result && @step.switch_pxe("prod_to_deploy_env")
+            result = result && @step.set_vlan("DEFAULT")
             result = result && @step.reboot("soft", first_attempt)
             result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  timeout)
@@ -346,7 +348,8 @@ module SetDeploymentEnvironnment
               timeout = @config.exec_specific.reboot_classical_timeout
             end
             #Here are the micro steps
-            result = result && @step.switch_pxe("prod_to_nfsroot_env")            
+            result = result && @step.switch_pxe("prod_to_nfsroot_env")
+            result = result && @step.set_vlan("DEFAULT")
             result = result && @step.reboot("soft", first_attempt)
             result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  timeout)

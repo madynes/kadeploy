@@ -2059,13 +2059,14 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # Output
     # * return true if the operation has been correctly performed, false otherwise
-    def ms_set_vlan(instance_thread)
+    def ms_set_vlan(instance_thread,vlan_id=nil)
       if (@config.exec_specific.vlan != nil) then
         list = String.new
         @nodes_ok.make_array_of_hostname.each { |hostname|
           list += " -m #{hostname}"
         }
-        cmd = @config.common.set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", @config.exec_specific.vlan).gsub("USER", @config.exec_specific.true_user)
+        vlan_id = @config.exec_specific.vlan unless vlan_id
+        cmd = @config.common.set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", vlan_id).gsub("USER", @config.exec_specific.true_user)
         if (not system(cmd)) then
           failed_microstep("Cannot set the VLAN")
           return false
