@@ -20,7 +20,7 @@ end
 USAGE           = "Usage: #{$0} [options] <deploykernels_directory> <envs_directory>"
 
 SSH_KEYS        = ["#{ENV['HOME']}/.ssh/id_dsa", "#{ENV['HOME']}/.ssh/id_rsa","#{ENV['HOME']}/.ssh/identity"]
-SSH_OPTIONS			= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o SetupTimeOut=16 -o ConnectionAttempts=3'
+SSH_OPTIONS			= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3'
 HTTP_PROXY_ADDR   = 'proxy'
 HTTP_PROXY_PORT   = 3128
 #DEB_REPOSITORY   	= 'http://apt.grid5000.fr/kadeploy'
@@ -1555,6 +1555,10 @@ optparse = OptionParser.new(USAGE) do |opts|
   	options[:dns_config] = d
 	end
 
+	opts.on( '-j', '--kascript <scriptfile>', 'Run a script after configuring kadeploy daemon and before running it (sample: config file migration script, ...)' ) do |j|
+  	options[:kascript] = j
+	end
+
 	opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes should be used as daemon in a YAML file with fields "host" and "newip" given for each services' ) do |d|
   	options[:daemon_config] = d || nil
 	end
@@ -1586,6 +1590,14 @@ if options[:kastafior]
     options[:kastafior] = File.expand_path(options[:kastafior])
   else
     msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true)
+  end
+end
+
+if options[:kascript]
+  if File.exists?(options[:kascript])
+    options[:kascript] = File.expand_path(options[:kascript])
+  else
+    msg("kascript file #{options[:kascript]} not found",MSG_ERROR,true)
   end
 end
 
@@ -2755,6 +2767,16 @@ sshgw.ssh(servername,'root') do |session|
 			end
 			sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{filepath}")
 		end
+
+    if options[:kascript]
+      msg("Executing kascript '#{options[:kascript]}'",MSG_INFO)
+      filepath = sexec(session,'tempfile')[0].chomp
+      scp(servername,options[:kascript],filepath)
+      sexec(session,"chmod 755 #{filepath}")
+      sexec(session,filepath)
+      sexec(session,"rm -f #{filepath}")
+    end
+
 		sexec(session,'service kadeploy3d restart')
 
 		msg('Configuring Kadeploy client',MSG_INFO)
