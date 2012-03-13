@@ -317,12 +317,12 @@ def cfg_kadeploy_kvm_procs_get()
   "cat #{File.join(CFG_KADEPLOY_KVM_PROCS_PATH,'HOSTNAME_FQDN')}"
 end
 
-def cfg_kadeploy_kvm_procs_get_pid()
-  "#{cfg_kadeploy_kvm_procs_get()} | cut -f 2 -d' '"
+def cfg_kadeploy_kvm_procs_get_pid(psechocmd)
+  "#{psechocmd} | cut -f 2 -d' '"
 end
 
-def cfg_kadeploy_kvm_procs_get_params()
-  "#{cfg_kadeploy_kvm_procs_get()} | cut -f 8- -d' ' | sed -e 's/^SCREEN/screen/g'"
+def cfg_kadeploy_kvm_procs_get_params(psechocmd)
+  "#{psechocmd} | cut -f 8- -d' ' | sed -e 's/^SCREEN/screen/g'"
 end
 
 def cfg_kadeploy_power_on_cmd()
@@ -331,7 +331,7 @@ def cfg_kadeploy_power_on_cmd()
 		when :KAVLAN
       ret = cfg_kadeploy_kapower_cmd('--on')
 		when :KVM, :VLANKVM
-      ret = "#{cfg_kadeploy_kvm_cmd("$(#{cfg_kadeploy_kvm_procs_get_params()}) &>/dev/null &")} "\
+      ret = "#{cfg_kadeploy_kvm_cmd("$(#{cfg_kadeploy_kvm_procs_get_params(cfg_kadeploy_kvm_procs_get())}) &>/dev/null &")} "\
         "&& #{cfg_kadeploy_kvm_procs_cache_update(true)}"
 		else
 			msg('Unknown mode',MSG_ERROR,true)
@@ -345,7 +345,7 @@ def cfg_kadeploy_power_off_cmd()
 		when :KAVLAN
       ret = cfg_kadeploy_kapower_cmd('--off')
 		when :KVM, :VLANKVM
-      ret = "#{cfg_kadeploy_kvm_cmd("kill $(#{cfg_kadeploy_kvm_procs_get_pid()}) &>/dev/null")}"
+      ret = "#{cfg_kadeploy_kvm_cmd("kill $(#{cfg_kadeploy_kvm_procs_get_pid(cfg_kadeploy_kvm_procs_get())}) &>/dev/null")}"
 		else
 			msg('Unknown mode',MSG_ERROR,true)
 	end
@@ -381,13 +381,27 @@ def cfg_kadeploy_console_cmd()
 end
 
 def cfg_kadeploy_reboot_cmd()
-  "#{cfg_kadeploy_power_off_cmd()} && sleep 2 && #{cfg_kadeploy_power_on_cmd()}"
+  ret = ''
+	case $mode
+		when :KAVLAN
+      ret = "#{cfg_kadeploy_power_off_cmd()} && sleep 2 && #{cfg_kadeploy_power_on_cmd()}"
+		when :KVM, :VLANKVM
+      ret = cfg_kadeploy_kvm_cmd(
+        "KVMPS=\\`#{cfg_kadeploy_kvm_ps()}\\` "\
+        "&& kill \\`#{cfg_kadeploy_kvm_procs_get_pid('echo \$KVMPS')}\\` "\
+        "&& \\`#{cfg_kadeploy_kvm_procs_get_params('echo \$KVMPS')}\\`"
+      )
+		else
+			msg('Unknown mode',MSG_ERROR,true)
+	end
+  ret
 end
 
 def cfg_kadeploy_hard_reboot_cmd()
   ret = ''
   ret = "rm -f #{File.join(CFG_KADEPLOY_KVM_PROCS_PATH,'HOSTNAME_FQDN')}; " if $mode == :VLANKVM
-  ret + cfg_kadeploy_reboot_cmd()
+  ret += "#{cfg_kadeploy_power_off_cmd()} && sleep 2 && #{cfg_kadeploy_power_on_cmd()}"
+  ret
 end
 
 def cfg_kadeploy_soft_reboot_cmd()
@@ -395,7 +409,7 @@ def cfg_kadeploy_soft_reboot_cmd()
   if CFG_KADEPLOY_SOFT_REBOOT
     ret = "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/reboot -f &>/dev/null &\""
   else
-    ret = "#{cfg_kadeploy_reboot_cmd()} &>/dev/null </dev/null &"
+    ret = "#{cfg_kadeploy_reboot_cmd()}"
   end
   ret
 end
@@ -2768,6 +2782,12 @@ sshgw.ssh(servername,'root') do |session|
 			sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{filepath}")
 		end
 
+		msg('Configuring Kadeploy client',MSG_INFO)
+		tempfile(cfg_kadeploy_client()) do |path|
+			scp(servername,path,CFG_KADEPLOY_CLIENT_CONF_FILE)
+		end
+		sexec(session,"chmod +r #{CFG_KADEPLOY_CLIENT_CONF_FILE}")
+
     if options[:kascript]
       msg("Executing kascript '#{options[:kascript]}'",MSG_INFO)
       filepath = sexec(session,'tempfile')[0].chomp
@@ -2778,12 +2798,6 @@ sshgw.ssh(servername,'root') do |session|
     end
 
 		sexec(session,'service kadeploy3d restart')
-
-		msg('Configuring Kadeploy client',MSG_INFO)
-		tempfile(cfg_kadeploy_client()) do |path|
-			scp(servername,path,CFG_KADEPLOY_CLIENT_CONF_FILE)
-		end
-		sexec(session,"chmod +r #{CFG_KADEPLOY_CLIENT_CONF_FILE}")
 
 		# Ugly hack to be removed when the repository will be updated
 		msg('Installing ruby',MSG_INFO)
