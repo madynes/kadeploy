@@ -39,6 +39,49 @@ def cluster_config_file(clname)
   File.join(KACONFIG_PATH,"specific_conf_#{clname}")
 end
 
+class String
+  BOOLEAN_VALUES_TRUE=['true','yes']
+  BOOLEAN_VALUES_FALSE=['false','no','none']
+
+  def integer?
+    true if Integer(self) rescue false
+  end
+
+  def float?
+    true if Float(self) rescue false
+  end
+
+  def boolean?
+    BOOLEAN_VALUES_TRUE.include?(self.downcase) or BOOLEAN_VALUES_FALSE.include?(self.downcase)
+  end
+
+  def to_b
+    if BOOLEAN_VALUES_TRUE.include?(self.downcase)
+      true
+    elsif BOOLEAN_VALUES_FALSE.include?(self.downcase)
+      false
+    else
+      nil
+    end
+  end
+end
+
+def parse_key_val(line)
+  key,val = nil
+  if line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/
+    key = Regexp.last_match(1)
+    val = Regexp.last_match(2)
+    if val.integer?
+      val = val.to_i
+    elsif val.float?
+      val = val.to_f
+    elsif val.boolean?
+      val = val.to_b
+    end
+  end
+  [key,val]
+end
+
 
 puts 'Starting migration'
 
@@ -46,12 +89,14 @@ FileUtils.mkdir_p(KABACKUP_PATH)
 FileUtils.chown_R(KAUSER,KAGROUP,KABACKUP_PATH)
 
 if File.exists?(OLD_CONFIG[:server_conf])
-  tmp = File.read(OLD_CONFIG[:server_conf])
-  tmp.gsub!(/^\s*(\S+)\s*=\s*(.*)\s*$/,'\1: \2')
-  tmp.gsub!(/\s+:/,':')
-  tmp.gsub!(/:\s+/,':')
-  tmp = "---\n" + tmp
-  File.open(NEW_CONFIG[:server_conf],'w+') { |f| f.puts(tmp) }
+  tmp = File.read(OLD_CONFIG[:server_conf]).split("\n")
+  config = {}
+  tmp.each do |line|
+    key,val = parse_key_val(line)
+    config[key] = val if key
+  end
+
+  File.open(NEW_CONFIG[:server_conf],'w+') { |f| f.puts(config.to_yaml) }
   FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:server_conf])
   FileUtils.mv(OLD_CONFIG[:server_conf],KABACKUP_PATH)
   puts "  migration of '#{OLD_CONFIG[:server_conf]}' ok"
@@ -60,12 +105,14 @@ else
 end
 
 if File.exists?(OLD_CONFIG[:client_conf])
-  tmp = File.read(OLD_CONFIG[:client_conf])
-  tmp.gsub!(/^\s*(\S+)\s*=\s*(.*)\s*$/,'\1: \2')
-  tmp.gsub!(/\s+:/,':')
-  tmp.gsub!(/:\s+/,':')
-  tmp = "---\n" + tmp
-  File.open(NEW_CONFIG[:client_conf],'w+') { |f| f.puts(tmp) }
+  tmp = File.read(OLD_CONFIG[:client_conf]).split("\n")
+  config = {}
+  tmp.each do |line|
+    key,val = parse_key_val(line)
+    config[key] = val if key
+  end
+
+  File.open(NEW_CONFIG[:client_conf],'w+') { |f| f.puts(config.to_yaml) }
   FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:client_conf])
   FileUtils.mv(OLD_CONFIG[:client_conf],KABACKUP_PATH)
   puts "  migration of '#{OLD_CONFIG[:client_conf]}' ok"
@@ -110,12 +157,29 @@ if $clusters and !$clusters.empty?
     old_config_file = cluster_config_file(cluster)
     new_config_file = File.join(KACONFIG_PATH,"#{CLUSTER_FILE_PREFIX}#{cluster}.yml")
     if File.exists?(old_config_file)
-      tmp = File.read(old_config_file)
-      tmp.gsub!(/^\s*(\S+)\s*=\s*(.*)\s*$/,'\1: \2')
-      tmp.gsub!(/\s+:/,':')
-      tmp.gsub!(/:\s+/,':')
-      tmp = "---\n" + tmp
-      File.open(new_config_file,'w+') { |f| f.puts(tmp) }
+      tmp = File.read(old_config_file).split("\n")
+      config = {}
+      config['macrosteps'] = {}
+      tmp.each do |line|
+        key,val = parse_key_val(line)
+        if key == 'macrostep'
+          macroname,macroval = val.split('|')
+          macroinsts = macroval.split(',')
+          macroinsts.each do |macroinst|
+            macrotmp = macroinst.split(':')
+            config['macrosteps'][macroname] = [] unless config['macrosteps'][macroname]
+            config['macrosteps'][macroname] << {
+              'type' => macrotmp[0],
+              'retries' => macrotmp[1].to_i,
+              'timeout' => macrotmp[2].to_i,
+            }
+          end
+        else
+          config[key] = val if key
+        end
+      end
+
+      File.open(new_config_file,'w+') { |f| f.puts(config.to_yaml) }
       FileUtils.chown(KAUSER,KAGROUP,new_config_file)
       FileUtils.mv(old_config_file,KABACKUP_PATH)
       clconfig[cluster]['conf_file'] = new_config_file

@@ -401,13 +401,19 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_server_config_file
+      configfile = SERVER_CONFIGURATION_FILE
       begin
-        config = YAML.load_file(SERVER_CONFIGURATION_FILE)
+        config = YAML.load_file(configfile)
       rescue ArgumentError
-        puts "Invalid YAML file '#{SERVER_CONFIGURATION_FILE}'"
+        puts "Invalid YAML file '#{configfile}'"
         return false
       rescue Errno::ENOENT
-        puts "File not found '#{SERVER_CONFIGURATION_FILE}'"
+        puts "File not found '#{configfile}'"
+        return false
+      end
+
+      unless config.is_a?(Hash)
+        puts "Invalid file format'#{configfile}'"
         return false
       end
 
@@ -697,14 +703,20 @@ module ConfigInformation
     def Config.load_client_config_file
       servers = Hash.new
 
+      configfile = CLIENT_CONFIGURATION_FILE
       begin
-        config = YAML.load_file(CLIENT_CONFIGURATION_FILE)
+        config = YAML.load_file(configfile)
       rescue ArgumentError
-        puts "Invalid YAML file '#{CLIENT_CONFIGURATION_FILE}'"
+        puts "Invalid YAML file '#{configfile}'"
         raise "Problem in configuration"
       rescue Errno::ENOENT
-        puts "File not found '#{CLIENT_CONFIGURATION_FILE}'"
+        puts "File not found '#{configfile}'"
         raise "Problem in configuration"
+      end
+
+      unless config.is_a?(Hash)
+        puts "Invalid file format'#{configfile}'"
+        return false
       end
 
       config.each_pair do |attr,val|
@@ -756,18 +768,19 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_clusters_config_file
+      configfile = CLUSTERS_CONFIGURATION_FILE
       begin
-        config = YAML.load_file(CLUSTERS_CONFIGURATION_FILE)
+        config = YAML.load_file(configfile)
       rescue ArgumentError
-        puts "Invalid YAML file '#{CLUSTERS_CONFIGURATION_FILE}'"
+        puts "Invalid YAML file '#{configfile}'"
         return false
       rescue Errno::ENOENT
-        puts "File not found '#{CLUSTERS_CONFIGURATION_FILE}'"
+        puts "File not found '#{configfile}'"
         return false
       end
 
       unless config.is_a?(Hash)
-        puts "Wrong file format, you should use YAML Hashes"
+        puts "Invalid file format'#{configfile}'"
         return false
       end
 
@@ -843,24 +856,29 @@ module ConfigInformation
       end
     end
 
-    def load_cluster_specific_config_file(cluster, conf_file)
+    def load_cluster_specific_config_file(cluster, configfile)
       unless @cluster_specific[cluster]
         puts "Internal error, cluster '' not declared"
         return false
       end
 
       begin
-        config = YAML.load_file(conf_file)
+        config = YAML.load_file(configfile)
       rescue ArgumentError
-        puts "Invalid YAML file '#{conf_file}'"
+        puts "Invalid YAML file '#{configfile}'"
         return false
       rescue Errno::ENOENT
-        puts "Cluster configuration file not found '#{conf_file}'"
+        puts "Cluster configuration file not found '#{configfile}'"
+        return false
+      end
+
+      unless config.is_a?(Hash)
+        puts "Invalid file format'#{configfile}'"
         return false
       end
 
       config.each_pair do |attr,val|
-        val = val.to_s
+        val = val.to_s unless attr == 'macrosteps'
 
         case attr
         when "deploy_kernel"
@@ -988,17 +1006,46 @@ module ConfigInformation
             puts "Invalid value for the admin_post_install field in the #{cluster} config file"
             return false
           end
-        when "macrostep"
-          macrostep_name = val.split("|")[0]
-          microstep_list = val.split("|")[1]
-          tmp = Array.new
-          microstep_list.split(",").each { |instance_infos|
-            instance_name = instance_infos.split(":")[0]
-            instance_max_retries = instance_infos.split(":")[1].to_i
-            instance_timeout = instance_infos.split(":")[2].to_i
-            tmp.push([instance_name, instance_max_retries, instance_timeout])
-          }
-          @cluster_specific[cluster].workflow_steps.push(MacroStep.new(macrostep_name, tmp))
+        when "macrosteps"
+          unless val.is_a?(Hash)
+            puts "Invalid macrostep format, 'macrosteps' field should be a YAML Hash"
+            return false
+          end
+
+          val.each_pair do |macroname,macroval|
+            unless macroval.is_a?(Array)
+              puts "Invalid macrostep format, '#{macroname}' field should be a YAML Array"
+              return false
+            end
+            macroinsts = []
+            macroval.each do |macroinst|
+              unless macroinst['type']
+                puts "No 'type' field for macrostep '#{macroname}' instance"
+                return false
+              end
+
+              unless macroinst['retries']
+                puts "No 'retries' field for macrostep '#{macroname}' instance"
+                return false
+              end
+
+              unless macroinst['timeout']
+                puts "No 'timeout' field for macrostep '#{macroname}' instance"
+                return false
+              end
+
+              macroinsts << [
+                macroinst['type'],
+                macroinst['retries'].to_i,
+                macroinst['timeout'].to_i,
+              ]
+            end
+
+            @cluster_specific[cluster].workflow_steps << MacroStep.new(
+              macroname,
+              macroinsts
+            )
+          end
         when "partition_creation_kind"
           if val =~ /\A(fdisk|parted)\Z/ then
             @cluster_specific[cluster].partition_creation_kind = val
@@ -1067,7 +1114,7 @@ module ConfigInformation
           if @cluster_specific.has_key?(cluster) then
             @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
           else
-            puts "The cluster #{cluster} has not been defined in #{CLUSTER_CONFIGURATION_FILE}"
+            puts "The cluster #{cluster} has not been defined in #{CLUSTERS_CONFIGURATION_FILE}"
           end
         end
         if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
@@ -1105,16 +1152,22 @@ module ConfigInformation
     # Output
     # * return true in case of success, false otherwise
     def load_commands
+      configfile = COMMANDS_FILE
       begin
-        config = YAML.load_file(COMMANDS_FILE)
+        config = YAML.load_file(configfile)
       rescue ArgumentError
-        puts "Invalid YAML file '#{COMMANDS_FILE}'"
+        puts "Invalid YAML file '#{configfile}'"
         return false
       rescue Errno::ENOENT
         return true
       end
 
       return true unless config
+
+      unless config.is_a?(Hash)
+        puts "Invalid file format'#{configfile}'"
+        return false
+      end
 
       config.each_pair do |nodename,commands|
         node = @common.nodes_desc.get_node_by_host(nodename)
