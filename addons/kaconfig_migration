@@ -6,8 +6,8 @@ require 'fileutils'
 KAUSER='deploy'
 KAGROUP='deploy'
 
-PARTITION_FILE_PREFIX='partition_file-'
-CLUSTER_FILE_PREFIX='config_file-'
+PARTITION_FILE_PREFIX='cluster_partition-'
+CLUSTER_FILE_PREFIX='cluster_conf-'
 
 KACONFIG_PATH = '/etc/kadeploy3'
 KABACKUP_PATH = File.join(KACONFIG_PATH, 'configs.bak')
