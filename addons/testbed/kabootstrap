@@ -38,7 +38,8 @@ DOMAIN = 'testbed.lan'
 CLUSTER_NAME_SUFIX = '-cluster'
 NODE_NAME_PREFIX = 'node-'
 HOST_NAME_PREFIX = 'host-'
-NODEFILE_NAME = 'NODELIST'
+NODELIST_NAME = 'NODELIST'
+NODEFILE_NAME = 'NODEFILE'
 
 NET_ADMIN_IFACE = 'eth0'
 USE_NET_DRIVER = false
@@ -2051,7 +2052,6 @@ rescue Errno::ENOENT
 	msg("File '#{nodelist_file}' not found",MSG_ERROR,true)
 end
 
-
 msg("nodelist parameter empty",MSG_ERROR,true) if $allnodes.empty?
 $allnodes.sort!
 
@@ -2060,35 +2060,6 @@ if $mode == :VLANKVM
 end
 
 deplnodes = $allnodes.dup
-
-if options[:daemon_kadeploy]
-  kaserver = options[:daemon_kadeploy].strip
-else
-  case $mode
-    when :KAVLAN
-      kaserver = $allnodes[0]
-    when :KVM
-      msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
-    when :VLANKVM
-      tmp = select_type($kanodes,:HOST)[0]
-      tmp[:type] = :SERVER
-      kaserver = tmp[:basename]
-    else
-      msg('Unknown mode',MSG_ERROR,true)
-  end
-end
-
-if options[:daemon_dns]
-  dnsserver = options[:daemon_dns].strip
-else
-  dnsserver = kaserver
-end
-
-if options[:daemon_dhcp]
-  dhcpserver = options[:daemon_dhcp].strip
-else
-  dhcpserver = kaserver
-end
 
 servers = nil
 if options[:daemon_config]
@@ -2127,6 +2098,35 @@ if options[:daemon_config]
       count += 1
     end
   end
+else
+  if options[:daemon_kadeploy]
+    kaserver = options[:daemon_kadeploy].strip
+  else
+    case $mode
+      when :KAVLAN
+        kaserver = $allnodes[0]
+      when :KVM
+        msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
+      when :VLANKVM
+        tmp = select_type($kanodes,:HOST)[0]
+        tmp[:type] = :SERVER
+        kaserver = tmp[:basename]
+      else
+        msg('Unknown mode',MSG_ERROR,true)
+    end
+  end
+
+  if options[:daemon_dns]
+    dnsserver = options[:daemon_dns].strip
+  else
+    dnsserver = kaserver
+  end
+
+  if options[:daemon_dhcp]
+    dhcpserver = options[:daemon_dhcp].strip
+  else
+    dhcpserver = kaserver
+  end
 end
 
 check_server = Proc.new do |server, servername|
@@ -2135,7 +2135,7 @@ check_server = Proc.new do |server, servername|
       addr = IPAddr.new(server)
       msg("#{name} daemon should be specified by hostname",MSG_ERROR,true)
     rescue ArgumentError
-      server = server.split("-#{getgw().split('.')[0]}").join
+      server = server.split("-#{getgw().split('.')[0]}").join if server
     end
   end
 
@@ -2196,7 +2196,6 @@ end
 kaserver,kaserverip = check_server.call(kaserver,'kadeploy')
 dnsserver,dnsserverip = check_server.call(dnsserver,'dns')
 dhcpserver,dhcpserverip = check_server.call(dhcpserver,'dhcp')
-
 
 msg("=== Servers",MSG_INFO)
 $services[:kadeploy] = {}
@@ -2534,15 +2533,12 @@ sshgw.ssh(servername,'root') do |session|
 		excls = []
 		excls << $kanodes[:dns][:ipv4]
 
-    nodes=[]
-    if $mode == :VLANKVM
-      nodes = select_type($kanodes,:SERVER) # + select_type($kanodes,:HOST)
-    else
-      nodes = select_type($kanodes,:SERVER)
-    end
+    nodes = select_type($kanodes,:SERVER) # + select_type($kanodes,:HOST)
+
 		nodes.each do |node|
 			unless excls.include?(node[:ipv4])
 				sexec(session,"scp -r #{SSH_OPTIONS} #{CFG_RESOLVCONF_FILE} root@#{node[:ipv4]}:#{CFG_RESOLVCONF_FILE}")
+        msg("  #{node[:name]} (#{node[:basename]}) ok",MSG_INFO)
 				excls << node[:ipv4]
 			end
 		end
@@ -3079,22 +3075,32 @@ sshgw.ssh(servername,'root') do |session|
 		end
 	end
 
-  nodes = []
+  nodelist = []
+  nodefile = []
   select_type($kanodes,:NODE).each do |node|
-    nodes << "#{node[:fqdn]} (#{node[:basename]}) #{(node[:host] ? "[#{node[:host][:fqdn]}]" : '')}"
+    nodelist << "#{node[:fqdn]} (#{node[:basename]}) #{(node[:host] ? "[#{node[:host][:fqdn]}]" : '')}"
+    nodefile << node[:fqdn]
   end
-  nodes.sort!
+  nodelist = nodelist.sort_by { |w| w.split(' ')[0].gsub(/\D/,'').to_i }
+  nodefile = nodefile.sort_by { |w| w.gsub(/\D/,'').to_i }
 
   tmp = sexec(session,"cat /etc/passwd | grep #{CFG_FRONTEND_USER}")[0]
   tmp = tmp.split(':')[5]
-  nodelistfile = File.join(tmp,NODEFILE_NAME)
-  msg("Creating node file in #{nodelistfile}",MSG_INFO)
 
-  tempfile(nodes.join("\n")) do |path|
-    scp(servername,path,nodelistfile)
+  nodelistpath = File.join(tmp,NODELIST_NAME)
+  msg("Creating node list in #{nodelistpath}",MSG_INFO)
+  tempfile(nodelist.join("\n")) do |path|
+    scp(servername,path,nodelistpath)
   end
+  sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{nodelistpath}")
 
-  sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{nodelistfile}")
+  nodefilepath = File.join(tmp,NODEFILE_NAME)
+  msg("Creating node file in #{nodefilepath}",MSG_INFO)
+  tempfile(nodefile.join("\n")) do |path|
+    scp(servername,path,nodefilepath)
+  end
+  sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{nodefilepath}")
+
 
 end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
