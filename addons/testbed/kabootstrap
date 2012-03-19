@@ -168,10 +168,10 @@ def cfg_kadeploy_conf()
       pxe_kind = 'IPXE'
       pxe_export = "http://#{$services[:www][:fqdn]}"
     when :TFTP
-      pxe_kind = 'pxelinux'
+      pxe_kind = 'PXElinux'
       pxe_export = '/'
     else
-      pxe_kind = 'pxelinux'
+      pxe_kind = 'PXElinux'
       pxe_export = '/'
   end
 
@@ -1546,7 +1546,7 @@ optparse = OptionParser.new(USAGE) do |opts|
   	$netiface = i
 	end
 
-	opts.on( '-T', '--use-tftp', "Use TFTP protocol to send the minimal deployment image (default: HTTP)" ) do
+	opts.on( '-t', '--use-tftp', "Use TFTP protocol to send the minimal deployment image (default: HTTP)" ) do
     $deploysendmeth = :TFTP
 	end
 
