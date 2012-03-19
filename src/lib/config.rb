@@ -486,7 +486,7 @@ module ConfigInformation
         when "max_preinstall_size"
           @common.max_preinstall_size = val.to_i
         when "max_postinstall_size"
-          @common.max_postinstall_size = val.to_i 
+          @common.max_postinstall_size = val.to_i
         when "ssh_port"
           if val =~ /\A\d+\Z/ then
             @common.ssh_port = val
@@ -877,8 +877,16 @@ module ConfigInformation
         return false
       end
 
+      castexcl = [
+        'macrosteps',
+        'admin_pre_install',
+        'admin_post_install',
+      ]
+
       config.each_pair do |attr,val|
-        val = val.to_s unless attr == 'macrosteps'
+        attr = attr.to_s.downcase
+
+        val = val.to_s unless castexcl.include?(attr)
 
         case attr
         when "deploy_kernel"
@@ -971,39 +979,70 @@ module ConfigInformation
         when "nfsroot_params"
           @cluster_specific[cluster].nfsroot_params = val
         when "admin_pre_install"
-          #filename|kind|script,filename|kind|script,...
-          if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-            @cluster_specific[cluster].admin_pre_install = Array.new
-            val.split(",").each { |tmp|
-              val = tmp.split("|")
-              entry = Hash.new
-              entry["file"] = val[0]
-              entry["kind"] = val[1]
-              entry["script"] = val[2]
-              @cluster_specific[cluster].admin_pre_install.push(entry)
-            }
-          elsif val =~ /\A(no_pre_install)\Z/ then
+          if val == false
             @cluster_specific[cluster].admin_pre_install = nil
+          elsif val.is_a?(Array)
+            @cluster_specific[cluster].admin_pre_install = Array.new
+            val.each do |preinst|
+              tmp = {}
+              if preinst['file']
+                tmp['file'] = preinst['file']
+              else
+                puts "No 'file' field for preinstall instance"
+                return false
+              end
+
+              if preinst['format']
+                tmp['kind'] = preinst['format']
+              else
+                puts "No 'format' field for preinstall instance"
+                return false
+              end
+
+              if preinst['script']
+                tmp['script'] = preinst['script'].to_s
+              else
+                tmp['script'] = 'none'
+              end
+
+              @cluster_specific[cluster].admin_pre_install.push(tmp)
+            end
           else
-            puts "Invalid value for the admin_pre_install field in the #{cluster} config file"
+            puts "Invalid preinstall format, 'admin_pre_install' field should be a YAML Array"
             return false
           end
         when "admin_post_install"
-          #filename|tgz|script,filename|tgz|script,...
-          if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-            @cluster_specific[cluster].admin_post_install = Array.new
-            val.split(",").each { |tmp|
-              val = tmp.split("|")
-              entry = Hash.new
-              entry["file"] = val[0]
-              entry["kind"] = val[1]
-              entry["script"] = val[2]
-              @cluster_specific[cluster].admin_post_install.push(entry)
-            }
-          elsif val =~ /\A(no_post_install)\Z/ then
+          if val == false
             @cluster_specific[cluster].admin_post_install = nil
+          elsif val.is_a?(Array)
+            @cluster_specific[cluster].admin_post_install = Array.new
+            val.each do |postinst|
+              tmp = {}
+
+              if postinst['file']
+                tmp['file'] = postinst['file']
+              else
+                puts "No 'file' field for postinstall instance"
+                return false
+              end
+
+              if postinst['format']
+                tmp['kind'] = postinst['format']
+              else
+                puts "No 'format' field for postinstall instance"
+                return false
+              end
+
+              if postinst['script']
+                tmp['script'] = postinst['script'].to_s
+              else
+                tmp['script'] = 'none'
+              end
+
+              @cluster_specific[cluster].admin_post_install.push(tmp)
+            end
           else
-            puts "Invalid value for the admin_post_install field in the #{cluster} config file"
+            puts "Invalid postinstall format, 'admin_post_install' field should be a YAML Array"
             return false
           end
         when "macrosteps"

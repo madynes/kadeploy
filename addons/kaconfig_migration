@@ -162,20 +162,38 @@ if $clusters and !$clusters.empty?
       config['macrosteps'] = {}
       tmp.each do |line|
         key,val = parse_key_val(line)
-        if key == 'macrostep'
-          macroname,macroval = val.split('|')
-          macroinsts = macroval.split(',')
-          macroinsts.each do |macroinst|
-            macrotmp = macroinst.split(':')
-            config['macrosteps'][macroname] = [] unless config['macrosteps'][macroname]
-            config['macrosteps'][macroname] << {
-              'type' => macrotmp[0],
-              'retries' => macrotmp[1].to_i,
-              'timeout' => macrotmp[2].to_i,
-            }
-          end
-        else
-          config[key] = val if key
+        case key.downcase
+          when 'macrostep'
+            macroname,macroval = val.split('|')
+            macroinsts = macroval.split(',')
+            macroinsts.each do |macroinst|
+              macrotmp = macroinst.split(':')
+              config['macrosteps'][macroname] = [] unless config['macrosteps'][macroname]
+              config['macrosteps'][macroname] << {
+                'type' => macrotmp[0],
+                'retries' => macrotmp[1].to_i,
+                'timeout' => macrotmp[2].to_i,
+              }
+            end
+          when 'admin_pre_install','admin_post_install'
+            kind = key.split('_')[1]
+            if val.to_s.downcase == "no_#{kind}_install"
+              config[key] = false
+            else
+              config[key] = []
+
+              prepostinsts = val.split(',')
+              prepostinsts.each do |prepostinst|
+                tmp = prepostinst.split('|')
+                config[key] << {
+                  'file' => tmp[0],
+                  'format' => tmp[1],
+                  'script' => tmp[2],
+                }
+              end
+            end
+          else
+            config[key] = val if key
         end
       end
 
