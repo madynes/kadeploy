@@ -1576,18 +1576,88 @@ module MicroStepsLibrary
         escalation_cmd_wrapper("reboot", "very_hard", instance_thread)
       when "kexec"
         if (@config.exec_specific.environment.environment_kind == "linux") then
-          kernel = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.kernel}"
-          initrd = "#{@config.common.environment_extraction_dir}#{@config.exec_specific.environment.initrd}"
-          root_part = get_deploy_part_str()
-          #Warning, this require the /usr/local/bin/kexec_detach script
-          return parallel_exec_command_wrapper("(/usr/local/bin/kexec_detach #{kernel} #{initrd} #{root_part} #{get_kernel_params()})",
-                                               @config.common.taktuk_connector, instance_thread)
+          script = "#!/bin/bash\n"
+          script += shell_kexec(
+            @config.exec_specific.environment.kernel,
+            @config.exec_specific.environment.initrd,
+            get_deploy_part_str(),
+            get_kernel_params(),
+            @config.common.environment_extraction_dir
+          )
+
+          tmpfile = Tempfile.new('kexec')
+          tmpfile.write(script)
+          tmpfile.close
+
+          ret = parallel_exec_cmd_with_input_file_wrapper(
+            tmpfile.path,
+            "file=`mktemp`;"\
+            "cat - >$file;"\
+            "chmod +x $file;"\
+            "nohup $file 1>/dev/null 2>/dev/null </dev/null &",
+            'tree',
+            @config.common.taktuk_connector,
+            '0',
+            instance_thread
+          )
+
+          tmpfile.unlink
+
+          return ret
         else
           @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
           escalation_cmd_wrapper("reboot", "soft", instance_thread)
         end
       end
       return true
+    end
+
+    # Get the shell command used to reboot the nodes with kexec
+    #
+    # Arguments
+    # * kernel: the path to the kernel image
+    # * initrd: the path to the initrd image
+    # * partition: the partition to boot on (given by partition device, for example: "/dev/sda2" )
+    # * kernel_params: the commands given to the kernel when booting
+    # * prefixdir: if specified, the 'kernel' and 'initrd' paths will be prefixed by 'prefixdir'
+    # Output
+    # * return a string that describe the shell command to be executed
+    def shell_kexec(kernel,initrd,partition,kernel_params,prefixdir=nil)
+      "kernel=#{shell_follow_symlink(kernel,prefixdir)} "\
+      "&& initrd=#{shell_follow_symlink(initrd,prefixdir)} "\
+      "&& /sbin/kexec "\
+        "-l $kernel "\
+        "--initrd=$initrd "\
+        "--append=\"root=#{partition} #{kernel_params}\" "\
+      "&& sleep 1 "\
+      "&& echo \"u\" > /proc/sysrq-trigger "\
+      "&& nohup /sbin/kexec -e\n"
+    end
+
+    # Get the shell command used to follow a symbolic link until reaching the real file
+    # * filename: the file
+    # * prefixpath: if specified, follow the link as if chrooted in 'prefixpath' directory
+    def shell_follow_symlink(filename,prefixpath=nil)
+      "$("\
+        "prefix=#{(prefixpath and !prefixpath.empty? ? prefixpath : '')} "\
+        "&& file=#{filename} "\
+        "&& while test -L ${prefix}$file; "\
+        "do "\
+          "tmp=`"\
+            "stat ${prefix}$file --format='%N' "\
+            "| sed "\
+              "-e 's/^.*->\\ *\\(.[^\\ ]\\+.\\)\\ *$/\\1/' "\
+              "-e 's/^.\\(.\\+\\).$/\\1/'"\
+          "` "\
+          "&& echo $tmp | grep '^/.*$' &>/dev/null "\
+            "&& dir=`dirname $tmp` "\
+            "|| dir=`dirname $file`/`dirname $tmp` "\
+          "&& dir=`cd ${prefix}$dir; pwd -P` "\
+          "&& dir=`echo $dir | sed -e \"s\#${prefix}##g\"` "\
+          "&& file=$dir/`basename $tmp`; "\
+        "done "\
+        "&& echo ${prefix}$file"\
+      ")"
     end
 
     # Perform a detached reboot from the deployment environment
