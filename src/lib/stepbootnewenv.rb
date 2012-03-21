@@ -139,6 +139,45 @@ module BootNewEnvironment
   end
 
   class BootNewEnvKexec < BootNewEnv
+
+    # Get the name of the deployment partition
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return the name of the deployment partition
+    def get_deploy_part_str
+      if (@config.exec_specific.deploy_part != "") then
+        if (@config.exec_specific.block_device != "") then
+          return @config.exec_specific.block_device + @config.exec_specific.deploy_part
+        else
+          return @config.cluster_specific[@cluster].block_device + @config.exec_specific.deploy_part
+        end
+      else
+        return @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].deploy_part
+      end
+    end
+
+    # Get the kernel parameters
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return the kernel parameters
+    def get_kernel_params
+      kernel_params = String.new
+      #We first check if the kernel parameters are defined in the environment
+      if (@config.exec_specific.environment.kernel_params != nil) then
+        kernel_params = @config.exec_specific.environment.kernel_params
+      #Otherwise we eventually check in the cluster specific configuration
+      elsif (@config.cluster_specific[@cluster].kernel_params != nil) then
+        kernel_params = @config.cluster_specific[@cluster].kernel_params
+      else
+        kernel_params = ""
+      end
+      return kernel_params
+    end
+
     # Main of the BootNewEnvKexec instance
     #
     # Arguments
@@ -169,8 +208,15 @@ module BootNewEnvironment
             result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.umount_deploy_part
             result = result && @step.mount_deploy_part
-            result = result && @step.reboot("kexec", false)
             result = result && @step.set_vlan
+            result = result && @step.kexec(
+              @config.exec_specific.environment.environment_kind,
+              @config.common.environment_extraction_dir,
+              @config.exec_specific.environment.kernel,
+              @config.exec_specific.environment.initrd,
+              get_kernel_params(),
+              get_deploy_part_str()
+            )
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
                                                  timeout, true)
             #End of micro steps

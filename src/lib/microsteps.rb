@@ -1557,7 +1557,7 @@ module MicroStepsLibrary
     #
     # Arguments
     # * instance_thread: thread id of the current thread
-    # * reboot_kind: kind of reboot (soft, hard, very_hard, kexec)
+    # * reboot_kind: kind of reboot (soft, hard, very_hard)
     # * first_attempt (opt): specify if it is the first attempt or not 
     # Output
     # * return true (should be false sometimes :D)
@@ -1574,42 +1574,56 @@ module MicroStepsLibrary
         escalation_cmd_wrapper("reboot", "hard", instance_thread)
       when "very_hard"
         escalation_cmd_wrapper("reboot", "very_hard", instance_thread)
-      when "kexec"
-        if (@config.exec_specific.environment.environment_kind == "linux") then
-          script = "#!/bin/bash\n"
-          script += shell_kexec(
-            @config.exec_specific.environment.kernel,
-            @config.exec_specific.environment.initrd,
-            get_deploy_part_str(),
-            get_kernel_params(),
-            @config.common.environment_extraction_dir
-          )
-
-          tmpfile = Tempfile.new('kexec')
-          tmpfile.write(script)
-          tmpfile.close
-
-          ret = parallel_exec_cmd_with_input_file_wrapper(
-            tmpfile.path,
-            "file=`mktemp`;"\
-            "cat - >$file;"\
-            "chmod +x $file;"\
-            "nohup $file 1>/dev/null 2>/dev/null </dev/null &",
-            'tree',
-            @config.common.taktuk_connector,
-            '0',
-            instance_thread
-          )
-
-          tmpfile.unlink
-
-          return ret
-        else
-          @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
-          escalation_cmd_wrapper("reboot", "soft", instance_thread)
-        end
       end
       return true
+    end
+
+    # Perform a kexec reboot on the current set of nodes_ok
+    #
+    # Arguments
+    # * instance_thread: thread id of the current thread
+    # * systemking: the kind of the system to boot ('linux', ...)
+    # * systemdir: the directory of the filesystem containing the system to boot
+    # * kernelfile: the (local to 'systemdir') path to the kernel image
+    # * initrdfile: the (local to 'systemdir') path to the initrd image
+    # * kernelparams: the commands given to the kernel when booting
+    # * partition: the partition to boot on (given by partition device, for example: "/dev/sda2" )
+    # Output
+    # * return false if the kexec execution failed
+    def ms_kexec(instance_thread, systemkind, systemdir, kernelfile, initrdfile, kernelparams, partition = nil)
+      if (systemkind == "linux") then
+        script = "#!/bin/bash\n"
+        script += shell_kexec(
+          kernelfile,
+          initrdfile,
+          kernelparams,
+          partition,
+          systemdir
+        )
+
+        tmpfile = Tempfile.new('kexec')
+        tmpfile.write(script)
+        tmpfile.close
+
+        ret = parallel_exec_cmd_with_input_file_wrapper(
+          tmpfile.path,
+          "file=`mktemp`;"\
+          "cat - >$file;"\
+          "chmod +x $file;"\
+          "nohup $file 1>/dev/null 2>/dev/null </dev/null &",
+          'tree',
+          @config.common.taktuk_connector,
+          '0',
+          instance_thread
+        )
+
+        tmpfile.unlink
+
+        return ret
+      else
+        @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
+        escalation_cmd_wrapper("reboot", "soft", instance_thread)
+      end
     end
 
     # Get the shell command used to reboot the nodes with kexec
@@ -1617,18 +1631,20 @@ module MicroStepsLibrary
     # Arguments
     # * kernel: the path to the kernel image
     # * initrd: the path to the initrd image
-    # * partition: the partition to boot on (given by partition device, for example: "/dev/sda2" )
     # * kernel_params: the commands given to the kernel when booting
+    # * partition: the partition to boot on (given by partition device, for example: "/dev/sda2" )
     # * prefixdir: if specified, the 'kernel' and 'initrd' paths will be prefixed by 'prefixdir'
     # Output
     # * return a string that describe the shell command to be executed
-    def shell_kexec(kernel,initrd,partition,kernel_params,prefixdir=nil)
+    def shell_kexec(kernel,initrd,kernel_params='',partition=nil,prefixdir=nil)
+      tmpparams = (partition and !partition.empty? ? "root=#{partition} " : '')
+
       "kernel=#{shell_follow_symlink(kernel,prefixdir)} "\
       "&& initrd=#{shell_follow_symlink(initrd,prefixdir)} "\
       "&& /sbin/kexec "\
         "-l $kernel "\
         "--initrd=$initrd "\
-        "--append=\"root=#{partition} #{kernel_params}\" "\
+        "--append=\"#{tmpparams}#{kernel_params}\" "\
       "&& sleep 1 "\
       "&& echo \"u\" > /proc/sysrq-trigger "\
       "&& nohup /sbin/kexec -e\n"
