@@ -161,7 +161,7 @@ module BootNewEnvironment
             @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
             if (@config.exec_specific.reboot_kexec_timeout == nil) then
-              timeout = @config.cluster_specific[@cluster].timeout_reboot_classical
+              timeout = @config.cluster_specific[@cluster].timeout_reboot_kexec
             else
               timeout = @config.exec_specific.reboot_kexec_timeout
             end
