@@ -1060,7 +1060,9 @@ module ConfigInformation
             end
             macroinsts = []
             macroval.each do |macroinst|
-              unless macroinst['type']
+              if macroinst['type']
+                macroinst['type'] = macroname.strip + macroinst['type'].strip
+              else
                 puts "No 'type' field for macrostep '#{macroname}' instance"
                 return false
               end

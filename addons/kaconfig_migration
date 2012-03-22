@@ -27,6 +27,12 @@ OLD_CONFIG = {
   :cmds_conf => File.join(KACONFIG_PATH, 'cmd'),
 }
 
+MACROSTEPS = [
+  'SetDeploymentEnv',
+  'BroadcastEnv',
+  'BootNewEnv',
+]
+
 $clusters = nil
 $nodes = nil
 
@@ -169,6 +175,9 @@ if $clusters and !$clusters.empty?
             macroinsts.each do |macroinst|
               macrotmp = macroinst.split(':')
               config['macrosteps'][macroname] = [] unless config['macrosteps'][macroname]
+              MACROSTEPS.each do |stepname|
+                macrotmp[0].sub!(stepname,'') if macrotmp[0].include?(stepname)
+              end
               config['macrosteps'][macroname] << {
                 'type' => macrotmp[0],
                 'retries' => macrotmp[1].to_i,
