@@ -437,6 +437,7 @@ def cfg_kadeploy_specific_conf(cluster)
   "deploy_kernel = #{File.basename(cluster[:kernel][:vmlinuz])}\n"\
   "deploy_initrd = #{File.basename(cluster[:kernel][:initrd])}\n"\
   "deploy_kernel_args = #{cfg_kadeploy_deploy_kernel_args(cluster)}\n"\
+  "kexec_repository = /tmp/kaexec\n"\
   "block_device = #{cfg_kadeploy_disk_device()}\n"\
   "prod_part = #{CFG_KADEPLOY_PARTITION_PROD_ID}\n"\
   "deploy_part = #{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\n"\
