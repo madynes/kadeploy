@@ -1667,8 +1667,57 @@ module MicroStepsLibrary
           "&& dir=`echo $dir | sed -e \"s\#${prefix}##g\"` "\
           "&& file=$dir/`basename $tmp`; "\
         "done "\
-        "&& echo ${prefix}$file"\
+        "&& echo ${prefix}/$file"\
       ")"
+    end
+
+    # Create kexec repository directory on current environment
+    #
+    # Arguments
+    # * instance_thread: thread id of the current thread
+    # * scattering_kind: kind of taktuk scatter (tree, chain, kastafior)
+    # Output
+    # * return true if the kernel has been successfully sent
+    def ms_create_kexec_repository(instance_thread)
+      return parallel_exec_command_wrapper(
+        "mkdir -p #{@config.cluster_specific[@cluster].kexec_repository}",
+        @config.common.taktuk_connector,
+        instance_thread
+      )
+    end
+
+    # Send the deploy kernel files to an environment kexec repository
+    #
+    # Arguments
+    # * instance_thread: thread id of the current thread
+    # * scattering_kind: kind of taktuk scatter (tree, chain, kastafior)
+    # Output
+    # * return true if the kernel files have been sent successfully
+    def ms_send_deployment_kernel(instance_thread, scattering_kind)
+      ret = true
+
+      pxedir = File.join(
+        @config.common.pxe.pxe_repository,
+        @config.common.pxe.pxe_repository_kernels
+      )
+
+      ret = ret && parallel_send_file_command_wrapper(
+        File.join(pxedir,@config.cluster_specific[@cluster].deploy_kernel),
+        @config.cluster_specific[@cluster].kexec_repository,
+        scattering_kind,
+        @config.common.taktuk_connector,
+        instance_thread
+      )
+
+      ret = ret && parallel_send_file_command_wrapper(
+        File.join(pxedir,@config.cluster_specific[@cluster].deploy_initrd),
+        @config.cluster_specific[@cluster].kexec_repository,
+        scattering_kind,
+        @config.common.taktuk_connector,
+        instance_thread
+      )
+
+      return ret
     end
 
     # Perform a detached reboot from the deployment environment

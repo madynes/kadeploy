@@ -895,6 +895,8 @@ module ConfigInformation
           @cluster_specific[cluster].deploy_kernel_args = val
         when "deploy_initrd"
           @cluster_specific[cluster].deploy_initrd = val
+        when "kexec_repository"
+          @cluster_specific[cluster].kexec_repository = val
         when "block_device"
           @cluster_specific[cluster].block_device = val
         when "deploy_part"
@@ -2975,6 +2977,7 @@ module ConfigInformation
     attr_accessor :deploy_kernel
     attr_accessor :deploy_kernel_args
     attr_accessor :deploy_initrd
+    attr_accessor :kexec_repository
     attr_accessor :block_device
     attr_accessor :deploy_part
     attr_accessor :prod_part
@@ -3017,6 +3020,7 @@ module ConfigInformation
       @deploy_kernel = nil
       @deploy_kernel_args = ""
       @deploy_initrd = nil
+      @kexec_repository = nil
       @block_device = nil
       @deploy_part = nil
       @prod_part = nil
@@ -3061,6 +3065,7 @@ module ConfigInformation
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_kernel_args = @deploy_kernel_args.clone
       dest.deploy_initrd = @deploy_initrd.clone
+      dest.kexec_repository = @kexec_repository.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
@@ -3106,6 +3111,7 @@ module ConfigInformation
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_kernel_args = @deploy_kernel_args.clone
       dest.deploy_initrd = @deploy_initrd.clone
+      dest.kexec_repository = @kexec_repository.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
@@ -3149,7 +3155,7 @@ module ConfigInformation
         a = eval i
         puts "Warning: " + i + err_msg if (a == nil)
       }
-      if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
+      if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@kexec_repository == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
           (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot_classical == nil) || (@timeout_reboot_kexec == nil) ||
           (@pxe_header == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then

@@ -23,7 +23,7 @@ module SetDeploymentEnvironnment
     # * output: instance of OutputControl
     # * logger: instance of Logger
     # Output
-    # * returns a SetDeploymentEnv instance (SetDeploymentEnvUntrusted, SetDeploymentEnvUntrustedCustomPreInstall, SetDeploymentEnvNfsroot, SetDeploymentEnvProd, SetDeploymentEnvDummy)
+    # * returns a SetDeploymentEnv instance (SetDeploymentEnvUntrusted, SetDeploymentEnvKexec, SetDeploymentEnvUntrustedCustomPreInstall, SetDeploymentEnvNfsroot, SetDeploymentEnvProd, SetDeploymentEnvDummy)
     # * raises an exception if an invalid kind of instance is given
     def SetDeploymentEnvFactory.create(kind, max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
       begin
@@ -169,6 +169,80 @@ module SetDeploymentEnvironnment
             result = result && @step.switch_pxe("prod_to_deploy_env", "")
             result = result && @step.set_vlan("DEFAULT")
             result = result && @step.reboot("soft", first_attempt)
+            result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
+                                                 timeout)
+            result = result && @step.send_key_in_deploy_env("tree")
+            result = result && @step.create_partition_table("untrusted_env")
+            result = result && @step.format_deploy_part
+            result = result && @step.mount_deploy_part
+            result = result && @step.format_tmp_part
+            result = result && @step.format_swap_part
+            #End of micro steps
+          }
+          @instances.push(instance_thread)
+          if not @step.timeout?(@timeout, instance_thread, get_macro_step_name, instance_node_set) then
+            if not @nodes_ok.empty? then
+              @logger.set("step1_duration", Time.now.to_i - @start, @nodes_ok)
+              @nodes_ok.duplicate_and_free(instance_node_set)
+              @queue_manager.next_macro_step(get_macro_step_name, instance_node_set)
+            end
+          end
+          @remaining_retries -= 1
+          first_attempt = false
+        end
+        #After several retries, some nodes may still be in an incorrect state
+        if (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed) then
+          #Maybe some other instances are defined
+          if not @queue_manager.replay_macro_step_with_next_instance(get_macro_step_name, @cluster, @nodes_ko) then
+            @queue_manager.add_to_bad_nodes_set(@nodes_ko)
+            @queue_manager.decrement_active_threads
+          end
+        else
+          @queue_manager.decrement_active_threads
+        end
+        finalize()
+      }
+      return tid
+    end
+  end
+
+  class SetDeploymentEnvKexec < SetDeploymentEnv
+    # Main of the SetDeploymentEnvKexec instance
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * return a thread id
+    def run
+      first_attempt = true
+      tid = Thread.new {
+        @queue_manager.next_macro_step(get_macro_step_name, @nodes) if @config.exec_specific.breakpointed
+        @nodes.duplicate_and_free(@nodes_ko)
+        while (@remaining_retries > 0) && (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed)
+          instance_node_set = Nodes::NodeSet.new
+          @nodes_ko.duplicate(instance_node_set)
+          instance_thread = Thread.new {
+            @logger.increment("retry_step1", @nodes_ko)
+            @nodes_ko.duplicate_and_free(@nodes_ok)
+            @output.verbosel(1, "Performing a SetDeploymentEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
+            result = true
+            if (@config.exec_specific.reboot_kexec_timeout == nil) then
+              timeout = @config.cluster_specific[@cluster].timeout_reboot_kexec
+            else
+              timeout = @config.exec_specific.reboot_kexec_timeout
+            end
+            #Here are the micro steps
+            result = result && @step.switch_pxe("prod_to_deploy_env", "")
+            result = result && @step.set_vlan("DEFAULT")
+            result = result && @step.create_kexec_repository
+            result = result && @step.send_deployment_kernel("tree")
+            result = result && @step.kexec(
+              'linux',
+              @config.cluster_specific[@cluster].kexec_repository,
+              @config.cluster_specific[@cluster].deploy_kernel,
+              @config.cluster_specific[@cluster].deploy_initrd,
+              @config.cluster_specific[@cluster].deploy_kernel_args
+            )
             result = result && @step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port],[],
                                                  timeout)
             result = result && @step.send_key_in_deploy_env("tree")

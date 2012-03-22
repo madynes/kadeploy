@@ -16,6 +16,9 @@ module PXEOperations
   end
 
   class PXE
+    attr_reader :pxe_repository_kernels
+    attr_reader :pxe_repository
+
     @pxe_repository = nil
     @pxe_export = nil
     @pxe_repository_kernels = nil
