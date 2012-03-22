@@ -175,6 +175,7 @@ module BootNewEnvironment
       else
         kernel_params = ""
       end
+      kernel_params = "root=#{get_deploy_part_str()} #{kernel_params}" unless kernel_params.include?('root=')
       return kernel_params
     end
 
@@ -214,8 +215,7 @@ module BootNewEnvironment
               @config.common.environment_extraction_dir,
               @config.exec_specific.environment.kernel,
               @config.exec_specific.environment.initrd,
-              get_kernel_params(),
-              get_deploy_part_str()
+              get_kernel_params()
             )
             result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
                                                  timeout, true)

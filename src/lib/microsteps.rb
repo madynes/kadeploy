@@ -1587,17 +1587,15 @@ module MicroStepsLibrary
     # * kernelfile: the (local to 'systemdir') path to the kernel image
     # * initrdfile: the (local to 'systemdir') path to the initrd image
     # * kernelparams: the commands given to the kernel when booting
-    # * partition: the partition to boot on (given by partition device, for example: "/dev/sda2" )
     # Output
     # * return false if the kexec execution failed
-    def ms_kexec(instance_thread, systemkind, systemdir, kernelfile, initrdfile, kernelparams, partition = nil)
+    def ms_kexec(instance_thread, systemkind, systemdir, kernelfile, initrdfile, kernelparams)
       if (systemkind == "linux") then
         script = "#!/bin/bash\n"
         script += shell_kexec(
           kernelfile,
           initrdfile,
           kernelparams,
-          partition,
           systemdir
         )
 
@@ -1632,19 +1630,16 @@ module MicroStepsLibrary
     # * kernel: the path to the kernel image
     # * initrd: the path to the initrd image
     # * kernel_params: the commands given to the kernel when booting
-    # * partition: the partition to boot on (given by partition device, for example: "/dev/sda2" )
     # * prefixdir: if specified, the 'kernel' and 'initrd' paths will be prefixed by 'prefixdir'
     # Output
     # * return a string that describe the shell command to be executed
-    def shell_kexec(kernel,initrd,kernel_params='',partition=nil,prefixdir=nil)
-      tmpparams = (partition and !partition.empty? ? "root=#{partition} " : '')
-
+    def shell_kexec(kernel,initrd,kernel_params='',prefixdir=nil)
       "kernel=#{shell_follow_symlink(kernel,prefixdir)} "\
       "&& initrd=#{shell_follow_symlink(initrd,prefixdir)} "\
       "&& /sbin/kexec "\
         "-l $kernel "\
         "--initrd=$initrd "\
-        "--append=\"#{tmpparams}#{kernel_params}\" "\
+        "--append=\"#{kernel_params}\" "\
       "&& sleep 1 "\
       "&& echo \"u\" > /proc/sysrq-trigger "\
       "&& nohup /sbin/kexec -e\n"
