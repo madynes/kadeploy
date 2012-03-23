@@ -200,11 +200,6 @@ module BootNewEnvironment
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvKexec step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
-            if (@config.exec_specific.reboot_kexec_timeout == nil) then
-              timeout = @config.cluster_specific[@cluster].timeout_reboot_kexec
-            else
-              timeout = @config.exec_specific.reboot_kexec_timeout
-            end
             #Here are the micro steps
             result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.umount_deploy_part
@@ -217,8 +212,7 @@ module BootNewEnvironment
               @config.exec_specific.environment.initrd,
               get_kernel_params()
             )
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
-                                                 timeout, true)
+            result = result && @step.wait_reboot("kexec","user",true)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -321,18 +315,12 @@ module BootNewEnvironment
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvClassical step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
-            if (@config.exec_specific.reboot_classical_timeout == nil) then
-              timeout = @config.cluster_specific[@cluster].timeout_reboot_classical
-            else
-              timeout = @config.exec_specific.reboot_classical_timeout
-            end
             #Here are the micro steps 
             result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.umount_deploy_part
             result = result && @step.reboot_from_deploy_env
             result = result && @step.set_vlan
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
-                                                 timeout, true)
+            result = result && @step.wait_reboot("classical","user",true)
             #End of micro steps
           }
           @instances.push(instance_thread)
@@ -383,17 +371,11 @@ module BootNewEnvironment
             @nodes_ko.duplicate_and_free(@nodes_ok)
             @output.verbosel(1, "Performing a BootNewEnvHardReboot step on the nodes: #{@nodes_ok.to_s_fold}")
             result = true
-            if (@config.exec_specific.reboot_classical_timeout == nil) then
-              timeout = @config.cluster_specific[@cluster].timeout_reboot_classical
-            else
-              timeout = @config.exec_specific.reboot_classical_timeout
-            end
             #Here are the micro steps 
             result = result && @step.switch_pxe("deploy_to_deployed_env")
             result = result && @step.reboot("hard", false)
             result = result && @step.set_vlan
-            result = result && @step.wait_reboot([@config.common.ssh_port],[@config.common.test_deploy_env_port],
-                                                 timeout, true)
+            result = result && @step.wait_reboot("classical","user",true)
             #End of micro steps
           }
           @instances.push(instance_thread)

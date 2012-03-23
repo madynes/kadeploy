@@ -684,13 +684,18 @@ class KadeployServer
               timeout = exec_specific.reboot_classical_timeout
             end
             if (exec_specific.reboot_kind == "deploy_env") then
-              step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
-                               timeout, true)
+              step.wait_reboot("classical","deploy",true,timeout)
               step.send_key_in_deploy_env("tree")
               set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
             else
-              step.wait_reboot([@config.common.ssh_port],[],
-                               timeout, true)
+              step.wait_reboot(
+                "classical",
+                "user",
+                true,
+                timeout,
+                [@config.common.ssh_port],
+                []
+              )
 
               if (exec_specific.reboot_kind == "env_recorded") then
                 part = String.new
@@ -861,13 +866,19 @@ class KadeployServer
               step.set_vlan
               if exec_specific.wait then
                 if (exec_specific.reboot_kind == "deploy_env") then
-                  step.wait_reboot([@config.common.ssh_port,@config.common.test_deploy_env_port], [], 
-                                   @config.cluster_specific[cluster].timeout_reboot_classical, true)
+                  step.wait_reboot("classical","deploy",true)
+
                   step.send_key_in_deploy_env("tree")
                   set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
                 else
-                  step.wait_reboot([@config.common.ssh_port],[],
-                                   @config.cluster_specific[cluster].timeout_reboot_classical, true)
+                  step.wait_reboot(
+                    "classical",
+                    "user",
+                    true,
+                    nil,
+                    [@config.common.ssh_port],
+                    []
+                  )
 
                   if (exec_specific.reboot_kind == "env_recorded") then
                     part = String.new

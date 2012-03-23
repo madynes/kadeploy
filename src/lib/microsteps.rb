@@ -1947,21 +1947,49 @@ module MicroStepsLibrary
     #
     # Arguments
     # * instance_thread: thread id of the current thread
+    # * kind: the kind of reboot, "kexec" or "classical" (used to determine the configured timeouts)
+    # * env: the environment that was booted, "deploy" for deployment env, "user" for deployed env (used to determine ports_up and ports_down)
+    # * vlan: nodes have been set in a specific vlan (use vlan specific hostnames)
+    # * timeout: override default timeout settings
     # * ports_up: up ports used to perform a reach test on the nodes
     # * ports_down: down ports used to perform a reach test on the nodes
-    # * timeout: reboot timeout
-    # * last_reboot: specify if we wait the last reboot
     # Output
     # * return true if some nodes are here, false otherwise
-    def ms_wait_reboot(instance_thread, ports_up, ports_down, timeout, last_reboot = false)
-      return parallel_wait_nodes_after_reboot_wrapper(timeout, 
-                                                      ports_up, 
-                                                      ports_down,
-                                                      @nodes_check_window,
-                                                      instance_thread,
-                                                      last_reboot)
+    def ms_wait_reboot(instance_thread, kind='classical', env='deploy', vlan=false, timeout=nil,ports_up=nil, ports_down=nil)
+      unless timeout
+        if kind == 'kexec'
+          timeout = @config.exec_specific.reboot_kexec_timeout \
+            || @config.cluster_specific[@cluster].timeout_reboot_kexec
+        else
+          timeout = @config.exec_specific.reboot_classical_timeout \
+            || @config.cluster_specific[@cluster].timeout_reboot_classical
+        end
+      end
+
+      unless ports_up
+        ports_up = [ @config.common.ssh_port ]
+        if env == 'deploy'
+          ports_up << @config.common.test_deploy_env_port
+        end
+      end
+
+      unless ports_down
+        ports_down = []
+        if env == 'user'
+          ports_down << @config.common.test_deploy_env_port
+        end
+      end
+
+      return parallel_wait_nodes_after_reboot_wrapper(
+        timeout,
+        ports_up,
+        ports_down,
+        @nodes_check_window,
+        instance_thread,
+        vlan
+      )
     end
-    
+
     # Eventually install a bootloader
     #
     # Arguments
