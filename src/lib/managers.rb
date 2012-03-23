@@ -8,6 +8,7 @@ require 'debug'
 require 'nodes'
 require 'config'
 require 'cache'
+require 'macrostep'
 require 'stepdeployenv'
 require 'stepbroadcastenv'
 require 'stepbootnewenv'
@@ -693,45 +694,20 @@ module Managers
           if kind != "ProcessFinishedNodes" then
             nodes.group_by_cluster.each_pair { |cluster, set|
               instance_name,instance_max_retries,instance_timeout = @config.cluster_specific[cluster].get_macro_step(kind).get_instance
-              case kind
-              when "SetDeploymentEnv"
-                ptr = SetDeploymentEnvironnment::SetDeploymentEnvFactory.create(instance_name, 
-                                                                                instance_max_retries,
-                                                                                instance_timeout,
-                                                                                cluster,
-                                                                                set,
-                                                                                @queue_manager,
-                                                                                @reboot_window,
-                                                                                @nodes_check_window,
-                                                                                @output,
-                                                                                @logger)
+              if MacroSteps.typenames.include?(kind)
+                ptr = MacroSteps::MacroStepFactory.create(
+                  instance_name,
+                  instance_max_retries,
+                  instance_timeout,
+                  cluster,
+                  set,
+                  @queue_manager,
+                  @reboot_window,
+                  @nodes_check_window,
+                  @output,
+                  @logger
+                )
                 @set_deployment_environment_instances.push(ptr)
-                tid = ptr.run
-              when "BroadcastEnv"
-                ptr = BroadcastEnvironment::BroadcastEnvFactory.create(instance_name, 
-                                                                       instance_max_retries, 
-                                                                       instance_timeout,
-                                                                       cluster,
-                                                                       set,
-                                                                       @queue_manager,
-                                                                       @reboot_window,
-                                                                       @nodes_check_window,
-                                                                       @output,
-                                                                       @logger)
-                @broadcast_environment_instances.push(ptr)
-                tid = ptr.run
-              when "BootNewEnv"
-                ptr = BootNewEnvironment::BootNewEnvFactory.create(instance_name, 
-                                                                   instance_max_retries,
-                                                                   instance_timeout,
-                                                                   cluster,
-                                                                   set,
-                                                                   @queue_manager,
-                                                                   @reboot_window,
-                                                                   @nodes_check_window,
-                                                                   @output,
-                                                                   @logger)
-                @boot_new_environment_instances.push(ptr)
                 tid = ptr.run
               else
                 raise "Invalid macro step name"
