@@ -1058,6 +1058,12 @@ module ConfigInformation
               puts "Invalid macrostep format, '#{macroname}' field should be a YAML Array"
               return false
             end
+
+            unless MacroSteps.typenames.include?(macroname)
+              puts "Invalid macrostep kind '#{macroname}'"
+              return false
+            end
+
             macroinsts = []
             macroval.each do |macroinst|
               if macroinst['type']
