@@ -1,0 +1,131 @@
+#!/usr/bin/ruby
+require 'rubygems'
+require 'ipaddress'
+require 'yaml'
+require 'resolv'
+
+USAGE="usage: #{$0} <yaml_servicefile> <nodefile>"
+
+
+SITESADDR = {
+  'bordeaux' => IPAddress.parse('10.3.192.0/18'),
+  'grenoble' => IPAddress.parse('10.7.192.0/18'),
+  'lille' => IPAddress.parse('10.11.192.0/18'),
+  'lyon' => IPAddress.parse('10.15.192.0/18'),
+  'nancy' => IPAddress.parse('10.19.192.0/18'),
+  'orsay' => IPAddress.parse('10.23.192.0/18'),
+  'rennes' => IPAddress.parse('10.27.192.0/18'),
+  'toulouse' => IPAddress.parse('10.31.192.0/18'),
+  'sophia' => IPAddress.parse('10.35.192.0/18'),
+  'reims' => IPAddress.parse('10.39.192.0/18'),
+  'luxembourg' => IPAddress.parse('10.43.192.0/18'),
+}
+
+tmp = `hostname`.chomp
+SITESADDR.each_pair do |name,addr|
+  if tmp.downcase.include?(name.downcase)
+    $siteaddr = addr
+    break
+  end
+end
+
+unless $siteaddr
+  $stderr.puts 'unable to gather site informations'
+  exit 1
+end
+
+
+$sites = {}
+tmplist = $siteaddr.subnet(23)
+
+tmplist.each do |tmp|
+  $sites[tmp] = {
+    :addr => tmp,
+    :servers => [],
+    :nodes => []
+  }
+end
+
+begin
+  tmpstruct = YAML.load_file(ARGV[0])
+  tmpstruct.each_value do |struct|
+    if struct.is_a?(Array)
+      struct.each do |tmp|
+        addrbase = Resolv.getaddress(tmp['host'])
+        addrbase = IPAddress.parse(addrbase)
+        addrnew = IPAddress.parse(tmp['newip'])
+        affected = false
+        $sites.each_pair do |addr,val|
+          if addr.include?(addrbase)
+            val[:servers] << addrnew
+            affected = true
+          end
+        end
+        $stderr.puts "server '#{tmp['host']}' not affected to any subnetworks of the site, ignoring" unless affected
+      end
+    end
+  end
+rescue Resolv::ResolvError
+  $stderr.puts "invalid hostname #{tmp['host']}"
+  exit 1
+rescue ArgumentError
+  $stderr.puts "invalid ip #{tmp['newip']}"
+  exit 1
+rescue Errno::ENOENT
+  $stderr.puts "File '#{ARGV[0]}' not found"
+  exit 1
+end
+
+begin
+  File.open(ARGV[1] , 'r') do |f|
+    f.each do |tmp|
+      begin
+        tmp = tmp.split
+        addrbase = IPAddress.parse(tmp[3])
+        addrnew = IPAddress.parse(tmp[1])
+        affected = false
+        $sites.each_pair do |addr,val|
+          if addr.include?(addrbase)
+            val[:nodes] << addrnew
+            affected = true
+          end
+        end
+        $stderr.puts "node '#{tmp[0]}' not affected to any subnetworks of the site, ignoring" unless affected
+      rescue ArgumentError
+        $stderr.puts "invalid address for node '#{tmp[0]}'"
+        exit 1
+      end
+    end
+  end
+rescue Errno::ENOENT
+  $stderr.puts "File '#{ARGV[1]}' not found"
+  exit 1
+end
+
+res = ""
+
+$sites.each_value do |val|
+  if !val[:nodes].empty? and !val[:servers].empty?
+    val[:servers].each do |server|
+	    res += "    {\n"
+	    res += "      {\n"
+	    val[:nodes].each do |node|
+	      res += "        #{node.to_s};\n"
+	    end
+	    res += "      };\n"
+	    res += "      {\n"
+	    #val[:servers].each do |server|
+	      res += "        #{server.to_s};\n"
+	    #end
+	    res += "      };\n"
+	    res += "    };\n"
+    end
+  end
+end
+
+puts "options {\n"\
+  "  sortlist {\n"\
+  + res +
+  "  };\n"\
+  "};\n"
+
