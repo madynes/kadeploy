@@ -124,10 +124,12 @@ module Debug
     #
     # Arguments
     # * nodeset: print with this NodeSet id
+    # * msg: if set, prints a message instead of the node set description
     # Output
     # * prints the node set
-    def print_nodeset(nodeset)
-      verbosel(2,"Nodeset(#{nodeset.id}): #{nodeset.to_s_fold}")
+    def print_nodeset(nodeset, msg = nil)
+      msg = ": #{nodeset.to_s_fold}" unless msg
+      verbosel(2,"Nodeset(#{nodeset.id}) #{msg}")
     end
 
     # Print the debug output of a command

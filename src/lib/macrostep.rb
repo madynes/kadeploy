@@ -199,6 +199,8 @@ module MacroSteps
           if not @step.timeout?(@timeout, instance_thread, get_macro_step_name, instance_node_set) then
             if not @nodes_ok.empty? then
               if not @nodes_ko.empty?
+                @output.print_nodeset(@nodes_ok, "splitted into :")
+
                 @config.exec_specific.nodesetid += 1
                 @nodes_ok.id = @config.exec_specific.nodesetid
                 @output.print_nodeset(@nodes_ok)
