@@ -83,8 +83,8 @@ module MacroSteps
       @reboot_window = reboot_window
       @nodes_check_window = nodes_check_window
       @output = output
-      @nodes_ok = Nodes::NodeSet.new
-      @nodes_ko = Nodes::NodeSet.new
+      @nodes_ok = Nodes::NodeSet.new(@nodes.id)
+      @nodes_ko = Nodes::NodeSet.new(@nodes.id)
       @cluster = cluster
       @loglevel = loglevel
       @logger = logger
@@ -184,9 +184,11 @@ module MacroSteps
             @logger.increment("retry_step#{@loglevel}", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
 
-            @output.verbosel(1,
-              "Performing a #{get_macro_step_name()} step "\
-              "on the nodes: #{@nodes_ok.to_s_fold}"
+            @output.verbosel(
+              1,
+              "Performing a #{get_instance_name()} step "\
+              "on the nodes: #{@nodes_ok.to_s_fold}",
+              @nodes_ok
             )
 
             microsteps()
@@ -196,6 +198,16 @@ module MacroSteps
 
           if not @step.timeout?(@timeout, instance_thread, get_macro_step_name, instance_node_set) then
             if not @nodes_ok.empty? then
+              if not @nodes_ko.empty?
+                @config.exec_specific.nodesetid += 1
+                @nodes_ok.id = @config.exec_specific.nodesetid
+                @output.print_nodeset(@nodes_ok)
+
+                @config.exec_specific.nodesetid += 1
+                @nodes_ko.id = @config.exec_specific.nodesetid
+                @output.print_nodeset(@nodes_ko)
+              end
+
               @logger.set(
                 "step#{@loglevel}_duration",
                 Time.now.to_i - @start,

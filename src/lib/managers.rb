@@ -644,9 +644,9 @@ module Managers
                                            @config.exec_specific.true_user, @deploy_id,
                                            @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, syslog_lock)
       end
-      @nodes_ok = Nodes::NodeSet.new
-      @nodes_ko = Nodes::NodeSet.new
       @nodeset = @config.exec_specific.node_set
+      @nodes_ok = Nodes::NodeSet.new(@nodeset.id)
+      @nodes_ko = Nodes::NodeSet.new(@nodeset.id)
       @queue_manager = QueueManager.new(@config, @nodes_ok, @nodes_ko)
       @reboot_window = reboot_window
       @nodes_check_window = nodes_check_window
@@ -661,6 +661,9 @@ module Managers
                                   @config.exec_specific.load_env_kind == "file",
                                   syslog_lock)
       @killed = false
+
+      @output.print_nodeset(@nodeset)
+
       @thread_set_deployment_environment = Thread.new {
         launch_thread_for_macro_step("SetDeploymentEnv")
       }

@@ -97,9 +97,12 @@ module Debug
     # Arguments
     # * l: debug level of the message
     # * msg: message
+    # * nodeset: print with this NodeSet id
     # Output
     # * prints the message on the server and on the client
-    def verbosel(l, msg)
+    def verbosel(l, msg, nodeset=nil)
+      msg = "(#{nodeset.id}) #{msg}" if nodeset and @verbose_level >= 3
+
       if ((l <= @verbose_level) && @client_output)
         @client.print(msg)
       end
@@ -115,6 +118,16 @@ module Debug
         sl.close
         @syslog_lock.unlock
       end
+    end
+
+    # Print a NodeSet
+    #
+    # Arguments
+    # * nodeset: print with this NodeSet id
+    # Output
+    # * prints the node set
+    def print_nodeset(nodeset)
+      verbosel(2,"Nodeset(#{nodeset.id}): #{nodeset.to_s_fold}")
     end
 
     # Print the debug output of a command

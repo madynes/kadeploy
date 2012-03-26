@@ -3,6 +3,7 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+require 'drb/drb'
 
 module Nodes
   class NodeCmd
@@ -130,16 +131,17 @@ module Nodes
   end
 
   class NodeSet
-    attr_accessor :set
-    
+    attr_accessor :set, :id
+
     # Constructor of NodeSet
     #
     # Arguments
-    # * nothing
+    # * id: the id of the nodeset (optional)
     # Output
     # * nothing
-    def initialize
+    def initialize(id = 0)
       @set = Array.new
+      @id = id
     end
 
     private
@@ -508,6 +510,7 @@ module Nodes
       @set.each { |node|
         dest.push(node)
       }
+      dest.id = @id
     end
 
     # Duplicate a NodeSet
@@ -520,6 +523,7 @@ module Nodes
       @set.each { |node|
         dest.push(node.dup)
       }
+      dest.id = @id
     end
 
     # Duplicate a NodeSet and free it
@@ -532,6 +536,7 @@ module Nodes
       @set.each { |node|
         dest.push(node.dup)
       }
+      dest.id = @id
       free()
     end
 
@@ -584,6 +589,7 @@ module Nodes
     def extract(n)
       if (n <= @set.length) then
         new_set = NodeSet.new
+        new_set.id = @id
         n.times {
           new_set.push(@set.shift)
         }
@@ -718,8 +724,11 @@ module Nodes
     # * return an Hash that groups the nodes by cluster (each entry is a NodeSet)
     def group_by_cluster
       ht = Hash.new
-      @set.each { |node| 
-        ht[node.cluster] = NodeSet.new if ht[node.cluster].nil?
+      @set.each { |node|
+        if ht[node.cluster].nil?
+          ht[node.cluster] = NodeSet.new
+          ht[node.cluster].id = @id
+        end
         ht[node.cluster].push(node.dup)
       }
       return ht
@@ -810,6 +819,10 @@ module Nodes
         end
       end
       good_nodes = diff(bad_nodes)
+
+      good_nodes.id = @id
+      bad_nodes.id = @id
+
       return [good_nodes, bad_nodes]
     end
 

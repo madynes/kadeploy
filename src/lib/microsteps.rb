@@ -57,7 +57,7 @@ module MicroStepsLibrary
     private
 
     def failed_microstep(msg)
-      @output.verbosel(0, msg)
+      @output.verbosel(0, msg, @nodes_ok)
       @nodes_ok.set_error_msg(msg)
       @nodes_ok.duplicate_and_free(@nodes_ko)
       @nodes_ko.set.each { |n|
@@ -81,7 +81,7 @@ module MicroStepsLibrary
       end
       if not good_bad_array[1].empty? then
         good_bad_array[1].each { |n|
-          @output.verbosel(4, "The node #{n.hostname} has been discarded of the current instance")
+          @output.verbosel(4, "The node #{n.hostname} has been discarded of the current instance",@nodes_ok)
           n.state = "KO"
           @config.set_node_state(n.hostname, "", "", "ko")
           @nodes_ko.push(n)
@@ -239,7 +239,7 @@ module MicroStepsLibrary
     def parallel_get_power_status(instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      @output.verbosel(3, "  *** A power status will be performed on the nodes #{node_set.to_s_fold}")
+      @output.verbosel(3, "  *** A power status will be performed on the nodes #{node_set.to_s_fold}",node_set)
       pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
       node_set.set.each { |node|
         if (node.cmd.power_status != nil) then
@@ -387,7 +387,7 @@ module MicroStepsLibrary
     # Output
     # * nothing
     def _escalation_cmd_wrapper(kind, level, node_set, initial_node_set, instance_thread)
-      @output.verbosel(3, "  *** A #{level} #{kind} will be performed on the nodes #{node_set.to_s_fold}")
+      @output.verbosel(3, "  *** A #{level} #{kind} will be performed on the nodes #{node_set.to_s_fold}",initial_node_set)
 
       #First, we remove the nodes without command
       no_command_provided_nodes = Nodes::NodeSet.new
@@ -550,8 +550,8 @@ module MicroStepsLibrary
     # Output
     # * nothing 
     def escalation_cmd_wrapper(kind, level, instance_thread)
-      node_set = Nodes::NodeSet.new
-      initial_node_set = Nodes::NodeSet.new
+      node_set = Nodes::NodeSet.new(@nodes_ok.id)
+      initial_node_set = Nodes::NodeSet.new(@nodes_ok.id)
       @nodes_ok.move(node_set)
       node_set.linked_copy(initial_node_set)
 
@@ -1145,7 +1145,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the command has been correctly performed, false otherwise
     def custom_exec_cmd(instance_thread, cmd)
-      @output.verbosel(3, "CUS exec_cmd: #{@nodes_ok.to_s_fold}")
+      @output.verbosel(3, "CUS exec_cmd: #{@nodes_ok.to_s_fold}",@nodes_ok)
       return parallel_exec_command_wrapper(cmd, @config.common.taktuk_connector, instance_thread)
     end
 
@@ -1158,7 +1158,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the file has been correctly sent, false otherwise
     def custom_send_file(instance_thread, file, dest_dir)
-      @output.verbosel(3, "CUS send_file: #{@nodes_ok.to_s_fold}")
+      @output.verbosel(3, "CUS send_file: #{@nodes_ok.to_s_fold}",@nodes_ok)
       return parallel_send_file_command_wrapper(file,
                                                 dest_dir,
                                                 "chain",
@@ -1304,7 +1304,7 @@ module MicroStepsLibrary
         sleep(1)
       end
       if (instance_thread.status != false) then
-        @output.verbosel(3, "Timeout before the end of the step on cluster #{@cluster}, let's kill the instance")
+        @output.verbosel(3, "Timeout before the end of the step on cluster #{@cluster}, let's kill the instance",@nodes_ok)
         Thread.kill(instance_thread)
         @process_container.killall(instance_thread)
         @nodes_ok.free
@@ -1335,25 +1335,25 @@ module MicroStepsLibrary
             brk_on_macrostep = @config.exec_specific.breakpoint_on_microstep.split(":")[0]
             brk_on_microstep = @config.exec_specific.breakpoint_on_microstep.split(":")[1]
             if ((brk_on_macrostep == @macro_step) && (brk_on_microstep == method_sym.to_s)) then
-              @output.verbosel(0, "BRK #{method_sym.to_s}: #{@nodes_ok.to_s_fold}")
+              @output.verbosel(0, "BRK #{method_sym.to_s}: #{@nodes_ok.to_s_fold}",@nodes_ok)
               @config.exec_specific.breakpointed = true
               return false
             end
           end
           if custom_methods_attached?(@macro_step, method_sym.to_s) then
             if run_custom_methods(Thread.current, @macro_step, method_sym.to_s) then
-              @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)")
-              @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}")
+              @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)",@nodes_ok)
+              @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}",@nodes_ok)
               send(real_method, Thread.current, *args)
             else
               return false
             end
           else
-            @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)")
-            @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}")
+            @output.verbosel(2, "--- #{method_sym.to_s} (#{@cluster} cluster)",@nodes_ok)
+            @output.verbosel(3, "  >>>  #{@nodes_ok.to_s_fold}",@nodes_ok)
             start = Time.now.to_i
             ret = send(real_method, Thread.current, *args)
-            @output.verbosel(4, "  Time in #{@macro_step}-#{method_sym.to_s}: #{Time.now.to_i - start}s")
+            @output.verbosel(4, "  Time in #{@macro_step}-#{method_sym.to_s}: #{Time.now.to_i - start}s",@nodes_ok)
             return ret
           end
         else
@@ -1380,7 +1380,7 @@ module MicroStepsLibrary
                                                          "0",
                                                          instance_thread)
       else
-        @output.verbosel(3, "  *** No key has been specified")
+        @output.verbosel(3, "  *** No key has been specified",@nodes_ok)
       end
       return true
     end
@@ -1769,7 +1769,7 @@ module MicroStepsLibrary
             cmd = "#{@config.common.taktuk_connector} root@#{node.hostname} \"mount | grep \\ \\/\\  | cut -f 1 -d\\ \""
             pr.add(cmd, node)
           }
-          @output.verbosel(3, "  *** A bunch of check prod env tests will be performed on #{ns.to_s_fold}")
+          @output.verbosel(3, "  *** A bunch of check prod env tests will be performed on #{ns.to_s_fold}",ns)
           pr.run
           pr.wait
           classify_nodes(pr.get_results_expecting_output(@config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].prod_part, "Bad root partition"))
@@ -1804,7 +1804,7 @@ module MicroStepsLibrary
     # * return true if the operation has been successfully performed, false otherwise
     def ms_create_partition_table(instance_thread, env)
       if @config.exec_specific.disable_disk_partitioning then
-        @output.verbosel(3, "  *** Bypass the disk partitioning")
+        @output.verbosel(3, "  *** Bypass the disk partitioning",@nodes_ok)
         return true
       else
         case @config.cluster_specific[@cluster].partition_creation_kind
@@ -1840,7 +1840,7 @@ module MicroStepsLibrary
                                                instance_thread)
         end
       else
-        @output.verbosel(3, "  *** Bypass the format of the deploy part")
+        @output.verbosel(3, "  *** Bypass the format of the deploy part",@nodes_ok)
         return true
       end
     end
@@ -1867,7 +1867,7 @@ module MicroStepsLibrary
                                                instance_thread)
         end
       else
-        @output.verbosel(3, "  *** Bypass the format of the tmp part")
+        @output.verbosel(3, "  *** Bypass the format of the tmp part",@nodes_ok)
       end
       return true
     end
@@ -1885,7 +1885,7 @@ module MicroStepsLibrary
                                              @config.common.taktuk_connector,
                                              instance_thread)
       else
-        @output.verbosel(3, "  *** Bypass the format of the swap part")
+        @output.verbosel(3, "  *** Bypass the format of the swap part",@nodes_ok)
       end
       return true
     end
@@ -1904,7 +1904,7 @@ module MicroStepsLibrary
                                              @config.common.taktuk_connector,
                                              instance_thread)
       else
-        @output.verbosel(3, "  *** Bypass the mount of the deploy part")
+        @output.verbosel(3, "  *** Bypass the mount of the deploy part",@nodes_ok)
         return true
       end
     end
@@ -2013,7 +2013,7 @@ module MicroStepsLibrary
         end
       when "chainload_pxe"
         if @config.exec_specific.disable_bootloader_install then
-          @output.verbosel(3, "  *** Bypass the bootloader installation")
+          @output.verbosel(3, "  *** Bypass the bootloader installation",@nodes_ok)
           return true
         else
           case @config.exec_specific.environment.environment_kind
@@ -2021,7 +2021,7 @@ module MicroStepsLibrary
             return install_grub_on_nodes("linux", instance_thread)
           when "xen"
 #            return install_grub_on_nodes("xen", instance_thread)
-            @output.verbosel(3, "   Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
+            @output.verbosel(3, "   Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion",@nodes_ok)
             return copy_kernel_initrd_to_pxe([@config.exec_specific.environment.kernel,
                                               @config.exec_specific.environment.initrd,
                                               @config.exec_specific.environment.hypervisor])
@@ -2061,7 +2061,7 @@ module MicroStepsLibrary
                                              @config.common.taktuk_connector,
                                              instance_thread)
       else
-        @output.verbosel(3, "  *** Bypass the umount of the deploy part")
+        @output.verbosel(3, "  *** Bypass the umount of the deploy part",@nodes_ok)
         return true
       end
     end
@@ -2096,7 +2096,7 @@ module MicroStepsLibrary
                                                          get_deploy_part_str(),
                                                          instance_thread)        
       end
-      @output.verbosel(3, "  *** Broadcast time: #{Time.now.to_i - start} seconds") if res
+      @output.verbosel(3, "  *** Broadcast time: #{Time.now.to_i - start} seconds",@nodes_ok) if res
       return res
     end
 
@@ -2116,7 +2116,7 @@ module MicroStepsLibrary
           return false
         end
         if (preinstall["script"] == "breakpoint") then
-          @output.verbosel(0, "Breakpoint on admin preinstall after sending the file #{preinstall["file"]}")
+          @output.verbosel(0, "Breakpoint on admin preinstall after sending the file #{preinstall["file"]}",@nodes_ok)
           @config.exec_specific.breakpointed = true
           return false
         elsif (preinstall["script"] != "none")
@@ -2132,7 +2132,7 @@ module MicroStepsLibrary
             return false
           end
           if (preinstall["script"] == "breakpoint") then
-            @output.verbosel(0, "Breakpoint on admin preinstall after sending the file #{preinstall["file"]}")
+            @output.verbosel(0, "Breakpoint on admin preinstall after sending the file #{preinstall["file"]}",@nodes_ok)
             @config.exec_specific.breakpointed = true
             return false
           elsif (preinstall["script"] != "none")
@@ -2144,7 +2144,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "  *** Bypass the admin preinstalls")
+        @output.verbosel(3, "  *** Bypass the admin preinstalls",@nodes_ok)
       end
       return true
     end
@@ -2163,7 +2163,7 @@ module MicroStepsLibrary
             return false
           end
           if (postinstall["script"] == "breakpoint") then 
-            @output.verbosel(0, "Breakpoint on admin postinstall after sending the file #{postinstall["file"]}")         
+            @output.verbosel(0, "Breakpoint on admin postinstall after sending the file #{postinstall["file"]}",@nodes_ok)
             @config.exec_specific.breakpointed = true
             return false
           elsif (postinstall["script"] != "none")
@@ -2175,7 +2175,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "  *** Bypass the admin postinstalls")
+        @output.verbosel(3, "  *** Bypass the admin postinstalls",@nodes_ok)
       end
       return true
     end
@@ -2194,7 +2194,7 @@ module MicroStepsLibrary
             return false
           end
           if (postinstall["script"] == "breakpoint") then
-            @output.verbosel(0, "Breakpoint on user postinstall after sending the file #{postinstall["file"]}")
+            @output.verbosel(0, "Breakpoint on user postinstall after sending the file #{postinstall["file"]}",@nodes_ok)
             @config.exec_specific.breakpointed = true
             return false
           elsif (postinstall["script"] != "none")
@@ -2206,7 +2206,7 @@ module MicroStepsLibrary
           end
         }
       else
-        @output.verbosel(3, "  *** Bypass the user postinstalls")
+        @output.verbosel(3, "  *** Bypass the user postinstalls",@nodes_ok)
       end
       return true
     end
@@ -2230,7 +2230,7 @@ module MicroStepsLibrary
           return false
         end
       else
-        @output.verbosel(3, "  *** Bypass the VLAN setting")
+        @output.verbosel(3, "  *** Bypass the VLAN setting",@nodes_ok)
       end
       return true
     end

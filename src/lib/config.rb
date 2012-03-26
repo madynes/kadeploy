@@ -277,7 +277,8 @@ module ConfigInformation
     def Config.load_kadeploy_exec_specific()
       exec_specific = OpenStruct.new
       exec_specific.environment = EnvironmentManagement::Environment.new
-      exec_specific.node_set = Nodes::NodeSet.new
+      exec_specific.nodesetid = 1
+      exec_specific.node_set = Nodes::NodeSet.new(exec_specific.nodesetid)
       exec_specific.node_array = Array.new
       exec_specific.load_env_kind = String.new
       exec_specific.load_env_arg = String.new
@@ -2308,7 +2309,8 @@ module ConfigInformation
     def Config.load_kareboot_exec_specific()
       exec_specific = OpenStruct.new
       exec_specific.verbose_level = String.new
-      exec_specific.node_set = Nodes::NodeSet.new
+      exec_specific.nodesetid = 1
+      exec_specific.node_set = Nodes::NodeSet.new(exec_specific.nodesetid)
       exec_specific.node_array = Array.new
       exec_specific.check_prod_env = false
       exec_specific.true_user = USER
