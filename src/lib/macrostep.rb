@@ -199,15 +199,19 @@ module MacroSteps
           if not @step.timeout?(@timeout, instance_thread, get_macro_step_name, instance_node_set) then
             if not @nodes_ok.empty? then
               if not @nodes_ko.empty?
-                @output.print_nodeset(@nodes_ok, "splitted into :")
-
+                tmp = @nodes_ok.id
                 @config.exec_specific.nodesetid += 1
                 @nodes_ok.id = @config.exec_specific.nodesetid
-                @output.print_nodeset(@nodes_ok)
 
                 @config.exec_specific.nodesetid += 1
                 @nodes_ko.id = @config.exec_specific.nodesetid
-                @output.print_nodeset(@nodes_ko)
+
+                @output.verbosel(
+                  2,
+                  "Nodeset(#{tmp}) splitted into :\n"\
+                  "  Nodeset(#{@nodes_ok.id}): #{@nodes_ok.to_s_fold}\n"\
+                  "  Nodeset(#{@nodes_ko.id}): #{@nodes_ko.to_s_fold}\n"
+                )
               end
 
               @logger.set(

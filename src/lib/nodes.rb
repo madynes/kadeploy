@@ -139,7 +139,7 @@ module Nodes
     # * id: the id of the nodeset (optional)
     # Output
     # * nothing
-    def initialize(id = 0)
+    def initialize(id = -1)
       @set = Array.new
       @id = id
     end

@@ -662,8 +662,6 @@ module Managers
                                   syslog_lock)
       @killed = false
 
-      @output.print_nodeset(@nodeset)
-
       @thread_set_deployment_environment = Thread.new {
         launch_thread_for_macro_step("SetDeploymentEnv")
       }
