@@ -82,11 +82,12 @@ module ParallelRunner
     # * output: instance of OutputControl
     # Output
     # * nothing
-    def initialize(output, instance_thread, process_container)
+    def initialize(output, instance_thread, process_container, nodesetid=0)
       @nodes = Hash.new
       @output = output
       @instance_thread = instance_thread
       @process_container = process_container
+      @nodesetid = nodesetid
     end
 
     # Add a command related to a node
@@ -175,6 +176,7 @@ module ParallelRunner
           bad_nodes.push(node)
         end
         nodeset = Nodes::NodeSet.new
+        nodeset.id = @nodesetid
         nodeset.push(node)
         @output.debug(@nodes[node]["cmd"].cmd, nodeset)
         nodeset = nil
@@ -207,6 +209,7 @@ module ParallelRunner
           bad_nodes.push(node)
         end
         nodeset = Nodes::NodeSet.new
+        nodeset.id = @nodesetid
         nodeset.push(node)
         @output.debug(@nodes[node]["cmd"].cmd, nodeset)
         nodeset = nil

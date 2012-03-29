@@ -240,7 +240,7 @@ module MicroStepsLibrary
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
       @output.verbosel(3, "  *** A power status will be performed on the nodes #{node_set.to_s_fold}",node_set)
-      pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+      pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container,node_set.id)
       node_set.set.each { |node|
         if (node.cmd.power_status != nil) then
           pr.add(node.cmd.power_status, node)
@@ -483,7 +483,7 @@ module MicroStepsLibrary
       #Finally, fire !!!!!!!!
       bad_nodes = Nodes::NodeSet.new
       callback = Proc.new { |na|
-        pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+        pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container,node_set.id)
         na.each { |entry|
           node = nil
           if entry.is_a?(String) then
@@ -961,7 +961,7 @@ module MicroStepsLibrary
     def send_tarball_and_uncompress_with_kastafior(tarball_file, tarball_kind, deploy_mount_point, deploy_part, instance_thread)
       if @config.cluster_specific[@cluster].use_ip_to_deploy then
         callback = Proc.new { |ns|
-          pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container)
+          pr = ParallelRunner::PRunner.new(@output, instance_thread, @process_container,ns.id)
           ns.set.each { |node|
             kastafior_hostname = node.ip
             cmd = "#{@config.common.taktuk_connector} #{node.ip} \"echo #{node.ip} > /tmp/kastafior_hostname\""
@@ -1047,7 +1047,7 @@ module MicroStepsLibrary
       std_reader.join
       err_reader.join
       @process_container.remove_process(instance_thread, c.pid)
-      @output.debug_command(cmd, std_output, err_output, c.status)
+      @output.debug_command(cmd, std_output, err_output, c.status, @nodes_ok)
       if (c.status != 0) then
         failed_microstep("Error while processing to the file broadcast with Kastafior (exited with status #{c.status})")
         return false
@@ -1764,7 +1764,7 @@ module MicroStepsLibrary
         #private key in the production environment.
         callback = Proc.new { |ns|
           
-          pr = ParallelRunner::PRunner.new(@output, nil, @process_container)
+          pr = ParallelRunner::PRunner.new(@output, nil, @process_container,ns.id)
           ns.set.each { |node|
             cmd = "#{@config.common.taktuk_connector} root@#{node.hostname} \"mount | grep \\ \\/\\  | cut -f 1 -d\\ \""
             pr.add(cmd, node)

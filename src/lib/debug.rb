@@ -129,22 +129,27 @@ module Debug
     # * nothing
     def debug(cmd, nodeset)
       if @debug then
-        @client.print("-------------------------")
-        @client.print("CMD: #{cmd}")
+        procprint = Proc.new do |str|
+          str = "(#{nodeset.id}) #{str}" if nodeset.id > 0
+          @client.print(str)
+        end
+
+        procprint.call("-------------------------")
+        procprint.call("CMD: #{cmd}")
         if (nodeset != nil) then
           nodeset.set.each { |node|
             node.last_cmd_stdout.split("\n").each { |line|
-              @client.print("#{node.hostname} -- STDOUT: #{line}")
+              procprint.call("#{node.hostname} -- STDOUT: #{line}")
             }
             node.last_cmd_stderr.split("\n").each { |line|
-              @client.print("#{node.hostname} -- STDERR: #{line}")
+              procprint.call("#{node.hostname} -- STDERR: #{line}")
             }
             node.last_cmd_exit_status.split("\n").each { |line|
-              @client.print("#{node.hostname} -- EXIT STATUS: #{line}")
+              procprint.call("#{node.hostname} -- EXIT STATUS: #{line}")
             }
           }
         end
-        @client.print("-------------------------")
+        procprint.call("-------------------------")
       end
     end
 
@@ -176,24 +181,30 @@ module Debug
     # * stdout: standard output
     # * stderr: standard error output
     # * exit_status: exit status
+    # * nodeset: the nodesed the command was applied on (used for the display template)
     # Output
     # * nothing
-    def debug_command(cmd, stdout, stderr, exit_status)
+    def debug_command(cmd, stdout, stderr, exit_status, nodeset)
       if @debug then
-        @client.print("-------------------------")
-        @client.print("CMD: #{cmd}")
+        procprint = Proc.new do |str|
+          str = "(#{nodeset.id}) #{str}" if nodeset.id > 0
+          @client.print(str)
+        end
+
+        procprint.call("-------------------------")
+        procprint.call("CMD: #{cmd}")
         if stdout != nil then
           stdout.split("\n").each { |line|
-            @client.print("-- STDOUT: #{line}")
+            procprint.call("-- STDOUT: #{line}")
           }
         end
         if stderr != nil then
           stderr.split("\n").each { |line|
-            @client.print("-- STDERR: #{line}")
+            procprint.call("-- STDERR: #{line}")
           }
         end
-        @client.print("-- EXIT STATUS: #{exit_status}")
-        @client.print("-------------------------")
+        procprint.call("-- EXIT STATUS: #{exit_status}")
+        procprint.call("-------------------------")
       end
     end
   end
