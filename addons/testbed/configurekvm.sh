@@ -241,9 +241,5 @@ echo "DHCP node: $dhcpdaemon"
 echo "www nodes:"
 echo "$wwwservers"
 
-if [ -n "$newnet" ]
-then
-  echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -f $nodefile -F $hostfile"
+echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile"
 else
-  echo "kabootstrap options: -V -g `hostname` -s $serviceyamlfile -f $nodefile -F $hostfile"
-fi
