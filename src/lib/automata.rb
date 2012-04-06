@@ -10,13 +10,19 @@ TIMING = true
 @@tstart = Time.now
 
 def debug(msg)
-  prefix = "[#{Time.now - @@tstart}] " if TIMING
+  prefix = "[#{sprintf("%.3f",Time.now - @@tstart)}] " if TIMING
   #puts "#{prefix}#{self.class.name}:\t#{msg}"
-  puts "#{prefix}\t#{msg}"
+  puts "#{prefix} #{msg}"
 end
 
 module Nodes
   class NodeSet
+    @@ids = 0
+
+    def self.newid
+      @@ids += 1
+    end
+
     def equals?(sub)
       ret = true
 
@@ -112,7 +118,7 @@ module Task
   end
 
   def raise_nodes(nodeset,status)
-    tmpnodeset = Nodes::NodeSet.new
+    tmpnodeset = Nodes::NodeSet.new(nodeset.id)
     nodeset.move(tmpnodeset)
 
     #debug("RAISE #{status} #{tmpnodeset.to_s_fold}")
@@ -120,13 +126,11 @@ module Task
   end
 
   def clean_nodes(nodeset)
-    mutex().synchronize do
-      if nodeset == nodes()
-        nodes().clean()
-      else
-        nodeset.set.each do |node|
-          nodes().remove(node)
-        end
+    if nodeset == nodes()
+      nodes().clean()
+    else
+      nodeset.set.each do |node|
+        nodes().remove(node)
       end
     end
   end
@@ -147,10 +151,8 @@ class QueueTask
     @params = params
     @mutex = Mutex.new
 
-    @nodes_ok = Nodes::NodeSet.new
-    @nodes_ok.id = @nodes.id
-    @nodes_ko = Nodes::NodeSet.new
-    @nodes_ko.id = @nodes.id
+    @nodes_ok = Nodes::NodeSet.new(@nodes.id)
+    @nodes_ko = Nodes::NodeSet.new(@nodes.id)
   end
 end
 
@@ -163,7 +165,7 @@ class TaskManager
     @queue = Queue.new
     @threads = {}
     @nodes = nodeset #all nodes
-    @done_nodes = Nodes::NodeSet.new(@nodes.id)
+    @nodes_done = Nodes::NodeSet.new(@nodes.id)
 
     nodeset = Nodes::NodeSet.new
     @nodes.linked_copy(nodeset)
@@ -215,26 +217,16 @@ class TaskManager
   end
 
   def done_task(task,nodeset)
-    @done_nodes.add(nodeset)
+    @nodes_done.add(nodeset)
   end
 
   def success_task(task,nodeset)
     #debug("SUCCESS #{nodeset.to_s_fold}")
-    unless task.nodes.equals?(nodeset)
-      tmpset = task.nodes.diff(nodeset)
-      split_nodeset(task.nodes,nodeset,tmpset)
-    end
-
     done_task(task,nodeset)
   end
 
   def fail_task(task,nodeset)
     #debug("FAIL #{nodeset.to_s_fold}")
-    unless task.nodes.equals?(nodeset)
-      tmpset = task.nodes.diff(nodeset)
-      split_nodeset(task.nodes,nodeset,tmpset)
-    end
-
     done_task(task,nodeset)
   end
 
@@ -257,20 +249,38 @@ class TaskManager
     tasks[idx][0].is_a?(Array)
   end
 
-  def split_nodeset(startns,ns1,ns2)
-    #nodesetids
+  def split_nodeset(startns,newns)
+    tmpns = startns.diff(newns)
+    tmpns.id = Nodes::NodeSet.newid
+    newns.id = Nodes::NodeSet.newid
+
+    ## Get the right nodeset
+    #allns = Nodes::NodeSet.new(startns.id)
+    #tmpns.linked_copy(allns)
+    #newns.linked_copy(allns)
+
+    debug(">-< Nodeset(#{startns.id}) split into :")
+    debug(">-<   Nodeset(#{tmpns.id}): #{tmpns.to_s_fold}")
+    debug(">-<   Nodeset(#{newns.id}): #{newns.to_s_fold}")
+
+    startns.id = tmpns.id
   end
 
-  def clean_nodeset(nodeset,lock=nil)
+  def clean_nodeset(nodeset)
     # gathering nodes that are not present in @nodes and removing them
     tmpset = nodeset.diff(@nodes)
     tmpset.set.each do |node|
       nodeset.remove(node)
     end
+
+    # gathering nodes that are present in @nodes_done and removing them
+    @nodes_done.set.each do |node|
+      nodeset.remove(node)
+    end
   end
 
   def done?()
-    @nodes.empty? or @done_nodes.equals?(@nodes)
+    @nodes.empty? or @nodes_done.equals?(@nodes)
   end
 
   def run_task(task)
@@ -289,7 +299,7 @@ class TaskManager
       end
     end
 
-    debug("!!! Timeout in #{task.name} with #{task.nodes.to_s_fold}") unless success
+    debug("(#{task.nodes.id}) !!! Timeout in #{task.name} with #{task.nodes.to_s_fold}") unless success
 
     success = success && thr.value
 
@@ -336,10 +346,10 @@ class TaskManager
   def start()
     #debug("START")
     load_config()
-    @done_nodes.clean()
+    @nodes_done.clean()
 
     until (done?)
-      #debug("WAIT_POP #{@done_nodes.set.size}/#{@nodes.set.size}")
+      #debug("WAIT_POP #{@nodes_done.set.size}/#{@nodes.set.size}")
 
       begin
         sleep(QUEUE_CKECK_PITCH)
@@ -374,19 +384,19 @@ class TaskManager
         if query[:status] == 'OK'
           #debug("TREAT_OK #{query[:nodes].to_s_fold}")
           if (curtask.idx + 1) < tasks().length
-            # ! split ?
             newtask[:idx] = curtask.idx + 1
             newtask[:context][:retries] = 0
           else
-            # ! split ?
             #debug("SUCCESS #{query[:nodes].to_s_fold}")
-            success_task(curtask,query[:nodes])
+            curtask.mutex.synchronize do
+              success_task(curtask,query[:nodes])
+              curtask.clean_nodes(query[:nodes])
+            end
             continue = false
           end
         elsif query[:status] == 'KO'
           #debug("TREAT_KO #{query[:nodes].to_s_fold}")
           if curtask.context[:retries] < (@config[curtask.name][:retries] - 1)
-            # ! split ?
             newtask[:idx] = curtask.idx
             newtask[:subidx] = curtask.subidx
             newtask[:context][:retries] += 1
@@ -394,19 +404,19 @@ class TaskManager
             tasks = tasks()
             if multi_task?(curtask.idx,tasks) \
             and curtask.subidx < (tasks[curtask.idx].size - 1)
-              # ! split ?
               newtask[:idx] = curtask.idx
               newtask[:subidx] = curtask.subidx + 1
               newtask[:context][:retries] = 0
             else
-              # ! split ?
-              fail_task(curtask,query[:nodes])
+              curtask.mutex.synchronize do
+                fail_task(curtask,query[:nodes])
+                curtask.clean_nodes(query[:nodes])
+              end
               continue = false
             end
           end
         end
-
-        curtask.clean_nodes(query[:nodes])
+        curtask.mutex.synchronize { curtask.clean_nodes(query[:nodes]) } if continue
       end
 
       #debug("TREAT_CONT #{continue}")
@@ -424,7 +434,7 @@ class TaskManager
 
     end
 
-    #debug("QUIT #{@done_nodes.set.size}/#{@nodes.set.size}")
+    #debug("QUIT #{@nodes_done.set.size}/#{@nodes.set.size}")
   end
 
   def kill()
@@ -432,7 +442,7 @@ class TaskManager
       thread.kill
       thread.join
     end
-    @done_nodes.free()
+    @nodes_done.free()
   end
 end
 
@@ -451,32 +461,36 @@ class TaskedTaskManager < TaskManager
     @params = params
     @mutex = Mutex.new
 
-    @nodes_ok = Nodes::NodeSet.new
-    @nodes_ok.id = @nodes.id
-    @nodes_ko = Nodes::NodeSet.new
-    @nodes_ko.id = @nodes.id
+    @nodes_ok = Nodes::NodeSet.new(@nodes.id)
+    @nodes_ko = Nodes::NodeSet.new(@nodes.id)
   end
 
   def success_task(task,nodeset)
     super(task,nodeset)
     nodeset.linked_copy(@nodes_ok)
+
+    split_nodeset(task.nodes,@nodes_ok) unless task.nodes.equals?(@nodes_ok)
+
     raise_nodes(@nodes_ok,'OK') if @config[task.name][:raisable]
   end
 
   def fail_task(task,nodeset)
     super(task,nodeset)
     nodeset.linked_copy(@nodes_ko)
+
+    split_nodeset(task.nodes,@nodes_ko) unless task.nodes.equals?(@nodes_ko)
+
     raise_nodes(@nodes_ko,'KO') if @config[task.name][:raisable]
   end
 
   def clean_nodes(nodeset)
     super(nodeset)
 
-    if nodeset == @done_nodes
-      @done_nodes.clean()
+    if nodeset == @nodes_done
+      @nodes_done.clean()
     else
       nodeset.set.each do |node|
-        @done_nodes.remove(node)
+        @nodes_done.remove(node)
       end
     end
   end
@@ -536,7 +550,7 @@ end
 
 class Macrostep < TaskedTaskManager
   def run()
-    debug("=== Launching #{self.class.name} on #{@nodes.to_s_fold}")
+    debug("(#{@nodes.id}) === Launching #{self.class.name} on #{@nodes.to_s_fold}")
 
     start()
     return true
@@ -558,12 +572,12 @@ class Macrostep < TaskedTaskManager
 
   def success_task(task,nodeset)
     super(task,nodeset)
-    debug("<<< Raising #{nodeset.to_s_fold} from #{self.class.name}")
+    debug("(#{@nodes.id}) <<< Raising #{nodeset.to_s_fold} from #{self.class.name}")
   end
 
   def fail_task(task,nodeset)
     super(task,nodeset)
-    debug("<<< Raising #{nodeset.to_s_fold} from #{self.class.name}")
+    debug("(#{@nodes.id}) <<< Raising #{nodeset.to_s_fold} from #{self.class.name}")
   end
 
   ## to be defined in each macrostep class
@@ -580,7 +594,7 @@ class Microstep < QueueTask
   end
 
   def run()
-    debug("  --- Launching #{@name} on #{@nodes.to_s_fold}")
+    debug("(#{@nodes.id})   --- Launching #{@name} on #{@nodes.to_s_fold}")
 
     #debug("\trun #{@name}/#{@params.inspect}")
     return send("ms_#{@name}".to_sym,*@params)

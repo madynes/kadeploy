@@ -210,7 +210,7 @@ end
 
 
 
-nodeset = Nodes::NodeSet.new
+nodeset = Nodes::NodeSet.new(0)
 16.times do |i|
   nodeset.push(
     Nodes::Node.new(
