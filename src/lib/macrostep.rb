@@ -208,7 +208,7 @@ module MacroSteps
 
                 @output.verbosel(
                   2,
-                  "Nodeset(#{tmp}) splitted into :\n"\
+                  "Nodeset(#{tmp}) split into :\n"\
                   "  Nodeset(#{@nodes_ok.id}): #{@nodes_ok.to_s_fold}\n"\
                   "  Nodeset(#{@nodes_ko.id}): #{@nodes_ko.to_s_fold}\n"
                 )
