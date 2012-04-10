@@ -28,6 +28,9 @@ end
 
 myip=Resolv.getaddress(Socket.gethostname)
 
+# Load tun driver
+cmd("modprobe tun")
+
 # Cleaning everything
 cmd("killall kvm &>/dev/null; true")
 sleep(4)
