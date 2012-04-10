@@ -3090,14 +3090,14 @@ sshgw.ssh(servername,'root') do |session|
 
   nodelistpath = File.join(tmp,NODELIST_NAME)
   msg("Creating node list in #{nodelistpath}",MSG_INFO)
-  tempfile(nodelist.join("\n")) do |path|
+  tempfile(nodelist.join("\n")+"\n") do |path|
     scp(servername,path,nodelistpath)
   end
   sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{nodelistpath}")
 
   nodefilepath = File.join(tmp,NODEFILE_NAME)
   msg("Creating node file in #{nodefilepath}",MSG_INFO)
-  tempfile(nodefile.join("\n")) do |path|
+  tempfile(nodefile.join("\n")+"\n") do |path|
     scp(servername,path,nodefilepath)
   end
   sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{nodefilepath}")
