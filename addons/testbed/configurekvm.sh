@@ -242,4 +242,3 @@ echo "www nodes:"
 echo "$wwwservers"
 
 echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile"
-else
