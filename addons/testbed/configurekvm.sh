@@ -14,7 +14,7 @@ SCRIPT_BRIDGE=./setupkvmbridge
 SCRIPT_LAUNCH=./launchkvms
 
 SCRIPT_GETNETWORK=./getkvmnetwork
-SCRIPT_GETTESTBEDIP=./gettestbedip
+SCRIPT_GETSERVICES=./getservices
 SCRIPT_GENNODES=./genkvmnodefile
 
 HOSTS_CONF=config.yml
@@ -25,7 +25,8 @@ TAKTUK_OPTIONS="-s -n -l root -o status -R connector=2 -R error=2"
 
 if [ $# -lt 1 ]
 then
-  echo "usage: $0 <hostlist> [<www_server_nb>] [<network_addr>]"
+  echo "usage: $0 <hostlist> [<network_addr>]"
+  echo "  You can set env variables NB_DNS, NB_DHCP and NB_WWW to specify the number of nodes to use for this services (default: 1)"
   exit 1
 fi
 
@@ -37,33 +38,12 @@ else
   exit 1
 fi
 
-nbnodes=`echo "$hosts" | wc -l`
-
-if [ $# -ge 2 ] && [ $2 -gt 0 ]
+if [ $# -ge 2 ] && [ -n "$2" ]
 then
-  tmp=$2
-  let nbservers=tmp+3
-else
-  let nbservers=nbnodes/BW_PER_WWW+4
-fi
-
-rm -Rf $TMP_DIR
-mkdir -p $TMP_DIR
-
-kadaemon=`echo "$hosts" | sed -n '1p'`
-dnsdaemon=`echo "$hosts" | sed -n '2p'`
-dhcpdaemon=`echo "$hosts" | sed -n '3p'`
-wwwservers=`echo "$hosts" | head -n $nbservers | sed -e '1,3d'`
-
-servicefile=${TMP_DIR}/servicefile
-echo "$hosts" | head -n $nbservers > $servicefile
-
-if [ $# -ge 3 ] && [ -n "$3" ]
-then
-  network=$3
+  network=$2
   newnet=1
 else
-  network=`dig +short $kadaemon`/$NETWORK_DEFAULT_CIDR
+  network=`dig +short $(echo "$hosts" | sed -n '1p')`/$NETWORK_DEFAULT_CIDR
   if [ $? -ne 0 ]
   then
     echo 'Failed to get network'
@@ -71,78 +51,27 @@ else
   fi
 fi
 
-exclfile=`tempfile`
-serviceyamlfile=${TMP_DIR}/service.yml
+rm -Rf $TMP_DIR
+mkdir -p $TMP_DIR
+
+allfile=${TMP_DIR}/allfile
+echo "$hosts" > $allfile
 
 networkyamlfile=${TMP_DIR}/network.yml
 $SCRIPT_GETNETWORK $network > $networkyamlfile
 
-serviceips=`$SCRIPT_GETTESTBEDIP $networkyamlfile $servicefile`
+serviceyamlfile=${TMP_DIR}/service.yml
+$SCRIPT_GETSERVICES $networkyamlfile $allfile > $serviceyamlfile
 
-tmp=`echo $network | cut -d '/' -f 1`
-tmp=`ruby -e "require 'ipaddr'; puts IPAddr.new('${tmp}').succ"`
+exclfile=`tempfile`
+grep 'newip:' $serviceyamlfile | cut -d ':' -f 2 | tr -d ' ' > $exclfile
 
-echo '---' > $serviceyamlfile
-echo 'kadeploy:' >> $serviceyamlfile
-tmp=`echo "$serviceips" | grep $kadaemon`
-echo "  host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
-
-if [ -n "$newnet" ]
-then
-  ip=`echo $tmp | cut -d ':' -f 2`
-  echo "  newip: $ip" >> $serviceyamlfile
-  echo $ip >> $exclfile
-else
-  echo $kadaemon >> $exclfile
-fi
-
-echo 'dns:' >> $serviceyamlfile
-tmp=`echo "$serviceips" | grep $dnsdaemon`
-echo "  host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
-
-if [ -n "$newnet" ]
-then
-  ip=`echo $tmp | cut -d ':' -f 2`
-  echo "  newip: $ip" >> $serviceyamlfile
-  echo $ip >> $exclfile
-else
-  echo $dnsdaemon >> $exclfile
-fi
-
-echo 'dhcp:' >> $serviceyamlfile
-tmp=`echo "$serviceips" | grep $dhcpdaemon`
-echo "  host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
-
-if [ -n "$newnet" ]
-then
-  ip=`echo $tmp | cut -d ':' -f 2`
-  echo "  newip: $ip" >> $serviceyamlfile
-  echo $ip >> $exclfile
-else
-  echo $dhcpdaemon >> $exclfile
-fi
-
-echo 'www:' >> $serviceyamlfile
-for wwwdaemon in `echo $wwwservers`
-do
-  tmp=`echo "$serviceips" | grep $wwwdaemon`
-  echo "  - host: `echo $tmp | cut -d ':' -f 1`" >> $serviceyamlfile
-
-  if [ -n "$newnet" ]
-  then
-    ip=`echo $tmp | cut -d ':' -f 2`
-    echo "    newip: $ip" >> $serviceyamlfile
-    echo $ip >> $exclfile
-  else
-    echo $wwwdaemon >> $exclfile
-  fi
-done
-
+nbservers=`grep 'host:' $serviceyamlfile | wc -l`
+servicefile=${TMP_DIR}/servicefile
+echo "$hosts" | head -n $nbservers > $servicefile
 hostfile=${TMP_DIR}/hostfile
 echo "$hosts" | sed -e "1,${nbservers}d" > $hostfile
 
-wwwfile=${TMP_DIR}/wwwfile
-echo "$wwwservers" > $wwwfile
 
 nbhosts=`cat $hostfile | wc -l`
 if [ $nbhosts -le 0 ]
@@ -227,18 +156,12 @@ echo "... done in ${stime} seconds"
 echo ""
 echo "Cleaning temporary files"
 
-#rm $nodefile
-#rm $hostfile
-#rm $wwwfile
-
 ssh-agent -k 1>/dev/null
 rm $sagentfile
 echo ""
 
-echo "Kadeploy node: $kadaemon"
-echo "DNS node: $dnsdaemon"
-echo "DHCP node: $dhcpdaemon"
-echo "www nodes:"
-echo "$wwwservers"
+echo "Services:"
+cat $serviceyamlfile | grep -v '\-\-\-' | grep -v 'newip:'
+echo ""
 
 echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile"

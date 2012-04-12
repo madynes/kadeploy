@@ -140,7 +140,7 @@ end
 CFG_KADEPLOY_CLIENT_CONF_FILE = File.join(CFG_KADEPLOY_CONF_PATH,'client_conf')
 def cfg_kadeploy_client()
   "default = kadeploy\n"\
-  "kadeploy = #{$kanodes[:kadeploy][:fqdn]}:#{CFG_KADEPLOY_PORT}\n"
+  "kadeploy = #{$services[:kadeploy][:fqdn]}:#{CFG_KADEPLOY_PORT}\n"
 end
 
 
@@ -191,7 +191,7 @@ def cfg_kadeploy_conf()
   "taktuk_auto_propagate = true\n"\
   "tarball_dest_dir = /tmp\n"\
   "environment_extraction_dir = /mnt/dest\n"\
-  "kadeploy_server = #{$kanodes[:kadeploy][:fqdn]}\n"\
+  "kadeploy_server = #{$services[:kadeploy][:fqdn]}\n"\
   "kadeploy_server_port = #{CFG_KADEPLOY_PORT}\n"\
   "kadeploy_tcp_buffer_size = 8192\n"\
   "kadeploy_cache_dir = #{CFG_KADEPLOY_CACHE_PATH}\n"\
@@ -616,7 +616,7 @@ end
 
 def cfg_dns_base()
   "$TTL 3h\n"\
-  "@    IN    SOA    #{$kanodes[:dns][:fqdn]}. postmaster.#{$kanodes[:dns][:fqdn]}. (\n"\
+  "@    IN    SOA    #{$services[:dns][:fqdn]}. postmaster.#{$services[:dns][:fqdn]}. (\n"\
   "  #{Time.now.strftime("%Y%m%d%H%M%S")}\n"\
   "  4h\n"\
   "  1h\n"\
@@ -632,7 +632,7 @@ def cfg_dns_master()
   end
 
   "#{cfg_dns_base()}\n"\
-  "@         IN    NS    #{$kanodes[:dns][:fqdn]}.\n"\
+  "@         IN    NS    #{$services[:dns][:fqdn]}.\n"\
   "@         IN    A     #{$kanodes[:kadeploy][:ipv4]}\n"\
   + nodescfg
 end
@@ -650,7 +650,7 @@ def cfg_dns_reverse()
   end
 
   "#{cfg_dns_base()}\n"\
-  "@         IN    NS    #{$kanodes[:dns][:fqdn]}.\n"\
+  "@         IN    NS    #{$services[:dns][:fqdn]}.\n"\
   + nodescfg
 end
 
@@ -710,9 +710,14 @@ end
 CFG_RESOLVCONF_FILE = '/etc/resolv.conf'
 
 def cfg_resolvconf(forward=nil)
+  nameservers = ''
+  select_server_type($kanodes,:dns).each do |server|
+    nameservers += "nameserver #{server[:ipv4]}\n"
+  end
+
   "domain #{DOMAIN}\n"\
   "search #{DOMAIN}\n"\
-  "nameserver #{$kanodes[:dns][:ipv4]}\n"
+  + nameservers
   #+ (forward ? "nameserver #{$network[:dns]}\n" : '')
 end
 
@@ -796,7 +801,7 @@ def cfg_dhcp(net=nil)
   "    option broadcast-address #{$network[:broadcast]};\n"\
   "    option routers #{$network[:gateway]};\n"\
   "    option domain-name \"#{DOMAIN}\";\n"\
-  "    option domain-name-servers #{$kanodes[:dns][:ipv4]};\n"\
+  "    option domain-name-servers #{select_server_type($kanodes,:dns)[0][:ipv4]};\n"\
   + # Kadeploy server
   "    if exists user-class and option user-class = \"iPXE\" {\n"\
   "      filename=concat(\"http://#{(HTTP_OVER_NFS ? $services[:www][:fqdn] : $kanodes[:kadeploy][:ipv4])}/\",host-decl-name);\n"\
@@ -825,7 +830,7 @@ def cfg_sql()
   + # Kadeploy database
   "CREATE DATABASE #{CFG_SQL_DB};\n"\
   + # Kadeploy user
-  "GRANT ALL ON #{CFG_SQL_DB}.* TO '#{CFG_SQL_USER}'@'#{$kanodes[:kadeploy][:fqdn]}' IDENTIFIED BY '#{CFG_SQL_PASS_USER}';\n"\
+  "GRANT ALL ON #{CFG_SQL_DB}.* TO '#{CFG_SQL_USER}'@'#{$services[:kadeploy][:fqdn]}' IDENTIFIED BY '#{CFG_SQL_PASS_USER}';\n"\
   + # Kadeploy tables, table environments
   "CREATE TABLE IF NOT EXISTS #{CFG_SQL_DB}.`environments` (\n"\
   "  `id` int(10) unsigned NOT NULL auto_increment,\n"\
@@ -2062,73 +2067,28 @@ end
 
 deplnodes = $allnodes.dup
 
-servers = nil
-if options[:daemon_config]
-  begin
-    servers = YAML.load_file(options[:daemon_config])
-  rescue ArgumentError
-    msg("Invalid YAML file '#{options[:daemon_config]}'",MSG_ERROR,true)
-  end
-  if servers['www'] and servers['www'].is_a?(Array)
-    count=1
-    servers['www'].each do |wwwserver|
-      tmp = wwwserver['host']
-      name = "www-#{count}"
+$services[:kadeploy] = {}
+$services[:kadeploy][:name] = 'kadeploy'
+$services[:kadeploy][:fqdn] = "#{$services[:kadeploy][:name]}.#{DOMAIN}"
+$services[:dns] = {}
+$services[:dns][:name] = 'dns'
+$services[:dns][:fqdn] = "#{$services[:dns][:name]}.#{DOMAIN}"
+$services[:tftp] = {}
+$services[:tftp][:name] = 'tftp'
+$services[:tftp][:fqdn] = "#{$services[:tftp][:name]}.#{DOMAIN}"
+$services[:dhcp] = {}
+$services[:dhcp][:name] = 'dhcp'
+$services[:dhcp][:fqdn] = "#{$services[:dhcp][:name]}.#{DOMAIN}"
+$services[:sql] = {}
+$services[:sql][:name] = 'sql'
+$services[:sql][:fqdn] = "#{$services[:sql][:name]}.#{DOMAIN}"
+$services[:www] = {}
+$services[:www][:name] = 'www'
+$services[:www][:fqdn] = "#{$services[:www][:name]}.#{DOMAIN}"
+$services[:frontend] = {}
+$services[:frontend][:name] = 'frontend'
+$services[:frontend][:fqdn] = "#{$services[:frontend][:name]}.#{DOMAIN}"
 
-      match = nil
-      select_type($kanodes,:HOST).each do |node|
-        if node[:basename] == tmp \
-        or node[:basename].split('.')[0] == tmp.split('.')[0]
-          match = node
-          break
-        end
-      end
-      if $kanodes[name.to_sym] or match
-        msg("duplicate version of www server '#{tmp}', using YAML file one",MSG_WARNING)
-        $kanodes.delete(name.to_sym)
-        $kanodes.delete(match[:name].to_sym)
-      end
-
-      $kanodes[name.to_sym] = {}
-      $kanodes[name.to_sym][:name] = name
-      $kanodes[name.to_sym][:basename] = tmp
-      $kanodes[name.to_sym][:ipv4] = wwwserver['newip']
-      $kanodes[name.to_sym][:type] = :SERVER
-      $kanodes[name.to_sym][:server_type] = :www
-
-      count += 1
-    end
-  end
-else
-  if options[:daemon_kadeploy]
-    kaserver = options[:daemon_kadeploy].strip
-  else
-    case $mode
-      when :KAVLAN
-        kaserver = $allnodes[0]
-      when :KVM
-        msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
-      when :VLANKVM
-        tmp = select_type($kanodes,:HOST)[0]
-        tmp[:type] = :SERVER
-        kaserver = tmp[:basename]
-      else
-        msg('Unknown mode',MSG_ERROR,true)
-    end
-  end
-
-  if options[:daemon_dns]
-    dnsserver = options[:daemon_dns].strip
-  else
-    dnsserver = kaserver
-  end
-
-  if options[:daemon_dhcp]
-    dhcpserver = options[:daemon_dhcp].strip
-  else
-    dhcpserver = kaserver
-  end
-end
 
 check_server = Proc.new do |server, servername|
   unless $mode == :KVM
@@ -2169,107 +2129,131 @@ check_server = Proc.new do |server, servername|
         end
       end
     when :VLANKVM
-
-      if servers and servers[servername]
-        msg("multiple values for service '#{servername}', using YAML file one",MSG_WARNING) if $kanodes[servername.to_sym]
-        server = servers[servername]['host']
-        serverip = servers[servername]['newip']
-      else
-        begin
-          serverip = Resolv.getaddress(getnode(server))
-        rescue Resolv::ResolvError
-          msg("invalid #{servername} daemon hostname '#{server}'",MSG_ERROR,true)
-        end
-        tmp = $kanodes.select { |n,h| h[:basename] =~ /^#{server}/ or h[:ipv4] == serverip }.collect { |v| v[0] }
-        tmp.each do |nodetmp|
-          deplnodes.delete(nodetmp.to_s)
-          $kanodes.delete(nodetmp) unless $kanodes[nodetmp][:name] == servername
-          $kanodes[nodetmp][:type] = :SERVER
-        end
+      begin
+        serverip = Resolv.getaddress(getnode(server))
+      rescue Resolv::ResolvError
+        msg("invalid #{servername} daemon hostname '#{server}'",MSG_ERROR,true)
       end
-
+      tmp = $kanodes.select { |n,h| h[:basename] =~ /^#{server}/ or h[:ipv4] == serverip }.collect { |v| v[0] }
+      tmp.each do |nodetmp|
+        deplnodes.delete(nodetmp.to_s)
+        $kanodes.delete(nodetmp) if $kanodes[nodetmp][:name] != servername and $kanodes[nodetmp][:type] != :SERVER
+        $kanodes[nodetmp][:type] = :SERVER
+      end
     else
       msg('Unknown mode',MSG_ERROR,true)
   end
   [ server.split('.')[0], serverip ]
 end
 
-kaserver,kaserverip = check_server.call(kaserver,'kadeploy')
-dnsserver,dnsserverip = check_server.call(dnsserver,'dns')
-dhcpserver,dhcpserverip = check_server.call(dhcpserver,'dhcp')
 
-msg("=== Servers",MSG_INFO)
-$services[:kadeploy] = {}
-$services[:kadeploy][:name] = 'kadeploy'
-$services[:kadeploy][:fqdn] = "#{$services[:kadeploy][:name]}.#{DOMAIN}"
-$kanodes[:kadeploy] = {}
-$kanodes[:kadeploy][:name] = $services[:kadeploy][:name]
-$kanodes[:kadeploy][:basename] = kaserver
-$kanodes[:kadeploy][:ipv4] = kaserverip || nil
-$kanodes[:kadeploy][:type] = :SERVER
-msg("  Kadeploy: #{$kanodes[:kadeploy][:basename]}",MSG_INFO)
+create_kaserver = Proc.new do |host,name,ip,type|
+  match = nil
+  select_type($kanodes,:HOST).each do |node|
+    if node[:basename] == host \
+    or node[:basename].split('.')[0] == host.split('.')[0]
+      match = node
+      break
+    end
+  end
+  if $kanodes[name.to_sym] or match
+    msg("duplicate version of server '#{name}', using '#{host}' to host",MSG_WARNING)
+    $kanodes.delete(name.to_sym)
+    $kanodes.delete(match[:name].to_sym)
+  end
 
-
-# >>> TODO: Add options
-$services[:dns] = {}
-$services[:dns][:name] = 'dns'
-$services[:dns][:fqdn] = "#{$services[:dns][:name]}.#{DOMAIN}"
-$kanodes[:dns] = {}
-$kanodes[:dns][:name] = $services[:dns][:name]
-$kanodes[:dns][:basename] = dnsserver
-$kanodes[:dns][:ipv4] = dnsserverip || nil
-$kanodes[:dns][:type] = :SERVER
-msg("  DNS: #{$kanodes[:dns][:basename]}",MSG_INFO)
-
-$services[:tftp] = {}
-$services[:tftp][:name] = 'tftp'
-$services[:tftp][:fqdn] = "#{$services[:tftp][:name]}.#{DOMAIN}"
-$kanodes[:tftp] = {}
-$kanodes[:tftp][:name] = $services[:tftp][:name]
-$kanodes[:tftp][:basename] = kaserver
-$kanodes[:tftp][:basename] = $kanodes[:kadeploy][:basename]
-$kanodes[:tftp][:ipv4] = $kanodes[:kadeploy][:ipv4]
-$kanodes[:tftp][:type] = :SERVER
-
-$services[:dhcp] = {}
-$services[:dhcp][:name] = 'dhcp'
-$services[:dhcp][:fqdn] = "#{$services[:dhcp][:name]}.#{DOMAIN}"
-$kanodes[:dhcp] = {}
-$kanodes[:dhcp][:name] = $services[:dhcp][:name]
-$kanodes[:dhcp][:basename] = dhcpserver
-$kanodes[:dhcp][:ipv4] = dhcpserverip || nil
-$kanodes[:dhcp][:type] = :SERVER
-msg("  DHCP: #{$kanodes[:dhcp][:basename]}",MSG_INFO)
-
-$services[:sql] = {}
-$services[:sql][:name] = 'sql'
-$services[:sql][:fqdn] = "#{$services[:sql][:name]}.#{DOMAIN}"
-$kanodes[:sql] = {}
-$kanodes[:sql][:name] = $services[:sql][:name]
-$kanodes[:sql][:basename] = $kanodes[:kadeploy][:basename]
-$kanodes[:sql][:ipv4] = $kanodes[:kadeploy][:ipv4]
-$kanodes[:sql][:type] = :SERVER
-
-$services[:www] = {}
-$services[:www][:name] = 'www'
-$services[:www][:fqdn] = "#{$services[:www][:name]}.#{DOMAIN}"
-if !$kanodes[:www] and !$kanodes[:"www-1"]
-  $kanodes[:www] = {}
-  $kanodes[:www][:name] = $services[:www][:name]
-  $kanodes[:www][:basename] = $kanodes[:kadeploy][:basename]
-  $kanodes[:www][:ipv4] = $kanodes[:kadeploy][:ipv4]
-  $kanodes[:www][:type] = :SERVER
-  $kanodes[:www][:server_type] = :www
+  $kanodes[name.to_sym] = {}
+  $kanodes[name.to_sym][:name] = name
+  $kanodes[name.to_sym][:basename] = host
+  $kanodes[name.to_sym][:ipv4] = ip
+  $kanodes[name.to_sym][:type] = :SERVER
+  $kanodes[name.to_sym][:server_type] = type.to_sym
 end
 
-$services[:frontend] = {}
-$services[:frontend][:name] = 'frontend'
-$services[:frontend][:fqdn] = "#{$services[:frontend][:name]}.#{DOMAIN}"
-$kanodes[:frontend] = {}
-$kanodes[:frontend][:name] = $services[:frontend][:name]
-$kanodes[:frontend][:basename] = $kanodes[:kadeploy][:basename]
-$kanodes[:frontend][:ipv4] = $kanodes[:kadeploy][:ipv4]
-$kanodes[:frontend][:type] = :SERVER
+if options[:daemon_config]
+  begin
+    servers = YAML.load_file(options[:daemon_config])
+  rescue ArgumentError
+    msg("Invalid YAML file '#{options[:daemon_config]}'",MSG_ERROR,true)
+  end
+
+  servers.each do |name,val|
+    if $services[name.to_sym]
+      if val.is_a?(Array)
+        count=1
+        val.each do |serv|
+          create_kaserver.call(serv['host'],"#{name}-#{count}",serv['newip'],name)
+          count += 1
+        end
+      else
+        create_kaserver.call(val['host'],name,val['newip'],name)
+      end
+    else
+      msg("Invalid service name '#{name}' in YAML file, ignoring",MSG_WARNING)
+    end
+  end
+end
+
+defaulthost = nil
+defaultip = nil
+
+create_kaservice = Proc.new do |service|
+  if !$kanodes[service[:name].to_sym] and !$kanodes["#{service[:name]}-1".to_sym]
+    host = nil
+    ip = nil
+    if options[:"daemon_#{service[:name]}"]
+      host,ip = check_server.call(
+        options[:"daemon_#{service[:name]}"].strip,
+        service[:name]
+      )
+    else
+      host = defaulthost
+      ip = defaultip
+    end
+    create_kaserver.call(host,service[:name],ip,service[:name])
+  end
+end
+
+
+if $kanodes[:kadeploy]
+  defaulthost = $kanodes[:kadeploy][:basename]
+  defaultip = $kanodes[:kadeploy][:ipv4]
+else
+  case $mode
+    when :KAVLAN
+      server = $allnodes[0]
+    when :KVM
+      msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
+    when :VLANKVM
+      tmp = select_type($kanodes,:HOST)[0]
+      tmp[:type] = :SERVER
+      server = tmp[:basename]
+    else
+      msg('Unknown mode',MSG_ERROR,true)
+  end
+  defaulthost,defaultip = check_server.call(server,'DEFAULT')
+end
+
+
+msg("=== Services",MSG_INFO)
+$services.each_pair do |servicename,serviceval|
+  create_kaservice.call(serviceval)
+
+  if $kanodes[servicename]
+    msg("  #{servicename}: #{$kanodes[servicename][:basename]}",MSG_INFO)
+  else
+    nodes = []
+    $kanodes.each_value do |node|
+      nodes << node[:basename] if node[:name] =~ /^#{servicename}-\d+$/
+    end
+
+    msg("  #{servicename}:",MSG_INFO)
+    nodes.each do |node|
+      msg("    #{node}",MSG_INFO)
+    end
+  end
+end
+
 
 
 msg('deploy nodelist empty',MSG_WARNING) if deplnodes.empty?
@@ -2375,7 +2359,7 @@ else
   sexec(gwsession,"echo '#{pubkey}' >> ~#{ENV['USER']}/.ssh/authorized_keys") if !tmp or tmp.empty?
 end
 
-server=$kanodes[:dns]
+server=select_server_type($kanodes,:dns)[0]
 servername=getnode(server[:basename])
 msg('=== Gathering network information',MSG_INFO)
 sshgw.ssh(servername,'root') do |session|
@@ -2426,12 +2410,12 @@ sshgw.ssh(servername,'root') do |session|
       ipv4 = line.split('inet addr:')[1].strip.split[0]
     end
   end
-  msg("can\'t collect IPv4/MAC on #{$kanodes[:dns][:basename]}",MSG_ERROR,true) \
+  msg("can\'t collect IPv4/MAC on #{server[:basename]}",MSG_ERROR,true) \
     if !mac or !ipv4 or mac.empty? or ipv4.empty?
 
   msg('Updating nodes IPv4/MAC addresses',MSG_INFO)
   $kanodes.values.each do |node|
-    if node == :dns or node[:basename].split('.')[0] == $kanodes[:dns][:basename].split('.')[0]
+    if node == :dns or node[:basename].split('.')[0] == server[:basename].split('.')[0]
       node[:mac] = mac unless node[:mac]
       node[:ipv4] = ipv4 unless node[:ipv4]
     end
@@ -2477,138 +2461,151 @@ end
 msg("Disconnected from #{server[:basename]}",MSG_INFO)
 msg("",MSG_INFO)
 
-server=$kanodes[:dns]
-servername=getnode(server[:basename])
-msg('=== Setting up DNS server',MSG_INFO)
-sshgw.ssh(servername,'root') do |session|
-  msg("Connected to #{server[:basename]}",MSG_INFO)
+msg('=== Setting up DNS server(s)',MSG_INFO)
+select_server_type($kanodes,:dns).each do |server|
+  servername=getnode(server[:basename])
+  sshgw.ssh(servername,'root') do |session|
+    msg("Connected to #{server[:basename]}",MSG_INFO)
 
-  msg("Tuning ARP cache size",MSG_INFO)
-  set_arp_cache(session)
+    msg("Tuning ARP cache size",MSG_INFO)
+    set_arp_cache(session)
 
-	http_tunnel(server,session) do
-		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session)
+    http_tunnel(server,session) do
+      msg('Updating debian packages list',MSG_INFO)
+      apt_update(session)
 
-		msg('Installing DNS server',MSG_INFO)
-		apt_install(session,'bind9')
-
-
-		msg('Configuring DNS server',MSG_INFO)
+      msg('Installing DNS server',MSG_INFO)
+      apt_install(session,'bind9')
 
 
-		tempfile(cfg_dns_master()) {|path| scp(servername,path,cfg_bind_master_file())}
-		sexec(session,"chown bind #{cfg_bind_master_file()}")
+      msg('Configuring DNS server',MSG_INFO)
 
-		tempfile(cfg_dns_reverse()) {|path| scp(servername,path,cfg_bind_reverse_file())}
-		sexec(session,"chown bind #{cfg_bind_reverse_file()}")
+
+      tempfile(cfg_dns_master()) {|path| scp(servername,path,cfg_bind_master_file())}
+      sexec(session,"chown bind #{cfg_bind_master_file()}")
+
+      tempfile(cfg_dns_reverse()) {|path| scp(servername,path,cfg_bind_reverse_file())}
+      sexec(session,"chown bind #{cfg_bind_reverse_file()}")
 
 =begin
-		tmp = sexec(session,"grep '^nameserver' #{CFG_RESOLVCONF_FILE}")[0]
-		if !tmp or tmp.empty?
-			tmp = ''
-			msg('no nameserver in resolv.conf file',MSG_WARNING)
-		else
-			tmp = tmp.split[1]
-		end
-=end
-		# Assume that default DNS server is the network gateway
-		tmp = $network[:dns]
-		tempfile(cfg_bind((tmp != $kanodes[:dns][:ipv4] ? tmp : ''))) do |path|
-			scp(servername,path,CFG_BIND_NAMED_FILE)
-		end
-
-
-    if $configs[:bind]
-      tempfile($configs[:bind]) { |path| scp(servername,path,CFG_BIND_CUSTOM_FILE) }
-		  sexec(session,"chown bind #{CFG_BIND_CUSTOM_FILE}")
-    end
-
-		sexec(session,"chown bind #{CFG_BIND_NAMED_FILE}")
-
-		sexec(session,'service bind9 restart')
-
-		msg('Updating resolv.conf files',MSG_INFO)
-		tempfile(cfg_resolvconf(options[:dns_forward])) {|path| scp(servername,path,CFG_RESOLVCONF_FILE)}
-
-		excls = []
-		excls << $kanodes[:dns][:ipv4]
-
-    nodes = select_type($kanodes,:SERVER) # + select_type($kanodes,:HOST)
-
-		nodes.each do |node|
-			unless excls.include?(node[:ipv4])
-				sexec(session,"scp -r #{SSH_OPTIONS} #{CFG_RESOLVCONF_FILE} root@#{node[:ipv4]}:#{CFG_RESOLVCONF_FILE}")
-        msg("  #{node[:name]} (#{node[:basename]}) ok",MSG_INFO)
-				excls << node[:ipv4]
-			end
-		end
-	end
-end
-msg("Disconnected from #{server[:basename]}",MSG_INFO)
-msg("",MSG_INFO)
-
-
-server=$kanodes[:dhcp]
-servername=getnode(server[:basename])
-msg('=== Setting up DHCP server',MSG_INFO)
-sshgw.ssh(servername,'root') do |session|
-  msg("Connected to #{server[:basename]}",MSG_INFO)
-
-  msg("Tuning ARP cache size",MSG_INFO)
-  set_arp_cache(session)
-
-	http_tunnel(server,session) do
-		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session)
-
-		msg('Installing DHCP server',MSG_INFO)
-		apt_install(session,'isc-dhcp-server')
-
-    msg('Gathering network informations',MSG_INFO)
-    tmp = sexec(session,'hostname -i')[0]
-    tmp = sexec(session,"ifconfig | grep '#{tmp}'")[0]
-    net=nil
-    if tmp =~ /^\s*inet addr:(\S+)\s+Bcast:\S+\s+Mask:(\S+)\s*.*$/
-      net = IPAddr.new("#{Regexp.last_match(1)}/#{Regexp.last_match(2)}")
-    else
-      msg('unavailable to gather network information',MSG_ERROR,true)
-    end
-    net = nil if net == $network[:ipaddr]
-
-		msg('Configuring DHCP server',MSG_INFO)
-		tempfile(cfg_dhcp(net)) {|path| scp(servername,path,CFG_DHCP_CONF_FILE)}
-		sexec(session,'service isc-dhcp-server restart')
-
-		#msg('Reloading network interfaces',MSG_INFO)
-		#sexec(session,'service networking restart &>/dev/null')
-=begin
-		excls = []
-		excls << $kanodes[:dhcp][:ipv4]
-		Net::SSH::Multi.start do |bcastsession|
-			bcastsession.via getgw(), ENV['USER']
-
-      nodes=[]
-      if $mode == :VLANKVM
-        nodes = select_type($kanodes,:SERVER) + select_type($kanodes,:HOST)
+      tmp = sexec(session,"grep '^nameserver' #{CFG_RESOLVCONF_FILE}")[0]
+      if !tmp or tmp.empty?
+        tmp = ''
+        msg('no nameserver in resolv.conf file',MSG_WARNING)
       else
-        nodes = select_type($kanodes,:SERVER)
+        tmp = tmp.split[1]
+      end
+=end
+      # Assume that default DNS server is the network gateway
+      tmp = $network[:dns]
+      tempfile(cfg_bind((tmp != server[:ipv4] ? tmp : ''))) do |path|
+        scp(servername,path,CFG_BIND_NAMED_FILE)
       end
 
-      nodes.each do |node|
-				unless excls.include?(node[:ipv4])
-					bcastsession.use "root@#{node[:ipv4]}"
-					excls << node[:ipv4]
-				end
-			end
 
-			bcastsession.exec('service networking restart &>/dev/null')
-		end
-=end
-	end
+      if $configs[:bind]
+        tempfile($configs[:bind]) { |path| scp(servername,path,CFG_BIND_CUSTOM_FILE) }
+        sexec(session,"chown bind #{CFG_BIND_CUSTOM_FILE}")
+      end
+
+      sexec(session,"chown bind #{CFG_BIND_NAMED_FILE}")
+
+      sexec(session,'service bind9 restart')
+
+    end
+  end
+  msg("Disconnected from #{server[:basename]}",MSG_INFO)
+  msg("",MSG_INFO)
 end
-msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
-msg("",MSG_INFO)
+
+server=select_server_type($kanodes,:dns)[0]
+servername=getnode(server[:basename])
+msg('=== Updating resolv.conf files',MSG_INFO)
+sshgw.ssh(servername,'root') do |session|
+  msg("Connected to #{server[:basename]}",MSG_INFO)
+
+  msg("Generating resolv.conf file",MSG_INFO)
+  tempfile(cfg_resolvconf(options[:dns_forward])) {|path| scp(servername,path,CFG_RESOLVCONF_FILE)}
+
+  excls = []
+  excls << server[:ipv4]
+
+  nodes = select_type($kanodes,:SERVER) # + select_type($kanodes,:HOST)
+
+  msg("Copying resolv.conf file:",MSG_INFO)
+  nodes.each do |node|
+    unless excls.include?(node[:ipv4])
+      sexec(session,"scp -r #{SSH_OPTIONS} #{CFG_RESOLVCONF_FILE} root@#{node[:ipv4]}:#{CFG_RESOLVCONF_FILE}")
+      msg("  #{node[:name]} (#{node[:basename]}) ok",MSG_INFO)
+      excls << node[:ipv4]
+    end
+  end
+  msg("Disconnected from #{server[:basename]}",MSG_INFO)
+  msg("",MSG_INFO)
+end
+
+
+msg('=== Setting up DHCP server(s)',MSG_INFO)
+select_server_type($kanodes,:dhcp).each do |server|
+  servername=getnode(server[:basename])
+  sshgw.ssh(servername,'root') do |session|
+    msg("Connected to #{server[:basename]}",MSG_INFO)
+
+    msg("Tuning ARP cache size",MSG_INFO)
+    set_arp_cache(session)
+
+    http_tunnel(server,session) do
+      msg('Updating debian packages list',MSG_INFO)
+      apt_update(session)
+
+      msg('Installing DHCP server',MSG_INFO)
+      apt_install(session,'isc-dhcp-server')
+
+      msg('Gathering network informations',MSG_INFO)
+      tmp = sexec(session,'hostname -i')[0]
+      tmp = sexec(session,"ifconfig | grep '#{tmp}'")[0]
+      net=nil
+      if tmp =~ /^\s*inet addr:(\S+)\s+Bcast:\S+\s+Mask:(\S+)\s*.*$/
+        net = IPAddr.new("#{Regexp.last_match(1)}/#{Regexp.last_match(2)}")
+      else
+        msg('unavailable to gather network information',MSG_ERROR,true)
+      end
+      net = nil if net == $network[:ipaddr]
+
+      msg('Configuring DHCP server',MSG_INFO)
+      tempfile(cfg_dhcp(net)) {|path| scp(servername,path,CFG_DHCP_CONF_FILE)}
+      sexec(session,'service isc-dhcp-server restart')
+
+      #msg('Reloading network interfaces',MSG_INFO)
+      #sexec(session,'service networking restart &>/dev/null')
+=begin
+      excls = []
+      excls << $kanodes[:dhcp][:ipv4]
+      Net::SSH::Multi.start do |bcastsession|
+        bcastsession.via getgw(), ENV['USER']
+
+        nodes=[]
+        if $mode == :VLANKVM
+          nodes = select_type($kanodes,:SERVER) + select_type($kanodes,:HOST)
+        else
+          nodes = select_type($kanodes,:SERVER)
+        end
+
+        nodes.each do |node|
+          unless excls.include?(node[:ipv4])
+            bcastsession.use "root@#{node[:ipv4]}"
+            excls << node[:ipv4]
+          end
+        end
+
+        bcastsession.exec('service networking restart &>/dev/null')
+      end
+=end
+    end
+  end
+  msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
+  msg("",MSG_INFO)
+end
 
 
 server=$kanodes[:sql]

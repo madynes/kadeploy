@@ -1,0 +1,107 @@
+#!/usr/bin/ruby
+
+require 'yaml'
+require 'ipaddr'
+require 'rubygems'
+require 'ipaddress'
+
+USAGE="usage: #{$0} <yaml_sitesfile> <hostlist>\n"\
+      "  You can set env variables NB_DNS, NB_DHCP and NB_WWW to specify the number of nodes to use for this services (default: 1)"
+
+
+$sites = {}
+$services = {
+  :kadeploy => {
+    :nb => 1,
+    :nodes => []
+  },
+  :dns => {
+    :nb => (ENV['NB_DNS'] ? ENV['NB_DNS'].to_i : 1),
+    :nodes => []
+  },
+  :dhcp => {
+    :nb => (ENV['NB_DHCP'] ? ENV['NB_DHCP'].to_i : 1),
+    :nodes => []
+  },
+  :www => {
+    :nb => (ENV['NB_WWW'] ? ENV['NB_WWW'].to_i : 1),
+    :nodes => []
+  },
+}
+$order = [ :kadeploy, :dns, :dhcp, :www ]
+
+begin
+  struct = YAML.load_file(ARGV[0])
+  if struct['subnetworks'] and struct['subnetworks'].is_a?(Array)
+    struct['subnetworks'].each do |subnet|
+      name = subnet['name']
+      if $sites[name]
+        $stderr.puts "multiple definition of site '#{name}', ignoring"
+      else
+        $sites[name] = {}
+        $sites[name][:addr] = IPAddress.parse(subnet['address'])
+        $sites[name][:iter] = IPAddr.new($sites[name][:addr].first.to_s)
+      end
+    end
+  else
+    $stderr.puts 'cannot find \'subnetwork\' field in YAML file'
+    exit 1
+  end
+rescue ArgumentError
+  $stderr.puts "invalid ip #{subnet['address']}"
+  exit 1
+rescue Errno::ENOENT
+  $stderr.puts "File '#{ARGV[0]}' not found"
+  exit 1
+end
+
+begin
+  f = File.open(ARGV[1], 'r')
+
+  $order.each do |servicename|
+    $services[servicename][:nb].times do
+      begin
+        tmp = f.readline.chomp
+      rescue EOFError
+        $stderr.puts "not enough nodes in #{ARGV[1]}"
+        exit 1
+      end
+
+      begin
+        IPAddr.new(tmp)
+        $stderr.puts "server must be specified by hostnames"
+        exit 1
+      rescue ArgumentError
+      end
+
+      affected = false
+      $sites.each_pair do |name,val|
+        if tmp.include?(name)
+          $services[servicename][:nodes] << {
+            'host' => tmp,
+            'newip' => val[:iter].to_s
+          }
+          val[:iter] = val[:iter].succ
+          affected = true
+          break
+        end
+      end
+      $stderr.puts "server '#{tmp}' not affected to any site, ignoring" unless affected
+    end
+  end
+rescue Errno::ENOENT
+  $stderr.puts "File '#{ARGV[1]}' not found"
+  exit 1
+end
+
+output = {}
+
+$services.each_pair do |name,val|
+  if val[:nodes].size <= 1
+    output[name.to_s] = val[:nodes][0]
+  else
+    output[name.to_s] = val[:nodes]
+  end
+end
+
+puts output.to_yaml
