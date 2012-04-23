@@ -74,7 +74,7 @@ end
 
 def parse_key_val(line)
   key,val = nil
-  if line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/
+  if line =~ /^\s*([^\s#]+)\s*=\s*(.*)\s*$/
     key = Regexp.last_match(1)
     val = Regexp.last_match(2)
     if val.integer?
@@ -102,8 +102,10 @@ if File.exists?(OLD_CONFIG[:server_conf])
     config[key] = val if key
   end
 
-  File.open(NEW_CONFIG[:server_conf],'w+') { |f| f.puts(config.to_yaml) }
-  FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:server_conf])
+  unless config.empty?
+    File.open(NEW_CONFIG[:server_conf],'w+') { |f| f.puts(config.to_yaml) }
+    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:server_conf])
+  end 
   FileUtils.mv(OLD_CONFIG[:server_conf],KABACKUP_PATH)
   puts "  migration of '#{OLD_CONFIG[:server_conf]}' ok"
 else
@@ -118,8 +120,10 @@ if File.exists?(OLD_CONFIG[:client_conf])
     config[key] = val if key
   end
 
-  File.open(NEW_CONFIG[:client_conf],'w+') { |f| f.puts(config.to_yaml) }
-  FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:client_conf])
+  unless config.empty?
+    File.open(NEW_CONFIG[:client_conf],'w+') { |f| f.puts(config.to_yaml) }
+    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:client_conf])
+  end
   FileUtils.mv(OLD_CONFIG[:client_conf],KABACKUP_PATH)
   puts "  migration of '#{OLD_CONFIG[:client_conf]}' ok"
 else
@@ -127,15 +131,22 @@ else
 end
 
 if File.exists?(OLD_CONFIG[:clusters_conf])
-  $clusters = File.read(OLD_CONFIG[:clusters_conf]).split("\n")
+  $clusters = []
+  tmp = File.read(OLD_CONFIG[:clusters_conf]).split("\n")
+  tmp.each do |line|
+    $clusters << Regexp.last_match(1).strip if line =~ /^\s*([^\s#].*)$/
+  end
   FileUtils.mv(OLD_CONFIG[:clusters_conf],KABACKUP_PATH)
 else
   puts "### file not found '#{OLD_CONFIG[:clusters_conf]}', ignored"
 end
 
 if File.exists?(OLD_CONFIG[:nodes_conf])
-  $nodes = File.read(OLD_CONFIG[:nodes_conf]).split("\n")
-  $nodes.collect! { |node| node.split }
+  $nodes = []
+  tmp = File.read(OLD_CONFIG[:nodes_conf]).split("\n")
+  tmp.each do |line|
+    $nodes << Regexp.last_match(1).strip.split if line =~ /^\s*([^\s#].*)$/
+  end
   FileUtils.mv(OLD_CONFIG[:nodes_conf],KABACKUP_PATH)
 else
   puts "### file not found '#{OLD_CONFIG[:nodes_conf]}', ignored"
@@ -207,8 +218,10 @@ if $clusters and !$clusters.empty?
         end
       end
 
-      File.open(new_config_file,'w+') { |f| f.puts(config.to_yaml) }
-      FileUtils.chown(KAUSER,KAGROUP,new_config_file)
+      unless config.empty?
+        File.open(new_config_file,'w+') { |f| f.puts(config.to_yaml) }
+        FileUtils.chown(KAUSER,KAGROUP,new_config_file)
+      end
       FileUtils.mv(old_config_file,KABACKUP_PATH)
       clconfig[cluster]['conf_file'] = new_config_file
       puts "    migration of '#{old_config_file}' ok"
@@ -229,22 +242,28 @@ if $clusters and !$clusters.empty?
     end
     puts "    migration of nodes ok"
   end
-  File.open(NEW_CONFIG[:clusters_conf],'w+') { |f| f.puts(clconfig.to_yaml) }
-  FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:clusters_conf])
+
+  unless config.empty?
+    File.open(NEW_CONFIG[:clusters_conf],'w+') { |f| f.puts(clconfig.to_yaml) }
+    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:clusters_conf])
+  end
 end
 
 if File.exists?(OLD_CONFIG[:cmds_conf])
-  cmdconfig = {}
+  config = {}
   cmds = File.read(OLD_CONFIG[:cmds_conf]).split("\n")
   cmds.each do |cmd|
-    tmp = cmd.split('|')
-    node = tmp[0].strip
-    cmdconfig[node] = {} if !$cmds[node]
-    cmdconfig[node][tmp[1].strip] = tmp[2].strip
+    if cmd =~ /^\s*([^\s#]+)\s*\|\s*(\S+)\s*\|\s*(.+)$/
+      node = Regexp.last_match(1)
+      config[node] = {} if !$cmds[node]
+      config[node][Regexp.last_match(2)] = Regexp.last_match(3)
+    end
   end
 
-  File.open(NEW_CONFIG[:cmds_conf],'w+') { |f| f.puts(cmdconfig.to_yaml) }
-  FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:cmds_conf])
+  unless config.empty?
+    File.open(NEW_CONFIG[:cmds_conf],'w+') { |f| f.puts(config.to_yaml) }
+    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:cmds_conf])
+  end
   FileUtils.mv(OLD_CONFIG[:cmds_conf],KABACKUP_PATH)
   puts "  migration of '#{OLD_CONFIG[:cmds_conf]}' ok"
 else
