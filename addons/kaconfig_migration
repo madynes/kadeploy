@@ -168,6 +168,7 @@ if $clusters and !$clusters.empty?
       config['macrosteps'] = {}
       tmp.each do |line|
         key,val = parse_key_val(line)
+	next unless key
         case key.downcase
           when 'macrostep'
             macroname,macroval = val.split('|')
@@ -202,7 +203,7 @@ if $clusters and !$clusters.empty?
               end
             end
           else
-            config[key] = val if key
+            config[key] = val
         end
       end
 
