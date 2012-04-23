@@ -74,7 +74,7 @@ end
 
 def parse_key_val(line)
   key,val = nil
-  if line =~ /^\s*(\S+)\s*=\s*(.*)\s*$/
+  if line =~ /^\s*([^\s#]+)\s*=\s*(.*)\s*$/
     key = Regexp.last_match(1)
     val = Regexp.last_match(2)
     if val.integer?
@@ -127,15 +127,22 @@ else
 end
 
 if File.exists?(OLD_CONFIG[:clusters_conf])
-  $clusters = File.read(OLD_CONFIG[:clusters_conf]).split("\n")
+  $clusters = []
+  tmp = File.read(OLD_CONFIG[:clusters_conf]).split("\n")
+  tmp.each do |line|
+    $clusters << Regexp.last_match(1).strip if tmp =~ /^\s*([^\s#].*)$/
+  end
   FileUtils.mv(OLD_CONFIG[:clusters_conf],KABACKUP_PATH)
 else
   puts "### file not found '#{OLD_CONFIG[:clusters_conf]}', ignored"
 end
 
 if File.exists?(OLD_CONFIG[:nodes_conf])
-  $nodes = File.read(OLD_CONFIG[:nodes_conf]).split("\n")
-  $nodes.collect! { |node| node.split }
+  $nodes = []
+  tmp = File.read(OLD_CONFIG[:nodes_conf]).split("\n")
+  tmp.each do |line|
+    $nodes << Regexp.last_match(1).strip.split if tmp =~ /^\s*([^\s#].*)$/
+  end
   FileUtils.mv(OLD_CONFIG[:nodes_conf],KABACKUP_PATH)
 else
   puts "### file not found '#{OLD_CONFIG[:nodes_conf]}', ignored"
@@ -237,10 +244,11 @@ if File.exists?(OLD_CONFIG[:cmds_conf])
   cmdconfig = {}
   cmds = File.read(OLD_CONFIG[:cmds_conf]).split("\n")
   cmds.each do |cmd|
-    tmp = cmd.split('|')
-    node = tmp[0].strip
-    cmdconfig[node] = {} if !$cmds[node]
-    cmdconfig[node][tmp[1].strip] = tmp[2].strip
+    if cmd =~ /^\s*([^\s#]+)\s*\|\s*(\S+)\s*\|\s*(.+)$/
+      node = Regexp.last_match(1)
+      cmdconfig[node] = {} if !$cmds[node]
+      cmdconfig[node][Regexp.last_match(2)] = Regexp.last_match(3)
+    end
   end
 
   File.open(NEW_CONFIG[:cmds_conf],'w+') { |f| f.puts(cmdconfig.to_yaml) }
