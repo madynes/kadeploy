@@ -17,7 +17,7 @@ require 'fileutils'
 require 'resolv'
 require 'yaml'
 
-R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]+\Z/
+R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 R_HTTP = /^http[s]?:\/\//
 
 module ConfigInformation
@@ -1302,6 +1302,51 @@ module ConfigInformation
     end
 
 
+    # Checks an hostname and adds it to the nodelist
+    #
+    # Arguments
+    # * nodelist: the array containing the node list
+    # * hostname: the hostname of the machine
+    # Output
+    # * return true in case of success, false otherwise
+    def self.load_machine(nodelist, hostname)
+      hostname.strip!
+      if R_HOSTNAME =~ hostname then
+        nodelist.push(hostname) unless hostname.empty?
+        return true
+      else
+        error("Invalid hostname: #{hostname}")
+        return false
+      end
+    end
+
+    # Loads a machinelist file
+    #
+    # Arguments
+    # * nodelist: the array containing the node list
+    # * param: the command line parameter
+    # Output
+    # * return true in case of success, false otherwise
+    def self.load_machinelist(nodelist, param)
+      if (param == "-") then
+        STDIN.read.split("\n").sort.uniq.each do |hostname|
+          return false unless load_machine(nodelist,hostname)
+        end
+      else
+        if File.readable?(param) then
+          IO.readlines(param).sort.uniq.each do |hostname|
+            return false unless load_machine(nodelist,hostname)
+          end
+        else
+          error("The file #{param} cannot be read")
+          return false
+        end
+      end
+
+      return true
+    end
+
+
 ##################################
 #       Kadeploy specific        #
 ##################################
@@ -1350,30 +1395,7 @@ module ConfigInformation
           exec_specific.load_env_arg = n
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-          if (f == "-") then
-            STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (R_HOSTNAME =~ hostname.strip) then
-                error("Invalid hostname: #{hostname}")
-                return false
-              else
-                exec_specific.node_array.push(hostname.strip)
-              end
-            }
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              IO.readlines(f).sort.uniq.each { |hostname|
-                if not (R_HOSTNAME =~ hostname.strip) then
-                  error("Invalid hostname: #{hostname}")
-                  return false
-                else
-                  exec_specific.node_array.push(hostname.strip)
-                end
-              }
-            end
-          end
+          return false unless load_machinelist(exec_specific.node_array, f)
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
@@ -1398,12 +1420,7 @@ module ConfigInformation
           end
         }
         opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
-          if not (R_HOSTNAME =~ hostname.strip) then
-            error("Invalid hostname: #{hostname}")
-            return false
-          else
-            exec_specific.node_array.push(hostname.strip)
-          end
+          return false unless load_machine(exec_specific.node_array, hostname)
         }
         opt.on("--multi-server", "Activate the multi-server mode") {
           exec_specific.multi_server = true
@@ -1918,36 +1935,15 @@ module ConfigInformation
           exec_specific.operation = "delete"
         }
         opt.on("-f", "--file FILE", "Machine file (- means stdin)")  { |f|
-          if (f == "-") then
-            STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (R_HOSTNAME =~ hostname.strip) then
-                error("Invalid hostname: #{hostname}")
-                return false
-              else
-                exec_specific.node_list.push(hostname.strip)
-              end
-            }
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              IO.readlines(f).sort.uniq.each { |hostname|
-                if not (R_HOSTNAME =~ hostname.strip) then
-                  error("Invalid hostname: #{hostname}")
-                  return false
-                end
-                exec_specific.node_list.push(hostname.strip)
-              }
-            end
-          end
+          return false unless load_machinelist(exec_specific.node_list, f)
         }
-        opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |m|
-          if (not (R_HOSTNAME =~ m.strip)) and (m != "*") then
-            error("Invalid hostname: #{m}")
-            return false
+        opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |hostname|
+          hostname.strip!
+          if hostname == "*"
+            exec_specific.node_list.push(hostname)
+          else
+            return false unless load_machine(exec_specific.node_list, hostname)
           end
-          exec_specific.node_list.push(m.strip)
         }
         opt.on("-o", "--overwrite-rights", "Overwrite existing rights") {
           exec_specific.overwrite_existing_rights = true
@@ -2091,12 +2087,8 @@ module ConfigInformation
         opt.on("-f", "--field FIELD", "Only print the given fields (user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
           exec_specific.fields.push(f)
         }
-        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (R_HOSTNAME =~ m.strip) then
-            error("Invalid hostname: #{m}")
-            return false
-          end
-          exec_specific.node_list.push(m.strip)
+        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |hostname|
+          return false unless load_machine(exec_specific.node_list, hostname)
         }
         opt.on("-s", "--step STEP", "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
           exec_specific.steps.push(s) 
@@ -2226,36 +2218,10 @@ module ConfigInformation
           exec_specific.operation = "get_deploy_state"
         }
         opt.on("-f", "--file MACHINELIST", "Only print information about the given machines (- means stdin)")  { |f|
-          if (f == "-") then
-            STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (R_HOSTNAME =~ hostname.strip) then
-                error("Invalid hostname: #{hostname}")
-                return false
-              else
-                exec_specific.node_list.push(hostname.strip)
-              end
-            }
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              IO.readlines(f).sort.uniq.each { |hostname|
-                if not (R_HOSTNAME =~ hostname.strip) then
-                  error("Invalid hostname: #{hostname}")
-                  return false
-                end
-                exec_specific.node_list.push(hostname.strip)
-              }
-            end
-          end
+          return false unless load_machinelist(exec_specific.node_list, f)
         }
-        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |m|
-          if not (R_HOSTNAME =~ m.strip) then
-            error("Invalid hostname: #{m}")
-            return false
-          end
-          exec_specific.node_list.push(m.strip)
+        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |hostname|
+          return false unless load_machine(exec_specific.node_list, hostname)
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
@@ -2379,30 +2345,7 @@ module ConfigInformation
           exec_specific.env_arg = e
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-          if (f == "-") then
-            STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (R_HOSTNAME =~ hostname.strip) then
-                error("Invalid hostname: #{hostname}")
-                return false
-              else
-                exec_specific.node_array.push(hostname.strip)
-              end
-            }
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              IO.readlines(f).sort.uniq.each { |hostname|
-                if not (R_HOSTNAME =~ hostname.strip) then
-                  error("Invalid hostname: #{hostname}")
-                  return false
-                else
-                  exec_specific.node_array.push(hostname.strip)
-                end
-              }
-            end
-          end
+          return false unless load_machinelist(exec_specific.node_array, f)
         }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
@@ -2435,12 +2378,7 @@ module ConfigInformation
           end
         }   
         opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
-          if not (R_HOSTNAME =~ hostname.strip) then
-            error("Invalid hostname: #{hostname}")
-            return false
-          else
-            exec_specific.node_array.push(hostname.strip)
-          end
+          return false unless load_machine(exec_specific.node_array, hostname)
         }
         opt.on("--multi-server", "Activate the multi-server mode") {
           exec_specific.multi_server = true
@@ -2655,11 +2593,12 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |hostname|
-          if not (R_HOSTNAME =~ hostname.strip) then
+          hostname.strip!
+          if not (R_HOSTNAME =~ hostname) then
             error("Invalid hostname: #{hostname}")
             return false
           end
-          exec_specific.node = hostname.strip
+          exec_specific.node = hostname
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
@@ -2751,30 +2690,7 @@ module ConfigInformation
           exec_specific.debug = true
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-          if (f == "-") then
-            STDIN.read.split("\n").sort.uniq.each { |hostname|
-              if not (R_HOSTNAME =~ hostname.strip) then
-                error("Invalid hostname: #{hostname}")
-                return false
-              else
-                exec_specific.node_array.push(hostname.strip)
-              end
-            }
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              IO.readlines(f).sort.uniq.each { |hostname|
-                if not (R_HOSTNAME =~ hostname.strip) then
-                  error("Invalid hostname: #{hostname}")
-                  return false
-                else
-                  exec_specific.node_array.push(hostname.strip)
-                end
-              }
-            end
-          end
+          return false unless load_machinelist(exec_specific.node_array,f)
         }
         opt.on("-l", "--level VALUE", "Level (soft, hard, very_hard)") { |l|
           if l =~ /\A(soft|hard|very_hard)\Z/ then
@@ -2785,12 +2701,7 @@ module ConfigInformation
           end
         }   
         opt.on("-m", "--machine MACHINE", "Operate on the given machines") { |hostname|
-          if not (R_HOSTNAME =~ hostname.strip) then
-            error("Invalid hostname: #{hostname}")
-            return false
-          else
-            exec_specific.node_array.push(hostname.strip)
-          end
+          return false unless load_machine(exec_specific.node_array, hostname)
         }
         opt.on("--multi-server", "Activate the multi-server mode") {
           exec_specific.multi_server = true
