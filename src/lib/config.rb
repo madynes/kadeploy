@@ -3030,7 +3030,7 @@ module ConfigInformation
       @deploy_kernel = nil
       @deploy_kernel_args = ""
       @deploy_initrd = nil
-      @kexec_repository = nil
+      @kexec_repository = '/tmp/karepository'
       @block_device = nil
       @deploy_part = nil
       @prod_part = nil
@@ -3165,7 +3165,7 @@ module ConfigInformation
         a = eval i
         puts "Warning: " + i + err_msg if (a == nil)
       }
-      if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@kexec_repository == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
+      if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
           (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot_classical == nil) || (@timeout_reboot_kexec == nil) ||
           (@pxe_header == nil) ||
           (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
