@@ -1807,12 +1807,22 @@ module MicroStepsLibrary
         @output.verbosel(3, "  *** Bypass the disk partitioning",@nodes_ok)
         return true
       else
+        ret = true
+
         case @config.cluster_specific[@cluster].partition_creation_kind
         when "fdisk"
-          return do_fdisk(env, instance_thread)
+          ret = do_fdisk(env, instance_thread)
         when "parted"
-          return do_parted(instance_thread)
+          ret = do_parted(instance_thread)
         end
+
+        ret = parallel_exec_command_wrapper(
+          "partprobe #{@config.cluster_specific[@cluster].block_device}", 
+          @config.common.taktuk_connector,
+          instance_thread
+        ) if ret
+
+        return ret
       end
     end
 
