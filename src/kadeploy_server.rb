@@ -1680,8 +1680,7 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_add_environment(exec_specific, client, db)
-    env = EnvironmentManagement::Environment.new
-    if env.load_from_file(exec_specific.file, exec_specific.file_content, @config.common.almighty_env_users, exec_specific.true_user, @config.common.kadeploy_cache_dir, client, true) then
+    if (env = exec_specific.environment)
       query = "SELECT * FROM environments WHERE name=\"#{env.name}\" AND version=\"#{env.version}\" AND user=\"#{env.user}\""
       res = db.run_query(query)
       if (res.num_rows != 0) then

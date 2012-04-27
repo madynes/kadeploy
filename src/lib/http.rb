@@ -23,8 +23,13 @@ module HTTP
     http_response = String.new
     etag = String.new
     begin
-      wget_output = Tempfile.new("wget_output", cache_dir)
-      wget_download = Tempfile.new("wget_download", cache_dir)
+      if cache_dir
+        wget_output = Tempfile.new("wget_output", cache_dir)
+        wget_download = Tempfile.new("wget_download", cache_dir)
+      else
+        wget_output = Tempfile.new("wget_output")
+        wget_download = Tempfile.new("wget_download")
+      end
     rescue StandardError
       return -1,0
     end

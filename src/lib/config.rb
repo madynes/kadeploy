@@ -124,17 +124,19 @@ module ConfigInformation
       #Environment load
       case exec_specific_config.load_env_kind
       when "file"
-        if (exec_specific_config.environment.load_from_file(exec_specific_config.load_env_arg,
-                                                            exec_specific_config.load_env_content,
-                                                            @common.almighty_env_users,
-                                                            exec_specific_config.true_user,
-                                                            @common.kadeploy_cache_dir,
-                                                            client,
-                                                            false) == false) then
+        if (
+          exec_specific_config.environment.load_from_file(
+            exec_specific_config.load_env_desc,
+              @common.almighty_env_users,
+              exec_specific_config.true_user,
+              client,
+              false
+            ) == false
+        ) then
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
         end
       when "db"
-        if (exec_specific_config.environment.load_from_db(exec_specific_config.load_env_arg,
+        if (exec_specific_config.environment.load_from_db(exec_specific_config.load_env_desc,
                                                           exec_specific_config.env_version,
                                                           exec_specific_config.user,
                                                           exec_specific_config.true_user,
@@ -210,7 +212,21 @@ module ConfigInformation
     end
 
     def check_kaenv_config(exec_specific_config, db, client)
-      return 0
+      #Environment load
+      if exec_specific_config.operation == "add"
+        if (
+          exec_specific_config.environment.load_from_file(
+            exec_specific_config.env_desc,
+            @common.almighty_env_users,
+            exec_specific_config.true_user,
+            client,
+            true
+          ) == false
+        ) then
+          return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
+        end
+      end
+      return KarebootAsyncError::NO_ERROR
     end
 
     def check_karights_config(exec_specific_config, db, client)
@@ -281,8 +297,7 @@ module ConfigInformation
       exec_specific.node_set = Nodes::NodeSet.new(exec_specific.nodesetid)
       exec_specific.node_array = Array.new
       exec_specific.load_env_kind = String.new
-      exec_specific.load_env_arg = String.new
-      exec_specific.load_env_content = String.new
+      exec_specific.load_env_desc = String.new
       exec_specific.env_version = nil #By default we load the latest version
       exec_specific.user = nil
       exec_specific.true_user = USER
@@ -1346,6 +1361,56 @@ module ConfigInformation
       return true
     end
 
+    # Load an environment description file
+    #
+    # Arguments
+    # * srcfile: the path to the file (URI, unix path)
+    # Output
+    # * return String in case of success, false otherwise
+    def self.load_envfile(srcfile)
+      tmpfile = nil
+      if (srcfile =~ /^http[s]?:\/\//) then
+        begin
+          tmpfile = Tempfile.new("env_file")
+        rescue StandardError
+          error("Temporary directory is full on the server side, please contact the administrator")
+          return false
+        end
+
+        http_response, etag = HTTP::fetch_file(srcfile, tmpfile.path, nil, nil)
+        case http_response
+        when -1
+          error("The file #{srcfile} cannot be fetched: impossible to create a tempfile in the cache directory")
+          return false
+        when -2
+          error("The file #{srcfile} cannot be fetched: impossible to move the file in the cache directory")
+          return false
+        when "200"
+          file = tmpfile.path
+        else
+          error("The file #{srcfile} cannot be fetched: http_response #{http_response}")
+          return false
+        end
+      else
+        if File.readable?(srcfile)
+          file = srcfile
+        else
+          error("The file #{srcfile} does not exist or is not readable")
+          return false
+        end
+      end
+
+      unless `file --mime-type --brief #{file}`.chomp == "text/plain"
+        error("The file #{srcfile} should be in plain text format")
+        return false
+      end
+
+      ret = IO::read(file)
+      tmpfile.unlink if tmpfile
+      return ret
+    end
+
+
 
 ##################################
 #       Kadeploy specific        #
@@ -1366,18 +1431,12 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
-          if not (f =~ R_HTTP) then
-            if not File.readable?(f) then
-              error("The file #{f} does not exist or is not readable")
-              return false
-            else
-              IO.readlines(f).each { |line|
-                exec_specific.load_env_content += line
-              }
-            end
+          if tmp = load_envfile(f)
+            exec_specific.load_env_desc = tmp
+            exec_specific.load_env_kind = "file"
+          else
+            return false
           end
-          exec_specific.load_env_kind = "file"
-          exec_specific.load_env_arg = f
         }
         opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
           if /\A[\w\/]+\Z/ =~ b then
@@ -1392,7 +1451,7 @@ module ConfigInformation
         }
         opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment to deploy") { |n|
           exec_specific.load_env_kind = "db"
-          exec_specific.load_env_arg = n
+          exec_specific.load_env_desc = n
         }
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           return false unless load_machinelist(exec_specific.node_array, f)
@@ -1673,8 +1732,7 @@ module ConfigInformation
       exec_specific = OpenStruct.new
       exec_specific.environment = EnvironmentManagement::Environment.new
       exec_specific.operation = String.new
-      exec_specific.file = String.new
-      exec_specific.file_content = String.new
+      exec_specific.env_desc = String.new
       exec_specific.env_name = String.new
       exec_specific.user = nil
       exec_specific.true_user = USER #By default, we use the current user
@@ -1710,16 +1768,12 @@ module ConfigInformation
         opt.separator ""
         opt.separator "General options:"
         opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
-          if (not (f =~ R_HTTP)) && (not File.readable?(f)) then
-            error("The file #{f} cannot be read")
-            return false
+          if tmp = load_envfile(f)
+            exec_specific.env_desc = tmp
+            exec_specific.operation = "add"
           else
-            IO.readlines(f).each { |line|
-              exec_specific.file_content += line
-            }
+            return false
           end
-          exec_specific.file = f
-          exec_specific.operation = "add"
         }
         opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
           exec_specific.env_name = n
@@ -1821,7 +1875,7 @@ module ConfigInformation
       return true if exec_specific.get_version
       case exec_specific.operation 
       when "add"
-        if (exec_specific.file == "") then
+        if (exec_specific.env_desc == "") then
           error("You must choose a file that contains the environment description")
           return false
         end

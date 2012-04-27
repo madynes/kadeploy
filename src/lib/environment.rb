@@ -5,6 +5,7 @@
 
 #Ruby libs
 require 'tempfile'
+require 'pathname'
 
 #Kadeploy libs
 require 'db'
@@ -37,43 +38,14 @@ module EnvironmentManagement
     # Load an environment file
     #
     # Arguments
-    # * file: filename
-    # * file_content: environment description
+    # * description: environment description
     # * almighty_env_users: array that contains almighty users
     # * user: true user
-    # * cache_dir: cache directory
     # * client: DRb handler to client
     # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(file, file_content, almighty_env_users, user, cache_dir, client, record_in_db)
-      begin
-        temp_env_file = Tempfile.new("env_file")
-      rescue StandardError
-        Debug::distant_client_error("Temporary directory is full on the server side, please contact the administrator", client)
-        return false
-      end
-      if (file =~ /^http[s]?:\/\//) then
-        http_response, etag = HTTP::fetch_file(file, temp_env_file.path, cache_dir, nil)
-        case http_response
-        when -1
-          Debug::distant_client_error("The file #{file} cannot be fetched: impossible to create a tempfile in the cache directory", client)
-          return false
-        when -2
-          Debug::distant_client_error("The file #{file} cannot be fetched: impossible to move the file in the cache directory", client)
-          return false
-        when "200"
-        else
-          Debug::distant_client_error("The file #{file} cannot be fetched: http_response #{http_response}", client)
-          return false
-        end
-      else
-        if not system("echo \"#{file_content}\" > #{temp_env_file.path}") then
-          Debug::distant_client_error("Cannot write the environment file", client)
-          return false
-        end
-      end
-      file = temp_env_file.path
+    def load_from_file(description, almighty_env_users, user, client, record_in_db)
       @preinstall = nil
       @postinstall = nil
       @environment_kind = nil
@@ -91,7 +63,7 @@ module EnvironmentManagement
       @user = user
       @version = 0
       @id = -1
-      IO::read(file).split("\n").each { |line|
+      description.split("\n").each { |line|
         if /\A(\w+)\ :\ (.+)\Z/ =~ line then
           content = Regexp.last_match
           attr = content[1]
@@ -255,6 +227,7 @@ module EnvironmentManagement
         Debug::distant_client_error("The environment_kind field is mandatory", client)
         return false       
       end
+
       return true
     end
 
