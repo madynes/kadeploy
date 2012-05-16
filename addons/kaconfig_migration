@@ -255,7 +255,7 @@ if File.exists?(OLD_CONFIG[:cmds_conf])
   cmds.each do |cmd|
     if cmd =~ /^\s*([^\s#]+)\s*\|\s*(\S+)\s*\|\s*(.+)$/
       node = Regexp.last_match(1)
-      config[node] = {} if !$cmds[node]
+      config[node] = {} unless config[node]
       config[node][Regexp.last_match(2)] = Regexp.last_match(3)
     end
   end
