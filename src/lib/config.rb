@@ -1373,7 +1373,7 @@ module ConfigInformation
         begin
           tmpfile = Tempfile.new("env_file")
         rescue StandardError
-          error("Temporary directory is full on the server side, please contact the administrator")
+          error("Cannot write to the temporary directory on the server side, please contact the administrator")
           return false
         end
 
