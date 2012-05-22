@@ -78,6 +78,49 @@ module Database
     end
   end
 
+  # Handle database results
+  class DbResult
+    attr_reader :fields, :affected_rows
+
+    def initialize(fields, content, affected_rows)
+      @fields = fields || []
+      @content = content || []
+      @affected_rows = affected_rows || 0
+
+      @cache_hash = nil
+    end
+
+    def each_array(&block)
+      to_array().each(&block)
+    end
+
+    def each_hash(&block)
+      to_hash().each(&block)
+    end
+
+    def to_array
+      return @content
+    end
+    alias_method :each, :each_array
+
+    def to_hash
+      unless @cache_hash
+        @cache_hash = []
+
+        @content.each do |row|
+          @cache_hash << Hash[*(@fields.zip(row).flatten)]
+        end
+      end
+
+      return @cache_hash
+    end
+
+    def size
+      return @content.size
+    end
+    alias_method :num_rows, :size
+  end
+
   class DbMysql < Db
 
     # Connect to the MySQL database
@@ -113,31 +156,36 @@ module Database
       @dbh.close if (@dbh != nil)
     end
 
-    # Run a query
+    # Run a query using SQL
     #
     # Arguments
-    # * query: string that contains the sql query
+    # * query: string that contains the sql query where each variable should be replaced by '?'
+    # * *args: variables that will take the place of the '?'s in the request
     # Output
-    # * return a MySQL::result and print an error if the execution failed
-    def run_query(query)
+    # * return a DbResult Object and print an error if the execution failed
+    def run_query(query, *args)
       res = nil
       begin
-        res = @dbh.query(query)
+        st = @dbh.prepare(query)
+        st.execute(*args)
+
+        content = nil
+        fields = nil
+        if st.result_metadata
+          content = []
+          fields = st.result_metadata.fetch_fields.collect{ |f| f.name }
+          st.each do |row|
+            content << row
+          end
+        end
+        res = DbResult.new(fields,content,st.affected_rows)
+
+        st.close
       rescue Mysql::Error => e
         puts "Error code: #{e.errno}"
         puts "Error message: #{e.error}"
       end
       return res
-    end
-
-    # Get the number of affected rows
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return the number of affected rows
-    def get_nb_affected_rows
-      return @dbh.affected_rows
     end
   end
 end

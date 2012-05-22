@@ -1010,45 +1010,55 @@ class KadeployServer
     return res
   end
 
+
+  def generic_where_nodelist(exec_specific, field)
+    args = []
+    ret = ''
+
+    unless exec_specific.node_list.empty? then
+      nbnodes = 0
+      exec_specific.node_list.each { |node|
+        if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+          nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
+        else
+          nodes = [node]
+        end
+
+        nodes.each{ |n|
+          if (node != "*") then
+            args << n
+            nbnodes += 1
+          end
+        }
+      }
+      ret += "(#{(["#{field} = ?"] * nbnodes).join(" OR ")})"
+    end
+
+    return [args,ret]
+  end
+
   # Generate some filters for the output according the options
   #
   # Arguments
   # * exec_specific: instance of Config.exec_specific
   # Output
   # * return a string that contains the where clause corresponding to the filters required
-  def kastat_append_generic_where_clause(exec_specific)
-    generic_where_clause = String.new
-    node_list = String.new
-    hosts = Array.new
-    date_min = String.new
-    date_max = String.new
-    if (not exec_specific.node_list.empty?) then
-      exec_specific.node_list.each { |node|
-        if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
-          nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-        else
-          nodes = [node]
-        end     
-        nodes.each{ |n|
-          hosts.push("hostname=\"#{n}\"")
-        }
-      }
-      node_list = "(#{hosts.join(" OR ")})"
-    end
+  def kastat_generic_where_clause(exec_specific)
+    args, ret = generic_where_nodelist(exec_specific,'hostname')
+
     if (exec_specific.date_min != 0) then
-      date_min = "start>=\"#{exec_specific.date_min}\""
+      ret += ' AND ' unless ret.empty?
+      args << exec_specific.date_min
+      ret += "start >= ?"
     end
+
     if (exec_specific.date_max != 0) then
-      date_max = "start<=\"#{exec_specific.date_max}\""
+      ret += ' AND ' unless ret.empty?
+      args << exec_specific.date_max
+      ret += "start <= ?"
     end
-    if ((node_list != "") || (date_min != "") || (date_max !="")) then
-      generic_where_clause = "#{node_list} AND #{date_min} AND #{date_max}"
-      #let's clean empty things
-      generic_where_clause = generic_where_clause.gsub("AND  AND","")
-      generic_where_clause = generic_where_clause.gsub(/^ AND/,"")
-      generic_where_clause = generic_where_clause.gsub(/AND $/,"")
-    end
-    return generic_where_clause
+
+    return [args, ret]
   end
 
 
@@ -1061,17 +1071,23 @@ class KadeployServer
   # Output
   # * string that contains the selected fields in a result line
   def kastat_select_fields(row, exec_specific, default_fields)
-    fields = Array.new  
-    if (not exec_specific.fields.empty?) then
-      exec_specific.fields.each{ |f|
-        fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
-      }
+    ret = []
+
+    fields = nil
+    unless exec_specific.fields.empty? then
+      fields = exec_specific.fields
     else
-      default_fields.each { |f|
-        fields.push(row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r"))
-      }
+      fields = default_fields
     end
-    return fields.join(",")
+
+    fields.each{ |f|
+      if row[f].is_a?(String)
+        ret << row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r")
+      else
+        ret << row[f].to_s
+      end
+    }
+    return ret.join(",")
   end
 
   # List the information about the nodes that require a given number of retries to be deployed
@@ -1083,33 +1099,33 @@ class KadeployServer
   # Output
   # * print the filtred information about the nodes that require a given number of retries to be deployed
   def kastat_list_retries(exec_specific, client, db)
+    args, generic_where_clause = kastat_generic_where_clause(exec_specific)
     step_list = String.new
-    steps = Array.new
+
     if (not exec_specific.steps.empty?) then
+      steps = []
       exec_specific.steps.each { |step|
         case step
         when "1"
-          steps.push("retry_step1>=\"#{exec_specific.min_retries}\"")
+          steps.push("retry_step1 >= ?")
+          args << exec_specific.min_retries
         when "2"
-          steps.push("retry_step2>=\"#{exec_specific.min_retries}\"")
+          steps.push("retry_step2 >= ?")
+          args << exec_specific.min_retries
         when "3"
-          steps.push("retry_step3>=\"#{exec_specific.min_retries}\"")
+          steps.push("retry_step3 >= ?")
+          args << exec_specific.min_retries
         end
       }
-      step_list = steps.join(" AND ")
+      step_list = "(#{steps.join(" AND ")})"
     else
-      step_list += "(retry_step1>=\"#{exec_specific.min_retries}\""
-      step_list += " OR retry_step2>=\"#{exec_specific.min_retries}\""
-      step_list += " OR retry_step3>=\"#{exec_specific.min_retries}\")"
+      step_list = "(retry_step1 >= ? OR retry_step2 >= ? OR retry_step3 >= ?)"
+      3.times{ args << exec_specific.min_retries }
     end
 
-    generic_where_clause = kastat_append_generic_where_clause(exec_specific)
-    if (generic_where_clause == "") then
-      query = "SELECT * FROM log WHERE #{step_list}"
-    else
-      query = "SELECT * FROM log WHERE #{generic_where_clause} AND #{step_list}"
-    end
-    res = db.run_query(query)
+    query = "SELECT * FROM log WHERE #{step_list}"
+    query += " AND #{generic_where_clause}" unless generic_where_clause.empty?
+    res = db.run_query(query,*args)
     if (res.num_rows > 0) then
       res.each_hash { |row|
         Debug::distant_client_print(kastat_select_fields(row, exec_specific, ["start","hostname","retry_step1","retry_step2","retry_step3"]), client)
@@ -1128,13 +1144,12 @@ class KadeployServer
   # Output
   # * print the filtred information about the nodes that have at least a given failure rate
   def kastat_list_failure_rate(exec_specific, client, db)
-    generic_where_clause = kastat_append_generic_where_clause(exec_specific)
-    if (generic_where_clause != "") then
-      query = "SELECT * FROM log WHERE #{generic_where_clause}"
-    else
-      query = "SELECT * FROM log"
-    end
-    res = db.run_query(query)
+    args, generic_where_clause = kastat_generic_where_clause(exec_specific)
+
+    query = "SELECT * FROM log"
+    query += " WHERE #{generic_where_clause}" unless generic_where_clause.empty?
+
+    res = db.run_query(query,*args)
     if (res.num_rows > 0) then
       hash = Hash.new
       res.each_hash { |row|
@@ -1169,13 +1184,12 @@ class KadeployServer
   # Output
   # * print the information about all the nodes
   def kastat_list_all(exec_specific, client, db)
-    generic_where_clause = kastat_append_generic_where_clause(exec_specific)
-    if (generic_where_clause != "") then
-      query = "SELECT * FROM log WHERE #{generic_where_clause}"
-    else
-      query = "SELECT * FROM log"
-    end
-    res = db.run_query(query)
+    args, generic_where_clause = kastat_generic_where_clause(exec_specific)
+
+    query = "SELECT * FROM log"
+    query += " WHERE #{generic_where_clause}" unless generic_where_clause.empty?
+
+    res = db.run_query(query,*args)
     if (res.num_rows > 0) then
       res.each_hash { |row|
         Debug::distant_client_print(kastat_select_fields(row, exec_specific,
@@ -1248,31 +1262,16 @@ class KadeployServer
   # Output
   # * prints the information about the nodes in a CSV format
   def kanodes_get_deploy_state(exec_specific, client, db)
+    args, where_nodelist = generic_where_nodelist(exec_specific,'nodes.hostname')
+
+    query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
+     FROM nodes \
+     LEFT JOIN environments ON nodes.env_id = environments.id"
     #If no node list is given, we print everything
-    if exec_specific.node_list.empty? then
-      query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
-             FROM nodes \
-             LEFT JOIN environments ON nodes.env_id = environments.id \
-             ORDER BY nodes.hostname"
-    else
-      hosts = Array.new
-      exec_specific.node_list.each { |node|
-        if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
-          nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-        else
-          nodes = [node]
-        end
-        nodes.each { |n|
-          hosts.push("nodes.hostname=\"#{n}\"")
-        }
-      }
-      query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name, environments.version, environments.user \
-             FROM nodes \
-             LEFT JOIN environments ON nodes.env_id = environments.id \
-             WHERE (#{hosts.join(" OR ")}) \
-             ORDER BY nodes.hostname"
-    end
-    res = db.run_query(query)
+    query += " WHERE #{where_nodelist}" unless where_nodelist.empty?
+    query += " ORDER BY nodes.hostname"
+
+    res = db.run_query(query,*args)
     if (res.num_rows > 0)
       res.each { |row|
         Debug::distant_client_print("#{row[0]},#{row[1]},#{row[2]},#{row[3]},#{row[4]},#{row[5]}", client)
@@ -1381,8 +1380,7 @@ class KadeployServer
   # * return true if some rights are granted for the given user, false otherwise
   def karights_show_rights(exec_specific, client, db)
     hash = Hash.new
-    query = "SELECT * FROM rights WHERE user=\"#{exec_specific.user}\""
-    res = db.run_query(query)
+    res = db.run_query("SELECT * FROM rights WHERE user = ?",exec_specific.user)
     if res != nil then
       res.each_hash { |row|
         if (not hash.has_key?(row["node"])) then
@@ -1417,39 +1415,27 @@ class KadeployServer
     #check if other users have rights on some nodes
     res = true
     nodes_to_remove = Array.new
-    hosts = Array.new
-    exec_specific.node_list.each { |node|
-      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
-        nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
-      else
-        nodes = [node]
-      end
-      nodes.each{ |n|
-        if (node != "*") then
-          hosts.push("node=\"#{n}\"")
-        end
-      }
-    }
+    args, where_nodelist = generic_where_nodelist(exec_specific,'node')
 
-    if not hosts.empty? then
-      query = "SELECT DISTINCT node FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
-      res = db.run_query(query)
+    if not args.empty? then
+      query = "SELECT DISTINCT node FROM rights WHERE part<>\"*\""
+      query += " AND #{where_nodelist}" unless where_nodelist.empty?
+      res = db.run_query(query,*args)
       res.each_hash { |row|
         nodes_to_remove.push(row["node"])
       }
     end
     if ((not nodes_to_remove.empty?) && exec_specific.overwrite_existing_rights) then
-      hosts = Array.new
-      nodes_to_remove.each { |node|
-        hosts.push("node=\"#{node}\"")
-      }
-      query = "DELETE FROM rights WHERE part<>\"*\" AND (#{hosts.join(" OR ")})"
-      db.run_query(query)
+      nodelist = ([ "node = ?" ] * nodes_to_remove.size).join(" OR ")
+      query = "DELETE FROM rights WHERE part<>\"*\" AND (#{nodelist})"
+      args = nodes_to_remove.dup
+      db.run_query(query,*args)
       Debug::distant_client_print("Some rights have been removed on the nodes #{nodes_to_remove.join(", ")}", client)
       nodes_to_remove.clear
     end
 
-    values_to_insert = Array.new
+    args = []
+    values_to_insert = 0
     exec_specific.node_list.each { |node|
       exec_specific.part_list.each { |part|
         if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
@@ -1461,11 +1447,21 @@ class KadeployServer
           if (not nodes_to_remove.include?(n)) then
             if ((node == "*") || (part == "*")) then
               #check if the rights are already inserted
-              query = "SELECT * FROM rights WHERE user=\"#{exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
-              res = db.run_query(query)
-              values_to_insert.push("(\"#{exec_specific.user}\", \"#{n}\", \"#{part}\")") if (res.num_rows == 0)
+              res = db.run_query(
+                "SELECT * FROM rights WHERE user = ? AND node = ? AND part = ?",
+                exec_specific.user, n, part
+              )
+              if (res.num_rows == 0)
+                values_to_insert += 1
+                args << exec_specific.user
+                args << n
+                args << part
+              end
             else
-              values_to_insert.push("(\"#{exec_specific.user}\", \"#{n}\", \"#{part}\")")
+              values_to_insert += 1
+              args << exec_specific.user
+              args << n
+              args << part
             end
           else
             Debug::distant_client_print("The node #{n} has been removed from the rights assignation since another user has some rights on it", client)
@@ -1475,9 +1471,10 @@ class KadeployServer
       }
     }
     #add the rights
-    if (not values_to_insert.empty?) then
-      query = "INSERT INTO rights (user, node, part) VALUES #{values_to_insert.join(",")}"
-      db.run_query(query)
+    if values_to_insert > 0 then
+      values = ([ "(?, ?, ?)" ] * values_to_insert).join(", ")
+      query = "INSERT INTO rights (user, node, part) VALUES #{values}"
+      db.run_query(query,*args)
     else
       Debug::distant_client_print("No rights added", client)
       res = false
@@ -1505,9 +1502,11 @@ class KadeployServer
           nodes = [node]
         end
         nodes.each{ |n|
-          query = "DELETE FROM rights WHERE user=\"#{exec_specific.user}\" AND node=\"#{n}\" AND part=\"#{part}\""
-          db.run_query(query)
-          if (db.dbh.affected_rows == 0)
+          res = db.run_query(
+            "DELETE FROM rights WHERE user = ? AND node = ? AND part = ?",
+            exec_specific.user, n, part
+          )
+          if (res.affected_rows == 0)
             Debug::distant_client_print("No rights have been removed for the node #{n} on the partition #{part}", client)
             res = false
           end
@@ -1585,25 +1584,26 @@ class KadeployServer
   def kaenv_list_environments(exec_specific, client, db)
     env = EnvironmentManagement::Environment.new
     user = exec_specific.user ? exec_specific.user : exec_specific.true_user
+    args = []
+    where = ''
     if (user == "*") then #we show the environments of all the users
       if (exec_specific.show_all_version == false) then
         if (exec_specific.version != "") then
-          query = "SELECT * FROM environments WHERE version=\"#{exec_specific.version}\" \
-                                              AND visibility<>\"private\" \
-                                              GROUP BY name \
-                                              ORDER BY user,name"
+          where = "version = ? \
+                   AND visibility <> 'private' \
+                   GROUP BY name"
+          args << exec_specific.version
         else
-          query = "SELECT * FROM environments e1 \
-                            WHERE e1.visibility<>\"private\" \
-                            AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
-                                                                   WHERE e2.name=e1.name \
-                                                                   AND e2.user=e1.user \
-                                                                   AND e2.visibility<>\"private\" \
-                                                                   GROUP BY e2.user,e2.name) \
-                            ORDER BY user,name"
+          where = "e1.visibility <> 'private' \
+                   AND e1.version=( \
+                     SELECT MAX(e2.version) FROM environments e2 \
+                     WHERE e2.name = e1.name \
+                     AND e2.user = e1.user \
+                     AND e2.visibility <> 'private' \
+                     GROUP BY e2.user, e2.name)"
         end
       else
-        query = "SELECT * FROM environments WHERE visibility<>\"private\" ORDER BY user,name,version"
+        query = "visibility <> 'private'"
       end
     else
       #If the user wants to print the environments of another user, private environments are not shown
@@ -1611,55 +1611,59 @@ class KadeployServer
       if (exec_specific.show_all_version == false) then
         if (exec_specific.version != "") then
           if mask_private_env then
-            query = "SELECT * FROM environments \
-                              WHERE user=\"#{user}\" \
-                              AND version=\"#{exec_specific.version}\" \
-                              AND visibility<>\"private\" \
-                              ORDER BY user,name"
+            where = "user = ? \
+                     AND version = ? \
+                     AND visibility <> 'private'"
+            args << user
+            args << exec_specific.version
           else
-            query = "SELECT * FROM environments \
-                              WHERE (user=\"#{user}\" AND version=\"#{exec_specific.version}\") \
-                              OR (user<>\"#{user}\" AND version=\"#{exec_specific.version}\" AND visibility=\"public\") \
-                              ORDER BY user,name"
+            where = "(user = ? AND version = ?) \
+                     OR (user <> ? AND version = ? AND visibility = 'public')"
+            2.times do
+              args << user
+              args << exec_specific.version
+            end
           end
         else
           if mask_private_env then
-            query = "SELECT * FROM environments e1\
-                              WHERE e1.user=\"#{user}\" \
-                              AND e1.visibility<>\"private\" \
-                              AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
-                                                                     WHERE e2.name=e1.name \
-                                                                     AND e2.user=e1.user \
-                                                                     AND e2.visibility<>\"private\" \
-                                                                     GROUP BY e2.user,e2.name) \
-                              ORDER BY e1.user,e1.name"
+            where = "e1.user = ? \
+                     AND e1.visibility <> 'private' \
+                     AND e1.version = ( \
+                       SELECT MAX(e2.version) FROM environments e2 \
+                       WHERE e2.name = e1.name \
+                       AND e2.user = e1.user \
+                       AND e2.visibility <> 'private' \
+                       GROUP BY e2.user, e2.name)"
+            args << user
           else
-            query = "SELECT * FROM environments e1\
-                              WHERE (e1.user=\"#{user}\" \
-                              OR (e1.user<>\"#{user}\" AND e1.visibility=\"public\")) \
-                              AND e1.version=(SELECT MAX(e2.version) FROM environments e2 \
-                                                                     WHERE e2.name=e1.name \
-                                                                     AND e2.user=e1.user \
-                                                                     AND (e2.user=\"#{user}\" \
-                                                                     OR (e2.user<>\"#{user}\" AND e2.visibility=\"public\")) \
-                                                                     GROUP BY e2.user,e2.name) \
-                              ORDER BY e1.user,e1.name"
+            where = "(e1.user = ? \
+                       OR (e1.user <> ? AND e1.visibility = 'public')) \
+                     AND e1.version = ( \
+                       SELECT MAX(e2.version) FROM environments e2 \
+                       WHERE e2.name = e1.name \
+                       AND e2.user = e1.user \
+                       AND (e2.user = ? \
+                       OR (e2.user <> ? AND e2.visibility = 'public')) \
+                       GROUP BY e2.user,e2.name)"
+            4.times{ args << user }
           end
         end
       else
         if mask_private_env then
-          query = "SELECT * FROM environments WHERE user=\"#{user}\" \
-                                              AND visibility<>\"private\" \
-                                              ORDER BY name,version"
+          where = "user = ? AND visibility <> 'private'"
+          args << user
         else
-          query = "SELECT * FROM environments WHERE user=\"#{user}\" \
-                                              OR (user<>\"#{user}\" AND visibility=\"public\") \  
-                                              ORDER BY user,name,version"
-
+          where = "user = ? OR (user <> ? AND visibility = 'public')"
+          2.times{ args << user }
         end
       end
     end
-    res = db.run_query(query)
+
+    query = "SELECT * FROM environments e1"
+    query += " WHERE #{where}" unless where.empty?
+    query += " ORDER BY e1.user, e1.name, e1.version"
+    res = db.run_query(query,*args)
+
     if (res.num_rows > 0) then
       env.short_view_header(client)
       res.each_hash { |row|
@@ -1682,57 +1686,68 @@ class KadeployServer
   def kaenv_add_environment(exec_specific, client, db)
     env = EnvironmentManagement::Environment.new
     if env.load_from_file(exec_specific.file, exec_specific.file_content, @config.common.almighty_env_users, exec_specific.true_user, @config.common.kadeploy_cache_dir, client, true) then
-      query = "SELECT * FROM environments WHERE name=\"#{env.name}\" AND version=\"#{env.version}\" AND user=\"#{env.user}\""
-      res = db.run_query(query)
+      args = []
+      args << env.name
+      args << env.version
+      args << env.user
+      res = db.run_query(
+        "SELECT * FROM environments WHERE name = ? AND version = ? AND user = ?",
+        env.name, env.version, env.user
+      )
       if (res.num_rows != 0) then
         Debug::distant_client_print("An environment with the name #{env.name} and the version #{env.version} has already been recorded for the user #{env.user}", client)
         return(1)
       end
       if (env.visibility == "public") then
-        query = "SELECT * FROM environments WHERE name=\"#{env.name}\" AND version=\"#{env.version}\" AND visibility=\"public\""
-        res = db.run_query(query)
+        res = db.run_query(
+          "SELECT * FROM environments WHERE name = ? AND version = ? AND visibility='public'",
+          env.name, env.version
+        )
         if (res.num_rows != 0) then
           Debug::distant_client_print("A public environment with the name #{env.name} and the version #{env.version} has already been recorded", client)
           return(1)
         end
       end
-      query = "INSERT INTO environments (name, \
-                                         version, \
-                                         description, \
-                                         author, \
-                                         tarball, \
-                                         preinstall, \
-                                         postinstall, \
-                                         kernel, \
-                                         kernel_params, \
-                                         initrd, \
-                                         hypervisor, \
-                                         hypervisor_params, \
-                                         fdisk_type, \
-                                         filesystem, \
-                                         user, \
-                                         environment_kind, \
-                                         visibility, \
-                                         demolishing_env) \
-                               VALUES (\"#{env.name}\", \
-                                       \"#{env.version}\", \
-                                       \"#{env.description}\", \
-                                       \"#{env.author}\", \
-                                       \"#{env.flatten_tarball_with_md5()}\", \
-                                       \"#{env.flatten_pre_install_with_md5()}\", \
-                                       \"#{env.flatten_post_install_with_md5()}\", \
-                                       \"#{env.kernel}\", \
-                                       \"#{env.kernel_params}\", \
-                                       \"#{env.initrd}\", \
-                                       \"#{env.hypervisor}\", \
-                                       \"#{env.hypervisor_params}\", \
-                                       \"#{env.fdisk_type}\", \
-                                       \"#{env.filesystem}\", \
-                                       \"#{env.user}\", \
-                                       \"#{env.environment_kind}\", \
-                                       \"#{env.visibility}\", \
-                                       \"#{env.demolishing_env}\")"
-      db.run_query(query)
+      db.run_query(
+        "INSERT INTO environments (\
+           name, \
+           version, \
+           description, \
+           author, \
+           tarball, \
+           preinstall, \
+           postinstall, \
+           kernel, \
+           kernel_params, \
+           initrd, \
+           hypervisor, \
+           hypervisor_params, \
+           fdisk_type, \
+           filesystem, \
+           user, \
+           environment_kind, \
+           visibility, \
+           demolishing_env) \
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+         env.name,
+         env.version,
+         env.description,
+         env.author,
+         env.flatten_tarball_with_md5(),
+         env.flatten_pre_install_with_md5() || '',
+         env.flatten_post_install_with_md5() || '',
+         env.kernel,
+         env.kernel_params || '',
+         env.initrd,
+         env.hypervisor || '',
+         env.hypervisor_params || '',
+         env.fdisk_type,
+         env.filesystem,
+         env.user,
+         env.environment_kind,
+         env.visibility,
+         env.demolishing_env
+      )
       return(0)
     end
   end
@@ -1751,11 +1766,11 @@ class KadeployServer
     else
       version = _get_max_version(db, exec_specific.env_name, exec_specific.true_user, exec_specific.true_user)
     end
-    query = "DELETE FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                      AND version=\"#{version}\" \
-                                      AND user=\"#{exec_specific.true_user}\""
-    db.run_query(query)
-    if (db.get_nb_affected_rows == 0) then
+    res = db.run_query(
+      "DELETE FROM environments WHERE name = ? AND version = ? AND user = ?",
+      exec_specific.env_name, version, exec_specific.true_user
+    )
+    if (res.affected_rows == 0) then
       Debug::distant_client_print("No environment has been deleted", client)
       return(1)
     end
@@ -1776,35 +1791,28 @@ class KadeployServer
     #If the user wants to print the environments of another user, private environments are not shown
     mask_private_env = exec_specific.true_user != user
 
+    args = []
+
+    query = "SELECT * FROM environments WHERE name = ? AND user = ?"
+    query += " AND visibility <> 'private'" if mask_private_env
+    args << exec_specific.env_name
+    args << user
+
     if (exec_specific.show_all_version == false) then
       if (exec_specific.version != "") then
         version = exec_specific.version
       else
         version = _get_max_version(db, exec_specific.env_name, user, exec_specific.true_user)
       end
-      if mask_private_env then
-        query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{user}\" \
-                                            AND version=\"#{version}\" \
-                                            AND visibility<>\"private\""
-      else
-        query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{user}\" \
-                                            AND version=\"#{version}\""
-      end
+
+      query += " AND version = ?"
+      args << version
     else
-      if mask_private_env then
-        query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{user}\" \
-                                            AND visibility<>\"private\" \
-                                            ORDER BY version"
-      else
-        query = "SELECT * FROM environments WHERE name=\"#{exec_specific.env_name}\" \
-                                            AND user=\"#{user}\" \
-                                            ORDER BY version"
-      end
+      query += " ORDER BY version"
     end
-    res = db.run_query(query)
+
+    res = db.run_query(query,*args)
+
     if (res.num_rows > 0) then
       res.each_hash { |row|
         Debug::distant_client_print("###", client)
@@ -1826,18 +1834,13 @@ class KadeployServer
   # * return the highest version number or -1 if no environment is found
   def _get_max_version(db, env_name, user, true_user)
     #If the user wants to print the environments of another user, private environments are not shown
-    if (user != true_user) then
-      query = "SELECT MAX(version) FROM environments WHERE user=\"#{user}\" \
-                                                     AND name=\"#{env_name}\" \
-                                                     AND visibility<>\"private\""
-    else
-      query = "SELECT MAX(version) FROM environments WHERE user=\"#{user}\" \
-                                                     AND name=\"#{env_name}\""
-    end
-    res = db.run_query(query)
+    query = "SELECT MAX(version) FROM environments WHERE user = ? AND name = ?"
+    query += " AND visibility <> 'private'" if (user != true_user)
+
+    res = db.run_query(query,user,env_name)
+
     if (res.num_rows > 0) then
-      row = res.fetch_row
-      return row[0]
+      return res.to_array[0][0]
     else
       return -1
     end
@@ -1869,10 +1872,12 @@ class KadeployServer
     else
       version = _get_max_version(db, env_name, env_user, true_user)
     end
-    query = "SELECT * FROM environments WHERE name=\"#{env_name}\" \
-                                        AND user=\"#{env_user}\" \
-                                        AND version=\"#{version}\""
-    res = db.run_query(query)
+
+    res = db.run_query(
+      "SELECT * FROM environments WHERE name = ? AND user = ? AND version = ?",
+      env_name, env_user, version
+    )
+    
     if (res.num_rows > 0) then
       res.each_hash  { |row|
         env = EnvironmentManagement::Environment.new
@@ -1880,11 +1885,11 @@ class KadeployServer
         md5 = client.get_file_md5(env.tarball["file"])
         if (md5 != 0) then
           tarball = "#{env.tarball["file"]}|#{env.tarball["kind"]}|#{md5}"         
-          query2 = "UPDATE environments SET tarball=\"#{tarball}\" WHERE name=\"#{env_name}\" \
-                                                                   AND user=\"#{env_user}\" \
-                                                                   AND version=\"#{version}\""
-          db.run_query(query2)
-          if (db.get_nb_affected_rows == 0) then
+          res = db.run_query(
+            "UPDATE environments SET tarball = ? WHERE name = ? AND user = ? AND version = ?",
+            tarball, env_name, env_user, version
+          )
+          if (res.affected_rows == 0) then
             Debug::distant_client_print("No update has been performed", client)
           end
         else
@@ -1925,10 +1930,10 @@ class KadeployServer
     else
       version = _get_max_version(db, env_name, env_user, true_user)
     end
-    query = "SELECT * FROM environments WHERE name=\"#{env_name}\" \
-                                        AND user=\"#{env_user}\" \
-                                        AND version=\"#{version}\""
-    res = db.run_query(query)
+    res = db.run_query(
+      "SELECT * FROM environments WHERE name = ? AND user = ? AND version = ?",
+      env_name, env_user, version
+    )
     if (res.num_rows > 0) then
       res.each_hash  { |row|
         env = EnvironmentManagement::Environment.new
@@ -1937,11 +1942,11 @@ class KadeployServer
           md5 = client.get_file_md5(env.preinstall["file"])
           if (md5 != 0) then
             tarball = "#{env.preinstall["file"]}|#{env.preinstall["kind"]}|#{md5}|#{env.preinstall["script"]}"
-            query2 = "UPDATE environments SET preinstall=\"#{tarball}\" WHERE name=\"#{env_name}\" \
-                                                                        AND user=\"#{env_user}\" \
-                                                                        AND version=\"#{version}\""
-            db.run_query(query2)
-            if (db.get_nb_affected_rows == 0) then
+            res = db.run_query(
+              "UPDATE environments SET preinstall = ? WHERE name = ? AND user = ? AND version = ?",
+              tarball, env_name, env_user, version
+            )
+            if (res.affected_rows == 0) then
               Debug::distant_client_print("No update has been performed", client)
             end
           else
@@ -1985,10 +1990,10 @@ class KadeployServer
     else
       version = _get_max_version(db, env_name, env_user, true_user)
     end
-    query = "SELECT * FROM environments WHERE name=\"#{env_name}\" \
-                                        AND user=\"#{env_user}\" \
-                                        AND version=\"#{version}\""
-    res = db.run_query(query)
+    res = db.run_query(
+      "SELECT * FROM environments WHERE name = ? AND user = ? AND version = ?",
+      env_name, env_user, version
+    )
     if (res.num_rows > 0) then
       res.each_hash  { |row|
         env = EnvironmentManagement::Environment.new
@@ -2007,12 +2012,11 @@ class KadeployServer
             end
           }
           if all_is_ok
-            query2 = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" \
-                                          WHERE name=\"#{env_name}\" \
-                                          AND user=\"#{env_user}\" \
-                                          AND version=\"#{version}\""
-            db.run_query(query2)
-            if (db.get_nb_affected_rows == 0) then
+            res = db.run_query(
+              "UPDATE environments SET postinstall = ? WHERE name = ? AND user = ?  AND version = ?",
+              postinstall_array.join(","), env_name, env_user, version
+            )
+            if (res.affected_rows == 0) then
               Debug::distant_client_print("No update has been performed", client)
             end
           end
@@ -2052,11 +2056,15 @@ class KadeployServer
     else
       version = _get_max_version(db, exec_specific.env_name, exec_specific.true_user, exec_specific.true_user)
     end
-    query = "UPDATE environments SET demolishing_env=0 WHERE name=\"#{exec_specific.env_name}\" \
-                                                       AND user=\"#{exec_specific.true_user}\" \
-                                                       AND version=\"#{version}\""
-    db.run_query(query)
-    if (db.get_nb_affected_rows == 0) then
+    res = db.run_query(
+      "UPDATE environments SET demolishing_env = 0 \
+       WHERE name = ? AND user = ? AND version = ?",
+      exec_specific.env_name,
+      exec_specific.true_user,
+      version
+    )
+        
+    if (res.affected_rows == 0) then
       Debug::distant_client_print("No update has been performed", client)
     end
   end
@@ -2074,12 +2082,14 @@ class KadeployServer
     if (exec_specific.visibility_tag == "public") && (not @config.common.almighty_env_users.include?(exec_specific.true_user)) then
       Debug::distant_client_print("Only the environment administrators can set the \"public\" tag", client)
     else
-      query = "UPDATE environments SET visibility=\"#{exec_specific.visibility_tag}\" \
-                                   WHERE name=\"#{exec_specific.env_name}\" \
-                                   AND user=\"#{user}\" \
-                                   AND version=\"#{exec_specific.version}\""
-      db.run_query(query)
-      if (db.get_nb_affected_rows == 0) then
+      res = db.run_query(
+        "UPDATE environments SET visibility = ? WHERE name = ? AND user = ? AND version = ?",
+        exec_specific.visibility_tag,
+        exec_specific.env_name,
+        user,
+        exec_specific.version
+      )
+      if (res.affected_rows == 0) then
         Debug::distant_client_print("No update has been performed", client)
       end
     end
@@ -2097,8 +2107,7 @@ class KadeployServer
     if (not @config.common.almighty_env_users.include?(exec_specific.true_user)) then
       Debug::distant_client_print("Only the environment administrators can move the files in the environments", client)
     else
-      query = "SELECT * FROM environments"
-      res = db.run_query(query)
+      res = db.run_query("SELECT * FROM environments")
       if (res.num_rows > 0) then
         #Let's check each environment
         res.each_hash { |row|
@@ -2106,10 +2115,11 @@ class KadeployServer
             ["tarball", "preinstall", "postinstall"].each { |kind_of_file|
               if row[kind_of_file].include?(file["src"]) then
                 modified_file = row[kind_of_file].gsub(file["src"], file["dest"])
-                query2 = "UPDATE environments SET #{kind_of_file}=\"#{modified_file}\" \
-                                            WHERE id=#{row["id"]}"
-                db.run_query(query2)
-                if (db.get_nb_affected_rows > 0) then
+                res = db.run_query(
+                  "UPDATE environments SET #{kind_of_file} = ? WHERE id = ?",
+                  modified_file, row['id']
+                )
+                if (res.affected_rows > 0) then
                   Debug::distant_client_print("The #{kind_of_file} of {#{row["name"]},#{row["version"]},#{row["user"]}} has been updated", client)
                   Debug::distant_client_print("Let's now update the md5 for this file", client)
                   send("_update_#{kind_of_file}_md5".to_sym,

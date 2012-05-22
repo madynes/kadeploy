@@ -807,16 +807,16 @@ module Nodes
     # * return an array that contains two NodeSet ([0] is the good nodes set and [1] is the bad nodes set)
     def check_nodes_in_deployment(db, purge)
       bad_nodes = NodeSet.new
-      hosts = Array.new
-      @set.each { |node|
-        hosts.push("hostname=\"#{node.hostname}\"")
-      }
-      query = "SELECT hostname FROM nodes WHERE state=\"deploying\" AND date > #{Time.now.to_i - purge} AND (#{hosts.join(" OR ")})"
-      res = db.run_query(query)
-      if (res != nil) then
-        while (row = res.fetch_row) do
-          bad_nodes.push(get_node_by_host(row[0]).dup)
-        end
+      args,nodelist = generic_where_nodelist()
+      args << (Time.now.to_i - purge)
+
+      res = db.run_query(
+        "SELECT hostname FROM nodes WHERE state='deploying' AND #{nodelist} AND date > ?",
+        *args
+      )
+
+      res.each_array do |row|
+        bad_nodes.push(get_node_by_host(row[0]).dup)
       end
       good_nodes = diff(bad_nodes)
 
@@ -836,50 +836,31 @@ module Nodes
     # Output
     # * return true if the state has been correctly modified, false otherwise
     def set_deployment_state(state, env_id, db, user)
-      hosts = Array.new
-      @set.each { |node|
-        hosts.push("hostname=\"#{node.hostname}\"")
-      }
+      args,nodelist = generic_where_nodelist()
       date = Time.now.to_i
       case state
       when "deploying"
-        query = "DELETE FROM nodes WHERE #{hosts.join(" OR ")}"
-        db.run_query(query)
+        db.run_query("DELETE FROM nodes WHERE #{nodelist}",*args)
+
         @set.each { |node|
-          query = "INSERT INTO nodes (hostname, state, env_id, date, user) \
-                   VALUES (\"#{node.hostname}\",\"deploying\",\"#{env_id}\",\"#{date}\",\"#{user}\")"
-          db.run_query(query)
+          db.run_query(
+            "INSERT INTO nodes (hostname, state, env_id, date, user) VALUES (?,'deploying',?,?,?)",
+             node.hostname,env_id,date,user
+          )
         }
       when "deployed"
-        @set.each { |node|
-          query = "UPDATE nodes SET state=\"deployed\" WHERE hostname=\"#{node.hostname}\""
-          db.run_query(query)
-        }
+        db.run_query("UPDATE nodes SET state='deployed' WHERE #{nodelist}",*args) unless args.empty?
       when "prod_env"
-         @set.each { |node|
-          query = "UPDATE nodes SET state=\"prod_env\" WHERE hostname=\"#{node.hostname}\""
-          db.run_query(query)
-        } 
+        db.run_query("UPDATE nodes SET state='prod_env' WHERE #{nodelist}",*args) unless args.empty?
       when "recorded_env"
-         @set.each { |node|
-          query = "UPDATE nodes SET state=\"recorded_env\" WHERE hostname=\"#{node.hostname}\""
-          db.run_query(query)
-        }
+        db.run_query("UPDATE nodes SET state='recorded_env' WHERE #{nodelist}",*args) unless args.empty?
       when "deploy_env"
-         @set.each { |node|
-          query = "UPDATE nodes SET state=\"deploy_env\",user=\"#{user}\",env_id=\"-1\",date=\"#{date}\" WHERE hostname=\"#{node.hostname}\""
-          db.run_query(query)
-        } 
+        args = [ user, date ] + args
+        db.run_query("UPDATE nodes SET state='deploy_env', user=?, env_id=\"-1\", date=? WHERE #{nodelist}",*args)
       when "aborted"
-        @set.each { |node|
-          query = "UPDATE nodes SET state=\"aborted\" WHERE hostname=\"#{node.hostname}\""
-          db.run_query(query)
-        }
+        db.run_query("UPDATE nodes SET state='aborted' WHERE #{nodelist}",*args) unless args.empty?
       when "deploy_failed"
-        @set.each { |node|
-          query = "UPDATE nodes SET state=\"deploy_failed\" WHERE hostname=\"#{node.hostname}\""
-          db.run_query(query)
-        }          
+        db.run_query("UPDATE nodes SET state='deploy_failed' WHERE #{nodelist}",*args)  unless args.empty?
       else
         return false
       end
@@ -894,14 +875,14 @@ module Nodes
     # Output
     # * return true if at least one node has been deployed with a demolishing environment
     def check_demolishing_env(db, threshold)
-      hosts = Array.new
-      @set.each { |node|
-        hosts.push("hostname=\"#{node.hostname}\"")
-      }
-      query = "SELECT hostname FROM nodes \
-                               INNER JOIN environments ON nodes.env_id=environments.id \
-                               WHERE demolishing_env>#{threshold} AND (#{hosts.join(" OR ")})"
-      res = db.run_query(query)
+      args,nodelist = generic_where_nodelist()
+      args << threshold
+      res = db.run_query(
+        "SELECT hostname FROM nodes \
+         INNER JOIN environments ON nodes.env_id = environments.id \
+         WHERE demolishing_env > ? AND #{nodelist}",
+        *args
+      )
       return (res.num_rows > 0)
     end
 
@@ -913,17 +894,25 @@ module Nodes
     # * return nothing
     def tag_demolishing_env(db)
       if not empty? then
-        hosts = Array.new
-        @set.each { |node|
-          hosts.push("hostname=\"#{node.hostname}\"")
-        }
-        query = "SELECT DISTINCT(env_id) FROM nodes WHERE #{hosts.join(" OR ")}"
-        res = db.run_query(query)
-        while (row = res.fetch_row) do
-          query2 = "UPDATE environments SET demolishing_env=demolishing_env+1 WHERE id=\"#{row[0]}\""
-          db.run_query(query2)
+        args,nodelist = generic_where_nodelist()
+        res = db.run_query("SELECT DISTINCT(env_id) FROM nodes WHERE #{nodelist}", *args)
+        res.each_array do |row|
+          db.run_query("UPDATE environments SET demolishing_env=demolishing_env+1 WHERE id=?", row[0])
         end
       end
+    end
+
+    def generic_where_nodelist(field='hostname', sep=' OR ')
+      ret = []
+      @set.each do |node|
+        if node.is_a?(Nodes::Node)
+          ret << node.hostname
+        else
+          ret << node
+        end
+      end
+      nodelist = "(#{(["#{field} = ?"] * ret.size).join(sep)})"
+      return [ ret, nodelist ]
     end
   end
 end

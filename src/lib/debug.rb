@@ -373,23 +373,52 @@ module Debug
     # * nothing
     def dump_to_db
       @nodes.each_pair { |hostname, node_infos|
-        query = "INSERT INTO log (deploy_id, user, hostname, \
-                                  step1, step2, step3, \
-                                  timeout_step1, timeout_step2, timeout_step3, \
-                                  retry_step1, retry_step2, retry_step3, \
-                                  start, \
-                                  step1_duration, step2_duration, step3_duration, \
-                                  env, anonymous_env, md5, \
-                                  success, error) \
-                        VALUES (\"#{node_infos["deploy_id"]}\", \"#{node_infos["user"]}\", \"#{hostname}\", \
-                                \"#{node_infos["step1"]}\", \"#{node_infos["step2"]}\", \"#{node_infos["step3"]}\", \
-                                \"#{node_infos["timeout_step1"]}\", \"#{node_infos["timeout_step2"]}\", \"#{node_infos["timeout_step3"]}\", \
-                                \"#{node_infos["retry_step1"]}\", \"#{node_infos["retry_step2"]}\", \"#{node_infos["retry_step3"]}\", \
-                                \"#{node_infos["start"].to_i}\", \
-                                \"#{node_infos["step1_duration"]}\", \"#{node_infos["step2_duration"]}\", \"#{node_infos["step3_duration"]}\", \
-                                \"#{node_infos["env"]}\", \"#{node_infos["anonymous_env"].to_s}\", \"#{node_infos["md5"]}\", \
-                                \"#{node_infos["success"]}\", \"#{node_infos["error"].gsub(/"/, "\\\"")}\")"
-        res = @db.run_query(query)
+        res = @db.run_query(
+         "INSERT INTO log ( \
+          deploy_id, \
+          user, \
+          hostname, \
+          step1, \
+          step2, \
+          step3, \
+          timeout_step1, \
+          timeout_step2, \
+          timeout_step3, \
+          retry_step1, \
+          retry_step2, \
+          retry_step3, \
+          start, \
+          step1_duration, \
+          step2_duration, \
+          step3_duration, \
+          env, \
+          anonymous_env, \
+          md5, \
+          success, \
+          error) \
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          node_infos["deploy_id"],
+          node_infos["user"],
+          hostname,
+          node_infos["step1"],
+          node_infos["step2"],
+          node_infos["step3"],
+          node_infos["timeout_step1"],
+          node_infos["timeout_step2"],
+          node_infos["timeout_step3"],
+          node_infos["retry_step1"],
+          node_infos["retry_step2"],
+          node_infos["retry_step3"],
+          node_infos["start"].to_i,
+          node_infos["step1_duration"],
+          node_infos["step2_duration"],
+          node_infos["step3_duration"],
+          node_infos["env"],
+          node_infos["anonymous_env"].to_s,
+          node_infos["md5"],
+          node_infos["success"].to_s,
+          node_infos["error"].gsub(/"/, "\\\"")
+        )
       }
     end
 

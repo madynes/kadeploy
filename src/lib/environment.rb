@@ -272,63 +272,58 @@ module EnvironmentManagement
     def load_from_db(name, version, specified_user, true_user, dbh, client)
       user = specified_user ? specified_user : true_user
       mask_private_env = true_user != user
-      if (version == nil) then
-        if mask_private_env then
-          query = "SELECT * FROM environments WHERE name=\"#{name}\" \
-                                              AND user=\"#{user}\" \
-                                              AND visibility<>\"private\" \
-                                              AND version=(SELECT MAX(version) FROM environments WHERE user=\"#{user}\" \
-                                                                                                 AND visibility<>\"private\" \
-                                                                                                 AND name=\"#{name}\")"
-        else
-          query = "SELECT * FROM environments WHERE name=\"#{name}\" \
-                                              AND user=\"#{user}\" \
-                                              AND version=(SELECT MAX(version) FROM environments WHERE user=\"#{user}\" \
-                                                                                                 AND name=\"#{name}\")"
 
-        end
+      args = []
+
+      query = "SELECT * FROM environments WHERE name=? AND user=?"
+      args << name
+      args << user
+      query += " AND visibility <> 'private'" if mask_private_env
+
+      if (version == nil) then
+        subquery = "SELECT MAX(version) FROM environments WHERE name = ? AND user = ?"
+        args << name
+        args << user
+        subquery += " AND visibility <> 'private'" if mask_private_env
+        query += " AND version = (#{subquery})"
       else
-        if mask_private_env then
-          query = "SELECT * FROM environments WHERE name=\"#{name}\" \
-                                              AND user=\"#{user}\" \
-                                              AND visibility<>\"private\" \
-                                              AND version=\"#{version}\""
-        else
-          query = "SELECT * FROM environments WHERE name=\"#{name}\" \
-                                              AND user=\"#{user}\" \
-                                              AND version=\"#{version}\""
-        end
+        query += "AND version = ?"
+        args << version
       end
-      res = dbh.run_query(query)
-      row = res.fetch_hash
-      if (row != nil) #We only take the first result since no other result should be returned
-        load_from_hash(row)
+
+      res = dbh.run_query(query, *args)
+      tmp = res.to_hash
+      unless tmp.empty? #We only take the first result since no other result should be returned
+        load_from_hash(tmp[0])
         return true
       end
-      
+
       #If no environment is found for the user, we check the public environments
       if (specified_user == nil) then
+        args = []
+        query = "SELECT * FROM environments WHERE name = ? AND user <> ? AND visibility = 'public'"
+        args << name
+        args << user
+
         if (version  == nil) then
-          query = "SELECT * FROM environments WHERE name=\"#{name}\" \
-                                              AND user<>\"#{user}\" \
-                                              AND visibility=\"public\" \
-                                              AND version=(SELECT MAX(version) FROM environments WHERE user<>\"#{user}\" \
-                                                                                                 AND visibility=\"public\" \
-                                                                                                 AND name=\"#{name}\")"
+          subquery = "SELECT MAX(version) FROM environments WHERE name = ? AND user <> ? AND visibility = 'public'"
+          args << name
+          args << user
+          query += " AND version = (#{subquery})"
         else
-          query = "SELECT * FROM environments WHERE name=\"#{name}\" \
-                                              AND user<>\"#{user}\" \
-                                              AND visibility=\"public\" \
-                                              AND version=\"#{version}\""
+          query = " AND version = ?"
+          args << version
         end
-        res = dbh.run_query(query)
-        row = res.fetch_hash
-        if (row != nil) #We only take the first result since no other result should be returned
-          load_from_hash(row)
+
+        res = dbh.run_query(query, *args)
+
+        tmp = res.to_hash
+        unless tmp.empty? #We only take the first result since no other result should be returned
+          load_from_hash(tmp[0])
           return true
         end
       end
-      
+
       Debug::distant_client_error("The environment #{name} cannot be loaded. Maybe the version number does not exist or it belongs to another user", client)
       return false
     end
@@ -571,14 +566,14 @@ module EnvironmentManagement
     # Output
     # * return true
     def set_md5(kind, file, hash, dbh)
-      query = String.new
+      query = ""
       case kind
       when "tarball"
         tarball = "#{@tarball["file"]}|#{@tarball["kind"]}|#{hash}"
-        query = "UPDATE environments SET tarball=\"#{tarball}\" WHERE id=\"#{@id}\""
+        query = "UPDATE environments SET tarball=\"#{tarball}\""
       when "presinstall"
         preinstall = "#{@preinstall["file"]}|#{@preinstall["kind"]}|#{hash}"
-        query = "UPDATE environments SET presinstall=\"#{preinstall}\" WHERE id=\"#{@id}\""
+        query = "UPDATE environments SET presinstall=\"#{preinstall}\""
       when "postinstall"
         postinstall_array = Array.new
         @postinstall.each { |p|
@@ -588,9 +583,11 @@ module EnvironmentManagement
             postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{p["md5"]}|#{p["script"]}")
           end
         }
-        query = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\" WHERE id=\"#{@id}\""
+        query = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\""
       end
-      dbh.run_query(query)
+      query += " WHERE id = ?"
+
+      dbh.run_query(query, @id)
       return true
     end
   end
