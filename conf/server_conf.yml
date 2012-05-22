@@ -1,0 +1,47 @@
+--- 
+purge_deployment_timer: 900
+log_to_syslog: true
+verbose_level: 3
+bt_download_timeout: 1800
+reboot_window_sleep_time: 10
+reboot_window: 50
+test_deploy_env_port: 25300
+kadeploy_cache_size: 500000
+kadeploy_tcp_buffer_size: 8192
+deploy_db_login: deploy
+pxe_kind: PXElinux
+nodes_check_window: 50
+kadeploy_server_port: 25300
+taktuk_auto_propagate: false
+ssh_port: 22
+max_postinstall_size: 20
+max_preinstall_size: 20
+tarball_dest_dir: /tmp
+demolishing_env_auto_tag: false
+dbg_to_syslog: true
+log_to_file: /tmp/kadeploy.log
+environment_extraction_dir: /mnt/dest
+deploy_db_passwd: deploy
+pxe_repository_kernels: kernels
+pxe_repository: /var/lib/tftpboot
+almighty_env_users: root,ejeanvoine
+taktuk_tree_arity: 0
+deploy_db_host: g5kdev
+pxe_export: /
+pxe_repository_kernels_max_size: 200
+set_vlan_cmd: kavlan NODES -s -i VLAN_ID -u USER
+vlan_hostname_suffix: -kavlan-VLAN_ID
+bt_tracker_ip: 172.24.100.2
+demolishing_env_threshold: 2
+rambin_path: /rambin
+kadeploy_cache_dir: /tmp/kadeploy_cache
+kadeploy_server: g5kdev
+async_end_of_deployment_hook: echo WORKFLOW_ID
+taktuk_connector: ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
+rights_kind: db
+bootloader: chainload_pxe
+log_to_db: true
+deploy_db_name: deploy
+mkfs_options: ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index
+dbg_to_syslog_level: 3
+db_kind: mysql

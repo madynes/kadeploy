@@ -1,0 +1,41 @@
+--- 
+partition_creation_kind: fdisk
+cmd_console: /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/console.sh HOSTNAME_SHORT
+cmd_very_hard_reboot: vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx start hard
+timeout_reboot_kexec: 60
+deploy_part: 3
+admin_post_install: 
+- script: launch_admin_post_install.sh
+  format: tgz
+  file: /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_post_install_g5kdev.tgz
+cmd_soft_reboot: ssh -A -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
+timeout_reboot_classical: 120
+deploy_kernel: deploy-vmlinuz-2.6.27.7
+cmd_hard_reboot: vmware-cmd /home/ejeanvoi/vmware/HOSTNAME_SHORT/HOSTNAME_SHORT.vmx reset hard
+admin_pre_install: 
+- script: launch_admin_pre_install.sh
+  format: tgz
+  file: /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_pre_install_g5kdev.tgz
+deploy_initrd: deploy-initrd-2.6.27.7
+tmp_part: 4
+prod_part: 2
+deploy_kernel_args: console=tty0 console=ttyS0,38400n8 rw
+macrosteps: 
+  BootNewEnv: 
+  - timeout: 150
+    type: Classical
+    retries: 1
+  BroadcastEnv: 
+  - timeout: 300
+    type: Chain
+    retries: 2
+  SetDeploymentEnv: 
+  - timeout: 200
+    type: Untrusted
+    retries: 2
+pxe_header: PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 1\n\nlabel bootlabel\n
+nfsroot_kernel: deploy-vmlinuz-2.6.27.7-nfsroot
+swap_part: 1
+nfsroot_params: rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=172.24.120.35:/mnt/nfsroot/rootfs init=/sbin/init
+kernel_params: console=tty0 console=ttyS0,38400n8
+block_device: /dev/hda
