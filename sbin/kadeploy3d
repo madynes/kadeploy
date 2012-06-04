@@ -19,7 +19,7 @@ Exit_handler_term()
     kill -15 $PID
 }
 
-if [ -x /etc/kadeploy3/load_kadeploy_env ]
+if [ -x /etc/kadeploy3/load_kadeploy_env ] && [ -z "${KADEPLOY_CONFIG_DIR}" ]
 then
     KADEPLOY_CONFIG_DIR=/etc/kadeploy3
     export KADEPLOY_CONFIG_DIR
