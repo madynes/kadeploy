@@ -1433,7 +1433,9 @@ The goal of the pre-install in the Kadeploy workflow is to prepare the disk of t
 \item mounting partition(s).
 \end{itemize}
 
-You can do want you want in the pre-install but you must that Kadeploy will extract the environment in the directory defined by the \texttt{environment\_extraction\_dir} field of the general configuration file. Commonly, this directory is \texttt{/mnt/dest}. Thus, you have to mount all the partitions you need in this directory. If you wish to deploy the environment onto several partitions, you can use for instance the following map:
+To setup a custom pre-install you first have to create an archive that contains your scripts. After that you have to tell kadeploy which script of your archive has to be executed, this is done by specifying the \texttt{preinstall} field in your environment description file (see section \ref{sec:env_desc}). Please be careful to use relative paths in your scripts since you dont know where they will be uncompressed.
+
+You can do want you want in the pre-install but you must know that Kadeploy will extract the environment in the directory defined by the \texttt{environment\_extraction\_dir} field of the general configuration file. Commonly, this directory is \texttt{/mnt/dest}. Thus, you have to mount all the partitions you need in this directory. If you wish to deploy the environment onto several partitions, you can use for instance the following map:
 \begin{itemize}
 \item /dev/sda3 $\mapsto$ /mnt/dest
 \item /dev/sda4 $\mapsto$ /mnt/dest/var
