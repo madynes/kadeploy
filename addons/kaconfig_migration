@@ -2,29 +2,33 @@
 
 require 'yaml'
 require 'fileutils'
+require 'optparse'
+
+
+# Default values and constants
 
 KAUSER='deploy'
 KAGROUP='deploy'
 
-PARTITION_FILE_PREFIX='cluster_partition-'
-CLUSTER_FILE_PREFIX='cluster_conf-'
+PARTITION_FILE_PREFIX ='cluster_partition-'
+CLUSTER_FILE_PREFIX   ='cluster_conf-'
 
 KACONFIG_PATH = '/etc/kadeploy3'
-KABACKUP_PATH = File.join(KACONFIG_PATH, 'configs.bak')
+KABACKUP_DIR = 'configs.bak'
 
 NEW_CONFIG = {
-  :server_conf => File.join(KACONFIG_PATH, 'server_conf.yml'),
-  :client_conf => File.join(KACONFIG_PATH, 'client_conf.yml'),
-  :clusters_conf => File.join(KACONFIG_PATH, 'clusters.yml'),
-  :cmds_conf => File.join(KACONFIG_PATH, 'cmd.yml'),
+  :server_conf => 'server_conf.yml',
+  :client_conf => 'client_conf.yml',
+  :clusters_conf => 'clusters.yml',
+  :cmds_conf => 'cmd.yml',
 }
 
 OLD_CONFIG = {
-  :server_conf => File.join(KACONFIG_PATH, 'conf'),
-  :client_conf => File.join(KACONFIG_PATH, 'client_conf'),
-  :clusters_conf => File.join(KACONFIG_PATH, 'clusters'),
-  :nodes_conf => File.join(KACONFIG_PATH, 'nodes'),
-  :cmds_conf => File.join(KACONFIG_PATH, 'cmd'),
+  :server_conf => 'conf',
+  :client_conf => 'client_conf',
+  :clusters_conf => 'clusters',
+  :nodes_conf => 'nodes',
+  :cmds_conf => 'cmd',
 }
 
 MACROSTEPS = [
@@ -33,18 +37,9 @@ MACROSTEPS = [
   'BootNewEnv',
 ]
 
-$clusters = nil
-$nodes = nil
 
 
-def cluster_partition_file(clname)
-  File.join(KACONFIG_PATH,"partition_file_#{clname}")
-end
-
-def cluster_config_file(clname)
-  File.join(KACONFIG_PATH,"specific_conf_#{clname}")
-end
-
+# Strings class improvements to test the content of a String
 class String
   BOOLEAN_VALUES_TRUE=['true','yes']
   BOOLEAN_VALUES_FALSE=['false','no','none']
@@ -72,6 +67,139 @@ class String
   end
 end
 
+
+
+# Options parsing
+
+$kaconfigpath   = KACONFIG_PATH
+$kabackuppath   = nil
+$kauser         = KAUSER
+$kagroup        = KAGROUP
+$part_prefix    = PARTITION_FILE_PREFIX
+$cluster_prefix = CLUSTER_FILE_PREFIX
+$setrights      = true
+
+$clusters = nil
+$nodes = nil
+$backupfiles = []
+$backup = true
+$confirm = true
+
+USAGE = "Usage: #{$0} [options]"
+
+optparse = OptionParser.new(USAGE) do |opts|
+	opts.on( '-h', '--help', 'Display this screen' ) do
+  		puts opts
+  		exit
+	end
+
+	opts.on( '-k', '--kadeploy-config-dir <PATH>', "Specify the path to the kadeploy (new) configuration files directory [default: '#{KACONFIG_PATH}']") do |k|
+  	$kaconfigpath = k
+	end
+
+	opts.on( '-b', '--kadeploy-backup-dir <PATH>', "Specify the path to the directory where kadeploy current configuration files should be saved [default: 'CONF_DIR/#{KABACKUP_DIR}']") do |b|
+  	$kabackuppath = b
+	end
+
+	opts.on( '-u', '--kadeploy-user <USERNAME>', "Specify the user that owns the configuration files [default: '#{KAUSER}]'") do |u|
+  	$kauser = u
+	end
+
+	opts.on( '-g', '--kadeploy-group <GROUPNAME>', "Specify the group of the configuration files [default: '#{KAGROUP}']") do |g|
+  	$kagroup = g
+	end
+
+	opts.on( '-c', '--cluster-file-prefix <PREFIX>', "Specify the prefix to be used for generated cluster specific files [default: '#{CLUSTER_FILE_PREFIX}']") do |c|
+  	$cluster_prefix = c
+	end
+
+	opts.on( '-p', '--partition-file-prefix <PREFIX>', "Specify the prefix to be used for partition files [default: '#{PARTITION_FILE_PREFIX}']") do |p|
+  	$part_prefix = p
+	end
+
+	opts.on( '-R', '--no-rights', "Do not set the USER/GROUP rights on generated files [default: enabled]") do
+  	$setrights = false
+	end
+
+	opts.on( '-B', '--no-backup', "Do not move current configuration files into the backup directory [default: enabled]") do
+  	$backup = false
+	end
+
+	opts.on( '-y', '--no-confirmation-dialog', "Disable the confirmation dialog [default: enabled]") do
+  	$confirm = false
+	end
+end
+
+begin
+  optparse.parse!
+rescue OptionParser::InvalidOption => e
+  $stderr.puts e.to_s
+  exit 1
+end
+
+
+
+# Signal handler
+trap('INT') do
+  abort_migration()
+end
+
+
+
+# Script methods
+def abort_migration()
+  $stderr.puts "\nMigration aborted."
+  exit 1
+end
+
+def get_cluster_partition_file(clname)
+  File.join($kaconfigpath,"partition_file_#{clname}")
+end
+
+def get_cluster_config_file(clname)
+  File.join($kaconfigpath,"specific_conf_#{clname}")
+end
+
+def get_config_file(filename)
+  File.join($kaconfigpath,filename)
+end
+
+def save_config_file(file, content_hash, options = { :sort=>true })
+  unless content_hash.empty?
+    if options[:sort]
+      # Ugly hack to enable yaml output sorting since the :SortKeys option do
+      # not work anymore and since OrderedHashes are only available in ruby 1.9
+      yaml = YAML::quick_emit(content_hash) do |out|
+        out.map(content_hash.taguri(), content_hash.to_yaml_style()) do |map|
+           #content_hash.sort_by { |k,v| k }.each{ |t| map.add(t[0],t[1]) }
+           content_hash.keys.sort.each { |k| map.add(k, content_hash[k]) }
+        end
+      end
+    else
+      yaml = content_hash.to_yaml
+    end
+
+    File.open(file,'w+') { |f| f.puts(yaml) }
+    FileUtils.chown($kauser,$kagroup,file) if $setrights
+  end
+end
+
+def migrate_file(file, options = {:content=>true, :errmsg=>true})
+  if File.exists?(file)
+    if options[:content]
+      content = File.read(file).split("\n")
+    else
+      content = nil
+    end
+
+    yield(content)
+
+    $backupfiles << file if $backup
+  else
+    $stderr.puts "### file not found '#{file}', ignored" if options[:errmsg]
+  end
+end
+
 def parse_key_val(line)
   key,val = nil
   if line =~ /^\s*([^\s#]+)\s*=\s*(.*)\s*$/
@@ -89,111 +217,140 @@ def parse_key_val(line)
 end
 
 
-puts 'Starting migration'
 
-FileUtils.mkdir_p(KABACKUP_PATH)
-FileUtils.chown_R(KAUSER,KAGROUP,KABACKUP_PATH)
+# Treatment
 
-if File.exists?(OLD_CONFIG[:server_conf])
-  tmp = File.read(OLD_CONFIG[:server_conf]).split("\n")
+$kabackuppath = File.join($kaconfigpath,KABACKUP_DIR) unless $kabackuppath
+
+# Confirmation dialog
+if $confirm
+  puts "\nMigration settings"
+  puts "  Configuration directory : #{$kaconfigpath}"
+  puts "  Backup directory        : #{$kabackuppath}"
+  puts "  Set rights to files     : #{$setrights}"
+  puts "  Move files to backup dir: #{$backup}"
+  puts "  Kadeploy user           : #{$kauser}"
+  puts "  Kadeploy group          : #{$kagroup}"
+  puts "  Partition files prefix  : #{$part_prefix}"
+  puts "  Cluster spefific files prefix\t: #{$cluster_prefix}"
+  print "\nAre this settings ok [y/N]? "
+
+  abort_migration() unless gets.chomp.downcase == 'y'
+end
+
+#
+# Migration
+puts "\nStarting migration"
+
+FileUtils.mkdir_p($kabackuppath) if $backup
+
+# Migration of server_conf file
+curfile = get_config_file(OLD_CONFIG[:server_conf])
+migrate_file(curfile) do |content|
   config = {}
-  tmp.each do |line|
+
+  content.each do |line|
     key,val = parse_key_val(line)
     config[key] = val if key
   end
 
-  unless config.empty?
-    File.open(NEW_CONFIG[:server_conf],'w+') { |f| f.puts(config.to_yaml) }
-    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:server_conf])
-  end 
-  FileUtils.mv(OLD_CONFIG[:server_conf],KABACKUP_PATH)
-  puts "  migration of '#{OLD_CONFIG[:server_conf]}' ok"
-else
-  puts "### file not found '#{OLD_CONFIG[:server_conf]}', ignored"
+  save_config_file(get_config_file(NEW_CONFIG[:server_conf]),config)
+
+  puts "  migration of '#{curfile}' ok"
 end
 
-if File.exists?(OLD_CONFIG[:client_conf])
-  tmp = File.read(OLD_CONFIG[:client_conf]).split("\n")
+# Migration of client_conf file
+curfile = get_config_file(OLD_CONFIG[:client_conf])
+migrate_file(curfile, :errmsg => false) do |content|
   config = {}
-  tmp.each do |line|
+
+  content.each do |line|
     key,val = parse_key_val(line)
     config[key] = val if key
   end
 
-  unless config.empty?
-    File.open(NEW_CONFIG[:client_conf],'w+') { |f| f.puts(config.to_yaml) }
-    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:client_conf])
-  end
-  FileUtils.mv(OLD_CONFIG[:client_conf],KABACKUP_PATH)
-  puts "  migration of '#{OLD_CONFIG[:client_conf]}' ok"
-else
-  puts "### file not found '#{OLD_CONFIG[:client_conf]}', ignored"
+  save_config_file(get_config_file(NEW_CONFIG[:client_conf]),config)
+
+  puts "  migration of '#{curfile}' ok"
 end
 
-if File.exists?(OLD_CONFIG[:clusters_conf])
+# Migration of cmds file
+curfile = get_config_file(OLD_CONFIG[:cmds_conf])
+migrate_file(curfile) do |content|
+  config = {}
+
+  content.each do |cmd|
+    if cmd =~ /^\s*([^\s#]+)\s*\|\s*(\S+)\s*\|\s*(.+)$/
+      node = Regexp.last_match(1)
+      config[node] = {} unless config[node]
+      config[node][Regexp.last_match(2)] = Regexp.last_match(3)
+    end
+  end
+
+  save_config_file(get_config_file(NEW_CONFIG[:cmds_conf]),config)
+
+  puts "  migration of '#{curfile}' ok"
+end
+
+# Migration of clusters, nodes and specific_conf_* files merging them into clusters.yml
+migrate_file(get_config_file(OLD_CONFIG[:clusters_conf])) do |content|
   $clusters = []
-  tmp = File.read(OLD_CONFIG[:clusters_conf]).split("\n")
-  tmp.each do |line|
+  content.each do |line|
     $clusters << Regexp.last_match(1).strip if line =~ /^\s*([^\s#].*)$/
   end
-  FileUtils.mv(OLD_CONFIG[:clusters_conf],KABACKUP_PATH)
-else
-  puts "### file not found '#{OLD_CONFIG[:clusters_conf]}', ignored"
 end
 
-if File.exists?(OLD_CONFIG[:nodes_conf])
+migrate_file(get_config_file(OLD_CONFIG[:nodes_conf])) do |content|
   $nodes = []
-  tmp = File.read(OLD_CONFIG[:nodes_conf]).split("\n")
-  tmp.each do |line|
+  content.each do |line|
     $nodes << Regexp.last_match(1).strip.split if line =~ /^\s*([^\s#].*)$/
   end
-  FileUtils.mv(OLD_CONFIG[:nodes_conf],KABACKUP_PATH)
-else
-  puts "### file not found '#{OLD_CONFIG[:nodes_conf]}', ignored"
 end
 
 clconfig = {}
 if $clusters and !$clusters.empty?
+    puts "  migration of clusters, nodes and specific files"
   $clusters.each do |cluster|
-  puts "  migration of cluster '#{cluster}' config"
+    puts "    migration of cluster '#{cluster}' config"
+
     clconfig[cluster] = {}
 
-    old_partition_file = cluster_partition_file(cluster)
-    new_partition_file = File.join(KACONFIG_PATH,"#{PARTITION_FILE_PREFIX}#{cluster}")
+    old_partition_file = get_cluster_partition_file(cluster)
+    new_partition_file = get_config_file("#{$part_prefix}#{cluster}")
 
-    if File.exists?(old_partition_file)
+    migrate_file(old_partition_file, :content => false) do
       FileUtils.cp(old_partition_file,new_partition_file)
-      FileUtils.chown(KAUSER,KAGROUP,new_partition_file)
-      FileUtils.mv(old_partition_file,KABACKUP_PATH)
+      FileUtils.chown($kauser,$kagroup,new_partition_file) if $setrights
       clconfig[cluster]['partition_file'] = new_partition_file
-      puts "    migration of '#{old_partition_file}' ok"
-    else
-      puts "### file not found '#{old_partition_file}', ignored"
+      puts "      migration of '#{old_partition_file}' ok"
     end
 
-    old_config_file = cluster_config_file(cluster)
-    new_config_file = File.join(KACONFIG_PATH,"#{CLUSTER_FILE_PREFIX}#{cluster}.yml")
-    if File.exists?(old_config_file)
-      tmp = File.read(old_config_file).split("\n")
+    old_config_file = get_cluster_config_file(cluster)
+    new_config_file = get_config_file("#{$cluster_prefix}#{cluster}.yml")
+
+    migrate_file(old_config_file) do |content|
       config = {}
+
       config['macrosteps'] = {}
-      tmp.each do |line|
+
+      content.each do |line|
         key,val = parse_key_val(line)
-	next unless key
+	      next unless key
+
         case key.downcase
           when 'macrostep'
             macroname,macroval = val.split('|')
             macroinsts = macroval.split(',')
             macroinsts.each do |macroinst|
-              macrotmp = macroinst.split(':')
+              tmp = macroinst.split(':')
               config['macrosteps'][macroname] = [] unless config['macrosteps'][macroname]
               MACROSTEPS.each do |stepname|
-                macrotmp[0].sub!(stepname,'') if macrotmp[0].include?(stepname)
+                tmp[0].sub!(stepname,'') if tmp[0].include?(stepname)
               end
               config['macrosteps'][macroname] << {
-                'type' => macrotmp[0],
-                'retries' => macrotmp[1].to_i,
-                'timeout' => macrotmp[2].to_i,
+                'type' => tmp[0],
+                'retries' => tmp[1].to_i,
+                'timeout' => tmp[2].to_i,
               }
             end
           when 'admin_pre_install','admin_post_install'
@@ -218,15 +375,11 @@ if $clusters and !$clusters.empty?
         end
       end
 
-      unless config.empty?
-        File.open(new_config_file,'w+') { |f| f.puts(config.to_yaml) }
-        FileUtils.chown(KAUSER,KAGROUP,new_config_file)
-      end
-      FileUtils.mv(old_config_file,KABACKUP_PATH)
+      save_config_file(new_config_file,config)
+
       clconfig[cluster]['conf_file'] = new_config_file
-      puts "    migration of '#{old_config_file}' ok"
-    else
-      puts "### file not found '#{old_partition_file}', ignored"
+
+      puts "      migration of '#{old_config_file}' ok"
     end
 
     clconfig[cluster]['nodes'] = []
@@ -240,32 +393,24 @@ if $clusters and !$clusters.empty?
         end
       end
     end
-    puts "    migration of nodes ok"
+    puts "    migration of '#{get_config_file(OLD_CONFIG[:nodes_conf])}' ok"
   end
 
-  unless config.empty?
-    File.open(NEW_CONFIG[:clusters_conf],'w+') { |f| f.puts(clconfig.to_yaml) }
-    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:clusters_conf])
+  save_config_file(
+    get_config_file(NEW_CONFIG[:clusters_conf]),
+    clconfig,
+    :sort=> false
+  )
+  puts "    migration of '#{get_config_file(OLD_CONFIG[:clusters_conf])}' ok"
+end
+
+# Backup of old files
+if $backup and !$backupfiles.empty?
+  puts "  Moving old files to backup directory"
+  $backupfiles.each do |file|
+    FileUtils.mv(file,$kabackuppath)
+    puts "  #{file} ok"
   end
 end
 
-if File.exists?(OLD_CONFIG[:cmds_conf])
-  config = {}
-  cmds = File.read(OLD_CONFIG[:cmds_conf]).split("\n")
-  cmds.each do |cmd|
-    if cmd =~ /^\s*([^\s#]+)\s*\|\s*(\S+)\s*\|\s*(.+)$/
-      node = Regexp.last_match(1)
-      config[node] = {} unless config[node]
-      config[node][Regexp.last_match(2)] = Regexp.last_match(3)
-    end
-  end
-
-  unless config.empty?
-    File.open(NEW_CONFIG[:cmds_conf],'w+') { |f| f.puts(config.to_yaml) }
-    FileUtils.chown(KAUSER,KAGROUP,NEW_CONFIG[:cmds_conf])
-  end
-  FileUtils.mv(OLD_CONFIG[:cmds_conf],KABACKUP_PATH)
-  puts "  migration of '#{OLD_CONFIG[:cmds_conf]}' ok"
-else
-  puts "### file not found '#{OLD_CONFIG[:cmds_conf]}', ignored"
-end
+puts "Migration done."
