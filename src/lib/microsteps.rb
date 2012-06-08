@@ -717,7 +717,7 @@ module MicroStepsLibrary
       }
       must_extract = false
       archive = @config.exec_specific.environment.tarball["file"]
-      dest_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
+      dest_dir = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels)
       files.each { |file|
         if not (File.exist?(File.join(dest_dir, @config.exec_specific.prefix_in_cache + File.basename(file)))) then
           must_extract = true
@@ -1449,7 +1449,7 @@ module MicroStepsLibrary
             when "linux"
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
-              images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
+              images_dir = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
                 failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
                 return false
@@ -1473,7 +1473,7 @@ module MicroStepsLibrary
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
-              images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
+              images_dir = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
                 failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
                 return false
@@ -1500,7 +1500,7 @@ module MicroStepsLibrary
                 return false
               end
             end
-            Cache::clean_cache(File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+            Cache::clean_cache(File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
                                @config.common.pxe_repository_kernels_max_size * 1024 * 1024,
                                1,
                                /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/,
@@ -1515,7 +1515,7 @@ module MicroStepsLibrary
               kernel = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.kernel)
               initrd = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.initrd) if (@config.exec_specific.environment.initrd != nil)
               hypervisor = @config.exec_specific.prefix_in_cache + File.basename(@config.exec_specific.environment.hypervisor)
-              images_dir = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels)
+              images_dir = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels)
               if not system("touch -a #{File.join(images_dir, kernel)}") then
                 failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
                 return false
@@ -1541,7 +1541,7 @@ module MicroStepsLibrary
                 failed_microstep("Cannot perform the set_pxe_for_xen operation")
                 return false
               end
-              Cache::clean_cache(File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+              Cache::clean_cache(File.join(@config.common.pxe_repository, @config.commony.pxe_repository_kernels),
                                  @config.common.pxe_repository_kernels_max_size * 1024 * 1024,
                                  1,
                                  /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
