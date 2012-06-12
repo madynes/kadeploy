@@ -1541,7 +1541,7 @@ module MicroStepsLibrary
                 failed_microstep("Cannot perform the set_pxe_for_xen operation")
                 return false
               end
-              Cache::clean_cache(File.join(@config.common.pxe_repository, @config.commony.pxe_repository_kernels),
+              Cache::clean_cache(File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
                                  @config.common.pxe_repository_kernels_max_size * 1024 * 1024,
                                  1,
                                  /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
