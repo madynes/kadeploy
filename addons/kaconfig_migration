@@ -3,7 +3,7 @@
 require 'yaml'
 require 'fileutils'
 require 'optparse'
-
+require 'pp'
 
 # Default values and constants
 
@@ -37,7 +37,54 @@ MACROSTEPS = [
   'BootNewEnv',
 ]
 
+# For description purpose
+class Boolean
+end
 
+# Hack to enable nested Hashes merging
+class Hash
+  def merge!(hash)
+    return unless hash.is_a?(Hash)
+    hash.each_pair do |k,v|
+      if self[k]
+        if v.is_a?(Hash)
+          self[k].merge!(v)
+        elsif v.is_a?(Array)
+          # Keep array's order
+          v.each_index do |i|
+            self[k][i] = v[i] unless v[i].nil?
+          end
+        else
+          self[k] = v
+        end
+      else
+        self[k] = v
+      end
+    end
+  end
+
+  def merge(hash)
+    ret = self.dup
+    return ret unless hash.is_a?(Hash)
+    hash.each_pair do |k,v|
+      if ret[k]
+        if v.is_a?(Hash)
+          ret[k] = ret[k].merge(v)
+        elsif v.is_a?(Array)
+          # Keep array's order
+          v.each_index do |i|
+            ret[k][i] = v[i] unless v[i].nil?
+          end
+        else
+          ret[k] = v
+        end
+      else
+        ret[k] = v
+      end
+    end
+    ret
+  end
+end
 
 # Strings class improvements to test the content of a String
 class String
@@ -67,6 +114,526 @@ class String
   end
 end
 
+# Description of a configuration resource and the way to migrate it
+class ConfigValue
+  attr_reader :oldname, :type, :default, :migmethod
+  attr_accessor :newname
+
+  def initialize(oldname, type, default = nil, migmeth = nil, listmeth = nil)
+    @oldname = oldname
+    @type = type
+    @default = default
+    @migmeth = migmeth
+    @listmeth = listmeth
+  end
+
+  def value(content)
+    ret = nil
+    if content
+      if @listmeth
+        ret = []
+        begin
+          list = @listmeth.call(content)
+        rescue Exception
+          raise ArgumentError.new(ConfigValue.errmsg("Unable to split as a list"))
+        end
+        list.each do |elem|
+          if @migmeth
+            begin
+              ret << @migmeth.call(elem)
+            rescue Exception
+              raise ArgumentError.new(errmsg("Unable to apply migration method"))
+            end
+          else
+            ret << elem
+          end
+        end
+      else
+        if @migmeth
+          begin
+            ret = @migmeth.call(content)
+          rescue Exception
+            raise ArgumentError.new(errmsg("Unable to apply migration method"))
+          end
+        else
+          ret = content
+        end
+      end
+    else
+      ret = @default
+    end
+
+    cast(ret)
+  end
+
+  def cast(value, type=nil)
+    # Cast to the specified type
+    type = @type if type.nil?
+    ret = nil
+    if value.is_a?(Array)
+      ret = value
+      value.collect! { |val| cast(val) }
+    elsif value
+      begin
+        if type == Fixnum
+          ret = Integer(value)
+        elsif type == Float
+          ret = Float(value)
+        elsif type == Boolean
+          ret = value.to_b
+        elsif type.is_a?(Array)
+          type.each do |t|
+            begin
+              ret = cast(value,t)
+              break
+            rescue ArgumentError
+            end
+          end
+        else
+          ret = value
+        end
+      rescue Exception
+        raise ArgumentError.new(errmsg(
+          "Unable to cast value '#{value}' to #{type.name}"
+        ))
+      end
+    end
+    ret
+  end
+
+  def ConfigValue.[](name,type,default=nil,migmeth=nil,listmeth=nil)
+    ConfigValue.new(name,type,default,migmeth,listmeth)
+  end
+
+  def errmsg(msg)
+    "migration error [field: #{@oldname}], #{msg}"
+  end
+end
+
+class ConfigIter
+  attr_reader :value
+
+  def initialize(hash)
+    @value = hash
+  end
+
+  def ConfigIter.[](hash)
+    ConfigIter.new(hash)
+  end
+end
+
+class ConfigDrop < ConfigValue
+  def ConfigDrop.[](name)
+    ConfigDrop.new(name,FalseClass)
+  end
+end
+
+# Allow to cache associations between old key names and new ConfigValues
+class ConfigWrapper
+  def initialize()
+    @newconf = {}
+  end
+
+  def add(path, config)
+    config.newname = path
+    @newconf[config.oldname] = [] unless @newconf[config.oldname]
+    @newconf[config.oldname] << config
+  end
+
+  def parse(curval, curpath=[])
+    if curval.is_a?(Hash)
+      curval.each_pair do |k,v|
+        curpath.push(k)
+        parse(v,curpath)
+        curpath.pop
+      end
+    elsif curval.is_a?(Array)
+      curval.each_index do |i|
+        curpath.push(i)
+        parse(curval[i],curpath)
+        curpath.pop
+      end
+    elsif curval.is_a?(ConfigIter)
+      curpath.push(ConfigIter)
+      parse(curval.value,curpath)
+      curpath.pop
+    elsif curval.is_a?(ConfigValue)
+      add(curpath.dup,curval)
+    end
+  end
+
+  def path2hash(path, value)
+    ret = nil
+    if path.empty?
+      ret = value
+    else
+      path.reverse_each do |cur|
+        next if cur == ConfigIter
+        if ret.nil?
+          if cur.is_a?(Fixnum)
+            ret = []
+          else
+            ret = {}
+          end
+          ret[cur] = value
+        else
+          tmp = ret
+          if cur.is_a?(Fixnum)
+            ret = []
+          else
+            ret = {}
+          end
+          ret[cur] = tmp
+        end
+      end
+    end
+    ret
+  end
+
+  def migrate(oldname, value)
+    ret = nil
+    unless @newconf[oldname].nil?
+      begin
+        path = nil
+        @newconf[oldname].each do |confval|
+          break if confval.is_a?(ConfigDrop)
+          path = confval.newname[0..-2] unless path
+          break if value.nil?
+          newval = confval.value(value)
+          if newval.is_a?(Array)
+            ret = [] unless ret
+            newval.each_index do |i|
+              ret[i] = {} unless ret[i]
+              ret[i][confval.newname.last] = newval[i] unless newval[i].nil?
+            end
+          else
+            ret = {} unless ret
+            ret[confval.newname.last] = newval unless newval.nil?
+          end
+        end
+        #puts "#{oldname}: #{path.pretty_inspect}"
+        ret = path2hash(path,ret) if !ret.nil? and ret.size > 0
+      rescue ArgumentError => ae
+        raise ae if $error
+      end
+    else
+      raise ArgumentError.new(
+        "No rules to migrate the '#{oldname}' field"
+      ) if $error
+    end
+    ret
+  end
+end
+
+SERVER_CONF = {
+  'database' => {
+    'kind' => ConfigValue['db_kind', String],
+    'host' => ConfigValue['deploy_db_host', String],
+    'name' => ConfigValue['deploy_db_name', String],
+    'login' => ConfigValue['deploy_db_login', String],
+    'passwd' => ConfigValue['deploy_db_passwd', String],
+  },
+  'rights' => {
+    'kind' => ConfigValue['rights_kind', String],
+    'almighty_users' => ConfigValue['almighty_env_users', String],
+    'purge_deployment_timer' => ConfigValue['purge_deployment_timer', Fixnum],
+  },
+  'logs' => {
+    'file' => ConfigValue['log_to_file', String],
+    'syslog' => ConfigValue['log_to_syslog', Boolean],
+    'database' => ConfigValue['log_to_db', Boolean],
+    'debug' => ConfigValue['dbg_to_syslog', Boolean],
+  },
+  'verbosity' => {
+    'clients' => ConfigValue['verbose_level', Fixnum],
+    'logs' => ConfigValue['dbg_to_syslog_level', Fixnum],
+  },
+  'cache' => {
+    'directory' => ConfigValue['kadeploy_cache_dir', String],
+    'size' => ConfigValue['kadeploy_cache_size', Fixnum],
+  },
+  'network' => {
+    'vlan' => {
+      'hostname_suffix' => ConfigValue['vlan_hostname_suffix', String],
+      'set_cmd' => ConfigValue['set_vlan_cmd', String],
+    },
+    'ports' => {
+      'kadeploy_server' => ConfigValue['kadeploy_server_port', Fixnum],
+      'test_deploy_env' => ConfigValue['test_deploy_env_port', Fixnum],
+      'ssh' => ConfigValue['ssh_port', Fixnum],
+    },
+    'tcp_buffer_size' => ConfigValue['kadeploy_tcp_buffer_size', Fixnum],
+    'server_hostname' => ConfigValue['kadeploy_server', String]
+  },
+  'windows' => {
+    'reboot' => {
+      'size' => ConfigValue['reboot_window', Fixnum],
+      'sleep_time' => ConfigValue['reboot_window_sleep_time', Fixnum],
+    },
+    'check' => {
+      'size' => ConfigValue['nodes_check_window', Fixnum],
+    },
+  },
+  'environments' => {
+    'deployment' => {
+      'extraction_dir' => ConfigValue['environment_extraction_dir', String],
+      'rambin_dir' => ConfigValue['rambin_path', String],
+      'tarball_dir' => ConfigValue['tarball_dest_dir', String],
+    },
+    'demolishing' => {
+      'auto_tag' => ConfigValue['demolishing_env_auto_tag', Boolean],
+      'tag_threshold' => ConfigValue['demolishing_env_threshold', Fixnum],
+    },
+    'max_preinstall_size' => ConfigValue['max_preinstall_size', Fixnum],
+    'max_postinstall_size' => ConfigValue['max_postinstall_size', Fixnum],
+  },
+  'pxe' => {
+    'kind' => ConfigValue[nil, String, 'PXElinux'],
+    'export' => ConfigValue[nil, String, '/'],
+    'repository' => ConfigValue['tftp_repository', String],
+    'kernels' => {
+      'directory' => ConfigValue['tftp_images_path', String],
+      'max_size' => ConfigValue['tftp_images_max_size', Fixnum],
+    },
+    'bootloader' => ConfigValue['bootloader', String],
+  },
+  'hooks' => {
+    'async' => {
+      'end_of_deployment' => ConfigValue['async_end_of_deployment_hook', String],
+      'end_of_reboot' => ConfigValue['async_end_of_reboot_hook', String],
+      'end_of_power' => ConfigValue['async_end_of_power_hook', String],
+    }
+  },
+  'external' => {
+    'taktuk' => {
+      'connector' => ConfigValue['taktuk_connector', String],
+      'tree_arity' => ConfigValue['taktuk_tree_arity', Fixnum],
+      'auto_propagate' => ConfigValue['taktuk_auto_propagate', Boolean],
+    },
+    'bittorrent' => {
+      'tracker_ip' => ConfigValue['bt_tracker_ip', String],
+      'download_timeout' => ConfigValue['bt_download_timeout', Fixnum],
+    },
+    'kastafior' => {
+      'binary' => ConfigValue[nil, String],
+    },
+    'grub' => {
+      'version' => ConfigValue[nil, Fixnum, 2],
+    },
+    'mkfs' => ConfigIter[
+      'fstype' => ConfigValue['mkfs_options', String, nil,
+        lambda { |old| old.split('@')[0] },
+        lambda { |old| old.split('|') }
+      ],
+      'args' => ConfigValue['mkfs_options', String, nil,
+        lambda { |old| old.split('@')[1] },
+        lambda { |old| old.split('|') }
+      ],
+    ],
+  },
+  'tftp_cfg' => ConfigDrop['tftp_cfg'],
+  'rsh_port' => ConfigDrop['rsh_port'],
+  'use_rsh_to_deploy' => ConfigDrop['use_rsh_to_deploy']
+}
+SERVER_SORT = [
+  'database',
+  'rights',
+  'logs',
+  'verbosity',
+  'cache',
+  'network',
+  'windows',
+  'environments',
+  'pxe',
+  'hooks',
+  'external',
+]
+
+split_cmd = lambda do |old|
+  tmp = old.split(',')
+  (tmp.size > 1 ? tmp[0..-2] : tmp[0])
+end
+split_group = lambda do |old|
+  tmp = old.split(',')
+  (tmp.size > 1 ? tmp[-1] : nil)
+end
+name_soft = lambda { |old| 'soft' }
+name_hard = lambda { |old| 'hard' }
+name_very_hard = lambda { |old| 'very_hard' }
+SPECIFIC_CONF = {
+  'partitioning' => {
+    'block_device' => ConfigValue['block_device', String],
+    'kind' => ConfigValue['partition_creation_kind', String],
+    'partitions' => {
+      'swap' => ConfigValue['swap_part', Fixnum],
+      'prod' => ConfigValue['prod_part', Fixnum],
+      'deploy' => ConfigValue['deploy_part', Fixnum],
+      'tmp' => ConfigValue['tmp_part', Fixnum],
+    },
+  },
+  'timeouts' => {
+    'reboot' => ConfigValue['timeout_reboot_classical', [Fixnum, String]],
+    'kexec' => ConfigValue['timeout_reboot_kexec', [Fixnum, String]],
+  },
+  'remoteops' => {
+    'console' => [
+      {
+        'name' => ConfigValue["cmd_console", String, '', name_soft],
+        'cmd' => ConfigValue['cmd_console', String, '', split_cmd],
+        'group' => ConfigValue['cmd_console', String, '', split_group],
+      },
+    ],
+    'power_status' => [
+      {
+        'name' => ConfigValue["cmd_power_status", String, '', name_soft],
+        'cmd' => ConfigValue['cmd_power_status', String, '', split_cmd],
+        'group' => ConfigValue['cmd_power_status', String, '', split_group],
+      },
+    ]
+  },
+  'kernels' => {
+    'user' => {
+      'params' => ConfigValue["kernel_params", String],
+    },
+    'deploy' => {
+      'vmlinuz' => ConfigValue["deploy_kernel", String],
+      'initrd' => ConfigValue["deploy_initrd", String],
+      'params' => ConfigValue["deploy_kernel_args", String, ''],
+      'drivers' => ConfigValue["drivers", String],
+    },
+    'nfsroot' => {
+      'vmlinuz' => ConfigValue["nfsroot_kernel", String],
+      'params' => ConfigValue["nfsroot_params", String],
+    }
+  },
+  'preinstall' => {
+    'files' => ConfigIter[
+      {
+        'file' => ConfigValue['admin_pre_install', String, nil,
+          lambda { |old| old.split('|')[0] }, lambda { |old| old.split(',') }
+        ],
+        'format' => ConfigValue['admin_pre_install', String, nil,
+          lambda { |old| old.split('|')[1] }, lambda { |old| old.split(',') }
+        ],
+        'script' => ConfigValue['admin_pre_install', String, nil,
+          lambda { |old| old.split('|')[2] }, lambda { |old| old.split(',') }
+        ]
+      }
+    ]
+  },
+  'postinstall' => {
+    'files' => ConfigIter[
+      {
+        'file' => ConfigValue['admin_post_install', String, nil,
+          lambda { |old| old.split('|')[0] }, lambda { |old| old.split(',') }
+        ],
+        'format' => ConfigValue['admin_post_install', String, nil,
+          lambda { |old| old.split('|')[1] }, lambda { |old| old.split(',') }
+        ],
+        'script' => ConfigValue['admin_post_install', String, nil,
+          lambda { |old| old.split('|')[2] }, lambda { |old| old.split(',') }
+        ]
+      }
+    ]
+  },
+  'kexec' => {
+    'repository' => ConfigValue["kexec_repository", String],
+  },
+  'pxe' => {
+    'headers' => ConfigValue["pxe_header", String],
+  },
+  'automata' => {
+    'macrosteps' => {
+    },
+  },
+  'hooks' => {
+    'use_ip_to_deploy' => ConfigValue["use_ip_to_deploy", Boolean],
+  },
+}
+multicmd = Proc.new do |name|
+{
+  name => [
+    {
+      'name' => ConfigValue["cmd_soft_#{name}", String, '', name_soft],
+      'cmd' => ConfigValue["cmd_soft_#{name}", String, '', split_cmd],
+      'group' => ConfigValue["cmd_soft_#{name}", String, '', split_group],
+    },
+    {
+      'name' => ConfigValue["cmd_hard_#{name}", String, '', name_hard],
+      'cmd' => ConfigValue["cmd_hard_#{name}", String, '', split_cmd],
+      'group' => ConfigValue["cmd_hard_#{name}", String, '', split_group],
+    },
+    {
+      'name' => ConfigValue["cmd_very_hard_#{name}", String, '', name_very_hard],
+      'cmd' => ConfigValue["cmd_very_hard_#{name}", String, '', split_cmd],
+      'group' => ConfigValue["cmd_very_hard_#{name}", String, '', split_group],
+    },
+  ]
+}
+end
+SPECIFIC_CONF['remoteops'].merge!(multicmd.call('reboot'))
+SPECIFIC_CONF['remoteops'].merge!(multicmd.call('power_on'))
+SPECIFIC_CONF['remoteops'].merge!(multicmd.call('power_off'))
+multimacro = Proc.new do |name|
+{
+  name => ConfigIter[
+    {
+      'type' => ConfigValue["macrostep_#{name}", String, nil,
+        lambda { |old| (
+          old =~ /^#{name}/ ?
+          old.split(':')[0].gsub(name,'') :
+          raise
+        ) },
+        lambda { |old| old.split(',') }
+      ],
+      'retries' => ConfigValue["macrostep_#{name}", Fixnum, nil,
+        lambda { |old| old.split(':')[1] },
+        lambda { |old| old.split(',') }
+      ],
+      'timeout' => ConfigValue["macrostep_#{name}", Fixnum, nil,
+        lambda { |old| old.split(':')[2] },
+        lambda { |old| old.split(',') }
+      ],
+    }
+  ]
+}
+end
+SPECIFIC_CONF['automata']['macrosteps'].merge!(multimacro.call('SetDeploymentEnv'))
+SPECIFIC_CONF['automata']['macrosteps'].merge!(multimacro.call('BroadcastEnv'))
+SPECIFIC_CONF['automata']['macrosteps'].merge!(multimacro.call('BootNewEnv'))
+SPECIFIC_SORT = [
+  'partitioning',
+  'timeouts',
+  'remoteops',
+  'kernels',
+  'preinstall',
+  'postinstall',
+  'kexec',
+  'pxe',
+  'automata',
+  'hooks',
+]
+
+CLIENT_CONF = {
+  'default' => ConfigValue['default', String],
+  'servers' => ConfigIter[
+    {
+      'name' => ConfigValue['servers', String, '',
+        lambda{ |old| old.split(':')[0] }, lambda{ |old| old.split(',') }
+      ],
+      'hostname' => ConfigValue['servers', String, '',
+        lambda{ |old| old.split(':')[1] }, lambda{ |old| old.split(',') }
+      ],
+      'port' => ConfigValue['servers', Fixnum, '',
+        lambda{ |old| old.split(':')[2] }, lambda{ |old| old.split(',') }
+      ],
+    }
+  ]
+}
+CLIENT_SORT = [
+  'default',
+  'servers',
+]
 
 
 # Options parsing
@@ -84,6 +651,9 @@ $nodes = nil
 $backupfiles = []
 $backup = true
 $confirm = true
+$save = true
+$debug = false
+$error = true
 
 USAGE = "Usage: #{$0} [options]"
 
@@ -117,6 +687,10 @@ optparse = OptionParser.new(USAGE) do |opts|
   	$part_prefix = p
 	end
 
+	opts.on( '-d', '--dry-run', "Do not write or modify any files [default: disabled]") do
+  	$save = false
+	end
+
 	opts.on( '-R', '--no-rights', "Do not set the USER/GROUP rights on generated files [default: enabled]") do
   	$setrights = false
 	end
@@ -127,6 +701,14 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-y', '--no-confirmation-dialog', "Disable the confirmation dialog [default: enabled]") do
   	$confirm = false
+	end
+
+	opts.on( '-E', '--no-errors', "Do not display errors [default: disabled]") do
+  	$error = false
+	end
+
+	opts.on( '', '--debug', "Print debug of the migration [default: disabled]") do
+  	$debug = true
 	end
 end
 
@@ -164,27 +746,40 @@ def get_config_file(filename)
   File.join($kaconfigpath,filename)
 end
 
-def save_config_file(file, content_hash, options = { :sort=>true })
+def save_config_file(file, content_hash, options = {:sort=>false})
   unless content_hash.empty?
     if options[:sort]
       # Ugly hack to enable yaml output sorting since the :SortKeys option do
       # not work anymore and since OrderedHashes are only available in ruby 1.9
+      max = options[:sort].size
       yaml = YAML::quick_emit(content_hash) do |out|
         out.map(content_hash.taguri(), content_hash.to_yaml_style()) do |map|
-           #content_hash.sort_by { |k,v| k }.each{ |t| map.add(t[0],t[1]) }
-           content_hash.keys.sort.each { |k| map.add(k, content_hash[k]) }
+          content_hash.keys.sort do |x,y|
+            tmpx = options[:sort].index(x)
+            tmpy = options[:sort].index(y)
+            tmpx,tmpy = [x.to_s,y.to_s] if !tmpx and !tmpy
+            (tmpx || max+1) <=> (tmpy || max+2)
+          end.each{ |k| map.add(k, content_hash[k]) }
+          #content_hash.sort_by { |k,v| k }.each{ |t| map.add(t[0],t[1]) }
+          #content_hash.keys.sort.each { |k| map.add(k, content_hash[k]) }
         end
       end
     else
       yaml = content_hash.to_yaml
     end
-
-    File.open(file,'w+') { |f| f.puts(yaml) }
-    FileUtils.chown($kauser,$kagroup,file) if $setrights
+    if $save
+      File.open(file,'w+') { |f| f.puts(yaml) }
+      FileUtils.chown($kauser,$kagroup,file) if $setrights
+    else
+      puts "\n=== #{file} ==="
+      puts yaml
+      puts '==='
+    end
   end
 end
 
-def migrate_file(file, options = {:content=>true, :errmsg=>true})
+def migrate_file(file, options = {:content=>true,:errmsg=>true})
+  config = nil
   if File.exists?(file)
     if options[:content]
       content = File.read(file).split("\n")
@@ -198,6 +793,50 @@ def migrate_file(file, options = {:content=>true, :errmsg=>true})
   else
     $stderr.puts "### file not found '#{file}', ignored" if options[:errmsg]
   end
+  config
+end
+
+def migrate_content(content, conftree = nil, options = {:wrap=>true,:custom=>false})
+  config = {}
+  if content
+    cw = nil
+    if options[:wrap]
+      cw = ConfigWrapper.new()
+      cw.parse(conftree)
+    end
+
+    content.each do |line|
+      key,val = parse_key_val(line)
+      next if key.nil?
+      puts "\tmigration of '#{key}' -> '#{val}':" if $debug
+      key,val = yield(key,val) if options[:custom]
+      if key and options[:wrap]
+        tmp = cw.migrate(key,val)
+      else
+        tmp = { key => val }
+      end
+      puts "\t#{tmp.pretty_inspect}" if $debug
+      config.merge!(tmp) unless key.nil?
+    end
+
+    prepare = Proc.new do |var|
+      if var.is_a?(Array)
+        var.compact!
+        #var.sort! { |x,y| (x.is_a?(String) or y.is_a?(String) ? x <=> y : 1) }
+        var.each do |val|
+          prepare.call(val)
+        end
+      elsif var.is_a?(Hash)
+        var.each_value do |val|
+          prepare.call(val)
+        end
+      end
+    end
+
+    prepare.call(config)
+  end
+
+  config
 end
 
 def parse_key_val(line)
@@ -205,6 +844,7 @@ def parse_key_val(line)
   if line =~ /^\s*([^\s#]+)\s*=\s*(.*)\s*$/
     key = Regexp.last_match(1)
     val = Regexp.last_match(2)
+=begin
     if val.integer?
       val = val.to_i
     elsif val.float?
@@ -212,6 +852,7 @@ def parse_key_val(line)
     elsif val.boolean?
       val = val.to_b
     end
+=end
   end
   [key,val]
 end
@@ -227,6 +868,9 @@ if $confirm
   puts "\nMigration settings"
   puts "  Configuration directory : #{$kaconfigpath}"
   puts "  Backup directory        : #{$kabackuppath}"
+  puts "  Dry run                 : #{!$save}"
+  puts "  Debug mode              : #{$debug}"
+  puts "  Enable errors           : #{$error}"
   puts "  Set rights to files     : #{$setrights}"
   puts "  Move files to backup dir: #{$backup}"
   puts "  Kadeploy user           : #{$kauser}"
@@ -244,33 +888,43 @@ puts "\nStarting migration"
 
 FileUtils.mkdir_p($kabackuppath) if $backup
 
+begin
+
 # Migration of server_conf file
 curfile = get_config_file(OLD_CONFIG[:server_conf])
 migrate_file(curfile) do |content|
-  config = {}
-
-  content.each do |line|
-    key,val = parse_key_val(line)
-    config[key] = val if key
-  end
-
-  save_config_file(get_config_file(NEW_CONFIG[:server_conf]),config)
-
+  config = migrate_content(content,SERVER_CONF)
+  save_config_file(
+    get_config_file(NEW_CONFIG[:server_conf]),
+    config,
+    :sort=>SERVER_SORT
+  )
   puts "  migration of '#{curfile}' ok"
 end
 
 # Migration of client_conf file
 curfile = get_config_file(OLD_CONFIG[:client_conf])
-migrate_file(curfile, :errmsg => false) do |content|
-  config = {}
-
+migrate_file(curfile, :errmsg => false, :content => true) do |content|
+  newcontent = []
+  servers = []
   content.each do |line|
     key,val = parse_key_val(line)
-    config[key] = val if key
+    next if key.nil?
+    if key == 'default'
+      newcontent << "#{key} = #{val}"
+    else
+      servers << "#{key}:#{val}"
+    end
   end
+  newcontent << "servers = #{servers.join(',')}"
 
-  save_config_file(get_config_file(NEW_CONFIG[:client_conf]),config)
+  config = migrate_content(newcontent,CLIENT_CONF)
 
+  save_config_file(
+    get_config_file(NEW_CONFIG[:client_conf]),
+    config,
+    :sort=>CLIENT_SORT
+  )
   puts "  migration of '#{curfile}' ok"
 end
 
@@ -287,7 +941,7 @@ migrate_file(curfile) do |content|
     end
   end
 
-  save_config_file(get_config_file(NEW_CONFIG[:cmds_conf]),config)
+  save_config_file(get_config_file(NEW_CONFIG[:cmds_conf]),config,:sort=>[])
 
   puts "  migration of '#{curfile}' ok"
 end
@@ -307,21 +961,26 @@ migrate_file(get_config_file(OLD_CONFIG[:nodes_conf])) do |content|
   end
 end
 
-clconfig = {}
+
 if $clusters and !$clusters.empty?
-    puts "  migration of clusters, nodes and specific files"
+  config = {}
+  config['clusters'] = []
+
+  puts "  migration of clusters, nodes and specific files"
+
   $clusters.each do |cluster|
     puts "    migration of cluster '#{cluster}' config"
 
-    clconfig[cluster] = {}
+    clconfig = {}
 
+    clconfig['name'] = cluster
     old_partition_file = get_cluster_partition_file(cluster)
     new_partition_file = get_config_file("#{$part_prefix}#{cluster}")
 
-    migrate_file(old_partition_file, :content => false) do
+    migrate_file(old_partition_file, :content => false, :errmsg => true) do
       FileUtils.cp(old_partition_file,new_partition_file)
       FileUtils.chown($kauser,$kagroup,new_partition_file) if $setrights
-      clconfig[cluster]['partition_file'] = new_partition_file
+      clconfig['partition_file'] = new_partition_file
       puts "      migration of '#{old_partition_file}' ok"
     end
 
@@ -329,64 +988,31 @@ if $clusters and !$clusters.empty?
     new_config_file = get_config_file("#{$cluster_prefix}#{cluster}.yml")
 
     migrate_file(old_config_file) do |content|
-      config = {}
-
-      config['macrosteps'] = {}
-
-      content.each do |line|
-        key,val = parse_key_val(line)
-	      next unless key
-
-        case key.downcase
-          when 'macrostep'
-            macroname,macroval = val.split('|')
-            macroinsts = macroval.split(',')
-            macroinsts.each do |macroinst|
-              tmp = macroinst.split(':')
-              config['macrosteps'][macroname] = [] unless config['macrosteps'][macroname]
-              MACROSTEPS.each do |stepname|
-                tmp[0].sub!(stepname,'') if tmp[0].include?(stepname)
-              end
-              config['macrosteps'][macroname] << {
-                'type' => tmp[0],
-                'retries' => tmp[1].to_i,
-                'timeout' => tmp[2].to_i,
-              }
-            end
-          when 'admin_pre_install','admin_post_install'
-            kind = key.split('_')[1]
-            if val.to_s.downcase == "no_#{kind}_install"
-              config[key] = false
-            else
-              config[key] = []
-
-              prepostinsts = val.split(',')
-              prepostinsts.each do |prepostinst|
-                tmp = prepostinst.split('|')
-                config[key] << {
-                  'file' => tmp[0],
-                  'format' => tmp[1],
-                  'script' => tmp[2],
-                }
-              end
-            end
-          else
-            config[key] = val
+      curconfig = migrate_content(
+        content,
+        SPECIFIC_CONF,
+        :custom => true,
+        :wrap => true
+      ) do |key,val|
+        if key == 'macrostep'
+          tmp = val.split('|')
+          key = "macrostep_#{tmp[0]}"
+          val = tmp[1]
         end
+        [key,val]
       end
+      save_config_file(new_config_file, curconfig, :sort=>SPECIFIC_SORT)
 
-      save_config_file(new_config_file,config)
-
-      clconfig[cluster]['conf_file'] = new_config_file
+      clconfig['conf_file'] = new_config_file
 
       puts "      migration of '#{old_config_file}' ok"
     end
 
-    clconfig[cluster]['nodes'] = []
+    clconfig['nodes'] = []
     if $nodes
       $nodes.each do |node|
         if node[2] == cluster
-          clconfig[cluster]['nodes'] << {
+          clconfig['nodes'] << {
             'name' => node[0],
             'address' => node[1],
           }
@@ -394,11 +1020,13 @@ if $clusters and !$clusters.empty?
       end
     end
     puts "    migration of '#{get_config_file(OLD_CONFIG[:nodes_conf])}' ok"
+
+    config['clusters'] << clconfig
   end
 
   save_config_file(
     get_config_file(NEW_CONFIG[:clusters_conf]),
-    clconfig,
+    config,
     :sort=> false
   )
   puts "    migration of '#{get_config_file(OLD_CONFIG[:clusters_conf])}' ok"
@@ -414,3 +1042,8 @@ if $backup and !$backupfiles.empty?
 end
 
 puts "Migration done."
+
+rescue ArgumentError => ae
+  $stderr.puts "Error: #{ae.message}"
+  exit 1
+end
