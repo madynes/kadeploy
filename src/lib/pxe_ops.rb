@@ -29,6 +29,10 @@ module PXEOperations
       @pxe_repository_kernels = pxe_repository_kernels
     end
 
+    def kernel_path
+      File.join(@pxe_export,@pxe_repository_kernels)
+    end
+
     private
     
     # Compute the hexalized value of a decimal number
@@ -152,27 +156,27 @@ module PXEOperations
 
   class PXElinux < PXE
     def set_pxe_for_linux(nodes, kernel, kernel_params, initrd, boot_part, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/" + @pxe_repository_kernels + "/" + kernel + "\n"
-      append_line = "\tAPPEND initrd=" + @pxe_export + "/" + @pxe_repository_kernels + "/" + initrd if (initrd != nil)
+      kernel_line = "\tKERNEL #{File.join(kernel_path(),kernel)}\n"
+      append_line = "\tAPPEND initrd=#{File.join(kernel_path(),initrd)}" if (initrd != nil)
       append_line += " root=" + boot_part if (boot_part != "")
       append_line += " " + kernel_params if (kernel_params != "")
       append_line += "\n"
+
       msg = pxe_header + kernel_line + append_line
-      
       nodes_info = nodes.collect { |node|
         { 'ip' => node['ip'], 'dest' => File.join(@pxe_repository, 'pxelinux.cfg', hexalize_ip(node['ip'])) }
       }
       return write_pxe(nodes_info, msg)
     end
-    
+
     def set_pxe_for_xen(nodes, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, pxe_header)
       kernel_line = "\tKERNEL mboot.c32\n"
-      append_line = "\tAPPEND " + @pxe_export + "/" + @pxe_repository_kernels + "/" + hypervisor
+      append_line = "\tAPPEND #{File.join(kernel_path(),hypervisor)}"
       append_line +=  " " + hypervisor_params if (hypervisor_params != nil)
-      append_line += " --- " + @pxe_export + "/" + @pxe_repository_kernels + "/" + kernel 
+      append_line += " --- #{File.join(kernel_path(),kernel)}"
       append_line += " " + kernel_params  if (kernel_params != "")
       append_line += " root=" + boot_part if (boot_part != "")
-      append_line += " --- " + @pxe_export + "/" + @pxe_repository_kernels + "/" + initrd if (initrd != nil)
+      append_line += " --- #{File.join(kernel_path(),initrd)}" if (initrd != nil)
       append_line += "\n"
       msg = pxe_header + kernel_line + append_line
 
@@ -183,7 +187,7 @@ module PXEOperations
     end
 
     def set_pxe_for_nfsroot(nodes, nfsroot_kernel, nfsroot_params, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/" + @pxe_repository_kernels + "/" + nfsroot_kernel + "\n"
+      kernel_line = "\tKERNEL #{File.join(kernel_path(),nfsroot_kernel)}\n"
       append_line = "\tAPPEND #{nfsroot_params}\n"
       msg = pxe_header + kernel_line + append_line
 
@@ -214,13 +218,13 @@ module PXEOperations
 
   class GPXElinux < PXE
     def set_pxe_for_linux(nodes, kernel, kernel_params, initrd, boot_part, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/" + @pxe_repository_kernels + "/" + kernel + "\n"
-      append_line = "\tAPPEND initrd=" + @pxe_export + "/" + @pxe_repository_kernels + "/" + initrd if (initrd != nil)
+      kernel_line = "\tKERNEL #{File.join(kernel_path(),kernel)}\n"
+      append_line = "\tAPPEND initrd=#{File.join(kernel_path(),initrd)}" if (initrd != nil)
       append_line += " root=" + boot_part if (boot_part != "")
       append_line += " " + kernel_params if (kernel_params != "")
       append_line += "\n"
       msg = pxe_header + kernel_line + append_line
-      
+
       nodes_info = nodes.collect { |node|
         { 'ip' => node['ip'], 'dest' => File.join(@pxe_repository, 'pxelinux.cfg', hexalize_ip(node['ip'])) }
       }
@@ -228,13 +232,13 @@ module PXEOperations
     end
 
     def set_pxe_for_xen(nodes, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/mboot.c32\n"
-      append_line = "\tAPPEND " + @pxe_export + "/" + @pxe_repository_kernels + "/" + hypervisor
+      kernel_line = "\tKERNEL #{File.join(@pxe_export,'mboot.c32')}\n"
+      append_line = "\tAPPEND #{File.join(kernel_path(),hypervisor)}"
       append_line +=  " " + hypervisor_params if (hypervisor_params != nil)
-      append_line += " --- " + @pxe_export + "/" + @pxe_repository_kernels + "/" + kernel 
+      append_line += " --- #{File.join(kernel_path(),kernel)}"
       append_line += " " + kernel_params  if (kernel_params != "")
       append_line += " root=" + boot_part if (boot_part != "")
-      append_line += " --- " + @pxe_export + "/" + @pxe_repository_kernels + "/" + initrd if (initrd != nil)
+      append_line += " --- #{File.join(kernel_path(),initrd)}" if (initrd != nil)
       append_line += "\n"
       msg = pxe_header + kernel_line + append_line
 
@@ -245,7 +249,7 @@ module PXEOperations
     end
 
     def set_pxe_for_nfsroot(nodes, nfsroot_kernel, nfsroot_params, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/" + @pxe_repository_kernels + "/" + nfsroot_kernel + "\n"
+      kernel_line = "\tKERNEL #{File.join(kernel_path(),nfsroot_kernel)}\n"
       append_line = "\tAPPEND #{nfsroot_params}\n"
       msg = pxe_header + kernel_line + append_line
 
@@ -256,7 +260,7 @@ module PXEOperations
     end
 
     def set_pxe_for_chainload(nodes, boot_part, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/chain.c32\n"
+      kernel_line = "\tKERNEL #{File.join(@pxe_export,'chain.c32')}\n"
       append_line = "\tAPPEND hd0 #{boot_part}\n"
       msg = pxe_header + kernel_line + append_line
 
@@ -277,12 +281,12 @@ module PXEOperations
 
   class IPXE < PXE
     def set_pxe_for_linux(nodes, kernel, kernel_params, initrd, boot_part, pxe_header)
-      kernel_line = "kernel " + @pxe_export + "/" + @pxe_repository_kernels + "/" + kernel + " " + kernel_params
+      kernel_line = "kernel #{File.join(kernel_path(),kernel)} #{kernel_params}"
       kernel_line += " root=" + boot_part if (boot_part != "")
       kernel_line += "\n"
-      append_line = "initrd " + @pxe_export + "/" + @pxe_repository_kernels + "/" + initrd if (initrd != nil)
+      append_line = "initrd #{File.join(kernel_path(),initrd)}" if (initrd != nil)
       msg = IPXEHEADER + kernel_line + append_line + "\nboot\n"
-      
+
       nodes_info = nodes.collect { |node|
         { 'ip' => node['ip'], 'dest' => File.join(@pxe_repository, node['hostname']) }
       }
@@ -290,13 +294,13 @@ module PXEOperations
     end
 
     def set_pxe_for_xen(nodes, hypervisor, hypervisor_params, kernel, kernel_params, initrd, boot_part, pxe_header)
-      kernel_line = "\tKERNEL " + "mboot.c32\n"
-      append_line = "\tAPPEND " + @pxe_export + "/" + @pxe_repository_kernels + "/" + hypervisor
+      kernel_line = "\tKERNEL mboot.c32\n"
+      append_line = "\tAPPEND #{File.join(kernel_path(),hypervisor)}"
       append_line +=  " " + hypervisor_params if (hypervisor_params != nil)
-      append_line += " --- " + @pxe_export + "/" + @pxe_repository_kernels + "/" + kernel 
+      append_line += " --- #{File.join(kernel_path(),kernel)}"
       append_line += " " + kernel_params  if (kernel_params != "")
       append_line += " root=" + boot_part if (boot_part != "")
-      append_line += " --- " + @pxe_export + "/" + @pxe_repository_kernels + "/" + initrd if (initrd != nil)
+      append_line += " --- #{File.join(kernel_path(),initrd)}" if (initrd != nil)
       append_line += "\n"
       msg = pxe_header + kernel_line + append_line
 
@@ -313,7 +317,7 @@ module PXEOperations
     end
 
     def set_pxe_for_nfsroot(nodes, nfsroot_kernel, nfsroot_params, pxe_header)
-      kernel_line = "kernel " + @pxe_export + "/" + @pxe_repository_kernels + "/" + nfsroot_kernel + " " + nfsroot_params
+      kernel_line = "kernel #{File.join(kernel_path(),nfsroot_kernel)} #{nfsroot_params}"
       msg = pxe_header + kernel_line + "\nboot\n"
 
       nodes_info = nodes.collect { |node|
@@ -323,7 +327,7 @@ module PXEOperations
     end
 
     def set_pxe_for_chainload(nodes, boot_part, pxe_header)
-      kernel_line = "\tKERNEL " + @pxe_export + "/chain.c32\n"
+      kernel_line = "\tKERNEL #{File.join(@pxe_export,'chain.c32')}\n"
       append_line = "\tAPPEND hd0 #{boot_part}\n"
       msg = pxe_header + kernel_line + append_line
 
