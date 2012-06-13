@@ -1033,7 +1033,7 @@ if $clusters and !$clusters.empty?
 end
 
 # Backup of old files
-if $backup and !$backupfiles.empty?
+if $save and $backup and !$backupfiles.empty?
   puts "  Moving old files to backup directory"
   $backupfiles.each do |file|
     FileUtils.mv(file,$kabackuppath)
