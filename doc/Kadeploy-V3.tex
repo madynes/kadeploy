@@ -5,8 +5,14 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{fancyvrb}
+\usepackage{alltt}
+\renewcommand{\ttdefault}{txtt}
 
 \newcommand{\version}{3.1-4}
+
+\newcommand{\ypath}[1]{\texttt{#1}}
+\newcommand{\yfield}[2]{\texttt{#1} {\small\{{\emph{#2}}\}}:}
+\newcommand{\yfieldd}[3]{\texttt{#1} {\small\{{\emph{#2}}\}} {\small(}#3{\small)}:}
 
 \addtolength{\hoffset}{-1.5cm}
 \addtolength{\textwidth}{3cm}
@@ -226,122 +232,372 @@ After being installed and configured, the Kadeploy server can be run either inte
 \noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
 \chapter{Server side configuration}
+\paragraph{Configuration files\\}
 Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
 
 The file \texttt{load\_kadeploy\_env} in the configuration directory contains the \texttt{KADEPLOY\_INSTALL\_DIR} variable. You should probably fill this variable with the Kadeploy installation directory you used. This directory can be anywhere in the filesystem.
 
+\paragraph{Description format: YAML\\}
+In Kadeploy configuration settings are given using the YAML markup language. You should be aware that, in this language, indentation is very important. Also, in the YAML language, fields are typed, the value \texttt{"16"} is not equivalent to the value \texttt{16}.
+
+\paragraph{YAML types\\}
+In Kadeploy configuration files, values can have the YAML data types: \emph{Integer}, \emph{Float}, \emph{Boolean} and \emph{String}.
+
+YAML provides a way to describe hierarchy between elements using \emph{Associative arrays} (\texttt{key} $\to$ \texttt{value}) and \emph{Ordered lists}. It's possible to mix this structures.
+
+Here are some examples:
+\begin{small}
+\begin{alltt}
+--- 
+sample-array:{\footnotesize # This is an Associative array containing 3} elements
+  elem1: 8{\footnotesize # Integer}
+  elem2: "8"{\footnotesize # String}
+  elem3:\textbf{\footnotesize vREF1}
+sample-list:{\footnotesize # This is an Ordered list of 2 elements}
+  - true{\footnotesize # Boolean}
+  - "true"{\footnotesize # String}
+sample-mix-1:{\footnotesize # An Ordered list of identical Associative arrays}
+  - elem1: value1{\footnotesize # String}
+    elem2:\textbf{\footnotesize vREF2}
+  - elem1: value2{\footnotesize # String}
+    elem2:\textbf{\footnotesize vREF3}
+sample-mix-2:{\footnotesize # An Associative array of Ordered lists}
+  elem1:
+    - 1.42{\footnotesize # Float}
+    - value1
+  elem2:
+    - value2
+    - value3
+sample-complex:{\footnotesize # Complex structure}
+  mylist:
+    - size: 16
+      name:\textbf{\footnotesize vREF4}
+    - size: 32
+      name:\textbf{\footnotesize vREF5}
+  value: myval
+  mysample:
+    file: filename
+    ext: ext
+    mode:\textbf{\footnotesize vREF6}
+\end{alltt}
+\end{small}
+
+\paragraph{Documentation: paths\\}
+Kadeploy configuration settings will be described by giving a \emph{path} to each resources. A \emph{path} explicit the hierarchy structure to follow to spefify a setting in the configuration file. In a \emph{path}, the character \texttt{/} describes a nested \emph{Associative array}, characters \texttt{$[...]$} describes an \emph{Ordered list} of identical \emph{Associative arrays}.\\
+
+Sample of \emph{path}s in our sample:
+\begin{itemize}
+  \item \texttt{\small /sample-array/elem3} refers to the value \texttt{\small vREF1};
+  \item \texttt{\small /$[$sample-mix-1$]$/elem2} refers to values such as \texttt{\small vREF2} and \texttt{\small vREF3};
+  \item \texttt{\small /sample-complex/$[$mylist$]$} refers to the \emph{Ordered List} \texttt{\small mylist};
+  \item \texttt{\small /sample-complex/$[$mylist$]$/name} refers to values such as \texttt{\small vREF4} and \texttt{\small vREF5};
+  \item \texttt{\small /sample-complex/mysample/mode} refers to value \texttt{\small vREF5}.
+\end{itemize}
+
+\paragraph{Documentation: configuration files fields\\}
+In the following, fields descriptions are given using the formalism:
+\begin{itemize}
+  \item \ypath{/path/to/the/field}
+  \begin{itemize}
+    \item \yfieldd{fieldname}{YAML type}{default value} description of the field
+  \end{itemize}
+\end{itemize}
+If no default value is specified, the field is mandatory.
+
+Sample of field description:
+\begin{itemize}
+  \item \ypath{/sample-complex}
+  \begin{itemize}
+    \item \yfield{myvalue}{String} the value of the element
+  \end{itemize}
+  \item \ypath{/sample-complex/mysample}
+  \begin{itemize}
+    \item \yfieldd{file}{String}{sample} the name of the sample file
+    \item \yfieldd{ext}{String}{txt} the extension of the sample file
+  \end{itemize}
+  \item \ypath{/sample-complex/[mylist]}
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the element
+    \item \yfieldd{size}{Integer}{8} the maximal size (MB) of the element
+  \end{itemize}
+\end{itemize}
+
 \section{General configuration file}\label{sec:general_config}
-The general configuration file is named \texttt{conf} and is located in the Kadeploy configuration directory.
+The general configuration file is named \texttt{server\_conf.yml} and is located in the Kadeploy configuration directory.
+
 \subsection{Example of a general configuration file}
 \begin{small}
 \begin{verbatim}
-verbose_level = 3
-tftp_repository = /var/lib/tftpboot/PXEClient
-tftp_images_path = images
-tftp_images_max_size = 4000
-tftp_cfg = pxelinux.cfg
-db_kind = mysql
-deploy_db_host = mysql
-deploy_db_name = deploy3
-deploy_db_login = deploy_user
-deploy_db_passwd = deploy_password
-rights_kind = db
-taktuk_connector = ssh -A -l root -q \
-                          -o StrictHostKeyChecking=no \
-                          -o UserKnownHostsFile=/dev/null \
-                          -o PreferredAuthentications=publickey \
-                          -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
-taktuk_tree_arity = 0
-taktuk_auto_propagate = false
-tarball_dest_dir = /tmp
-environment_extraction_dir = /mnt/dest
-kadeploy_server = fgdx2.orsay.grid5000.fr
-kadeploy_server_port = 25300
-kadeploy_tcp_buffer_size = 8192
-kadeploy_cache_dir = /tmp/kadeploy_cache
-kadeploy_cache_size = 20000
-max_preinstall_size = 30
-max_postinstall_size = 30
-ssh_port = 22
-test_deploy_env_port = 25300
-use_rsh_to_deploy = false
-log_to_file = /tmp/kadeploy.log
-log_to_syslog = true
-log_to_db = true
-dbg_to_syslog = false
-dbg_to_syslog_level = 4
-reboot_window = 100
-reboot_window_sleep_time = 10
-nodes_check_window = 90
-bootloader = chainload_pxe
-purge_deployment_timer = 900
-rambin_path = /rambin
-mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|\
-               ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index
-demolishing_env_threshold = 2
-demolishing_env_auto_tag = false
-bt_tracker_ip = 172.24.100.2
-bt_download_timeout = 1800
-almighty_env_users = root,ejeanvoine
-async_end_of_deployment_hook = echo WORKFLOW_ID
-async_end_of_reboot_hook = echo REBOOT_ID
-async_end_of_power_hook = echo POWER_ID
-vlan_hostname_suffix = -kavlan-VLAN_ID
-set_vlan_cmd = kavlan NODES -s -i VLAN_ID -u USER
+--- 
+database:
+  host: mysql.lan
+  name: deploy3
+  login: deploy_user
+  passwd: deploy_password
+  kind: mysql
+rights:
+  kind: db
+  almighty_users: root,superuser
+  purge_deployment_timer: 900
+logs:
+  file: /tmp/kadeploy.log
+  syslog: true
+  database: true
+  debug: true
+verbosity:
+  clients: 3
+  logs: 4
+cache:
+  directory: /var/cache/kadeploy
+  size: /tmp/kadeploy_cache
+  disabled: false
+network:
+  server_hostname: kadeploy.lan
+  vlan:
+    set_cmd: kavlan NODES -s -i VLAN_ID -u USER
+    hostname_suffix: -kavlan-VLAN_ID
+  ports: 
+    ssh: 22
+    kadeploy_server: 25300
+    test_deploy_env: 25300
+  tcp_buffer_size: 8192
+windows: 
+  check: 
+    size: 90
+  reboot: 
+    size: 100
+    sleep_time: 10
+environments: 
+  deployment: 
+    extraction_dir: /mnt/dest
+    tarball_dir: /tmp
+    rambin_dir: /rambin
+  demolishing:
+    auto_tag: false
+    tag_threshold: 2
+  max_postinstall_size: 10
+  max_preinstall_size: 10
+pxe:
+  kind: PXElinux
+  repository: /var/lib/tftpboot/
+  export: /
+  kernels:
+    directory: kernels
+    max_size: 4000
+  bootloader: chainload_pxe
+hooks: 
+  async: 
+    end_of_reboot: echo REBOOT_ID
+    end_of_power: echo POWER_ID
+    end_of_deployment: echo WORKFLOW_ID
+external:
+  taktuk: 
+    auto_propagate: false
+    connector: |-
+      ssh -q -o StrictHostKeyChecking=no \
+      -o UserKnownHostsFile=/dev/null \
+      -o PreferredAuthentications=publickey \
+      -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
+    tree_arity: 0
+  bittorrent: 
+    tracker_ip: 10.0.0.4
+    download_timeout: 1800
+  grub:
+    version: 2
+  mkfs:
+  - fstype: ext2
+    args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
+  - fstype: ext3
+    args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
+  kastafior:
+    binary: /usr/bin/kastafior
 \end{verbatim}
 \end{small}
 
 \subsection{Explanation of the fields used in the general configuration file}
-Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
 \begin{itemize}
-\item \texttt{verbose\_level}: number between 0 and 4 that specifies the default verbose level for the client. 0 means ``no verbose'' and 4 means ``full verbose''.
-\item \texttt{tftp\_repository}: absolute path of the TFTP repository.
-\item \texttt{tftp\_images\_path}: relative path of the TFTP image sub-repository.
-\item \texttt{tftp\_images\_max\_size}: maximal size in MB of the TFTP image repository. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to read in this directory.
-\item \texttt{tftp\_cfg}: relative path of the TFTP configuration repository. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
-\item \texttt{db\_kind}: database kind (only mysql is available now).
-\item \texttt{deploy\_db\_host}: hostname of the database.
-\item \texttt{deploy\_db\_name}: name of the Kadeploy database.
-\item \texttt{deploy\_db\_login}: login for the Kadeploy database.
-\item \texttt{deploy\_db\_passwd}: password for the Kadeploy database.
-\item \texttt{rights\_kind}: authentication kind (use db for a true rights management or dummy to bypass the rights management).
-\item \texttt{taktuk\_connector}: connector used by Taktuk.
-\item \texttt{taktuk\_tree\_arity}: Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
-\item \texttt{taktuk\_auto\_propagate}: use of the auto propagation feature of Taktuk (expected values are true or false). You should use this feature if the deployment environment doesn't contain Taktuk.
-\item \texttt{tarball\_dest\_dir}: destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent .
-\item \texttt{environment\_extraction\_dir}: extraction directory for the tarball in the deployment environment.
-\item \texttt{kadeploy\_server}: hostname of the Kadeploy server.
-\item \texttt{kadeploy\_server\_port}: port of the Kadeploy server.
-\item \texttt{kadeploy\_tcp\_buffer\_size}: TCP buffer size for the Kadeploy file server.
-\item \texttt{kadeploy\_cache\_dir}: absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment. It is possible to disable the use of a cache by setting \textit{no\_cache} to this field.
-\item \texttt{kadeploy\_cache\_size}: size in MB of the Kadeploy cache.
-\item \texttt{max\_preinstall\_size}: maximum size in MB of the preinstall files.
-\item \texttt{max\_postinstall\_size}: maximum size in MB of the postinstall files.
-\item \texttt{ssh\_port}: port used by SSH
-\item \texttt{test\_deploy\_env\_port}: port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted.
-\item \texttt{use\_rsh\_to\_deploy}: use rsh in the deployment workflow (expected values are true or false).
-\item \texttt{log\_to\_file}: absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
-\item \texttt{log\_to\_syslog}: use Syslog to export the log information (expected values are true or false). The Syslog tag is ``Kadeploy-log''.
-\item \texttt{log\_to\_db}: use the Kadeploy database to export the log information (expected values are true or false).
-\item \texttt{dbg\_to\_syslog}: use Syslog to export the debug information (expected values are true or false). The Syslog tag is ``Kadeploy-dbg''.
-\item \texttt{dbg\_to\_syslog\_level}: debug level of the output exported to Syslog.
-\item \texttt{reboot\_window}: global size of the reboot window (ie. maximum number of nodes able to reboot at the same time). This might be useful to avoid high electricity peak.
-\item \texttt{reboot\_window\_sleep\_time}: time to wait if the reboot window is full.
-\item \texttt{nodes\_check\_window}: size of the nodes check window.
-\item \texttt{bootloader}: kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe).
-\item \texttt{purge\_deployment\_timer}: timeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
-\item \texttt{rambin\_path}: path of the ramdisk directory in the deployment environment (/rambin seems to be a good value).
-\item \texttt{mkfs\_options}: options for mkfs. The options for several FS can be defined here with the following syntax: fstype1@options|fstype2@options|... (no newline is expected)
-\item \texttt{demolishing\_env\_threshold}: maximum number of reboot failures (on the production environment) before considering that an environment is demolishing.
-\item \texttt{demolishing\_env\_auto\_tag}: specify if Kareboot must tag automatically an environment as demolishing after a failed reboot on the production environment.
-\item \texttt{bt\_tracker\_ip}: ip of the Bittorrent tracker.
-\item \texttt{bt\_download\_timeout}: timeout for the Bittorrent file download.
-\item \texttt{almighty\_env\_users}: list of users allowed to perform special operations on the environments like publishing environments or moving files.
-\item \texttt{async\_end\_of\_deployment\_hook}: command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
-\item \texttt{async\_end\_of\_reboot\_hook}: command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
-\item \texttt{async\_end\_of\_power\_hook}: command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
-\item \texttt{vlan\_hostname\_suffix}: this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
-\item \texttt{set\_vlan\_cmd}: command to launch in orded to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
+  \item \ypath{/database}
+  \begin{itemize}
+    \item \yfield{host}{String} hostname of the database
+    \item \yfield{name}{String} name of the Kadeploy database
+    \item \yfield{login}{String} login for the Kadeploy database
+    \item \yfield{passwd}{String} password for the Kadeploy database
+    \item \yfield{kind}{String} database kind (only mysql is available now).
+  \end{itemize}
+
+  \item \ypath{/rights}
+  \begin{itemize}
+    \item \yfieldd{kind}{String}{db} authentication kind (use db for a true rights management or dummy to bypass the rights management)
+    \item \yfieldd{almighty\_users}{String}{root} list of users allowed to perform special operations on the environments like publishing environments or moving files
+    \item \yfieldd{purge\_deployment\_timer}{Integer}{900} limeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
+  \end{itemize}
+
+  \item \ypath{/logs}
+  \begin{itemize}
+    \item \yfieldd{file}{String}{/var/log/kadeploy.log} absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
+    \item \yfieldd{syslog}{Boolean}{true} use Syslog to export the log information (expected values are true or false). The Syslog tag is ``Kadeploy-log''.
+    \item \yfieldd{database}{Boolean}{true} use the Kadeploy database to export the log information
+    \item \yfieldd{debug}{Boolean}{false} use Syslog to export the debug information (expected values are true or false). The Syslog tag is ``Kadeploy-dbg''.
+  \end{itemize}
+
+  \item \ypath{/verbosity}
+  \begin{itemize}
+    \item \yfieldd{clients}{Integer}{3} number between 0 and 4 that specifies the default verbose level for the client. 0 means ``no verbose'' and 4 means ``full verbose''.
+    \item \yfieldd{logs}{Integer}{3} debug level of the output exported to Syslog.
+  \end{itemize}
+
+  \item \ypath{/cache}
+  \begin{itemize}
+    \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment
+    \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
+    \item \yfieldd{disable}{boolean}{false} disable the use of a cache
+  \end{itemize}
+
+  \item \ypath{/network}
+  \begin{itemize}
+    \item \yfield{server\_hostname}{String} hostname of the Kadeploy server
+    \item \yfieldd{tcp\_buffer\_size}{Integer}{8192} TCP buffer size (Bytes) for the Kadeploy file server
+  \end{itemize}
+
+  \item \ypath{/network/vlan}
+  \begin{itemize}
+    \item \yfieldd{hostname\_suffix}{String}{''} this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
+    \item \yfieldd{set\_cmd}{String}{''} command to launch in order to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
+  \end{itemize}
+
+  \item \ypath{/network/ports}
+  \begin{itemize}
+    \item \yfieldd{ssh}{Integer}{22} port used by SSH
+    \item \yfieldd{kadeploy\_server}{Integer}{25300} port of the Kadeploy server
+    \item \yfieldd{test\_deploy\_env}{Integer}{25300} port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted
+  \end{itemize}
+
+  \item \ypath{/windows/check}
+  \begin{itemize}
+    \item \yfieldd{size}{Integer}{22} size of the nodes check window.
+  \end{itemize}
+
+  \item \ypath{/windows/reboot}
+  \begin{itemize}
+    \item \yfieldd{size}{Integer}{50} global size of the reboot window (ie. maximum number of nodes able to reboot at the same time). This might be useful to avoid high electricity peak.
+    \item \yfieldd{sleep\_time}{Integer}{10} time to wait if the reboot window is full
+  \end{itemize}
+
+  \item \ypath{/environments}
+  \begin{itemize}
+    \item \yfieldd{max\_preinstall\_size}{Integer}{20} maximum size (MB) of the preinstall files
+    \item \yfieldd{max\_postinstall\_size}{Integer}{20} maximum size (MB) of the postinstall files
+  \end{itemize}
+
+  \item \ypath{/environments/deployment}
+  \begin{itemize}
+    \item \yfieldd{extraction\_dir}{String}{/mnt/dest} extraction directory for the tarball in the deployment environment
+    \item \yfieldd{tarball\_dir}{String}{/tmp} destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent.
+    \item \yfieldd{rambin\_dir}{String}{/rambin} path of the ramdisk directory in the deployment environment
+  \end{itemize}
+  \item \ypath{/environments/demolishing}
+  \begin{itemize}
+    \item \yfieldd{auto\_tag}{Boolean}{false} specify if Kareboot must tag automatically an environment as demolishing after a failed reboot on the production environment
+    \item \yfieldd{tag\_threshold}{Integer}{1000000} maximum number of reboot failures (on the production environment) before considering that an environment is demolishing
+  \end{itemize}
+
+  \item \ypath{/pxe}
+  \begin{itemize}
+    \item \yfieldd{kind}{String}{PXElinux} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux or IPXE)
+    \item \yfield{repository}{String} absolute path of the repository where PXE profiles are accessibles (TFTP, HTTP, ...). This path should not include the 'pxelinux.cfg' directory, Kadeploy find it automatically. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
+    \item \yfieldd{export}{String}{/} the root path to be used in pxe profiles. If the service used to serve PXE profiles is TFTP, it should be '/', if the service is HTTP, 'http://domain.tld/' or 'http://IP\_ADDR/'.
+    \item \yfieldd{bootloader}{String}{chainload\_pxe} kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe)
+  \end{itemize}
+
+  \item \ypath{/pxe/kernels}
+  \begin{itemize}
+    \item \yfield{directory}{String} relative path of the PXE kernels sub-repository
+    \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE kernels sub-repository
+  \end{itemize}
+
+  \item \ypath{/hooks/async}
+  \begin{itemize}
+    \item \yfieldd{end\_of\_reboot}{String}{''} command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_power}{String}{''} command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_deployment}{String}{''} command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
+  \end{itemize}
+
+  \item \ypath{/external/taktuk}
+  \begin{itemize}
+    \item \yfield{connector}{String} connector used by Taktuk
+    \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
+    \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
+  \end{itemize}
+
+  \item \ypath{/external/bittorrent}
+  \begin{itemize}
+    \item \yfieldd{tracker\_ip}{String}{nil} ip of the Bittorrent tracker
+    \item \yfieldd{download\_timeout}{Integer}{nil} timeout for the Bittorrent file download
+  \end{itemize}
+
+  \item \ypath{/external/grub}
+  \begin{itemize}
+    \item \yfieldd{version}{Integer}{2} the version of grub to be installed on the partition of the deployed environment
+  \end{itemize}
+
+  \item \ypath{/external/[mkfs]} Options for mkfs. The options for several FS can be defined here.
+  \begin{itemize}
+    \item \yfieldd{fstype}{String}{nil} the filesystem type
+    \item \yfieldd{args}{String}{nil} the specific options for this filesystem type
+  \end{itemize}
+
+  \item \ypath{/external/kastafior}
+  \begin{itemize}
+    \item \yfieldd{binary}{String}{kastafior} the command used to launch kastafior
+  \end{itemize}
+\end{itemize}
+
+
+\section{Clusters file}
+This file describes the list of all the clusters, the location of their specific setting files and their nodes. All the nodes of the clusters that aim to be deployed must be declared in this file. It must be defined in the  \texttt{/etc/kadeploy3/clusters.yml} file.
+
+Warning, a cluster-specific configuration file and a partition file must be defined for each cluster define in this file.
+
+\subsection{Example of a clusters file\\}
+\begin{small}
+\begin{verbatim}
+--- 
+clusters:
+- name: graphene
+  conf_file: cluster_conf-graphene.yml
+  partition_file: cluster_partition-graphene
+  nodes: 
+    - name: graphene-1.nancy.grid5000.fr # Full version
+      address: 10.0.66.1
+    - name: graphene-2.nancy.grid5000.fr
+      address: 10.0.66.2
+    - name: graphene-3.nancy.grid5000.fr
+      address: 10.0.66.3
+    - name: graphene-4.nancy.grid5000.fr
+      address: 10.0.66.4
+- name: griffon
+  conf_file: cluster_conf-griffon.yml
+  partition_file: cluster_partition-griffon
+  nodes: 
+    - name: griffon-[1-92].nancy.grid5000.fr # Digest version
+      address: 10.0.65.[1-92]
+\end{verbatim}
+\end{small}
+
+\subsection{Explanation of the fields used in the clusters file\\}
+\begin{itemize}
+  \item \ypath{/clusters}
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the cluster
+    \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
+    \item \yfield{partition\_file}{String} the partition file for this cluster (see section \ref{sec:partfiles})
+  \end{itemize}
+
+  \item \ypath{/clusters/[nodes]}
+  \begin{itemize}
+    \item \yfield{name}{String} the hostname of the node(s). Ranges can also be used to define hostnames: griffon-[1-92].nancy.grid5000.fr.
+    \item \yfield{address}{String} the IP address of the node(s). Ranges can also be used to define addresses: 10.0.65.[1-92] .
+  \end{itemize}
 \end{itemize}
 
 \section{Cluster-specific configuration files}\label{sec:specific_config}
@@ -349,191 +605,356 @@ To define the specific configuration of a cluster, you must create a specific fi
 \subsection{Example of a cluster-specific configuration file}
 \begin{small}
 \begin{verbatim}
-deploy_kernel = http://172.24.100.1/kadeploy/deploy-vmlinuz-2.6.27.8-bt
-deploy_initrd = http://172.24.100.1/kadeploy/deploy-initrd-2.6.27.8-bt \
-                ETH_DRV=tg3 ETH_DEV=eth0 DISK_DRV=sata_svw SLEEP_TIME=5\
-                console=tty0 console=ttyS0,38400n8 ramdisk_size=260000 rw init=/linuxrc
-block_device = /dev/sda
-prod_part = 2
-deploy_part = 3
-tmp_part = 5
-swap_part = 1
-timeout_reboot_classical = 200 + 150 * Math.log(n)
-timeout_reboot_kexec = 60
-cmd_soft_reboot = ssh -A -q \
-                         -o BatchMode=yes -o StrictHostKeyChecking=no \
-                         -o PreferredAuthentications=publickey \
-                         -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
-                         -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN /sbin/reboot
-cmd_hard_reboot = /usr/local/kadeploy/bin/reboot.rb HOSTNAME_SHORT
-cmd_very_hard_reboot = /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
-cmd_console = /usr/local/kadeploy/bin/console HOSTNAME_SHORT
-#cmd_soft_power_on = 
-#cmd_hard_power_on = 
-#cmd_very_hard_power_on = 
-#cmd_soft_power_off = 
-#cmd_hard_power_off = 
-#cmd_very_hard_power_off = 
-#cmd_power_status =
-drivers = ata_piix,ata_generic
-kernel_params = console=tty0 console=ttyS1,38400n8
-pxe_header = PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
-nfsroot_kernel = deploy-vmlinuz-2.6.27.7-nfsroot
-nfsroot_params = rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=172.24.120.35:/mnt/nfsroot/rootfs init=/sbin/init
-partition_creation_kind = fdisk
-admin_pre_install = /g5k/admin_pre_install.tgz|tgz|launch.sh
-admin_post_install = /g5k/admin_post_install.tgz|tgz|launch.sh
-
-#Automata description
-macrostep = SetDeploymentEnv|SetDeploymentEnvProd:1:200,SetDeploymentEnvUntrusted:1:400
-macrostep = BroadcastEnv|BroadcastEnvKastafior:2:500
-macrostep = BootNewEnv|BootNewEnvKexec:1:200,BootNewEnvHardReboot:1:300
+--- 
+partitioning: 
+  block_device: /dev/sda
+  kind: fdisk
+  partitions:
+    swap: 1
+    prod: 2
+    deploy: 3
+    tmp: 5
+timeouts: 
+  reboot: 200 + 150 * Math.log(n)
+  kexec: 60
+remoteops: 
+  reboot: 
+    - name: soft
+      cmd: |-
+        ssh -A -q \
+        -o BatchMode=yes -o StrictHostKeyChecking=no \
+        -o PreferredAuthentications=publickey \
+        -o ConnectTimeout=2 -o UserKnownHostsFile=/dev/null \
+        -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN
+    - name: hard
+      cmd: /usr/local/kadeploy/bin/hard_reboot.rb HOSTNAME_SHORT
+    - name: very_hard
+      cmd: /usr/local/kadeploy/bin/reboot_RSA.exp HOSTNAME_SHORT
+  power_on:
+#   - name: soft
+#      cmd: ...
+    - name: hard
+      cmd: /usr/bin/lanpower -c on -m HOSTNAME_SHORT
+      name: hard
+#   - name: very_hard
+#      cmd: ...
+  power_off: 
+    - name: soft
+      cmd: |-
+        ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o \
+        PreferredAuthentications=publickey -o ConnectTimeout=2 \
+        -o UserKnownHostsFile=/dev/null \
+        -i /etc/kadeploy3/keys/id_deploy root@HOSTNAME_FQDN \
+        "nohup /sbin/halt &>/dev/null &"
+    - name: hard
+      cmd: /usr/bin/lanpower -c off -m HOSTNAME_SHORT
+#   - name: very_hard
+#      cmd: ...
+  power_status: 
+    - name: soft
+      cmd: /usr/bin/lanpower -m HOSTNAME_FQDN -s
+  console: 
+    - name: soft
+      cmd: /usr/local/conman/bin/conman -d conman HOSTNAME_SHORT
+kernels:
+  user: 
+    params: console=tty0 console=ttyS1,38400n8
+  deploy:
+    vmlinuz: deploy-vmlinuz-2.6.27.8-bt
+    initrd: deploy-initrd-2.6.27.8-bt
+    params: console=tty0 console=ttyS0,38400n8 ramdisk_size=260000 rw
+    drivers: ata_piix,ata_generic
+  nfsroot:
+    vmlinuz: deploy-vmlinuz-2.6.27.7-nfsroot
+    params: rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=10.0.100.35:/mnt/nfsroot/rootfs init=/sbin/init
+preinstall: 
+  files:
+    - file: /g5k/admin_pre_install.tgz
+      format: tgz
+      script: launch.sh
+postinstall: 
+  files:
+    - file: /g5k/admin_post_install.tgz
+      format: tgz
+      script: launch.sh
+pxe: 
+  headers: PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
+kexec:
+  repository: /karepository
+hooks:
+  use_ip_to_deploy: true
+automata: 
+  macrosteps:
+    SetDeploymentEnv:
+      - type: Prod
+        retries: 1
+        timeout: 200
+      - type: Untrusted
+        retries: 1
+        timeout: 400
+    BroadcastEnv: 
+      - type: Kastafior
+        retries: 1
+        timeout: 900
+    BootNewEnv: 
+      - type: Kexec
+        retries: 1
+        timeout: 100
+#     - type: Classical
+#       retries: 1
+#       timeout: 200
+      - type: HardReboot
+        retries: 1
+        timeout: 300
 \end{verbatim}
 \end{small}
 
 \subsection{Explanation of the fields used in the cluster-specific configuration file}
-Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
+
 \begin{itemize}
-\item \texttt{deploy\_kernel}: name of the kernel used by the deployment environment. It is possible to specify an http location if you use gpxelinux.
-\item \texttt{deploy\_initrd}: name of the initrd used by the deployment environment and boot arguments. It is possible to specify an http location if you use gpxelinux. According your hardware, you must set the \texttt{ETH\_DRV}, \texttt{ETH\_DEV}, \texttt{DISK\_DRV} and \texttt{SLEEP\_TIME} (for slow disks) correctly. Furthermore, if you use a deployment kernel generated with the script provided in the Kadeploy distribution, you must set the \texttt{ramdisk\_size} value correctly and you must specify \texttt{init=/linuxrc}.
-\item \texttt{block\_device}: block device of the disk used on the nodes.
-\item \texttt{prod\_part}: number of the production partition on the disk.
-\item \texttt{deploy\_part}: number of the deployment partition on the disk.
-\item \texttt{tmp\_part}: number of the tmp partition on the disk.
-\item \texttt{swap\_part}: number of the swap partition on the disk. If the \texttt{none} value is specified, the swap format at the deployment time will be bypassed.
-\item \texttt{timeout\_reboot\_classical}: classical reboot timeout. A Ruby expression can be used here to represent a function depending on n (the number of nodes currently rebooted).
-\item \texttt{timeout\_reboot\_kexec}: kexec reboot timeout. A Ruby expression can be used here to represent a function depending on n (the number of nodes currently rebooted).
-\item \texttt{cmd\_soft\_reboot}: generic soft reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_hard\_reboot}: generic hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_very\_hard\_reboot}: generic very hard reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{drivers}: list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
-\item \texttt{cmd\_soft\_power\_on}: generic soft power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_hard\_power\_on}: generic hard power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_very\_hard\_power\_on}: generic very hard power on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_soft\_power\_off}: generic soft power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_hard\_power\_off}: generic hard power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_very\_hard\_power\_off}: generic very hard power off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{cmd\_power\_status}: generic power status command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-\item \texttt{kernel\_params}: default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
-\item \texttt{pxe\_header}: default PXE header (must be defined in one line).
-\item \texttt{nfsroot\_kernel}: kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
-\item \texttt{nfsroot\_params}: kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
-\item \texttt{partition\_creation\_kind}: tool used to create the partition table. The expected values are \texttt{fdisk} or \texttt{parted}.
-\item \texttt{admin\_pre\_install}: list of pre-install to execute at the pre-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_pre\_install} value can also be used if no administrator pre-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
-\item \texttt{admin\_post\_install}: list of post-install to execute at the post-install of a deployment. The syntax is: file1|kind\_file1|script1,file2|kind\_file2|script2, ... The kind of file must be tgz or tbz2. The \textit{no\_post\_install} value can also be used if no administrator post-install must be executed. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
-\item \texttt{macrostep}: list of implementations for a macro-step. The syntax is: macrostepname|implem1:nb\_retry:timeout,implem2:nb\_retry:timeout,... There are 3 macro-steps, so you must specify one line in the specific configuration file for each one. Here is the list of the macro-step and their implementation:
+  \item \ypath{/partitioning}
   \begin{itemize}
-  \item \texttt{SetDeploymentEnv}
+    \item \yfield{block\_device}{String}block device of the disk used on the nodes
+    \item \yfield{kind}{String} tool used to create the partition table (expected values are \texttt{fdisk} or \texttt{parted})
+    \item \yfieldd{disable\_swap}{Boolean}{false} disable the swap partition on the disk
+  \end{itemize}
+
+  \item \ypath{/partitioning/partitions}
+  \begin{itemize}
+    \item \yfieldd{swap}{Integer}{1} number of the swap partition on the disk
+    \item \yfield{prod}{Integer} number of the production partition on the disk
+    \item \yfield{deploy}{Integer} number of the deployment partition on the disk
+    \item \yfield{tmp}{Integer} number of the tmp partition on the disk
+  \end{itemize}
+
+  \item \ypath{/timeouts}
+  \begin{itemize}
+    \item \yfield{reboot}{Integer/String} classical reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
+    \item \yfieldd{kexec}{Integer/String}{60} kexec reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
+  \end{itemize}
+
+  \item \ypath{/remoteops/[reboot]} The reboot commands, an escalation of them will be performed in the order of the List. Warning: at the moment, only the names \emph{soft}, \emph{hard} and \emph{very\_hard} can be used.
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the command (used in the display)
+    \item \yfield{cmd}{String} generic reboot command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+    \item \yfieldd{group}{String}{nil} the affinity between nodes (see section \ref{sec:groupcmd})
+  \end{itemize}
+
+  \item \ypath{/remoteops/[power\_on]} The power\_on commands, an escalation of them will be performed in the order of the List. This commands are not mandatory. Warning: at the moment, only the names \emph{soft}, \emph{hard} and \emph{very\_hard} can be used.
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the command (used in the display)
+    \item \yfield{cmd}{String} generic power\_on command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+    \item \yfieldd{group}{String}{nil} the affinity between nodes (see section \ref{sec:groupcmd})
+  \end{itemize}
+
+  \item \ypath{/remoteops/[power\_off]} The power\_off commands, an escalation of them will be performed in the order of the List. This commands are not mandatory. Warning: at the moment, only the names \emph{soft}, \emph{hard} and \emph{very\_hard} can be used.
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the command (used in the display)
+    \item \yfield{cmd}{String} generic power\_off command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+    \item \yfieldd{group}{String}{nil} the affinity between nodes (see section \ref{sec:groupcmd})
+  \end{itemize}
+
+  \item \ypath{/remoteops/[power\_status]} The power\_status commands, an escalation of them will be performed in the order of the List. This commands are not mandatory. This commands are not mandatory. Warning: at the moment, only the name \emph{soft} can be used.
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the command (used in the display)
+    \item \yfield{cmd}{String} generic power\_status command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+  \end{itemize}
+
+  \item \ypath{/remoteops/[console]} The console commands, an escalation of them will be performed in the order of the List. This commands are not mandatory. This commands are not mandatory. Warning: at the moment, only the name \emph{soft} can be used.
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the command (used in the display)
+    \item \yfield{cmd}{String} generic console command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
+  \end{itemize}
+
+  \item \ypath{/kernels/user}
+  \begin{itemize}
+    \item \yfieldd{params}{String}{''} default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
+  \end{itemize}
+
+  \item \ypath{/kernels/deploy}
+  \begin{itemize}
+    \item \yfield{vmlinuz}{String} name of the kernel used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/export} and \ypath{pxe/kernels/directory} settings of the general configuration file.
+    \item \yfield{initrd}{String} name of the initrd used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/export} and \ypath{pxe/kernels/directory} settings of the general configuration file.
+    \item \yfieldd{params}{String}{''} boot parameters of the deployment environment kernel
+    \item \yfieldd{drivers}{String}{''} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
+  \end{itemize}
+
+  \item \ypath{/kernels/nfsroot}
+  \begin{itemize}
+    \item \yfieldd{vmlinuz}{String}{''} kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+    \item \yfieldd{params}{String}{''} kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+  \end{itemize}
+
+  \item \ypath{/preinstall/[files]} list of pre-install to execute at the pre-install of a deployment. This fields are not mandatory. 
+  \begin{itemize}
+    \item \yfield{file}{String} the absolute path to the archive containing the scripts
+    \item \yfield{format}{String} the kind of file (expected values are \emph{tgz} or \emph{tbz2})
+    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
+  \end{itemize}
+
+  \item \ypath{/postinstall/[files]} list of post-install to execute at the post-install of a deployment. This fields are not mandatory. 
+  \begin{itemize}
+    \item \yfield{file}{String} the absolute path to the archive containing the scripts
+    \item \yfield{format}{String} the kind of file (expected values are \emph{tgz} or \emph{tbz2})
+    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
+  \end{itemize}
+
+  \item \ypath{/pxe}
+  \begin{itemize}
+    \item \yfieldd{headers}{String}{''} default PXE header (must be defined in one line, you can use the \\n notation to add newlines)
+  \end{itemize}
+
+  \item \ypath{/kexec}
+  \begin{itemize}
+    \item \yfieldd{repository}{String}{/karepository} the directory in the running system where deploy kernel files have to be copied for kexec purpose
+  \end{itemize}
+
+  \item \ypath{/hooks}
+  \begin{itemize}
+    \item \yfieldd{use\_ip\_to\_deploy}{Boolean}{false} use IP addresses instead of hostnames to contact the nodes
+  \end{itemize}
+
+  \item \ypath{/automata/macrosteps} list of implementations for each macro-steps of the automata. There are 3 macro-steps, so you must specify each of them.
+  \item \ypath{/automata/macrosteps/[SetDeploymentEnv]} the macro-step in charge of rebooting the nodes on the deployment environment
+  \begin{itemize}
+    \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Untrusted}, \emph{Kexec}, \emph{Prod}, \emph{Nfsroot}, \emph{UntrustedCustomPreInstall} and \emph{Dummy})
+    \item \yfield{retries}{Integer} the number of retries for this macro-step
+    \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
+  \end{itemize}
+
+  \item \ypath{/automata/macrosteps/[BroadcastEnv]} the macro-step in charge of broadcasting the image of the user's environment image on the nodes
+  \begin{itemize}
+    \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Kastafior}, \emph{Chain}, \emph{Tree}, \emph{Bittorrent} and \emph{Dummy})
+    \item \yfield{retries}{Integer} the number of retries for this macro-step
+    \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
+  \end{itemize}
+
+  \item \ypath{/automata/macrosteps/[BootNewEnv]} the macro-step in charge of rebooting the nodes after the installation of the environment
+  \begin{itemize}
+    \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Classical}, \emph{Kexec}, \emph{HardReboot}, \emph{PivotRoot} (not implemented yet) and \emph{Dummy})
+    \item \yfield{retries}{Integer} the number of retries for this macro-step
+    \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
+  \end{itemize} 
+\end{itemize}
+\paragraph{The automata macro-steps\\}
+Here is the list of the macro-step and their implementation:
+\begin{itemize}
+\item \texttt{SetDeploymentEnv}
+  \begin{itemize}
+  \item \texttt{SetDeploymentEnvProd}
     \begin{itemize}
-    \item \texttt{SetDeploymentEnvProd}
-      \begin{itemize}
-      \item check\_nodes
-      \item create\_partition\_table
-      \item format\_deploy\_part
-      \item mount\_deploy\_part
-      \item format\_tmp\_part
-      \end{itemize}
-    \item \texttt{SetDeploymentEnvUntrusted}
-      \begin{itemize}
-      \item switch\_pxe
-      \item reboot
-      \item wait\_reboot
-      \item send\_key\_in\_deploy\_env
-      \item create\_partition\_table
-      \item format\_deploy\_part
-      \item mount\_deploy\_part
-      \item format\_tmp\_part
-      \end{itemize}
-    \item \texttt{SetDeploymentEnvUntrustedCustomPreInstall}
-      \begin{itemize}
-      \item switch\_pxe
-      \item reboot
-      \item wait\_reboot
-      \item send\_key\_in\_deploy\_env
-      \item manage\_admin\_pre\_install
-      \end{itemize}
-    \item \texttt{SetDeploymentEnvNfsroot}
-      \begin{itemize}
-      \item switch\_pxe
-      \item reboot
-      \item wait\_reboot
-      \item send\_key\_in\_deploy\_env
-      \item create\_partition\_table
-      \item format\_deploy\_part
-      \item mount\_deploy\_part
-      \item format\_tmp\_part
-      \end{itemize}
-    \item \texttt{SetDeploymentEnvDummy}
+    \item check\_nodes
+    \item create\_partition\_table
+    \item format\_deploy\_part
+    \item mount\_deploy\_part
+    \item format\_tmp\_part
     \end{itemize}
-  \item \texttt{BroadcastEnv}
+  \item \texttt{SetDeploymentEnvUntrusted}
     \begin{itemize}
-      \item \texttt{BroadcastEnvChain}
-        \begin{itemize}
-        \item send\_environment(``chain'')
-        \item manage\_admin\_post\_install
-        \item manage\_user\_post\_install
-        \item send\_key
-        \item install\_bootloader
-        \item switch\_pxe
-        \end{itemize}
-      \item \texttt{BroadcastEnvKastafior}
-        \begin{itemize}
-        \item send\_environment(``kastafior'')
-        \item manage\_admin\_post\_install
-        \item manage\_user\_post\_install
-        \item send\_key
-        \item install\_bootloader
-        \item switch\_pxe
-        \end{itemize}
-      \item \texttt{BroadcastEnvTree}
-        \begin{itemize}
-        \item send\_environment(``tree'')
-        \item manage\_admin\_post\_install
-        \item manage\_user\_post\_install
-        \item send\_key
-        \item install\_bootloader
-        \item switch\_pxe
-        \end{itemize}
-      \item \texttt{BroadcastEnvBittorrent}
-        \begin{itemize}
-        \item send\_environment(``bittorrent'')
-        \item manage\_admin\_post\_install
-        \item manage\_user\_post\_install
-        \item send\_key
-        \item install\_bootloader
-        \item switch\_pxe
-        \end{itemize}
-      \item \texttt{BroadcastEnvDummy}
+    \item switch\_pxe
+    \item reboot
+    \item wait\_reboot
+    \item send\_key\_in\_deploy\_env
+    \item create\_partition\_table
+    \item format\_deploy\_part
+    \item mount\_deploy\_part
+    \item format\_tmp\_part
     \end{itemize}
-  \item \texttt{BootNewEnv}
+  \item \texttt{SetDeploymentEnvUntrustedCustomPreInstall}
     \begin{itemize}
-      \item \texttt{BootNewEnvClassical}
-        \begin{itemize}
-        \item umount\_deploy\_part
-        \item reboot\_from\_deploy\_env
-        \item wait\_reboot
-        \end{itemize}
-      \item \texttt{BootNewEnvKexec}
-        \begin{itemize}
-        \item reboot(``kexec'')
-        \item wait\_reboot
-        \end{itemize}
-      \item \texttt{BootNewEnvHardReboot}
-        \begin{itemize}
-        \item reboot(``hard'')
-        \item wait\_reboot
-        \end{itemize}
-      \item \texttt{BootNewEnvDummy}
+    \item switch\_pxe
+    \item reboot
+    \item wait\_reboot
+    \item send\_key\_in\_deploy\_env
+    \item manage\_admin\_pre\_install
     \end{itemize}
+  \item \texttt{SetDeploymentEnvNfsroot}
+    \begin{itemize}
+    \item switch\_pxe
+    \item reboot
+    \item wait\_reboot
+    \item send\_key\_in\_deploy\_env
+    \item create\_partition\_table
+    \item format\_deploy\_part
+    \item mount\_deploy\_part
+    \item format\_tmp\_part
+    \end{itemize}
+  \item \texttt{SetDeploymentEnvDummy}
+  \end{itemize}
+\item \texttt{BroadcastEnv}
+  \begin{itemize}
+    \item \texttt{BroadcastEnvChain}
+      \begin{itemize}
+      \item send\_environment(``chain'')
+      \item manage\_admin\_post\_install
+      \item manage\_user\_post\_install
+      \item send\_key
+      \item install\_bootloader
+      \item switch\_pxe
+      \end{itemize}
+    \item \texttt{BroadcastEnvKastafior}
+      \begin{itemize}
+      \item send\_environment(``kastafior'')
+      \item manage\_admin\_post\_install
+      \item manage\_user\_post\_install
+      \item send\_key
+      \item install\_bootloader
+      \item switch\_pxe
+      \end{itemize}
+    \item \texttt{BroadcastEnvTree}
+      \begin{itemize}
+      \item send\_environment(``tree'')
+      \item manage\_admin\_post\_install
+      \item manage\_user\_post\_install
+      \item send\_key
+      \item install\_bootloader
+      \item switch\_pxe
+      \end{itemize}
+    \item \texttt{BroadcastEnvBittorrent}
+      \begin{itemize}
+      \item send\_environment(``bittorrent'')
+      \item manage\_admin\_post\_install
+      \item manage\_user\_post\_install
+      \item send\_key
+      \item install\_bootloader
+      \item switch\_pxe
+      \end{itemize}
+    \item \texttt{BroadcastEnvDummy}
+  \end{itemize}
+\item \texttt{BootNewEnv}
+  \begin{itemize}
+    \item \texttt{BootNewEnvClassical}
+      \begin{itemize}
+      \item umount\_deploy\_part
+      \item reboot\_from\_deploy\_env
+      \item wait\_reboot
+      \end{itemize}
+    \item \texttt{BootNewEnvKexec}
+      \begin{itemize}
+      \item reboot(``kexec'')
+      \item wait\_reboot
+      \end{itemize}
+    \item \texttt{BootNewEnvHardReboot}
+      \begin{itemize}
+      \item reboot(``hard'')
+      \item wait\_reboot
+      \end{itemize}
+    \item \texttt{BootNewEnvDummy}
   \end{itemize}
 \end{itemize}
 
-\paragraph{Note about the reboot/power-on/power-off commands}
+\paragraph{Note about the reboot/power-on/power-off commands}\label{sec:groupcmd}
 In some special cases, a such command can affect a group of nodes. Thus, you can specify group of nodes for a given command using the following syntax :
 \begin{small}
 \begin{verbatim}
-cmd_very_hard_power_off = /usr/sbin/very_hard_power_off GROUP_SHORT, \
-                          path_to_group_of_node_for_hard_power_off_cmd
+---
+# ...
+remoteops:
+  reboot:
+    - name: very_hard
+      cmd: /usr/sbin/very_hard_power_off GROUP_SHORT
+      group: path_to_group_of_node_for_hard_power_off_cmd
+# ...
 \end{verbatim}
 \end{small}
 You can remark two things :
@@ -543,80 +964,53 @@ You can remark two things :
 \end{itemize}
 For a given command on a given cluster, if you specify some group of nodes (with \texttt{GROUP\_SHORT} or \texttt{GROUP\_FQDN} patterns), you will also be able to specify, for some nodes of the cluster, a command that does not imply a group of nodes. To do this, you must specify these commands in the specific commands configuration files.
 
-\section{Clusters file}
-The list of all the clusters must be defined in the  \texttt{/etc/kadeploy3/clusters} file. For instance, the file may contain something like :
-\begin{small}
-\begin{verbatim}
-#list of the clusters
-gdx
-netgdx
-\end{verbatim}
-\end{small}
-Warning, a cluster-specific configuration file must be defined for each cluster define in this file.
+\section{Partition map files}\label{sec:partfiles}
+A partition map must be provided for each cluster. 
 
-\section{Partition map files}
-A partition map must be provided for each cluster with the name \texttt{partition\_file\_CLUSTER} where \texttt{CLUSTER} is the cluster name. 
+If you specify \texttt{fdisk} for the \ypath{/partitioning/kind} field in the cluster-specific configuration file, the partition map file must be a fdisk map. In this case, concerning the kind of the deployment partition, you must use the value \texttt{PARTTYPE} instead of a real value. Thus, this value will be modified on the fly according to the kind of environment deployed (Linux, FreeBSD, ...).
 
-If you specify \texttt{fdisk} for the \texttt{partition\_creation\_kind} field in the cluster-specific configuration file, the partition map file must be a fdisk map. In this case, concerning the kind of the deployment partition, you must use the value \texttt{PARTTYPE} instead of a real value. Thus, this value will be modified on the fly according to the kind of environment deployed (Linux, FreeBSD, ...).
+If you specify \texttt{parted} for the \ypath{/partitioning/kind} field in the cluster-specific configuration file, you must provide a parted script as a partition map file. Currently, only the Linux partition kind is handled with parted.
 
-If you specify \texttt{parted} for the \texttt{partition\_creation\_kind} field in the cluster-specific configuration file, you must provide a parted script as a partition map file. Currently, only the Linux partition kind is handled with parted.
-
-\section{Nodes configuration files}
-All the nodes of the clusters that aim to be deployed must be declared in a file named \texttt{nodes} in the configuration directory. Each line of the file must specify a node and the syntax is: \texttt{hostname} \texttt{ip} \texttt{cluster}. Ranges can also be used to define the nodes.
-
-Here is an example:
-\begin{small}
-\begin{verbatim}
-gdx-1.orsay.grid5000.fr 172.24.1.1 gdx
-gdx-2.orsay.grid5000.fr 172.24.1.2 gdx
-gdx-3.orsay.grid5000.fr 172.24.1.3 gdx
-gdx-4.orsay.grid5000.fr 172.24.1.4 gdx
-gdx-5.orsay.grid5000.fr 172.24.1.5 gdx
-gdx-6.orsay.grid5000.fr 172.24.1.6 gdx
-gdx-7.orsay.grid5000.fr 172.24.1.7 gdx
-gdx-8.orsay.grid5000.fr 172.24.1.8 gdx
-gdx-9.orsay.grid5000.fr 172.24.1.9 gdx
-netgdx-1.orsay.grid5000.fr 172.25.1.1 netgdx
-netgdx-2.orsay.grid5000.fr 172.25.1.2 netgdx
-netgdx-3.orsay.grid5000.fr 172.25.1.3 netgdx
-netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
-\end{verbatim}
-\end{small}
-
-Another example:
-\begin{small}
-\begin{verbatim}
-gdx-[1-9].orsay.grid5000.fr 172.24.1.[1-9] gdx
-netgdx-[1-3].orsay.grid5000.fr 172.25.1.[1-3] netgdx
-netgdx-4.orsay.grid5000.fr 172.25.1.4 netgdx
-\end{verbatim}
-\end{small}
 
 \section{Specific commands configuration files}
-In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd} in the configuration directory. Each line of the file must specify a command to override for a given node and the syntax is: \texttt{hostname}|command kind|\texttt{cmd} where \texttt{hostname} must be also defined in the \texttt{nodes} file and the expected values for command kind are:
-\begin{itemize}
-\item \texttt{reboot\_soft}
-\item \texttt{reboot\_hard}
-\item \texttt{reboot\_very\_hard}
-\item \texttt{power\_on\_soft}
-\item \texttt{power\_on\_hard}
-\item \texttt{power\_on\_very\_hard}
-\item \texttt{power\_off\_soft}
-\item \texttt{power\_off\_hard}
-\item \texttt{power\_off\_very\_hard}
-\item \texttt{power\_status}
-\item \texttt{console}
-\end{itemize}
+In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd.yml} in the configuration directory.
 
-Here is an example:
+Note: it is not mandatory to override all the commands for a given node.
+
+\subsection{Example of a commands file\\}
 \begin{small}
 \begin{verbatim}
-vm-001|reboot_soft|ssh -q root@vm-001 /sbin/special_reboot_for_vm
-vm-001|reboot_hard|vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
-vm-002|reboot_soft|ssh -q root@vm-002 /sbin/special_reboot_for_vm
+---
+vm-001:
+  reboot_soft: ssh -q root@vm-001 /sbin/special_reboot_for_vm
+  reboot_hard: vmware-cmd /home/vmware/vm-001/vm-001.vmx reset hard
+vm-002:
+  reboot_soft: ssh -q root@vm-002 /sbin/special_reboot_for_vm
 \end{verbatim}
 \end{small}
-Note: it is not mandatory to override all the commands for a given node.
+
+\subsection{Explanation of the fields used in the commands file\\}
+\begin{itemize}
+  \item \ypath{/NODENAME} The nodes are specified by hostname (as declared in the clusters configuration file)
+  \begin{itemize}
+    \item \yfield{COMMAND}{String} the setting to override and the command
+  \end{itemize}
+\end{itemize}
+
+The COMMAND can should be:
+\begin{itemize}
+  \item \texttt{reboot\_soft} to override \ypath{/remoteops/reboot/[]/name=soft}
+  \item \texttt{reboot\_hard} to override \ypath{/remoteops/reboot/[]/name=hard}
+  \item \texttt{reboot\_very\_hard} to override \ypath{/remoteops/reboot/[]/name=very\_hard}
+  \item \texttt{power\_on\_soft} to override \ypath{/remoteops/power\_on/[]/name=soft}
+  \item \texttt{power\_on\_hard} to override \ypath{/remoteops/power\_on/[]/name=hard}
+  \item \texttt{power\_on\_very\_hard} to override \ypath{/remoteops/power\_on/[]/name=very\_hard}
+  \item \texttt{power\_off\_soft} to override \ypath{/remoteops/power\_off/[]/name=soft}
+  \item \texttt{power\_off\_hard} to override \ypath{/remoteops/power\_off/[]/name=hard}
+  \item \texttt{power\_off\_very\_hard} to override \ypath{/remoteops/power\_off/[]/name=very\_hard}
+  \item \texttt{power\_status} to override \ypath{/remoteops/power\_status/[]/name=soft}
+  \item \texttt{console} to override \ypath{/remoteops/console/[]/name=soft}
+\end{itemize}
 
 
 \section{Deployment environment}
@@ -655,12 +1049,31 @@ TODO
 In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastafior} macro-step), the server must be able to perform an ssh connection on itself. Thus, you must add the deploy key installed in the \texttt{/etc/kadeploy3/keys/id\_deploy.pub} in the \texttt{.ssh/authorized\_keys} file of the \texttt{deploy} user. This step is optional if you do not plan to use the \texttt{BroadcastEnvKastafior} macro-step.
 
 \chapter{Client side configuration}
-On the client side, you only have to configure the file named \texttt{client\_conf}. This file defines one Kadeploy server per line and a default server. For instance:
+On the client side, you only have to configure the file named \texttt{client\_conf.yml}. This file defines Kadeploy servers and a default server.
+
+\paragraph{Sample of a client configuration file}
 \begin{verbatim}
-default = rennes
-rennes = rennes.grid5000.fr:25300
-toulouse = toulouse.grid5000.fr:25300
+---
+default: nancy
+servers:
+  - name: lille
+    hostname: frontend.lille.grid5000.fr
+    port: 25300
+  - name: nancy
+    hostname: nancy.lille.grid5000.fr
+    port: 25300
 \end{verbatim}
+
+\paragraph{Explanation of the fields\\}
+\begin{itemize}
+  \item \yfield{\ypath{/default}}{String} the default Kadeploy server to use (name should be included in the list of \ypath{/[servers]/name})
+  \item \ypath{/[servers]} The different servers
+  \begin{itemize}
+    \item \yfield{name}{String} the Kadeploy server name
+    \item \yfield{hostname}{String} the Kadeploy server hostname
+    \item \yfield{port}{Integer} the port the Kadeploy server is listening on
+  \end{itemize}
+\end{itemize}
 
 \chapter{User guide}
 
@@ -863,7 +1276,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
                            BroadcastEnv|BroadcastEnvKastafior:2:300&
                            BootNewEnv|BootNewEnvKexec:1:150"
 \end{verbatim}
-If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \texttt{macrostep} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
+If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \ypath{/automata/macrosteps} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
 
 \paragraph{Use case 10 - expert usage - insert custom operations in the deployment workflow}
 \begin{verbatim}
@@ -1435,7 +1848,7 @@ The goal of the pre-install in the Kadeploy workflow is to prepare the disk of t
 
 To setup a custom pre-install you first have to create an archive that contains your scripts. After that you have to tell kadeploy which script of your archive has to be executed, this is done by specifying the \texttt{preinstall} field in your environment description file (see section \ref{sec:env_desc}). Please be careful to use relative paths in your scripts since you dont know where they will be uncompressed.
 
-You can do want you want in the pre-install but you must know that Kadeploy will extract the environment in the directory defined by the \texttt{environment\_extraction\_dir} field of the general configuration file. Commonly, this directory is \texttt{/mnt/dest}. Thus, you have to mount all the partitions you need in this directory. If you wish to deploy the environment onto several partitions, you can use for instance the following map:
+You can do want you want in the pre-install but you must know that Kadeploy will extract the environment in the directory defined by the \ypath{/environments/deployment/extraction\_dir} field of the general configuration file. Commonly, this directory is \texttt{/mnt/dest}. Thus, you have to mount all the partitions you need in this directory. If you wish to deploy the environment onto several partitions, you can use for instance the following map:
 \begin{itemize}
 \item /dev/sda3 $\mapsto$ /mnt/dest
 \item /dev/sda4 $\mapsto$ /mnt/dest/var
@@ -1443,7 +1856,7 @@ You can do want you want in the pre-install but you must know that Kadeploy will
 \item /dev/sda6 $\mapsto$ /mnt/dest/tmp
 \end{itemize}
 
-If you choose to mount more than one partition in the pre-install, remember to umount all the partitions excepted the one mounted on \texttt{environment\_extraction\_dir} (\texttt{/mnt/dest} in principle) in the post-install step. Indeed, the common Kadeploy workflow will automatically umount the partition mounted on \texttt{environment\_extraction\_dir}. Thus, if other partitions are mounted, the umount will fail.
+If you choose to mount more than one partition in the pre-install, remember to umount all the partitions excepted the one mounted on \ypath{/environments/deployment/extraction\_dir} (\texttt{/mnt/dest} in principle) in the post-install step. Indeed, the common Kadeploy workflow will automatically umount the partition mounted on \ypath{/environments/deployment/extraction\_dir}. Thus, if other partitions are mounted, the umount will fail.
 
 
 \end{document}
