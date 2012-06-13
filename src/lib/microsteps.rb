@@ -1620,7 +1620,8 @@ module MicroStepsLibrary
         return ret
       else
         @output.verbosel(3, "   The Kexec optimization can only be used with a linux environment")
-        escalation_cmd_wrapper("reboot", "soft", instance_thread)
+        #escalation_cmd_wrapper("reboot", "soft", instance_thread)
+        return false
       end
     end
 
