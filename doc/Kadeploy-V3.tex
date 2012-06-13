@@ -5,8 +5,14 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{fancyvrb}
+\usepackage{alltt}
+\renewcommand{\ttdefault}{txtt}
 
 \newcommand{\version}{3.1-4}
+
+\newcommand{\ypath}[1]{\texttt{#1}}
+\newcommand{\yfield}[2]{\texttt{#1} {\small\{{\emph{#2}}\}}:}
+\newcommand{\yfieldd}[3]{\texttt{#1} {\small\{{\emph{#2}}\}} {\small(}#3{\small)}:}
 
 \addtolength{\hoffset}{-1.5cm}
 \addtolength{\textwidth}{3cm}
@@ -226,122 +232,326 @@ After being installed and configured, the Kadeploy server can be run either inte
 \noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
 \chapter{Server side configuration}
+\paragraph{Configuration files\\}
 Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
 
 The file \texttt{load\_kadeploy\_env} in the configuration directory contains the \texttt{KADEPLOY\_INSTALL\_DIR} variable. You should probably fill this variable with the Kadeploy installation directory you used. This directory can be anywhere in the filesystem.
 
+\paragraph{Description format: YAML\\}
+In Kadeploy configuration settings are given using the YAML markup language. You should be aware that, in this language, indentation is very important. Also, in the YAML language, fields are typed, the value \texttt{"16"} is not equivalent to the value \texttt{16}.
+
+\paragraph{YAML types\\}
+In Kadeploy configuration files, values can have the YAML data types: \emph{Integer}, \emph{Float}, \emph{Boolean} and \emph{String}.
+
+YAML provides a way to describe hierarchy between elements using \emph{Associative arrays} (\texttt{key} $\to$ \texttt{value}) and \emph{Ordered lists}. It's possible to mix this structures.
+
+Here are some examples:
+\begin{small}
+\begin{alltt}
+--- 
+sample-array:{\footnotesize # This is an Associative array containing 3} elements
+  elem1: 8{\footnotesize # Integer}
+  elem2: "8"{\footnotesize # String}
+  elem3:\textbf{\footnotesize vREF1}
+sample-list:{\footnotesize # This is an Ordered list of 2 elements}
+  - true{\footnotesize # Boolean}
+  - "true"{\footnotesize # String}
+sample-mix-1:{\footnotesize # An Ordered list of identical Associative arrays}
+  - elem1: value1{\footnotesize # String}
+    elem2:\textbf{\footnotesize vREF2}
+  - elem1: value2{\footnotesize # String}
+    elem2:\textbf{\footnotesize vREF3}
+sample-mix-2:{\footnotesize # An Associative array of Ordered lists}
+  elem1:
+    - 1.42{\footnotesize # Float}
+    - value1
+  elem2:
+    - value2
+    - value3
+sample-complex:{\footnotesize # Complex structure}
+  mylist:
+    - size: 16
+      name:\textbf{\footnotesize vREF4}
+    - size: 32
+      name:\textbf{\footnotesize vREF5}
+  value: myval
+  mysample:
+    file: filename
+    ext: ext
+    mode:\textbf{\footnotesize vREF6}
+\end{alltt}
+\end{small}
+
+\paragraph{Documentation: paths\\}
+Kadeploy configuration settings will be described by giving a \emph{path} to each resources. A \emph{path} explicit the hierarchy structure to follow to spefify a setting in the configuration file. In a \emph{path}, the character \texttt{/} describes a nested \emph{Associative array}, characters \texttt{$[...]$} describes an \emph{Ordered list} of identical \emph{Associative arrays}.\\
+
+Sample of \emph{path}s in our sample:
+\begin{itemize}
+  \item \texttt{\small /sample-array/elem3} refers to the value \texttt{\small vREF1};
+  \item \texttt{\small /$[$sample-mix-1$]$/elem2} refers to values such as \texttt{\small vREF2} and \texttt{\small vREF3};
+  \item \texttt{\small /sample-complex/$[$mylist$]$} refers to the \emph{Ordered List} \texttt{\small mylist};
+  \item \texttt{\small /sample-complex/$[$mylist$]$/name} refers to values such as \texttt{\small vREF4} and \texttt{\small vREF5};
+  \item \texttt{\small /sample-complex/mysample/mode} refers to value \texttt{\small vREF5}.
+\end{itemize}
+
+\paragraph{Documentation: configuration files fields\\}
+In the following, fields descriptions are given using the formalism:
+\begin{itemize}
+  \item \ypath{/path/to/the/field}
+  \begin{itemize}
+    \item \yfieldd{fieldname}{YAML type}{default value} description of the field
+  \end{itemize}
+\end{itemize}
+If no default value is specified, the field is mandatory.
+
+Sample of field description:
+\begin{itemize}
+  \item \ypath{/sample-complex}
+  \begin{itemize}
+    \item \yfield{myvalue}{String} the value of the element
+  \end{itemize}
+  \item \ypath{/sample-complex/mysample}
+  \begin{itemize}
+    \item \yfieldd{file}{String}{sample} the name of the sample file
+    \item \yfieldd{ext}{String}{txt} the extension of the sample file
+  \end{itemize}
+  \item \ypath{/sample-complex/[mylist]}
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the element
+    \item \yfieldd{size}{Integer}{8} the maximal size (MB) of the element
+  \end{itemize}
+\end{itemize}
+
 \section{General configuration file}\label{sec:general_config}
-The general configuration file is named \texttt{conf} and is located in the Kadeploy configuration directory.
+The general configuration file is named \texttt{server\_conf.yml} and is located in the Kadeploy configuration directory.
+
 \subsection{Example of a general configuration file}
 \begin{small}
 \begin{verbatim}
-verbose_level = 3
-tftp_repository = /var/lib/tftpboot/PXEClient
-tftp_images_path = images
-tftp_images_max_size = 4000
-tftp_cfg = pxelinux.cfg
-db_kind = mysql
-deploy_db_host = mysql
-deploy_db_name = deploy3
-deploy_db_login = deploy_user
-deploy_db_passwd = deploy_password
-rights_kind = db
-taktuk_connector = ssh -A -l root -q \
-                          -o StrictHostKeyChecking=no \
-                          -o UserKnownHostsFile=/dev/null \
-                          -o PreferredAuthentications=publickey \
-                          -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
-taktuk_tree_arity = 0
-taktuk_auto_propagate = false
-tarball_dest_dir = /tmp
-environment_extraction_dir = /mnt/dest
-kadeploy_server = fgdx2.orsay.grid5000.fr
-kadeploy_server_port = 25300
-kadeploy_tcp_buffer_size = 8192
-kadeploy_cache_dir = /tmp/kadeploy_cache
-kadeploy_cache_size = 20000
-max_preinstall_size = 30
-max_postinstall_size = 30
-ssh_port = 22
-test_deploy_env_port = 25300
-use_rsh_to_deploy = false
-log_to_file = /tmp/kadeploy.log
-log_to_syslog = true
-log_to_db = true
-dbg_to_syslog = false
-dbg_to_syslog_level = 4
-reboot_window = 100
-reboot_window_sleep_time = 10
-nodes_check_window = 90
-bootloader = chainload_pxe
-purge_deployment_timer = 900
-rambin_path = /rambin
-mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|\
-               ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index
-demolishing_env_threshold = 2
-demolishing_env_auto_tag = false
-bt_tracker_ip = 172.24.100.2
-bt_download_timeout = 1800
-almighty_env_users = root,ejeanvoine
-async_end_of_deployment_hook = echo WORKFLOW_ID
-async_end_of_reboot_hook = echo REBOOT_ID
-async_end_of_power_hook = echo POWER_ID
-vlan_hostname_suffix = -kavlan-VLAN_ID
-set_vlan_cmd = kavlan NODES -s -i VLAN_ID -u USER
+--- 
+database:
+  host: mysql.lan
+  name: deploy3
+  login: deploy_user
+  passwd: deploy_password
+  kind: mysql
+rights:
+  kind: db
+  almighty_users: root,superuser
+  purge_deployment_timer: 900
+logs:
+  file: /tmp/kadeploy.log
+  syslog: true
+  database: true
+  debug: true
+verbosity:
+  clients: 3
+  logs: 4
+cache:
+  directory: /var/cache/kadeploy
+  size: /tmp/kadeploy_cache
+  disabled: false
+network:
+  server_hostname: kadeploy.lan
+  vlan:
+    set_cmd: kavlan NODES -s -i VLAN_ID -u USER
+    hostname_suffix: -kavlan-VLAN_ID
+  ports: 
+    ssh: 22
+    kadeploy_server: 25300
+    test_deploy_env: 25300
+  tcp_buffer_size: 8192
+windows: 
+  check: 
+    size: 90
+  reboot: 
+    size: 100
+    sleep_time: 10
+environments: 
+  deployment: 
+    extraction_dir: /mnt/dest
+    tarball_dir: /tmp
+    rambin_dir: /rambin
+  demolishing:
+    auto_tag: false
+    tag_threshold: 2
+  max_postinstall_size: 10
+  max_preinstall_size: 10
+pxe:
+  kind: PXElinux
+  repository: /var/lib/tftpboot/
+  export: /
+  kernels:
+    directory: kernels
+    max_size: 4000
+  bootloader: chainload_pxe
+hooks: 
+  async: 
+    end_of_reboot: echo REBOOT_ID
+    end_of_power: echo POWER_ID
+    end_of_deployment: echo WORKFLOW_ID
+external:
+  taktuk: 
+    auto_propagate: false
+    connector: |-
+      ssh -q -o StrictHostKeyChecking=no \
+      -o UserKnownHostsFile=/dev/null \
+      -o PreferredAuthentications=publickey \
+      -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
+    tree_arity: 0
+  bittorrent: 
+    tracker_ip: 10.0.0.4
+    download_timeout: 1800
+  grub:
+    version: 2
+  mkfs:
+  - fstype: ext2
+    args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
+  - fstype: ext3
+    args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
+  kastafior:
+    binary: /usr/bin/kastafior
 \end{verbatim}
 \end{small}
 
 \subsection{Explanation of the fields used in the general configuration file}
-Each line of the configuration file must follow the pattern: \texttt{key = value} (note that the spaces around the \texttt{=} are mandatory.
+
+In the following description
 \begin{itemize}
-\item \texttt{verbose\_level}: number between 0 and 4 that specifies the default verbose level for the client. 0 means ``no verbose'' and 4 means ``full verbose''.
-\item \texttt{tftp\_repository}: absolute path of the TFTP repository.
-\item \texttt{tftp\_images\_path}: relative path of the TFTP image sub-repository.
-\item \texttt{tftp\_images\_max\_size}: maximal size in MB of the TFTP image repository. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to read in this directory.
-\item \texttt{tftp\_cfg}: relative path of the TFTP configuration repository. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
-\item \texttt{db\_kind}: database kind (only mysql is available now).
-\item \texttt{deploy\_db\_host}: hostname of the database.
-\item \texttt{deploy\_db\_name}: name of the Kadeploy database.
-\item \texttt{deploy\_db\_login}: login for the Kadeploy database.
-\item \texttt{deploy\_db\_passwd}: password for the Kadeploy database.
-\item \texttt{rights\_kind}: authentication kind (use db for a true rights management or dummy to bypass the rights management).
-\item \texttt{taktuk\_connector}: connector used by Taktuk.
-\item \texttt{taktuk\_tree\_arity}: Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
-\item \texttt{taktuk\_auto\_propagate}: use of the auto propagation feature of Taktuk (expected values are true or false). You should use this feature if the deployment environment doesn't contain Taktuk.
-\item \texttt{tarball\_dest\_dir}: destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent .
-\item \texttt{environment\_extraction\_dir}: extraction directory for the tarball in the deployment environment.
-\item \texttt{kadeploy\_server}: hostname of the Kadeploy server.
-\item \texttt{kadeploy\_server\_port}: port of the Kadeploy server.
-\item \texttt{kadeploy\_tcp\_buffer\_size}: TCP buffer size for the Kadeploy file server.
-\item \texttt{kadeploy\_cache\_dir}: absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment. It is possible to disable the use of a cache by setting \textit{no\_cache} to this field.
-\item \texttt{kadeploy\_cache\_size}: size in MB of the Kadeploy cache.
-\item \texttt{max\_preinstall\_size}: maximum size in MB of the preinstall files.
-\item \texttt{max\_postinstall\_size}: maximum size in MB of the postinstall files.
-\item \texttt{ssh\_port}: port used by SSH
-\item \texttt{test\_deploy\_env\_port}: port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted.
-\item \texttt{use\_rsh\_to\_deploy}: use rsh in the deployment workflow (expected values are true or false).
-\item \texttt{log\_to\_file}: absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
-\item \texttt{log\_to\_syslog}: use Syslog to export the log information (expected values are true or false). The Syslog tag is ``Kadeploy-log''.
-\item \texttt{log\_to\_db}: use the Kadeploy database to export the log information (expected values are true or false).
-\item \texttt{dbg\_to\_syslog}: use Syslog to export the debug information (expected values are true or false). The Syslog tag is ``Kadeploy-dbg''.
-\item \texttt{dbg\_to\_syslog\_level}: debug level of the output exported to Syslog.
-\item \texttt{reboot\_window}: global size of the reboot window (ie. maximum number of nodes able to reboot at the same time). This might be useful to avoid high electricity peak.
-\item \texttt{reboot\_window\_sleep\_time}: time to wait if the reboot window is full.
-\item \texttt{nodes\_check\_window}: size of the nodes check window.
-\item \texttt{bootloader}: kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe).
-\item \texttt{purge\_deployment\_timer}: timeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
-\item \texttt{rambin\_path}: path of the ramdisk directory in the deployment environment (/rambin seems to be a good value).
-\item \texttt{mkfs\_options}: options for mkfs. The options for several FS can be defined here with the following syntax: fstype1@options|fstype2@options|... (no newline is expected)
-\item \texttt{demolishing\_env\_threshold}: maximum number of reboot failures (on the production environment) before considering that an environment is demolishing.
-\item \texttt{demolishing\_env\_auto\_tag}: specify if Kareboot must tag automatically an environment as demolishing after a failed reboot on the production environment.
-\item \texttt{bt\_tracker\_ip}: ip of the Bittorrent tracker.
-\item \texttt{bt\_download\_timeout}: timeout for the Bittorrent file download.
-\item \texttt{almighty\_env\_users}: list of users allowed to perform special operations on the environments like publishing environments or moving files.
-\item \texttt{async\_end\_of\_deployment\_hook}: command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
-\item \texttt{async\_end\_of\_reboot\_hook}: command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
-\item \texttt{async\_end\_of\_power\_hook}: command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
-\item \texttt{vlan\_hostname\_suffix}: this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
-\item \texttt{set\_vlan\_cmd}: command to launch in orded to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
+  \item \ypath{/database}
+  \begin{itemize}
+    \item \yfield{host}{String} hostname of the database
+    \item \yfield{name}{String} name of the Kadeploy database
+    \item \yfield{login}{String} login for the Kadeploy database
+    \item \yfield{passwd}{String} password for the Kadeploy database
+    \item \yfield{kind}{String} database kind (only mysql is available now).
+  \end{itemize}
+
+  \item \ypath{/rights}
+  \begin{itemize}
+    \item \yfieldd{kind}{String}{db} authentication kind (use db for a true rights management or dummy to bypass the rights management)
+    \item \yfieldd{almighty\_users}{String}{root} list of users allowed to perform special operations on the environments like publishing environments or moving files
+    \item \yfieldd{purge\_deployment\_timer}{Integer}{900} limeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
+  \end{itemize}
+
+  \item \ypath{/logs}
+  \begin{itemize}
+    \item \yfieldd{file}{String}{/var/log/kadeploy.log} absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
+    \item \yfieldd{syslog}{Boolean}{true} use Syslog to export the log information (expected values are true or false). The Syslog tag is ``Kadeploy-log''.
+    \item \yfieldd{database}{Boolean}{true} use the Kadeploy database to export the log information
+    \item \yfieldd{debug}{Boolean}{false} use Syslog to export the debug information (expected values are true or false). The Syslog tag is ``Kadeploy-dbg''.
+  \end{itemize}
+
+  \item \ypath{/verbosity}
+  \begin{itemize}
+    \item \yfieldd{clients}{Integer}{3} number between 0 and 4 that specifies the default verbose level for the client. 0 means ``no verbose'' and 4 means ``full verbose''.
+    \item \yfieldd{logs}{Integer}{3} debug level of the output exported to Syslog.
+  \end{itemize}
+
+  \item \ypath{/cache}
+  \begin{itemize}
+    \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment
+    \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
+    \item \yfieldd{disable}{boolean}{false} disable the use of a cache
+  \end{itemize}
+
+  \item \ypath{/network}
+  \begin{itemize}
+    \item \yfield{server\_hostname}{String} hostname of the Kadeploy server
+    \item \yfieldd{tcp\_buffer\_size}{Integer}{8192} TCP buffer size (Bytes) for the Kadeploy file server
+  \end{itemize}
+
+  \item \ypath{/network/vlan}
+  \begin{itemize}
+    \item \yfieldd{hostname\_suffix}{String}{''} this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
+    \item \yfieldd{set\_cmd}{String}{''} command to launch in order to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
+  \end{itemize}
+
+  \item \ypath{/network/ports}
+  \begin{itemize}
+    \item \yfieldd{ssh}{Integer}{22} port used by SSH
+    \item \yfieldd{kadeploy\_server}{Integer}{25300} port of the Kadeploy server
+    \item \yfieldd{test\_deploy\_env}{Integer}{25300} port used as a tag in the deployment environment to ensure that the deployment environment is successfully booted
+  \end{itemize}
+
+  \item \ypath{/windows/check}
+  \begin{itemize}
+    \item \yfieldd{size}{Integer}{22} size of the nodes check window.
+  \end{itemize}
+
+  \item \ypath{/windows/reboot}
+  \begin{itemize}
+    \item \yfieldd{size}{Integer}{50} global size of the reboot window (ie. maximum number of nodes able to reboot at the same time). This might be useful to avoid high electricity peak.
+    \item \yfieldd{sleep\_time}{Integer}{10} time to wait if the reboot window is full
+  \end{itemize}
+
+  \item \ypath{/environments}
+  \begin{itemize}
+    \item \yfieldd{max\_preinstall\_size}{Integer}{20} maximum size (MB) of the preinstall files
+    \item \yfieldd{max\_postinstall\_size}{Integer}{20} maximum size (MB) of the postinstall files
+  \end{itemize}
+
+  \item \ypath{/environments/deployment}
+  \begin{itemize}
+    \item \yfieldd{extraction\_dir}{String}{/mnt/dest} extraction directory for the tarball in the deployment environment
+    \item \yfieldd{tarball\_dir}{String}{/tmp} destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent.
+    \item \yfieldd{rambin\_dir}{String}{/rambin} path of the ramdisk directory in the deployment environment
+  \end{itemize}
+  \item \ypath{/environments/demolishing}
+  \begin{itemize}
+    \item \yfieldd{auto\_tag}{Boolean}{false} specify if Kareboot must tag automatically an environment as demolishing after a failed reboot on the production environment
+    \item \yfieldd{tag\_threshold}{Integer}{1000000} maximum number of reboot failures (on the production environment) before considering that an environment is demolishing
+  \end{itemize}
+
+  \item \ypath{/pxe}
+  \begin{itemize}
+    \item \yfieldd{kind}{String}{PXElinux} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux or IPXE)
+    \item \yfield{repository}{String} absolute path of the repository where PXE profiles are accessibles (TFTP, HTTP, ...). This path should not include the 'pxelinux.cfg' directory, Kadeploy find it automatically. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
+    \item \yfieldd{export}{String}{/} the root path to be used in pxe profiles. If the service used to serve PXE profiles is TFTP, it should be '/', if the service is HTTP, 'http://domain.tld/' or 'http://IP\_ADDR/'.
+    \item \yfieldd{bootloader}{String}{chainload\_pxe} kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe)
+  \end{itemize}
+
+  \item \ypath{/pxe/kernels}
+  \begin{itemize}
+    \item \yfield{directory}{String} relative path of the PXE kernels sub-repository
+    \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE kernels sub-repository
+  \end{itemize}
+
+  \item \ypath{/hooks/async}
+  \begin{itemize}
+    \item \yfieldd{end\_of\_reboot}{String}{''} command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_power}{String}{''} command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_deployment}{String}{''} command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
+  \end{itemize}
+
+  \item \ypath{/external/taktuk}
+  \begin{itemize}
+    \item \yfield{connector}{String} connector used by Taktuk
+    \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
+    \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
+  \end{itemize}
+
+  \item \ypath{/external/bittorrent}
+  \begin{itemize}
+    \item \yfieldd{tracker\_ip}{String}{nil} ip of the Bittorrent tracker
+    \item \yfieldd{download\_timeout}{Integer}{nil} timeout for the Bittorrent file download
+  \end{itemize}
+
+  \item \ypath{/external/grub}
+  \begin{itemize}
+    \item \yfieldd{version}{Integer}{2} the version of grub to be installed on the partition of the deployed environment
+  \end{itemize}
+
+  \item \ypath{/external/[mkfs]} Options for mkfs. The options for several FS can be defined here.
+  \begin{itemize}
+    \item \yfieldd{fstype}{String}{nil} the filesystem type
+    \item \yfieldd{args}{String}{nil} the specific options for this filesystem type
+  \end{itemize}
+
+  \item \ypath{/external/kastafior}
+  \begin{itemize}
+    \item \yfieldd{binary}{String}{kastafior} the command used to launch kastafior
+  \end{itemize}
 \end{itemize}
 
 \section{Cluster-specific configuration files}\label{sec:specific_config}
