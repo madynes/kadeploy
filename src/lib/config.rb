@@ -3182,5 +3182,9 @@ module ConfigInformation
     def get_instance
       return @array_of_instances[@current]
     end
+
+    def get_instances
+      return @array_of_instances
+    end
   end
 end

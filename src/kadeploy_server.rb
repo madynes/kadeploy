@@ -429,6 +429,22 @@ class KadeployServer
         @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
       }
     end
+
+    # Crappy: Kexec optimization can only be used with linux environments -> automata overriding...
+    if (exec_specific.environment.environment_kind != "linux") then
+      exec_specific.node_set.group_by_cluster.each_key { |cluster|
+        instances = config.cluster_specific[cluster].get_macro_step("BootNewEnv").get_instances
+        kexec = false
+        instances.each { |instance| kexec = true if (instance[0] == "BootNewEnvKexec") }
+        #retries and timeout should not be hardcoded
+        config.cluster_specific[cluster].replace_macro_step("BootNewEnv", 
+                                                            ["BootNewEnvClassical", 
+                                                             2, 
+                                                             config.cluster_specific[cluster].timeout_reboot_classical.to_i + 200]
+                                                            ) if kexec
+      }
+    end
+
     @workflow_info_hash_lock.lock
     workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
     workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
