@@ -893,7 +893,20 @@ begin
 # Migration of server_conf file
 curfile = get_config_file(OLD_CONFIG[:server_conf])
 migrate_file(curfile) do |content|
-  config = migrate_content(content,SERVER_CONF)
+  disable_cache = false
+  config = migrate_content(
+    content,
+    SERVER_CONF,
+    :custom => true,
+    :wrap => true
+  ) do |key,val|
+    if key == 'kadeploy_cache_dir' and val == 'none'
+      val = ''
+      disable_cache = true
+    end
+    [key,val]
+  end
+  config['cache']['disabled'] = disable_cache
   save_config_file(
     get_config_file(NEW_CONFIG[:server_conf]),
     config,
@@ -988,6 +1001,7 @@ if $clusters and !$clusters.empty?
     new_config_file = get_config_file("#{$cluster_prefix}#{cluster}.yml")
 
     migrate_file(old_config_file) do |content|
+      disable_swap = false
       curconfig = migrate_content(
         content,
         SPECIFIC_CONF,
@@ -998,9 +1012,13 @@ if $clusters and !$clusters.empty?
           tmp = val.split('|')
           key = "macrostep_#{tmp[0]}"
           val = tmp[1]
+        elsif key == 'swap_part' and val == 'none'
+          val = 0
+          disable_swap = true
         end
         [key,val]
       end
+      curconfig['partitioning']['disable_swap'] = disable_swap
       save_config_file(new_config_file, curconfig, :sort=>SPECIFIC_SORT)
 
       clconfig['conf_file'] = new_config_file

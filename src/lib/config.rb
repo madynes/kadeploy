@@ -821,11 +821,14 @@ module ConfigInformation
             'kind',String,nil,['fdisk','parted']
           )
           cp.parse('partitions',true) do
-            conf.swap_part = cp.value('swap',Fixnum).to_s
+            conf.swap_part = cp.value('swap',Fixnum,1).to_s
             conf.prod_part = cp.value('prod',Fixnum).to_s
             conf.deploy_part = cp.value('deploy',Fixnum).to_s
             conf.tmp_part = cp.value('tmp',Fixnum).to_s
           end
+          conf.swap_part = 'none' if cp.value(
+            'disable_swap',[TrueClass,FalseClass],false
+          )
         end
 
         cp.parse('timeouts',true) do |info|
