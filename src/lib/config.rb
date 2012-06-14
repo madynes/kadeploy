@@ -597,7 +597,7 @@ module ConfigInformation
           cp.parse('bittorrent') do |info|
             unless info[:empty]
               conf.bt_tracker_ip = cp.value(
-                'tracker_ip',String,/\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/
+                'tracker_ip',String,nil,/\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/
               )
               conf.bt_download_timeout = cp.value('download_timeout',Fixnum)
             end
@@ -996,7 +996,7 @@ module ConfigInformation
               conf.admin_pre_install = Array.new if info[:iter] == 0
               tmp = {}
               tmp['file'] = cp.value('file',String,nil,File)
-              tmp['kind'] = cp.value('format',String,['tgz','tbz2'])
+              tmp['kind'] = cp.value('format',String,nil,['tgz','tbz2'])
               tmp['script'] = cp.value('script',String,nil,Pathname)
 
               conf.admin_pre_install.push(tmp)
@@ -1010,7 +1010,7 @@ module ConfigInformation
               conf.admin_post_install = Array.new if info[:iter] == 0
               tmp = {}
               tmp['file'] = cp.value('file',String,nil,File)
-              tmp['kind'] = cp.value('format',String,['tgz','tbz2'])
+              tmp['kind'] = cp.value('format',String,nil,['tgz','tbz2'])
               tmp['script'] = cp.value('script',String,nil,Pathname)
 
               conf.admin_post_install.push(tmp)
