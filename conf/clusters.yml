@@ -1,5 +1,6 @@
 --- 
-g5kdev-cluster: 
+clusters: 
+- name: g5kdev-cluster
   conf_file: ./cluster_conf-g5kdev-cluster.yml
   nodes: 
   - address: 172.16.160.2

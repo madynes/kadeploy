@@ -1,4 +1,9 @@
 --- 
-lille: frontend.lille.grid5000.fr:25300
-toulouse: frontend.toulouse.grid5000.fr:25300
 default: lille
+servers: 
+- name: lille
+  port: 25300
+  hostname: frontend.lille.grid5000.fr
+- name: toulouse
+  port: 25300
+  hostname: frontend.toulouse.grid5000.fr
