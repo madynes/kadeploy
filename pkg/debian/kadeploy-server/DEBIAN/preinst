@@ -1,7 +1,6 @@
 #!/bin/bash
 
 now=`date +"%F_%T"`
-[ -e /etc/kadeploy3/conf ] && cp /etc/kadeploy3/conf /etc/kadeploy3/conf-save-$now || exit 0
-[ -e /etc/kadeploy3/clusters ] && cp /etc/kadeploy3/clusters /etc/kadeploy3/clusters-save-$now || exit 0
-[ -e /etc/kadeploy3/nodes ] && cp /etc/kadeploy3/nodes /etc/kadeploy3/nodes-save-$now || exit 0
-[ -e /etc/kadeploy3/cmd ] && cp /etc/kadeploy3/cmd /etc/kadeploy3/cmd-save-$now || exit 0
+[ -e /etc/kadeploy3/server_conf.yml ] && cp /etc/kadeploy3/server_conf.yml /etc/kadeploy3/server_conf-save-$now.yml || exit 0
+[ -e /etc/kadeploy3/clusters.yml ] && cp /etc/kadeploy3/clusters.yml /etc/kadeploy3/clusters-save-$now.yml || exit 0
+[ -e /etc/kadeploy3/cmd.yml ] && cp /etc/kadeploy3/cmd.yml /etc/kadeploy3/cmd-save-$now.yml || exit 0

@@ -3,6 +3,6 @@ Version: MAJOR_VERSION-MINOR_VERSION
 Section: base
 Priority: optional
 Architecture: all
-Depends: libmysql-ruby1.8,ruby1.8,bittorrent,ctorrent,kadeploy-common (= MAJOR_VERSION-MINOR_VERSION),taktuk (>= 3.6)
+Depends: libmysql-ruby1.8,ruby1.8,kadeploy-common (= MAJOR_VERSION-MINOR_VERSION),taktuk (>= 3.6)
 Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
 Description: Kadeploy: the cluster deployment tool - server part
