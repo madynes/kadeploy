@@ -1,4 +1,0 @@
-default = lille
-lille = frontend.lille.grid5000.fr:25300
-toulouse = frontend.toulouse.grid5000.fr:25300
-
