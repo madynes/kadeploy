@@ -44,6 +44,7 @@ class KadeployClient
     else
       puts "#{@site} server: #{msg}"
     end
+    STDOUT.flush
   end
 
   # Test method to check that the client is still there (RPC)

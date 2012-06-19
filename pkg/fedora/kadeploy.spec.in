@@ -5,7 +5,7 @@ Group:          System/Cluster
 License:        CeCILL V2
 URL:            http://gforge.inria.fr/scm/?group_id=2026
 Source0:        %{name}-%{version}.tar.gz
-BuildRoot:      %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
+BuildRoot:      %{_tmppath}/%{name}-%{version}.%{release}-root-%(%{__id_u} -n)
 BuildArch:      noarch
 Summary:        Package of the Kadeploy deployment tool.
 
@@ -23,14 +23,14 @@ This package provide the common part of the Kadeploy deployment tool.
 
 %package server
 Summary:        Server part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}-%{release}, taktuk >= 3.6
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}.%{release}, taktuk >= 3.6
 Group:          System/Cluster
 %description server
 This package provide the server part of the Kadeploy deployment tool.
 
 %package client
 Summary:        Client part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}-%{release}
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}.%{release}
 Group:          System/Cluster
 %description client
 This package provide the client part of the Kadeploy deployment tool.

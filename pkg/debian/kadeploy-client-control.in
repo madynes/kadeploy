@@ -1,8 +1,8 @@
 Package: kadeploy-client
-Version: MAJOR_VERSION-MINOR_VERSION
+Version: MAJOR_VERSION.MINOR_VERSION
 Section: base
 Priority: optional
 Architecture: all
-Depends: libmysql-ruby1.8,ruby1.8,kadeploy-common (= MAJOR_VERSION-MINOR_VERSION)
+Depends: libmysql-ruby1.8,ruby1.8,kadeploy-common (= MAJOR_VERSION.MINOR_VERSION)
 Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
 Description: Kadeploy: the cluster deployment tool - client part

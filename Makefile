@@ -70,7 +70,7 @@ install_ssh_key:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 400 $(ADDONS)/ssh/id_deploy.pub $(DESTDIR)/etc/kadeploy3/keys
 
 install_version:
-	@echo "$(MAJOR_VERSION)-$(MINOR_VERSION)" > $(DESTDIR)/etc/kadeploy3/version
+	@echo "$(MAJOR_VERSION).$(MINOR_VERSION)" > $(DESTDIR)/etc/kadeploy3/version
 	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DESTDIR)/etc/kadeploy3/version
 
 install_man:
