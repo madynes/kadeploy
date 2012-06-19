@@ -32,15 +32,14 @@ install_db:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(DB)/db_creation.sql $(DESTDIR)/usr/local/kadeploy3/db
 
 install_conf_client:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf.yml $(DESTDIR)/etc/kadeploy3
 
 install_conf_server:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/conf $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/clusters $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/specific_conf* $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/nodes $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/partition_file_* $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/server_conf.yml $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/clusters.yml $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_conf*.yml $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd.yml $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_partition-* $(DESTDIR)/etc/kadeploy3
 
 install_conf_common:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
