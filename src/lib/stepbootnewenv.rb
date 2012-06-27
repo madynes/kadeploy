@@ -76,7 +76,6 @@ module MacroSteps
       ret = ret && @step.switch_pxe("deploy_to_deployed_env")
       ret = ret && @step.umount_deploy_part
       ret = ret && @step.mount_deploy_part
-      ret = ret && @step.set_vlan
       ret = ret && @step.kexec(
         @config.exec_specific.environment.environment_kind,
         @config.common.environment_extraction_dir,
@@ -84,6 +83,7 @@ module MacroSteps
         @config.exec_specific.environment.initrd,
         get_kernel_params()
       )
+      ret = ret && @step.set_vlan
       ret = ret && @step.wait_reboot("kexec","user",true)
       return ret
     end
