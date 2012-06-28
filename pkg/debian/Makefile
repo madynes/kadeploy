@@ -1,8 +1,14 @@
 KADEPLOY_ROOT=../..
 MAJOR_VERSION:=$(shell cat ../../major_version)
 MINOR_VERSION:=$(shell cat ../../minor_version)
+RELEASE_VERSION:=$(shell cat ../../release_version)
+ifeq ($(strip $(RELEASE_VERSION)),stable)
+	RELEASE_VERSION:=
+else
+	RELEASE_VERSION:=$(addprefix -,$(RELEASE_VERSION))
+endif
 PWD:=$(shell pwd)
-VERSION=$(MAJOR_VERSION).$(MINOR_VERSION)
+VERSION=$(MAJOR_VERSION).$(MINOR_VERSION)$(RELEASE_VERSION)
 DEPLOY_USER=deploy
 DEB_ROOT_CLIENT=kadeploy-client
 DEB_ROOT_SERVER=kadeploy-server

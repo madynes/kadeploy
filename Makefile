@@ -12,7 +12,8 @@ PKG=$(KADEPLOY_ROOT)/pkg
 MAN=$(KADEPLOY_ROOT)/man
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
-DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-$(MAJOR_VERSION)
+RELEASE_VERSION:=$(shell cat release_version)
+DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-$(MAJOR_VERSION).$(MINOR_VERSION)
 
 
 api: cleanapi

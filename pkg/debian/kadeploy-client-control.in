@@ -1,5 +1,5 @@
 Package: kadeploy-client
-Version: MAJOR_VERSION.MINOR_VERSION
+Version: MAJOR_VERSION.MINOR_VERSIONRELEASE_VERSION
 Section: base
 Priority: optional
 Architecture: all
