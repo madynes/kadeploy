@@ -1,0 +1,6 @@
+#!/bin/bash
+
+now=`date +"%F_%T"`
+[ -e /etc/kadeploy3-dev/server_conf.yml ] && cp /etc/kadeploy3-dev/server_conf.yml /etc/kadeploy3-dev/server_conf-save-$now.yml || exit 0
+[ -e /etc/kadeploy3-dev/clusters.yml ] && cp /etc/kadeploy3-dev/clusters.yml /etc/kadeploy3-dev/clusters-save-$now.yml || exit 0
+[ -e /etc/kadeploy3-dev/cmd.yml ] && cp /etc/kadeploy3-dev/cmd.yml /etc/kadeploy3-dev/cmd-save-$now.yml || exit 0

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+now=`date +"%F_%T"`
+[ -e /etc/kadeploy3-dev/client_conf.yml ] && cp /etc/kadeploy3-dev/client_conf.yml /etc/kadeploy3-dev/client_conf-save-$now.yml || exit 0
