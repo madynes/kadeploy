@@ -1,0 +1,35 @@
+---
+- name: exp-kexec
+  times: 10
+  environments:
+    - mysqueeze
+    - squeeze-x64-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 400
+      retries: 1
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 800
+      retries: 1
+    BootNewEnv:
+      type: Kexec
+      timeout: 160
+      retries: 1
+- name: exp-classical
+  times: 10
+  environments:
+    - mysqueeze
+    - squeeze-x64-min
+  macrosteps:
+    BootNewEnv:
+      type: Classical
+      timeout: 300
+- name: exp-chain
+  times: 5
+  environments:
+    - mysqueeze
+  macrosteps:
+    BroadcastEnv:
+      type: Chain
