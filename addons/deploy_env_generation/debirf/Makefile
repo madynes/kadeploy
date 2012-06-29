@@ -1,4 +1,10 @@
-all: build gen_initrd
+MODULES_DIR:=/usr/share/debirf/modules/
+MODULES:=a0_motd install-kernel network serial-terminal z1_clean-root a0_prep-root z0_remove-locales
+
+all: modlinks build gen_initrd
+
+modlinks:
+	@$(foreach module,$(MODULES), ln -sf $(MODULES_DIR)$(module) kadeploy-deploy-kernel/modules;)
 
 build:
 	debirf make kadeploy-deploy-kernel
