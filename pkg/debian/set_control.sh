@@ -8,10 +8,17 @@ MAJOR_VERSION=`cat ../../major_version`
 MINOR_VERSION=`cat ../../minor_version`
 RELEASE_VERSION=`cat ../../release_version`
 
-if [ "$RELEASE_VERSION" = "stable" ]
-then
-	RELEASE_VERSION=
-fi
+case "$RELEASE_VERSION" in
+	stable)
+		RELEASE_VERSION=
+	;;
+	git)
+		RELEASE_VERSION=~git$(git log --pretty=format:'%H' -n 1)
+	;;
+	*)
+		RELEASE_VERSION=-$RELEASE_VERSION
+	;;
+esac
 
 sed '
 s/MAJOR_VERSION/'"$MAJOR_VERSION"'/
