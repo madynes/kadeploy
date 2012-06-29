@@ -1,6 +1,6 @@
 Name:           kadeploy
-Version:        MAJOR_VERSION
-Release:        MINOR_VERSION
+Version:        MAJOR_VERSION.MINOR_VERSION
+Release:        RELEASE_VERSION
 Group:          System/Cluster
 License:        CeCILL V2
 URL:            http://gforge.inria.fr/scm/?group_id=2026
@@ -23,14 +23,14 @@ This package provide the common part of the Kadeploy deployment tool.
 
 %package server
 Summary:        Server part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}.%{release}, taktuk >= 3.6
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}, taktuk >= 3.6
 Group:          System/Cluster
 %description server
 This package provide the server part of the Kadeploy deployment tool.
 
 %package client
 Summary:        Client part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}.%{release}
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}
 Group:          System/Cluster
 %description client
 This package provide the client part of the Kadeploy deployment tool.
