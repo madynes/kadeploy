@@ -642,9 +642,9 @@ class KadeployServer
         gfm = Managers::GrabFileManager.new(config, output, client, db)
         exec_specific.pxe_upload_files.each { |pxe_file|
           user_prefix = "pxe-#{config.exec_specific.true_user}--"
-          local_pxe_file = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
+          local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                               File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+                                               File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
                                                config.common.pxe_repository_kernels_max_size, false) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             return 3
@@ -831,9 +831,9 @@ class KadeployServer
         gfm = Managers::GrabFileManager.new(config, output, nil, db)
         exec_specific.pxe_upload_files.each { |pxe_file|
           user_prefix = "pxe-#{config.exec_specific.true_user}-"
-          local_pxe_file = File.join(@config.common.pxe_repository, @common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
+          local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                               File.join(@config.common.pxe_repository, @common.pxe_repository_kernels),
+                                               File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
                                                config.common.pxe_repository_kernels_max_size, true) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
