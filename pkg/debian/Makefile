@@ -5,7 +5,11 @@ RELEASE_VERSION:=$(shell cat ../../release_version)
 ifeq ($(strip $(RELEASE_VERSION)),stable)
 	RELEASE_VERSION:=
 else
-	RELEASE_VERSION:=$(addprefix -,$(RELEASE_VERSION))
+	ifeq ($(strip $(RELEASE_VERSION)),git)
+		RELEASE_VERSION:=~git$(shell git log --pretty=format:'%H' -n 1)
+	else
+		RELEASE_VERSION:=$(addprefix -,$(RELEASE_VERSION))
+	endif
 endif
 PWD:=$(shell pwd)
 VERSION=$(MAJOR_VERSION).$(MINOR_VERSION)$(RELEASE_VERSION)
