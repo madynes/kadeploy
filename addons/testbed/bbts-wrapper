@@ -1,0 +1,83 @@
+#!/usr/bin/ruby
+
+require 'optparse'
+require 'tempfile'
+
+SSH_OPTIONS='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -q'
+
+$nodes=[]
+$okfile=nil
+$kofile=nil
+$env=nil
+$verbose=nil
+$steps=nil
+
+opts = OptionParser::new do |opts|
+  opts.on("-m MACHINE", "", "") do |o|
+    $nodes << o
+  end
+  opts.on("-o OKFILE", "", "") do |o|
+    $okfile = o
+  end
+  opts.on("-n KOFILE", "", "") do |o|
+    $kofile = o
+  end
+  opts.on("-e ENV", "", "") do |o|
+    $env = o
+  end
+  opts.on("-k KEY", "", "") do |o|
+  end
+  opts.on("", "--verbose-level VERBOSEL", "") do |o|
+    $verbose = o
+  end
+  opts.on("", "--force-steps STEPS", "") do |o|
+    $steps = o
+  end
+end
+opts.parse!(ARGV)
+
+if ARGV.size < 2
+  $stderr.puts "usage: #{$0} <user> <host> <kadeploy options...>"
+  exit 1
+end
+
+$user=ARGV[0]
+$host=ARGV[1]
+
+$nodelist = Tempfile.new("nodelist")
+`scp #{$remote}:NODELIST #{$nodelist.path}`
+$nodelist.rewind
+list = $nodelist.read.split("\n")
+$nodes.collect! do |node|
+  newname = nil
+  list.each do |tmp|
+    if tmp =~ /^\s*(\S+)\s*\(\s*#{node.strip}\s*\)\s*$/
+      newname = Regexp.last_match(1)
+      break
+    end
+  end
+  if newname.nil?
+    ret = node
+  else
+    ret = newname
+  end
+  ret
+end
+$nodelist.close
+$nodelist.unlink
+
+puts `ssh #{SSH_OPTIONS} #{$user}@#{$host} "kadeploy3 #{$nodes.join(' -m ')} -e #{$env} --force-steps '#{$steps}' --verbose-level #{$verbose} -o /tmp/OKFILE -n /tmp/KOFILE --ignore-nodes-deploying"`
+
+oks=`ssh #{SSH_OPTIONS} #{$user}@#{$host} "cat /tmp/OKFILE"`.split("\n")
+File.open($okfile,'w') do |f|
+  oks.each do |node|
+    f.puts node.strip
+  end
+end
+kos=`ssh #{SSH_OPTIONS} #{$user}@#{$host} "cat /tmp/KOFILE"`.split("\n")
+File.open($kofile,'w') do |f|
+  kos.each do |node|
+    f.puts node.strip
+  end
+end
+

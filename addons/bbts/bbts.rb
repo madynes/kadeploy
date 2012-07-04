@@ -8,9 +8,11 @@ require 'fileutils'
 SSH_KEY='~/.ssh/id_rsa.pub'
 BBT_SCRIPT='./blackbox_tests.rb'
 CONLOG_SCRIPT='./conmanlogger.sh'
-MACRO_SETUP_TIMEOUT=450
-MACRO_BCAST_TIMEOUT=900
-MACRO_REBOOT_TIMEOUT=200
+KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
+
+REMOTE=false
+REMOTE_HOST='node-hostname'
+REMOTE_USER='node-user'
 
 # Allowed values
 MACROSTEPS = {
@@ -93,8 +95,10 @@ def check_macro(type,macro)
 end
 
 def check_env(env)
-  $kaenvs = `kaenv3 -l | grep -v '^Name' | grep -v '^####' | cut -d ' ' -f 1`.split("\n") unless $kaenvs
-  yaml_error("env '#{env}' does not exists") unless $kaenvs.include?(env)
+  unless REMOTE
+    $kaenvs = `kaenv3 -l | grep -v '^Name' | grep -v '^####' | cut -d ' ' -f 1`.split("\n") unless $kaenvs
+    yaml_error("env '#{env}' does not exists") unless $kaenvs.include?(env)
+  end
 end
 
 def check_exp(exps)
@@ -117,6 +121,16 @@ def check_exp(exps)
     exp['macrosteps']['BootNewEnv'] = {} if exp['macrosteps']['BootNewEnv'].nil?
     check_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])
   end
+end
+
+def kadeploy_cmd()
+  ret=nil
+  if REMOTE
+    ret = "#{KAREMOTE_SCRIPT} #{REMOTE_USER} #{REMOTE_HOST}"
+  else
+    ret = "kadeploy3"
+  end
+  ret
 end
 
 if ARGV.size < 3
@@ -221,7 +235,8 @@ $exps.each do |exp|
 
       puts '      Running bbt'
       system(
-        "#{BBT_SCRIPT} -f #{$nodefile} -k #{SSH_KEY} "\
+        "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
+	"-f #{$nodefile} -k #{SSH_KEY} "\
         "--env-list #{env} --max-simult 1 "\
         "-a #{automata_file.path} &> #{envlogfile}"
       )
