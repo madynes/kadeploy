@@ -25,6 +25,7 @@ ADDONS=$(KADEPLOY_ROOT)/addons
 DB=$(KADEPLOY_ROOT)/db
 TEST=$(KADEPLOY_ROOT)/test
 MAN=$(KADEPLOY_ROOT)/man
+TMPFILE:=$(shell tempfile)
 
 SUFFIX = ""
 ifeq ($(DEV),)
@@ -51,7 +52,8 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_partition-* $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 
 install_conf_common:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DEB_ROOT_COMMON)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
+	@cat $(CONF)/load_kadeploy_env | sed -e "s/kadeploy3/kadeploy3$(SUFFIX)/g" > $(TMPFILE)
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(TMPFILE) $(DEB_ROOT_COMMON)$(SUFFIX)/etc/kadeploy3$(SUFFIX)/load_kadeploy_env
 
 install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kaconsole3 $(DEB_ROOT_CLIENT)$(SUFFIX)/usr/bin/kaconsole3$(SUFFIX)
@@ -166,3 +168,5 @@ else
 	@rm -rf $(DEB_ROOT_COMMON)$(SUFFIX)
 endif
 	@rm -f kadeploy-client-$(VERSION).deb kadeploy-server-$(VERSION).deb kadeploy-common-$(VERSION).deb
+	@rm -f $(TMPFILE)
+
