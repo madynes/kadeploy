@@ -7,7 +7,7 @@ modlinks:
 	@$(foreach module,$(MODULES), ln -sf $(MODULES_DIR)$(module) kadeploy-deploy-kernel/modules;)
 
 build:
-	debirf make kadeploy-deploy-kernel
+	debirf make -r kadeploy-deploy-kernel
 
 gen_initrd:
 	(cd kadeploy-deploy-kernel/nest ; find | cpio -H newc -o | gzip -9 > ../initrd)

@@ -1,1 +1,5 @@
 Deployment kernel generation based on Debirf (http://cmrg.fifthhorseman.net/wiki/debirf).
+
+There are some issues with non-root builds, since they involve many tricks
+using fakeroot. (see http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=680235
+for example). Therefore we generate the image as root (using debirf make -r).
