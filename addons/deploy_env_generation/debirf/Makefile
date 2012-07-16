@@ -1,5 +1,5 @@
 MODULES_DIR:=/usr/share/debirf/modules/
-MODULES:=a0_motd install-kernel network serial-terminal z1_clean-root a0_prep-root z0_remove-locales
+MODULES:=a0_add_extra_repos a0_motd install-kernel network serial-terminal z1_clean-root a0_prep-root z0_remove-locales
 
 all: modlinks build gen_initrd
 
