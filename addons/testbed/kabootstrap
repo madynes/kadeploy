@@ -77,7 +77,7 @@ CFG_KADEPLOY_SOFT_REBOOT = false
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 2,
-  :timeout => 1200
+  :timeout => 600
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
@@ -88,7 +88,7 @@ CFG_KADEPLOY_MACROSTEP3 = [
   {
     :name => 'BootNewEnv|BootNewEnvClassical',
     :retries => 1,
-    :timeout => 1200
+    :timeout => 600
   },
   {
     :name => 'BootNewEnvHardReboot',
@@ -98,11 +98,11 @@ CFG_KADEPLOY_MACROSTEP3 = [
 ]
 
 CFG_KADEPLOY_PARTITION_SWAP_ID = 3
-CFG_KADEPLOY_PARTITION_SWAP_SIZE = '32M'
+CFG_KADEPLOY_PARTITION_SWAP_SIZE = '1G'
 CFG_KADEPLOY_PARTITION_PROD_ID = 1
-CFG_KADEPLOY_PARTITION_PROD_SIZE = '8M'
+CFG_KADEPLOY_PARTITION_PROD_SIZE = '4G'
 CFG_KADEPLOY_PARTITION_DEPLOY_ID = 2
-CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '512M'
+CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '4G'
 CFG_KADEPLOY_PARTITION_TMP_ID = 4
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
 
@@ -178,6 +178,7 @@ def cfg_kadeploy_conf()
   "verbose_level = #{CFG_KADEPLOY_VERBOSE}\n"\
   "pxe_kind = #{pxe_kind}\n"\
   "pxe_repository = #{cfg_pxe_path()}\n"\
+  "pxe_repository_kernels = kernels\n"\
   "pxe_repository_kernels_max_size = 600\n"\
   "pxe_export = #{pxe_export}\n"\
   "db_kind = mysql\n"\
@@ -205,8 +206,8 @@ def cfg_kadeploy_conf()
   "log_to_db = true\n"\
   "dbg_to_syslog = true\n"\
   "dbg_to_syslog_level = 3\n"\
-  "reboot_window = 150\n"\
-  "reboot_window_sleep_time = 10\n"\
+  "reboot_window = 50\n"\
+  "reboot_window_sleep_time = 5\n"\
   "nodes_check_window = 100\n"\
   "bootloader = chainload_pxe\n"\
   "purge_deployment_timer = 900\n"\
@@ -214,7 +215,6 @@ def cfg_kadeploy_conf()
   "mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index\n"\
   "demolishing_env_threshold = 2\n"\
   "demolishing_env_auto_tag = false\n"\
-  "bt_download_timeout = 1800\n"\
   "almighty_env_users = root,oar,deploy\n"\
   "max_preinstall_size = 10\n"\
   "max_postinstall_size = 10\n"\
@@ -1536,6 +1536,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 		$mode = :VLANKVM
 	end
 
+	opts.on( '-v', '--vlan', 'Set the VLAN ID (be careful to disable kavlan DHCP manually)' ) do |k|
+		$kavlan_id = k
+	end
+
 	opts.on( '-g', '--gateway <address>', "Specify the gateway to use to contact the nodes" ) do |g|
   	options[:gateway] = g
 	end
@@ -1839,21 +1843,31 @@ end
 # Kavlan
 case $mode
 	when :KAVLAN, :VLANKVM
-		$kavlan_id = `kavlan --show-vlan-id`
-		if $?.success? and !$kavlan_id.empty?
-			begin
-				Integer($kavlan_id)
-			rescue ArgumentError
-				msg("kavlan not set",MSG_ERROR,true)
-			else
-				$kavlan_id = $kavlan_id.to_i
-			end
-		else
-			msg("kavlan not set",MSG_ERROR,true)
-		end
+    if $kavlan_id
+      begin
+        Integer($kavlan_id)
+      rescue ArgumentError
+        msg("invalid vlan id",MSG_ERROR,true)
+      else
+        $kavlan_id = $kavlan_id.to_i
+      end
+    else
+      $kavlan_id = `kavlan --show-vlan-id`
+      if $?.success? and !$kavlan_id.empty?
+        begin
+          Integer($kavlan_id)
+        rescue ArgumentError
+          msg("kavlan not set",MSG_ERROR,true)
+        else
+          $kavlan_id = $kavlan_id.to_i
+        end
+      else
+        msg("kavlan not set",MSG_ERROR,true)
+      end
 
-		# Disabling DHCP in kavlan
-		`kavlan --disable-dhcp`
+      # Disabling DHCP in kavlan
+      `kavlan --disable-dhcp`
+    end
 	when :KVM
 	else
 		msg('Unknown mode',MSG_ERROR,true)
