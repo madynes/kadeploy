@@ -236,8 +236,15 @@ class ConfigWrapper
 
   def add(path, config)
     config.newname = path
-    @newconf[config.oldname] = [] unless @newconf[config.oldname]
-    @newconf[config.oldname] << config
+    if config.oldname.is_a?(Array)
+      config.oldname.each do |oldname|
+        @newconf[oldname] = [] unless @newconf[oldname]
+        @newconf[oldname] << config
+      end
+    else
+      @newconf[config.oldname] = [] unless @newconf[config.oldname]
+      @newconf[config.oldname] << config
+    end
   end
 
   def parse(curval, curpath=[])
@@ -388,12 +395,16 @@ SERVER_CONF = {
     'max_postinstall_size' => ConfigValue['max_postinstall_size', Fixnum],
   },
   'pxe' => {
-    'kind' => ConfigValue[nil, String, 'PXElinux'],
-    'export' => ConfigValue[nil, String, '/'],
-    'repository' => ConfigValue['tftp_repository', String],
+    'kind' => ConfigValue['pxe_kind', String, 'PXElinux'],
+    'export' => ConfigValue['pxe_export', String, '/'],
+    'repository' => ConfigValue[['tftp_repository','pxe_repository'], String],
     'kernels' => {
-      'directory' => ConfigValue['tftp_images_path', String],
-      'max_size' => ConfigValue['tftp_images_max_size', Fixnum],
+      'directory' => ConfigValue[
+        ['tftp_images_path','pxe_repository_kernels'], String, 'kernels'
+      ],
+      'max_size' => ConfigValue[
+        ['tftp_images_max_size','pxe_repository_kernels_max_size'], Fixnum
+      ],
     },
     'bootloader' => ConfigValue['bootloader', String],
   },
@@ -906,6 +917,9 @@ migrate_file(curfile) do |content|
     end
     [key,val]
   end
+  config.delete('bittorrent') if config['bittorrent'] \
+    and config['bittorrent']['download_timeout'] \
+    and !config['bittorrent']['tracker_ip']
   config['cache']['disabled'] = disable_cache
   save_config_file(
     get_config_file(NEW_CONFIG[:server_conf]),
