@@ -1536,7 +1536,7 @@ optparse = OptionParser.new(USAGE) do |opts|
 		$mode = :VLANKVM
 	end
 
-	opts.on( '-v', '--vlan', 'Set the VLAN ID (be careful to disable kavlan DHCP manually)' ) do |k|
+	opts.on( '-v', '--vlan ID', 'Set the VLAN ID (be careful to disable kavlan DHCP manually)' ) do |k|
 		$kavlan_id = k
 	end
 
