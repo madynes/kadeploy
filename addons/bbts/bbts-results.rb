@@ -4,7 +4,7 @@ require 'pp'
 require 'yaml'
 
 if ARGV.size < 1
-	$stderr.puts "usage: #{$0} <bbtlogfile1> <bbtlogfile2> <...> <bbtlogfilen>"
+	$stderr.puts "usage: #{$0} <file1> <file2> <...> <filen>"
 	exit 1
 end
 
@@ -17,6 +17,13 @@ def stddev(values,avg = nil)
   avg = average(values) unless avg
   sum = values.inject(0){ |tmpsum,v| tmpsum + ((v.to_f-avg) ** 2) }
   return Math.sqrt(sum / values.size)
+end
+
+def confint(values,factor, avg = nil, stddev = nil)
+  avg = average(values) unless avg
+  stddev = stddev(values) unless stddev
+  tmp = ((factor * stddev) / Math.sqrt(values.size))
+  return ((avg-tmp)..(avg+tmp)) 
 end
 
 $stats = {}
@@ -64,19 +71,29 @@ $stats.each_pair do |automata,kinds|
         puts "      #{tot} nodes:"
         times = stats.collect { |node| node[:time] }
         avg = average(times)
+        std = stddev(times,avg)
+        conf = confint(times,1.96,avg,std)
         puts "        times:"
+        puts "          min: #{times.min}"
+        puts "          max: #{times.max}"
         puts "          average: #{sprintf('%.2f',avg)}"
-        puts "          std dev: #{sprintf('%.2f',stddev(times,avg))}"
+        puts "          std dev: #{sprintf('%.2f',std)}"
+        puts "          95% conf. int.: [#{sprintf('%.1f',conf.first)};#{sprintf('%.1f',conf.last)}]"
         puts "          nb val: #{times.size}"
-        puts "          values: #{times.join(', ')}"
+        puts "          values: {#{times.join(', ')}}"
 
         oks = stats.collect { |node| node[:ok] }
         avg = average(oks)
+        std = stddev(oks,avg)
+        conf = confint(oks,1.96,avg,std)
         puts "        oks:"
+        puts "          min: #{oks.min}"
+        puts "          max: #{oks.max}"
         puts "          average: #{sprintf('%.1f',average(oks))}"
-        puts "          std dev: #{sprintf('%.2f',stddev(oks,avg))}"
+        puts "          std dev: #{sprintf('%.2f',std)}"
+        puts "          95% conf. int.: [#{sprintf('%.1f',conf.first)};#{sprintf('%.1f',conf.last)}]"
         puts "          nb val: #{oks.size}"
-        puts "          values: #{oks.join(', ')}"
+        puts "          values: {#{oks.join(', ')}}"
       end
     end
   end
