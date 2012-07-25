@@ -23,13 +23,22 @@ mkdir -p $DEBIRF_ROOT/usr/local/bin
 cp $DEBIRF_BUILDD/kadeploy_specific/scripts/* $DEBIRF_ROOT/usr/local/bin
 chmod +x $DEBIRF_ROOT/usr/local/bin/*
 
-cat > $DEBIRF_ROOT/etc/rc.local <<EOF
+cat > "$DEBIRF_ROOT/etc/rc.local" <<'EOF'
 #!/bin/sh -e
 
-ifup eth0=dhcp
+# parse kadeploy-specific kernel command line arguments
+netdev=eth0
+for param in $(cat /proc/cmdline); do
+  if printf "%s" "$param" | egrep -q '^ETH_DEV='
+  then
+    netdev="$(printf "%s" "$param" | cut -f2 -d=)"
+  fi
+done
+
+ifup "$netdev"=dhcp
 (while true; do nc -l -p 25300; done) &
 
-. /var/lib/dhcpcd/dhcpcd-eth0.info
+. /var/lib/dhcpcd/dhcpcd-${netdev}.info
 # set hostname and its resolution
 echo "\${HOSTNAME}.\${DNSDOMAIN}" > /etc/hostname
 echo "\${IPADDR} \${HOSTNAME}.\${DNSDOMAIN} \${HOSTNAME}" >> /etc/hosts
