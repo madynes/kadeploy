@@ -40,14 +40,14 @@ ifup "$netdev"=dhcp
 
 . /var/lib/dhcpcd/dhcpcd-${netdev}.info
 # set hostname and its resolution
-echo "\${HOSTNAME}.\${DNSDOMAIN}" > /etc/hostname
-echo "\${IPADDR} \${HOSTNAME}.\${DNSDOMAIN} \${HOSTNAME}" >> /etc/hosts
-/bin/hostname "\${HOSTNAME}.\${DNSDOMAIN}" 
+echo "${HOSTNAME}.${DNSDOMAIN}" > /etc/hostname
+echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
+/bin/hostname "${HOSTNAME}.${DNSDOMAIN}"
 # configure DNS with dhcp info
-echo "search \${DNSDOMAIN}" > /etc/resolv.conf
-for ns in \${DNSSERVERS}
+echo "search ${DNSDOMAIN}" > /etc/resolv.conf
+for ns in ${DNSSERVERS}
 do
-    echo "nameserver \$ns" >> /etc/resolv.conf
+    echo "nameserver $ns" >> /etc/resolv.conf
 done
 
 exit 0
