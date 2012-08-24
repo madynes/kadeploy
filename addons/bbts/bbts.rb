@@ -10,6 +10,9 @@ BBT_SCRIPT='./blackbox_tests.rb'
 CONLOG_SCRIPT='./conmanlogger.sh'
 KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
 
+KADEPLOY_BIN='kadeploy3'
+KADEPLOY_OPTIONS=''
+
 REMOTE=false
 REMOTE_HOST='node-hostname'
 REMOTE_USER='node-user'
@@ -128,7 +131,7 @@ def kadeploy_cmd()
   if REMOTE
     ret = "#{KAREMOTE_SCRIPT} #{REMOTE_USER} #{REMOTE_HOST}"
   else
-    ret = "kadeploy3"
+    ret = "#{KADEPLOY_BIN} #{KADEPLOY_OPTIONS}"
   end
   ret
 end
