@@ -14,9 +14,12 @@ case "$RELEASE_VERSION" in
 	;;
 	git)
 		RELEASE_VERSION=~git$(git log --pretty=format:'%H' -n 1)
+        ;;
+        rc[0-9]*)
+		RELEASE_VERSION=~$RELEASE_VERSION
 	;;
 	*)
-		RELEASE_VERSION=-$RELEASE_VERSION
+		RELEASE_VERSION=.$RELEASE_VERSION
 	;;
 esac
 
