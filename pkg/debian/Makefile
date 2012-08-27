@@ -8,7 +8,11 @@ else
 	ifeq ($(strip $(RELEASE_VERSION)),git)
 		RELEASE_VERSION:=~git$(shell git log --pretty=format:'%H' -n 1)
 	else
-		RELEASE_VERSION:=$(addprefix -,$(RELEASE_VERSION))
+		ifeq ($(findstring rc,$(strip $(RELEASE_VERSION))),rc)
+			RELEASE_VERSION:=$(addprefix ~,$(RELEASE_VERSION))
+		else
+			RELEASE_VERSION:=$(addprefix .,$(RELEASE_VERSION))
+		endif
 	endif
 endif
 PWD:=$(shell pwd)
