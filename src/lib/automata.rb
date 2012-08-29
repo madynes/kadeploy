@@ -23,7 +23,7 @@ module Nodes
       @@ids += 1
     end
 
-    def equals?(sub)
+    def equal?(sub)
       ret = true
 
       @set.each do |node|
@@ -170,9 +170,18 @@ class TaskManager
     nodeset = Nodes::NodeSet.new
     @nodes.linked_copy(nodeset)
     @queue.push({ :nodes => nodeset })
+    load_config()
   end
 
-  def load_config()
+  def create_task(idx,subidx,nodes,context)
+    raise 'Should be reimplemented'
+  end
+
+  def tasks()
+    raise 'Should be reimplemented'
+  end
+
+  def init_config()
     tasks = tasks()
 
     proc_init = Proc.new do |taskname|
@@ -190,12 +199,19 @@ class TaskManager
     end
   end
 
-  def create_task(idx,subidx,nodes,context)
-    raise 'Should be reimplemented'
+  # To be redefined
+  def load_config()
+    init_config()
   end
 
-  def tasks()
-    raise 'Should be reimplemented'
+  # To be used at runtine
+  def config(config)
+    unless config.nil?
+      config.each_pair do |taskname,taskconf|
+        conf_task(taskname,taskconf)
+      end
+    end
+    self
   end
 
   def conf_task_default()
@@ -203,6 +219,7 @@ class TaskManager
       :timeout => 0,
       :retries => 0,
       :raisable => true,
+      :config => nil,
     }
   end
 
@@ -223,11 +240,13 @@ class TaskManager
   def success_task(task,nodeset)
     #debug("SUCCESS #{nodeset.to_s_fold}")
     done_task(task,nodeset)
+    nodeset.linked_copy(@nodes_ok)
   end
 
   def fail_task(task,nodeset)
     #debug("FAIL #{nodeset.to_s_fold}")
     done_task(task,nodeset)
+    nodeset.linked_copy(@nodes_ko)
   end
 
   def get_task(idx,subidx)
@@ -280,7 +299,7 @@ class TaskManager
   end
 
   def done?()
-    @nodes.empty? or @nodes_done.equals?(@nodes)
+    @nodes.empty? or @nodes_done.equal?(@nodes)
   end
 
   def run_task(task)
@@ -315,7 +334,7 @@ class TaskManager
           clean_nodeset(task.nodes_ok)
           #debug("RUN_PUSH OK #{task.name} #{task.nodes_ok.to_s_fold}")
           task.nodes_ok.linked_copy(treated)
-          @queue.push({ :task => task, :status => 'OK', :nodes => task.nodes_ok})
+          @queue.push({ :task => task, :status => :OK, :nodes => task.nodes_ok})
         end
 
         unless task.nodes_ko.empty?
@@ -325,19 +344,19 @@ class TaskManager
         end
 
         # Set nodes with no status as KO
-        unless treated.equals?(task.nodes)
+        unless treated.equal?(task.nodes)
           tmp = task.nodes.diff(treated)
           #debug("RUN_TREATED diff:#{tmp.to_s_fold} nodes_ko:#{task.nodes_ko.to_s_fold}")
           tmp.move(task.nodes_ko)
         end
 
-        @queue.push({ :task => task, :status => 'KO', :nodes => task.nodes_ko}) unless task.nodes_ko.empty?
+        @queue.push({ :task => task, :status => :KO, :nodes => task.nodes_ko}) unless task.nodes_ko.empty?
 
       elsif !task.nodes.empty?
         #debug("RUN_PUSH ALL KO #{task.name} #{task.nodes.to_s_fold}")
         task.nodes_ko().clean()
         task.nodes().linked_copy(task.nodes_ko())
-        @queue.push({ :task => task, :status => 'KO', :nodes => task.nodes_ko})
+        @queue.push({ :task => task, :status => :KO, :nodes => task.nodes_ko})
       end
       #debug("DONE_TASK #{task.name} #{task.nodes.to_s_fold}")
     end
@@ -345,7 +364,6 @@ class TaskManager
 
   def start()
     #debug("START")
-    load_config()
     @nodes_done.clean()
 
     until (done?)
@@ -381,7 +399,7 @@ class TaskManager
 
       if query[:status] and curtask
         #debug("TREAT_STATUS #{query[:nodes].to_s_fold}")
-        if query[:status] == 'OK'
+        if query[:status] == :OK
           #debug("TREAT_OK #{query[:nodes].to_s_fold}")
           if (curtask.idx + 1) < tasks().length
             newtask[:idx] = curtask.idx + 1
@@ -394,7 +412,7 @@ class TaskManager
             end
             continue = false
           end
-        elsif query[:status] == 'KO'
+        elsif query[:status] == :KO
           #debug("TREAT_KO #{query[:nodes].to_s_fold}")
           if curtask.context[:retries] < (@config[curtask.name][:retries] - 1)
             newtask[:idx] = curtask.idx
@@ -467,20 +485,18 @@ class TaskedTaskManager < TaskManager
 
   def success_task(task,nodeset)
     super(task,nodeset)
-    nodeset.linked_copy(@nodes_ok)
 
-    split_nodeset(task.nodes,@nodes_ok) unless task.nodes.equals?(@nodes_ok)
+    split_nodeset(task.nodes,@nodes_ok) unless task.nodes.equal?(@nodes_ok)
 
-    raise_nodes(@nodes_ok,'OK') if @config[task.name][:raisable]
+    raise_nodes(@nodes_ok,:OK) if @config[task.name][:raisable]
   end
 
   def fail_task(task,nodeset)
     super(task,nodeset)
-    nodeset.linked_copy(@nodes_ko)
 
-    split_nodeset(task.nodes,@nodes_ko) unless task.nodes.equals?(@nodes_ko)
+    split_nodeset(task.nodes,@nodes_ko) unless task.nodes.equal?(@nodes_ko)
 
-    raise_nodes(@nodes_ko,'KO') if @config[task.name][:raisable]
+    raise_nodes(@nodes_ko,:KO) if @config[task.name][:raisable]
   end
 
   def clean_nodes(nodeset)
@@ -515,14 +531,12 @@ class Workflow < TaskManager
 
   def success_task(task,nodeset)
     super(task,nodeset)
-    nodeset.linked_copy(@nodes_ok)
 
     debug("### Add #{nodeset.to_s_fold} to OK nodeset")
   end
 
   def fail_task(task,nodeset)
     super(task,nodeset)
-    nodeset.linked_copy(@nodes_ko)
 
     debug("### Add #{nodeset.to_s_fold} to KO nodeset")
   end
@@ -544,11 +558,32 @@ class Workflow < TaskManager
       @queue,
       context,
       nil
-    )
+    ).config(@config[taskval[0].to_sym][:config])
   end
 end
 
+class Microstep < QueueTask
+  def initialize(name, idx, subidx, nodes, manager_queue, context = {}, params = [])
+    super(name, idx, subidx, nodes, manager_queue, context, params)
+  end
+
+  def run()
+    debug("(#{@nodes.id})   --- Launching #{@name} on #{@nodes.to_s_fold}")
+
+    #debug("\trun #{@name}/#{@params.inspect}")
+    return send("ms_#{@name}".to_sym,*@params)
+  end
+
+  # ...
+  # microstep methods
+  # ...
+end
+
 class Macrostep < TaskedTaskManager
+  def microclass
+    Microstep
+  end
+
   def run()
     debug("(#{@nodes.id}) === Launching #{self.class.name} on #{@nodes.to_s_fold}")
 
@@ -559,7 +594,7 @@ class Macrostep < TaskedTaskManager
   def create_task(idx,subidx,nodes,context)
     taskval = get_task(idx,subidx)
 
-    Microstep.new(
+    microclass().new(
       taskval[0],
       idx,
       subidx,
@@ -581,26 +616,9 @@ class Macrostep < TaskedTaskManager
   end
 
   ## to be defined in each macrostep class
-  # def load_config()
+  # def conf_task_default()
   # end
   #
   # def tasks()
   # end
-end
-
-class Microstep < QueueTask
-  def initialize(name, idx, subidx, nodes, manager_queue, context = {}, params = [])
-    super(name, idx, subidx, nodes, manager_queue, context, params)
-  end
-
-  def run()
-    debug("(#{@nodes.id})   --- Launching #{@name} on #{@nodes.to_s_fold}")
-
-    #debug("\trun #{@name}/#{@params.inspect}")
-    return send("ms_#{@name}".to_sym,*@params)
-  end
-
-  # ...
-  # microstep methods
-  # ...
 end
