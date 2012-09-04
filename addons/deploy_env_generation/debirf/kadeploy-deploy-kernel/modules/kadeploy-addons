@@ -20,6 +20,8 @@ mkdir -p $DEBIRF_ROOT/rambin
 mkdir -p $DEBIRF_ROOT/mnt/tmp
 mkdir -p $DEBIRF_ROOT/usr/local/bin
 
+rm -f /var/lib/dhcp/dhclient*.leases
+
 cp $DEBIRF_BUILDD/kadeploy_specific/scripts/* $DEBIRF_ROOT/usr/local/bin
 chmod +x $DEBIRF_ROOT/usr/local/bin/*
 
@@ -34,29 +36,14 @@ for param in $(cat /proc/cmdline); do
     netdev="$(printf "%s" "$param" | cut -f2 -d=)"
   fi
 done
-dhcpfile=/var/lib/dhcpcd/dhcpcd-${netdev}.info
 
 ifup "$netdev"=dhcp
+if [ ! -f "/var/lib/dhcp/dhclient.${netdev}.leases" ]
+then
+  exit 1
+fi
+
 (while true; do nc -l -p 25300; done) &
-
-i=0
-while [ ! -f "$dhcpfile" ] && [ $i -lt 16 ]
-do
-  let i=i+1
-  sleep 1
-done
-
-. "$dhcpfile"
-# set hostname and its resolution
-echo "${HOSTNAME}.${DNSDOMAIN}" > /etc/hostname
-echo "${IPADDR} ${HOSTNAME}.${DNSDOMAIN} ${HOSTNAME}" >> /etc/hosts
-/bin/hostname "${HOSTNAME}.${DNSDOMAIN}"
-# configure DNS with dhcp info
-echo "search ${DNSDOMAIN}" > /etc/resolv.conf
-for ns in ${DNSSERVERS}
-do
-    echo "nameserver $ns" >> /etc/resolv.conf
-done
 
 exit 0
 EOF
