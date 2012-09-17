@@ -47,16 +47,15 @@ module MacroSteps
     @timeout = 0
     @queue_manager = nil
     @config = nil
+    @cluster_config = nil
     @reboot_window = nil
     @nodes_check_window = nil
     @output = nil
-    @cluster = nil
     @nodes = nil
     @nodes_ok = nil
     @nodes_ko = nil
-    @step = nil
+    @curstep = nil
     @start = nil
-    @instances = nil
     @loglevel = nil
     @currentretry = nil
 
@@ -80,36 +79,34 @@ module MacroSteps
       @nodes = nodes
       @queue_manager = queue_manager
       @config = @queue_manager.config
+      @cluster_config = @config.cluster_specific[cluster]
       @reboot_window = reboot_window
       @nodes_check_window = nodes_check_window
       @output = output
       @nodes_ok = Nodes::NodeSet.new(@nodes.id)
       @nodes_ko = Nodes::NodeSet.new(@nodes.id)
-      @cluster = cluster
       @loglevel = loglevel
       @logger = logger
       @logger.set("step#{@loglevel}", get_instance_name, @nodes)
       @logger.set("timeout_step#{@loglevel}", @timeout, @nodes)
-      @instances = Array.new
       @start = Time.now.to_i
-      @step = MicroStepsLibrary::MicroSteps.new(@nodes_ok, @nodes_ko, @reboot_window, @nodes_check_window, @config, cluster, output, get_instance_name)
       @currentretry = 0
+      @curstep = nil
     end
 
     def finalize
       @queue_manager = nil
       @config = nil
+      #@cluster_config = nil
       @reboot_window = nil
       @nodes_check_window = nil
       @output = nil
       @nodes_ok = nil
       @nodes_ko = nil
-      @cluster = nil
       @logger = nil
-      @instances.delete_if { |i| true }
       @instances = nil
       @start = nil
-      @step = nil
+      @curstep = nil
     end
 
     # Kill all the running threads
@@ -119,14 +116,7 @@ module MacroSteps
     # Output
     # * nothing
     def kill
-      if (@instances != nil) then
-        @instances.each { |tid|
-          #first, we clean all the pending processes
-          @step.process_container.killall(tid)
-          #then, we kill the thread
-          Thread.kill(tid)
-        }
-      end
+      @curstep.kill
     end
 
     # Get the name of the current macro step
@@ -156,8 +146,31 @@ module MacroSteps
     # * nothing
     # Output
     # * return a thread id
-    def microsteps
+    def microsteps(step)
       raise 'Should be reimplemented'
+    end
+
+    def microstep_timeout?(step,instance_node_set)
+      start = Time.now.to_i
+      while ((step.instance_thread.status != false) && (Time.now.to_i < (start + @timeout)))
+        sleep(1)
+      end
+      if (step.instance_thread.status != false) then
+        @output.verbosel(3, "Timeout before the end of the step on cluster #{@cluster_config.name}, let's kill the instance",@nodes_ok)
+        kill()
+        step.nodes_ok.free
+        instance_node_set.set_error_msg("Timeout in the #{get_macro_step_name} step")
+        instance_node_set.add_diff_and_free(step.nodes_ko)
+        step.nodes_ko.set.each { |node|
+          node.state = "KO"
+          @config.set_node_state(node.hostname, "", "", "ko")
+        }
+        return true
+      else
+        instance_node_set.free()
+        step.instance_thread.join
+        return false
+      end
     end
 
     # Generic automata that run a macrostep
@@ -180,7 +193,20 @@ module MacroSteps
           instance_node_set = Nodes::NodeSet.new
           @nodes_ko.duplicate(instance_node_set)
 
+          @curstep = MicroStepsLibrary::MicroSteps.new(
+            @nodes_ok,
+            @nodes_ko,
+            @reboot_window,
+            @nodes_check_window,
+            @config,
+            @cluster_config,
+            @output,
+            get_instance_name
+          )
+
           instance_thread = Thread.new do
+            @curstep.instance_thread = Thread.current
+
             @logger.increment("retry_step#{@loglevel}", @nodes_ko)
             @nodes_ko.duplicate_and_free(@nodes_ok)
 
@@ -191,12 +217,11 @@ module MacroSteps
               @nodes_ok
             )
 
-            microsteps()
+            microsteps(@curstep)
           end
 
-          @instances.push(instance_thread)
 
-          if not @step.timeout?(@timeout, instance_thread, get_macro_step_name, instance_node_set) then
+          if not microstep_timeout?(@curstep, instance_node_set) then
             if not @nodes_ok.empty? then
               if not @nodes_ko.empty?
                 tmp = @nodes_ok.id
@@ -235,7 +260,7 @@ module MacroSteps
         #After several retries, some nodes may still be in an incorrect state
         if (not @nodes_ko.empty?) && (not @config.exec_specific.breakpointed) then
           #Maybe some other instances are defined
-          if not @queue_manager.replay_macro_step_with_next_instance(get_macro_step_name, @cluster, @nodes_ko)
+          if not @queue_manager.replay_macro_step_with_next_instance(get_macro_step_name, @cluster_config.name, @nodes_ko)
             @queue_manager.add_to_bad_nodes_set(@nodes_ko)
             @queue_manager.decrement_active_threads
           end
