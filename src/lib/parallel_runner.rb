@@ -10,69 +10,11 @@ require 'nodes'
 require 'thread'
 
 module ParallelRunner
-  class Command
-    attr_reader :cmd
-    attr_reader :stdout
-    attr_reader :stderr
-    attr_reader :pid
-    attr_reader :status
-
-    # Constructor of Command
-    #
-    # Arguments
-    # * cmd: string of the command
-    # Output
-    # * nothing
-    def initialize(cmd)
-      @cmd = cmd
-      @status = nil
-    end
-
-    # Run the command
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def run
-      @stdout, @mystdout = IO::pipe
-      @stderr, @mystderr = IO::pipe
-      @pid = fork {
-        @stdout.close
-        @stderr.close
-        @mystdout.sync = true
-        @mystderr.sync = true
-        STDOUT.reopen(@mystdout)
-        STDERR.reopen(@mystderr)
-        @mystdout.close
-        @mystderr.close
-        begin
-          exec(@cmd)
-        rescue
-          exit!(1)
-        end
-      }
-      @mystdout.close
-      @mystderr.close
-    end
-
-    # Wait the end of the command
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing    
-    def wait
-      if not @status
-        Process::waitpid(@pid)
-        @status = $?
-      end
-    end
-  end
-
   class PRunner
-    @nodes = nil
+    @execs = nil
     @output = nil
+    @threads = nil
+
     @instance_thread = nil
     @process_container = nil
 
@@ -83,11 +25,14 @@ module ParallelRunner
     # Output
     # * nothing
     def initialize(output, instance_thread, process_container, nodesetid=0)
-      @nodes = Hash.new
+      @execs = {}
       @output = output
+
       @instance_thread = instance_thread
       @process_container = process_container
       @nodesetid = nodesetid
+
+      @threads = ThreadGroup.new
     end
 
     # Add a command related to a node
@@ -98,11 +43,7 @@ module ParallelRunner
     # Output
     # * nothing
     def add(cmd, node)
-      @nodes[node] = Hash.new
-      @nodes[node]["cmd"] = Command.new(cmd)
-      @nodes[node]["stdout_fd"] = nil
-      @nodes[node]["stdout_reader"] = nil
-      @nodes[node]["stderr_reader"] = nil
+      @execs[node] = Execute[cmd]
     end
 
     # Run the bunch of commands
@@ -110,34 +51,18 @@ module ParallelRunner
     # Arguments
     # * nothing
     # Output
-    # * nothing   
+    # * nothing
     def run
-      @nodes.each_key { |node|
-        @nodes[node]["cmd"].run
-        @process_container.add_process(@instance_thread, @nodes[node]["cmd"].pid) if @instance_thread != nil
-        @nodes[node]["stdout_fd"] = @nodes[node]["cmd"].stdout
-        @nodes[node]["stderr_fd"] = @nodes[node]["cmd"].stderr
-        @nodes[node]["stdout_reader"] = Thread.new { 
-          begin
-            node.last_cmd_stdout = ""
-            while line = @nodes[node]["stdout_fd"].gets
-              node.last_cmd_stdout += line
-            end
-          ensure
-            @nodes[node]["stdout_fd"].close
-          end
-        }
-        @nodes[node]["stderr_reader"] = Thread.new { 
-          begin
-            node.last_cmd_stderr = ""
-            while line = @nodes[node]["stderr_fd"].gets
-              node.last_cmd_stderr += line
-            end
-          ensure
-            @nodes[node]["stderr_fd"].close
-          end
-        }
-      }
+      @execs.each_pair do |node,exec|
+        tid = Thread.new do
+          exec.run
+          status,stdout,stderr = exec.wait
+          node.last_cmd_stdout = stdout.chomp.gsub(/\n/,"\\n")
+          node.last_cmd_stderr = stderr.chomp.gsub(/\n/,"\\n")
+          node.last_cmd_exit_status = status.exitstatus.to_s
+        end
+        @threads.add(tid)
+      end
     end
 
     # Wait the end of all the executions
@@ -147,13 +72,19 @@ module ParallelRunner
     # Output
     # * nothing
     def wait
-      @nodes.each_key { |node|
-        @nodes[node]["cmd"].wait
-        @process_container.remove_process(@instance_thread, @nodes[node]["cmd"].pid) if @instance_thread != nil
-        node.last_cmd_exit_status = @nodes[node]["cmd"].status.to_s
-        @nodes[node]["stdout_reader"].join
-        @nodes[node]["stderr_reader"].join
-      }
+      @threads.list.each do |thr|
+        thr.join
+      end
+    end
+
+    # Kill every running process
+    def kill
+      @threads.list.each do |thr|
+        Thread.kill(thr)
+      end
+      @execs.each_value do |exec|
+        exec.kill
+      end
     end
 
     # Get the results of the execution
@@ -161,60 +92,35 @@ module ParallelRunner
     # Arguments
     # * nothing
     # Output
-    # * array of two arrays ([0] contains the nodes OK and [1] contains the nodes KO)   
-    def get_results
-      good_nodes = Array.new
-      bad_nodes = Array.new
-      @nodes.each_key { |node|
-        node.last_cmd_stdout = node.last_cmd_stdout.chomp.gsub(/\n/,"\\n")
-        node.last_cmd_stderr = node.last_cmd_stderr.chomp.gsub(/\n/,"\\n")
-        if (node.last_cmd_exit_status == "0") then
-#          good_nodes.push(node.dup)
-          good_nodes.push(node)
-        else
-#          bad_nodes.push(node.dup)
-          bad_nodes.push(node)
-        end
-        nodeset = Nodes::NodeSet.new
-        nodeset.id = @nodesetid
-        nodeset.push(node)
-        @output.debug(@nodes[node]["cmd"].cmd, nodeset)
-        nodeset = nil
-      }
-      return [good_nodes, bad_nodes]
-    end
+    # * array of two arrays ([0] contains the nodes OK and [1] contains the nodes KO)
+    def get_results(expects={})
+      good = []
+      bad = []
 
-    # Get the results of the execution and expect an output
-    #
-    # Arguments
-    # * value: expected value
-    # * error_msg: error message
-    # Output
-    # * array of two arrays ([0] contains the nodes OK and [1] contains the nodes KO)   
-    def get_results_expecting_output(value, error_msg)
-      good_nodes = Array.new
-      bad_nodes = Array.new
-      @nodes.each_key { |node|
-        if (node.last_cmd_exit_status == "0") then
-          if (node.last_cmd_stdout.split("\n")[0] == value) then
-#            good_nodes.push(node.dup)
-            good_nodes.push(node)
-          else
-            node.last_cmd_stderr = error_msg
-#            bad_nodes.push(node.dup)
-            bad_nodes.push(node)
-          end
-        else
-          node.last_cmd_stderr = "Cannot connect to the node"
-          bad_nodes.push(node)
+      @execs.each_key do |node|
+        status = (expects[:status] ? expects[:status] : ['0'])
+
+        unless status.include?(node.last_cmd_exit_status)
+          bad << node
+          next
         end
+
+        if expects[:output] and node.last_cmd_stdout.split("\n")[0] != expects[:output]
+          bad << node
+          next
+        end
+
+        good << node
+
+        # to be removed
         nodeset = Nodes::NodeSet.new
         nodeset.id = @nodesetid
         nodeset.push(node)
         @output.debug(@nodes[node]["cmd"].cmd, nodeset)
         nodeset = nil
-      }
-      return [good_nodes, bad_nodes]
+      end
+
+      [good, bad]
     end
   end
 end
