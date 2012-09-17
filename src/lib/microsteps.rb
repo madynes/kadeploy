@@ -121,18 +121,18 @@ module MicroStepsLibrary
     # * window: WindowManager instance, eventually used to launch the command
     # Output
     # * return true if the command has been successfully ran on one node at least, false otherwise
-    def parallel_exec_command_wrapper(cmd, taktuk_connector, instance_thread, window = nil)
+    # TODO: scattering kind
+    def parallel_exec(cmd, expects={}, opts={}, instance_thread, window=nil)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
 
       if window then
-        callback = Proc.new { |ns|
-          po = ParallelOperations::ParallelOps.new(ns, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
-          classify_nodes(po.execute(cmd))
-        }
-        window.launch_on_node_set(node_set, &callback)
+        window.launch_on_node_set(node_set) do |ns|
+          po = ParallelOperations::ParallelOps.new(ns, @config, @config.cluster_specific[@cluster], @output, instance_thread, @process_container)
+          classify_nodes(po.taktuk_exec(cmd))
+        end
       else
-        po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
+        po = ParallelOperations::ParallelOps.new(node_set, @config, @config.cluster_specific[@cluster], @output, instance_thread, @process_container)
         classify_nodes(po.execute(cmd))
       end
       return (not @nodes_ok.empty?)
@@ -147,6 +147,8 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # Output
     # * return true if the command has been successfully ran on one node at least, false otherwise
+    # ###!!!
+    # TODO: scattering kind
     def parallel_exec_command_wrapper_expecting_status(cmd, status, taktuk_connector, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
@@ -165,6 +167,8 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # Output
     # * return true if the command has been successfully ran on one node at least, false otherwise
+    # ###!!!
+    # TODO: scattering kind
     def parallel_exec_command_wrapper_expecting_status_and_output(cmd, status, output, taktuk_connector, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
@@ -183,11 +187,12 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # Output
     # * return true if the file has been successfully sent on one node at least, false otherwise
-    def parallel_send_file_command_wrapper(file, dest_dir, scattering_kind, taktuk_connector, instance_thread)
+    # TODO: scattering kind
+    def parallel_sendfile(src_file, dest_dir, opts={}, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, taktuk_connector, @output, instance_thread, @process_container)
-      classify_nodes(po.send_file(file, dest_dir, scattering_kind))
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @config.cluster_specific[@cluster], @output, instance_thread, @process_container)
+      classify_nodes(po.sendfile(src_file, dest_dir, opts))
       return (not @nodes_ok.empty?)
     end
 
@@ -203,6 +208,7 @@ module MicroStepsLibrary
     # * instance_thread: thread id of the current thread
     # Output
     # * return true if the command has been successfully ran on one node at least, false otherwise
+    # ###!!!
     def parallel_exec_cmd_with_input_file_wrapper(file, cmd, scattering_kind, taktuk_connector, status, instance_thread)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
@@ -222,11 +228,12 @@ module MicroStepsLibrary
     # * last_reboot: specify if we wait the last reboot
     # Output
     # * return true if at least one node has been successfully rebooted, false otherwise
-    def parallel_wait_nodes_after_reboot_wrapper(timeout, ports_up, ports_down, nodes_check_window, instance_thread, last_reboot)
+    # ###!!!
+    def parallel_wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, instance_thread, vlan)
       node_set = Nodes::NodeSet.new
       @nodes_ok.duplicate_and_free(node_set)
-      po = ParallelOperations::ParallelOps.new(node_set, @config, @cluster, nil, @output, instance_thread, @process_container)
-      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, last_reboot))
+      po = ParallelOperations::ParallelOps.new(node_set, @config, @config.cluster_specific[@cluster], @output, instance_thread, @process_container)
+      classify_nodes(po.wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, vlan))
       return (not @nodes_ok.empty?)
     end
 
@@ -851,12 +858,14 @@ module MicroStepsLibrary
         failed_microstep("Invalid os kind #{kind}")
         return false
       end
-      return parallel_exec_command_wrapper_expecting_status("(/usr/local/bin/install_grub \
-                                                            #{kind} #{root} \"#{grubpart}\" #{path} \
-                                                            \"#{line1}\" \"#{line2}\" \"#{line3}\")",
-                                                            ["0"],
-                                                            @config.common.taktuk_connector,
-                                                            instance_thread)
+      return parallel_exec(
+        "(/usr/local/bin/install_grub "\
+        "#{kind} #{root} \"#{grubpart}\" #{path} "\
+        "\"#{line1}\" \"#{line2}\" \"#{line3}\")",
+        {},
+        {},
+        instance_thread
+      )
     end
 
     # Install Grub 2 on the deployment partition
@@ -895,12 +904,13 @@ module MicroStepsLibrary
         failed_microstep("Invalid os kind #{kind}")
         return false
       end
-      return parallel_exec_command_wrapper_expecting_status("(/usr/local/bin/install_grub2 \
-                                                            #{kind} #{root} \"#{grubpart}\" #{path} \
-                                                            \"#{line1}\" \"#{line2}\" \"#{line3}\")",
-                                                            ["0"],
-                                                            @config.common.taktuk_connector,
-                                                            instance_thread)
+      return parallel_exec(
+        "(/usr/local/bin/install_grub2 "\
+        "#{kind} #{root} \"#{grubpart}\" #{path} "\
+        "\"#{line1}\" \"#{line2}\" \"#{line3}\")",
+        {:status => ["0"]},
+        {},
+        instance_thread)
     end
 
     def install_grub_on_nodes(kind, instance_thread)
@@ -940,12 +950,12 @@ module MicroStepsLibrary
         failed_microstep("The #{tarball_kind} archive kind is not supported")
         return false
       end
-      return parallel_exec_cmd_with_input_file_wrapper(tarball_file,
-                                                       cmd,
-                                                       scattering_kind,
-                                                       @config.common.taktuk_connector,
-                                                       "0",
-                                                       instance_thread)
+      return parallel_exec(
+        cmd,
+        { :input_file => tarball_file, :scattering => scaterring_kind }
+        { :status => ["0"] },
+        instance_thread
+      )
     end
 
     # Send a tarball with Kastafior and uncompress it on the nodes
@@ -1016,40 +1026,22 @@ module MicroStepsLibrary
       else
         cmd = "#{@config.common.kastafior} -c \\\"#{@config.common.taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
       end
-      c = ParallelRunner::Command.new(cmd)
-      c.run
-      std_output = String.new
-      err_output = String.new
-      std_reader = Thread.new {
-        std_output_full = false
-        begin
-          while (line = c.stdout.gets) && (not std_output_full)
-            std_output += line
-            std_output_full = true if std_output.length > 1000
-          end
-        ensure
-          c.stdout.close
-        end
-      }
-      err_reader = Thread.new {
-        err_output_full = false
-        begin
-          while (line = c.stderr.gets) && (not err_output_full)
-            err_output += line
-            err_output_full = true if err_output.length > 1000
-          end
-        ensure
-          c.stderr.close
-        end
-      }
-      @process_container.add_process(instance_thread, c.pid)
-      c.wait
-      std_reader.join
-      err_reader.join
-      @process_container.remove_process(instance_thread, c.pid)
-      @output.debug_command(cmd, std_output, err_output, c.status, @nodes_ok)
+      exec = Execute[cmd]
+      out = ''
+      err = ''
+      status = nil
+      exec.run do |pid,stdin,stdout,stderr|
+        Process.wait(pid)
+        status $?.exitstatus
+        out = stdout.read(1000)
+        stdout.close
+        err = stderr.read(1000)
+        stderr.close
+      end
+
+      @output.debug_command(cmd, out, err, status, @nodes_ok)
       if (c.status != 0) then
-        failed_microstep("Error while processing to the file broadcast with Kastafior (exited with status #{c.status})")
+        failed_microstep("Error while processing to the file broadcast with Kastafior (exited with status #{status})")
         return false
       else
         return true
@@ -1067,9 +1059,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the operation is correctly performed, false otherwise
     def send_tarball_and_uncompress_with_bittorrent(tarball_file, tarball_kind, deploy_mount_point, deploy_part, instance_thread)
-      if not parallel_exec_command_wrapper("rm -f /tmp/#{File.basename(tarball_file)}*",
-                                           @config.common.taktuk_connector,
-                                           instance_thread) then
+      if not parallel_exec("rm -f /tmp/#{File.basename(tarball_file)}*",{},{},instance_thread) then
         failed_microstep("Error while cleaning the /tmp")
         return false
       end
@@ -1089,13 +1079,11 @@ module MicroStepsLibrary
         failed_microstep("The seed of #{torrent} has not been launched")
         return false
       end
-      if not parallel_send_file_command_wrapper(torrent, "/tmp", "tree", @config.common.taktuk_connector, instance_thread) then
+      if not parallel_sendfile(torrent, "/tmp", { :scattering => 'tree' }, instance_thread) then
         failed_microstep("Error while sending the torrent file")
         return false
       end
-      if not parallel_exec_command_wrapper("/usr/local/bin/bittorrent_detach /tmp/#{File.basename(torrent)}", 
-                                           @config.common.taktuk_connector,
-                                           instance_thread) then
+      if not parallel_exec("/usr/local/bin/bittorrent_detach /tmp/#{File.basename(torrent)}", {}, {}, instance_thread) then
         failed_microstep("Error while launching the bittorrent download")
         return false
       end
@@ -1124,13 +1112,11 @@ module MicroStepsLibrary
         failed_microstep("The #{tarball_kind} archive kind is not supported")
         return false
       end
-      if not parallel_exec_command_wrapper(cmd, @config.common.taktuk_connector, instance_thread) then
+      if not parallel_exec(cmd, {}, {}, instance_thread) then
         failed_microstep("Error while uncompressing the tarball")
         return false
       end
-      if not parallel_exec_command_wrapper("rm -f /tmp/#{File.basename(tarball_file)}*",
-                                           @config.common.taktuk_connector,
-                                           instance_thread) then
+      if not parallel_exec("rm -f /tmp/#{File.basename(tarball_file)}*", {}, {}, instance_thread) then
         failed_microstep("Error while cleaning the /tmp")
         return false
       end
@@ -1146,7 +1132,7 @@ module MicroStepsLibrary
     # * return true if the command has been correctly performed, false otherwise
     def custom_exec_cmd(instance_thread, cmd)
       @output.verbosel(3, "CUS exec_cmd: #{@nodes_ok.to_s_fold}",@nodes_ok)
-      return parallel_exec_command_wrapper(cmd, @config.common.taktuk_connector, instance_thread)
+      return parallel_exec(cmd, {}, {}, instance_thread)
     end
 
     # Send a custom file on the nodes
@@ -1159,11 +1145,12 @@ module MicroStepsLibrary
     # * return true if the file has been correctly sent, false otherwise
     def custom_send_file(instance_thread, file, dest_dir)
       @output.verbosel(3, "CUS send_file: #{@nodes_ok.to_s_fold}",@nodes_ok)
-      return parallel_send_file_command_wrapper(file,
-                                                dest_dir,
-                                                "chain",
-                                                @config.common.taktuk_connector,
-                                                instance_thread)
+      return parallel_sendfile(
+        file,
+        dest_dir,
+        { :scattering => "chain"},
+        instance_thread
+      )
     end
 
     # Run the custom methods attached to a micro step
@@ -1260,12 +1247,10 @@ module MicroStepsLibrary
         failed_microstep("Cannot generate the partition_file")
         return false
       end
-      if not parallel_exec_cmd_with_input_file_wrapper(temp.path,
-                                                       "fdisk #{@config.cluster_specific[@cluster].block_device}",
-                                                       "tree",
-                                                       @config.common.taktuk_connector,
-                                                       expected_status,
-                                                       instance_thread) then
+      if not parallel_exec(
+        "fdisk #{@config.cluster_specific[@cluster].block_device}",
+        { :input_file => temp.path, :scattering => 'tree' },
+        { :status => expected_status}, instance_thread) then
         failed_microstep("Cannot perform the fdisk operation")
         return false
       end
@@ -1280,12 +1265,11 @@ module MicroStepsLibrary
     # Output
     # * return true if the parted has been successfully performed, false otherwise
     def do_parted(instance_thread)
-      return parallel_exec_cmd_with_input_file_wrapper(@config.cluster_specific[@cluster].partition_file,
-                                                       "cat - > /rambin/parted_script && chmod +x /rambin/parted_script && /rambin/parted_script",
-                                                       "tree",
-                                                       @config.common.taktuk_connector,
-                                                       "0",
-                                                       instance_thread)
+      return parallel_exec(
+        "cat - > /rambin/parted_script && chmod +x /rambin/parted_script && /rambin/parted_script",
+        { :input_file => @config.cluster_specific[@cluster].partition_file, :scattering => 'tree' },
+        instance_thread
+      )
     end
 
     public
@@ -1373,12 +1357,12 @@ module MicroStepsLibrary
     def ms_send_key_in_deploy_env(instance_thread, scattering_kind)
       if (@config.exec_specific.key != "") then
         cmd = "cat - >>/root/.ssh/authorized_keys"
-        return parallel_exec_cmd_with_input_file_wrapper(@config.exec_specific.key,
-                                                         cmd,
-                                                         scattering_kind,
-                                                         @config.common.taktuk_connector,
-                                                         "0",
-                                                         instance_thread)
+        return parallel_exec(
+          cmd,
+          { :input_file => @config.exec_specific.key, :scattering => scattering_kind},
+          {},
+          instance_thread
+        )
       else
         @output.verbosel(3, "  *** No key has been specified",@nodes_ok)
       end
@@ -1603,15 +1587,14 @@ module MicroStepsLibrary
         tmpfile.write(script)
         tmpfile.close
 
-        ret = parallel_exec_cmd_with_input_file_wrapper(
-          tmpfile.path,
+        ret = parallel_exec(
           "file=`mktemp`;"\
           "cat - >$file;"\
           "chmod +x $file;"\
           "nohup $file 1>/dev/null 2>/dev/null </dev/null &",
           'tree',
-          @config.common.taktuk_connector,
-          '0',
+          { :input_file => tmpfile.path },
+          {}
           instance_thread
         )
 
@@ -1679,9 +1662,10 @@ module MicroStepsLibrary
     # Output
     # * return true if the kernel has been successfully sent
     def ms_create_kexec_repository(instance_thread)
-      return parallel_exec_command_wrapper(
+      return parallel_exec(
         "mkdir -p #{@config.cluster_specific[@cluster].kexec_repository}",
-        @config.common.taktuk_connector,
+        {},
+        {},
         instance_thread
       )
     end
@@ -1701,19 +1685,17 @@ module MicroStepsLibrary
         @config.common.pxe.pxe_repository_kernels
       )
 
-      ret = ret && parallel_send_file_command_wrapper(
+      ret = ret && parallel_sendfile(
         File.join(pxedir,@config.cluster_specific[@cluster].deploy_kernel),
         @config.cluster_specific[@cluster].kexec_repository,
-        scattering_kind,
-        @config.common.taktuk_connector,
+        { :scattering => scattering_kind },
         instance_thread
       )
 
-      ret = ret && parallel_send_file_command_wrapper(
+      ret = ret && parallel_sendfile(
         File.join(pxedir,@config.cluster_specific[@cluster].deploy_initrd),
         @config.cluster_specific[@cluster].kexec_repository,
-        scattering_kind,
-        @config.common.taktuk_connector,
+        { :scattering => scattering_kind },
         instance_thread
       )
 
@@ -1727,7 +1709,7 @@ module MicroStepsLibrary
     # Output
     # * return true if the reboot has been successfully performed, false otherwise
     def ms_reboot_from_deploy_env(instance_thread)
-      return parallel_exec_command_wrapper("/usr/local/bin/reboot_detach", @config.common.taktuk_connector, instance_thread, @reboot_window)
+      return parallel_exec("/usr/local/bin/reboot_detach", {},{}, instance_thread, @reboot_window)
     end
 
     # Perform a power operation on the current set of nodes_ok
@@ -1753,17 +1735,17 @@ module MicroStepsLibrary
       case step
       when "deployed_env_booted"
         #we look if the / mounted partition is the deployment partition
-        return parallel_exec_command_wrapper_expecting_status_and_output("(mount | grep \\ \\/\\  | cut -f 1 -d\\ )",
-                                                                         ["0"],
-                                                                         get_deploy_part_str(),
-                                                                         @config.common.taktuk_connector,
-                                                                         instance_thread)
+        return parallel_exec(
+          "(mount | grep \\ \\/\\  | cut -f 1 -d\\ )",
+          {},
+          { :stdout => get_deploy_part_str() },
+          instance_thread
+        )
       when "prod_env_booted"
         #We look if the / mounted partition is the default production partition.
         #We don't use the Taktuk method because this would require to have the deploy
         #private key in the production environment.
         callback = Proc.new { |ns|
-          
           pr = ParallelRunner::PRunner.new(@output, nil, @process_container,ns.id)
           ns.set.each { |node|
             cmd = "#{@config.common.taktuk_connector} root@#{node.hostname} \"mount | grep \\ \\/\\  | cut -f 1 -d\\ \""
@@ -1772,7 +1754,14 @@ module MicroStepsLibrary
           @output.verbosel(3, "  *** A bunch of check prod env tests will be performed on #{ns.to_s_fold}",ns)
           pr.run
           pr.wait
-          classify_nodes(pr.get_results_expecting_output(@config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].prod_part, "Bad root partition"))
+          good, bad = pr.get_results(
+            { :output => @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].prod_part }
+          )
+          bad.each do |node|
+            node.last_cmd_stderr = "Bad root partition"
+          end
+
+          classify_nodes([good,bad])
         }
         node_set = Nodes::NodeSet.new
         @nodes_ok.duplicate_and_free(node_set)
@@ -1792,7 +1781,7 @@ module MicroStepsLibrary
       @config.cluster_specific[@cluster].drivers.each_index { |i|
         cmd += "modprobe #{@config.cluster_specific[@cluster].drivers[i]};"
       }
-      return parallel_exec_command_wrapper(cmd, @config.common.taktuk_connector, instance_thread)
+      return parallel_exec(cmd, {}, {}, instance_thread)
     end
 
     # Create the partition table on the nodes
@@ -1816,9 +1805,10 @@ module MicroStepsLibrary
           ret = do_parted(instance_thread)
         end
 
-        ret = parallel_exec_command_wrapper(
+        ret = parallel_exec(
           "partprobe #{@config.cluster_specific[@cluster].block_device}", 
-          @config.common.taktuk_connector,
+          {},
+          {},
           instance_thread
         ) if ret
 
@@ -1837,17 +1827,23 @@ module MicroStepsLibrary
           (@config.exec_specific.environment.tarball["kind"] == "tbz2")) then
         if @config.common.mkfs_options.has_key?(@config.exec_specific.environment.filesystem) then
           opts = @config.common.mkfs_options[@config.exec_specific.environment.filesystem]
-          return parallel_exec_command_wrapper("mkdir -p #{@config.common.environment_extraction_dir}; \
-                                               umount #{get_deploy_part_str()} 2>/dev/null; \
-                                               mkfs -t #{@config.exec_specific.environment.filesystem} #{opts} #{get_deploy_part_str()}",
-                                               @config.common.taktuk_connector,
-                                               instance_thread)
+          return parallel_exec(
+            "mkdir -p #{@config.common.environment_extraction_dir}; "\
+            "umount #{get_deploy_part_str()} 2>/dev/null; "\
+            "mkfs -t #{@config.exec_specific.environment.filesystem} #{opts} #{get_deploy_part_str()}",
+            {},
+            {},
+            instance_thread
+          )
         else
-          return parallel_exec_command_wrapper("mkdir -p #{@config.common.environment_extraction_dir}; \
-                                               umount #{get_deploy_part_str()} 2>/dev/null; \
-                                               mkfs -t #{@config.exec_specific.environment.filesystem} #{get_deploy_part_str()}",
-                                               @config.common.taktuk_connector,
-                                               instance_thread)
+          return parallel_exec(
+            "mkdir -p #{@config.common.environment_extraction_dir}; "\
+            "umount #{get_deploy_part_str()} 2>/dev/null; "\
+            "mkfs -t #{@config.exec_specific.environment.filesystem} #{get_deploy_part_str()}",
+            {},
+            {},
+            instance_thread
+          )
         end
       else
         @output.verbosel(3, "  *** Bypass the format of the deploy part",@nodes_ok)
@@ -1867,14 +1863,10 @@ module MicroStepsLibrary
         if @config.common.mkfs_options.has_key?(fstype) then
           opts = @config.common.mkfs_options[fstype]
           tmp_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].tmp_part
-          return parallel_exec_command_wrapper("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{opts} #{tmp_part}",
-                                               @config.common.taktuk_connector,
-                                               instance_thread)
+          return parallel_exec("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{opts} #{tmp_part}",{},{},instance_thread)
         else
           tmp_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].tmp_part
-          return parallel_exec_command_wrapper("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{tmp_part}",
-                                               @config.common.taktuk_connector,
-                                               instance_thread)
+          return parallel_exec("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{tmp_part}",{},{},instance_thread)
         end
       else
         @output.verbosel(3, "  *** Bypass the format of the tmp part",@nodes_ok)
@@ -1891,9 +1883,7 @@ module MicroStepsLibrary
     def ms_format_swap_part(instance_thread)
       if (@config.cluster_specific[@cluster].swap_part != nil) && (@config.cluster_specific[@cluster].swap_part!= "none") then
         swap_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].swap_part
-        return parallel_exec_command_wrapper("mkswap #{swap_part}",
-                                             @config.common.taktuk_connector,
-                                             instance_thread)
+        return parallel_exec("mkswap #{swap_part}",{},{},instance_thread)
       else
         @output.verbosel(3, "  *** Bypass the format of the swap part",@nodes_ok)
       end
@@ -1910,9 +1900,7 @@ module MicroStepsLibrary
       #we do not mount the deploy part for a dd.gz or dd.bz2 image
       if ((@config.exec_specific.environment.tarball["kind"] == "tgz") ||
           (@config.exec_specific.environment.tarball["kind"] == "tbz2")) then
-        return parallel_exec_command_wrapper("mount #{get_deploy_part_str()} #{@config.common.environment_extraction_dir}",
-                                             @config.common.taktuk_connector,
-                                             instance_thread)
+        return parallel_exec("mount #{get_deploy_part_str()} #{@config.common.environment_extraction_dir}",{},{},instance_thread)
       else
         @output.verbosel(3, "  *** Bypass the mount of the deploy part",@nodes_ok)
         return true
@@ -1927,9 +1915,7 @@ module MicroStepsLibrary
     # * return true if the mount has been successfully performed, false otherwise
     def ms_mount_tmp_part(instance_thread)
       tmp_part = @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].tmp_part
-      return parallel_exec_command_wrapper("mount #{tmp_part} /tmp",
-                                           @config.common.taktuk_connector,
-                                           instance_thread)
+      return parallel_exec("mount #{tmp_part} /tmp",{},{},instance_thread)
     end
 
     # Send the SSH key in the deployed environment
@@ -1943,12 +1929,12 @@ module MicroStepsLibrary
       if ((@config.exec_specific.key != "") && ((@config.exec_specific.environment.tarball["kind"] == "tgz") ||
                                                 (@config.exec_specific.environment.tarball["kind"] == "tbz2"))) then
         cmd = "cat - >>#{@config.common.environment_extraction_dir}/root/.ssh/authorized_keys"
-        return parallel_exec_cmd_with_input_file_wrapper(@config.exec_specific.key,
-                                                         cmd,
-                                                         scattering_kind,
-                                                         @config.common.taktuk_connector,
-                                                         "0",
-                                                       instance_thread)
+        return parallel_exec(
+          cmd,
+          {:input_file => @config.exec_specific.key}, :scattering => scattering_kind }
+          {},
+          instance_thread
+        )
       end
       return true
     end
@@ -2067,9 +2053,7 @@ module MicroStepsLibrary
     def ms_umount_deploy_part(instance_thread)
       if ((@config.exec_specific.environment.tarball["kind"] == "tgz") ||
           (@config.exec_specific.environment.tarball["kind"] == "tbz2")) then
-        return parallel_exec_command_wrapper("umount -l #{get_deploy_part_str()}",
-                                             @config.common.taktuk_connector,
-                                             instance_thread)
+        return parallel_exec("umount -l #{get_deploy_part_str()}",{},{},instance_thread)
       else
         @output.verbosel(3, "  *** Bypass the umount of the deploy part",@nodes_ok)
         return true
@@ -2130,9 +2114,7 @@ module MicroStepsLibrary
           @config.exec_specific.breakpointed = true
           return false
         elsif (preinstall["script"] != "none")
-          if not parallel_exec_command_wrapper("(#{set_env()} #{@config.common.rambin_path}/#{preinstall["script"]})",
-                                               @config.common.taktuk_connector,
-                                               instance_thread) then
+          if not parallel_exec("(#{set_env()} #{@config.common.rambin_path}/#{preinstall["script"]})", {}, {}, instance_thread) then
             return false
           end
         end
@@ -2146,9 +2128,7 @@ module MicroStepsLibrary
             @config.exec_specific.breakpointed = true
             return false
           elsif (preinstall["script"] != "none")
-            if not parallel_exec_command_wrapper("(#{set_env()} #{@config.common.rambin_path}/#{preinstall["script"]})",
-                                                 @config.common.taktuk_connector,
-                                                 instance_thread) then
+            if not parallel_exec("(#{set_env()} #{@config.common.rambin_path}/#{preinstall["script"]})",{},{},instance_thread) then
               return false
             end
           end
@@ -2177,9 +2157,7 @@ module MicroStepsLibrary
             @config.exec_specific.breakpointed = true
             return false
           elsif (postinstall["script"] != "none")
-            if not parallel_exec_command_wrapper("(#{set_env()} #{@config.common.rambin_path}/#{postinstall["script"]})",
-                                                 @config.common.taktuk_connector,
-                                                 instance_thread) then
+            if not parallel_exec("(#{set_env()} #{@config.common.rambin_path}/#{postinstall["script"]})",{},{},instance_thread) then
               return false
             end
           end
@@ -2208,9 +2186,7 @@ module MicroStepsLibrary
             @config.exec_specific.breakpointed = true
             return false
           elsif (postinstall["script"] != "none")
-            if not parallel_exec_command_wrapper("(#{set_env()} #{@config.common.rambin_path}/#{postinstall["script"]})",
-                                                 @config.common.taktuk_connector,
-                                                 instance_thread) then
+            if not parallel_exec("(#{set_env()} #{@config.common.rambin_path}/#{postinstall["script"]})", {}, {}, instance_thread) then
               return false
             end
           end
