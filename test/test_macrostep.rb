@@ -411,4 +411,79 @@ class TestMacrostep < Test::Unit::TestCase
     undefine(:MacroRaise)
     undefine(:MacroEnd)
   end
+
+  def test_breakpoint
+    define(:MacroRaise,Macrostep)
+    define(:MacroBreak,Macrostep)
+    define(:MacroNever,Macrostep)
+    define(:MacroOK,Macrostep)
+    define(:MacroKO,Macrostep)
+
+    Workflow.any_instance.stubs(:tasks).returns([
+      [
+        [ :MacroRaise ],
+        [ :MacroBreak ],
+        [ :MacroNever ],
+      ],
+      [ :MacroKO ],
+      [
+        [ :MacroOK ],
+        [ :MacroBreak ],
+        [ :MacroNever ],
+      ]
+    ])
+    MacroRaise.any_instance.stubs(:tasks).returns([
+      [ :raise, {
+        :raise => {
+          :nodeset => @nodeset[0..4],
+          :status => :KO,
+        },
+      }]
+    ])
+    MacroBreak.any_instance.stubs(:tasks).returns([
+      [ :breakpoint ]
+    ])
+    MacroNever.any_instance.stubs(:tasks).returns([
+      [ :never ]
+    ])
+    MacroKO.any_instance.stubs(:tasks).returns([
+      [ :raise, {
+        :raise => {
+          :nodeset => @nodeset[9..12],
+          :status => :KO,
+        },
+      }]
+    ])
+    MacroOK.any_instance.stubs(:tasks).returns([
+      [ :raise, {
+        :raise => {
+          :nodeset => @nodeset[13..15],
+          :status => :OK,
+        },
+      }]
+    ])
+    Microstep.any_instance.stubs(:breakpoint).never
+    Microstep.any_instance.stubs(:never).never
+    Microstep.any_instance.stubs(:raise).times(3).returns(true,true,false)
+
+    workflow = Workflow.new(@nodeset)
+    workflow.config({
+      :MacroBreak => {
+        :breakpoint => true
+      },
+    })
+    workflow.start
+
+    assert_same(workflow.nodes,@nodeset)
+    assert_same(workflow.nodes_done,@nodeset)
+    assert_same(workflow.nodes_brk,@nodeset[0..8])
+    assert_same(workflow.nodes_ok,@nodeset[13..15])
+    assert_same(workflow.nodes_ko,@nodeset[9..12])
+
+    undefine(:MacroRaise)
+    undefine(:MacroBreak)
+    undefine(:MacroNever)
+    undefine(:MacroOK)
+    undefine(:MacroKO)
+  end
 end
