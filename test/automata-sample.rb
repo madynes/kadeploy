@@ -61,12 +61,12 @@ class Microstep < QueueTask
       (@nodes.set.size/2).times do |i|
         @nodes_ok.push(@nodes.set[i])
       end
-      raise_nodes(@nodes_ok,'OK')
+      raise_nodes(@nodes_ok,:OK)
     else
       (@nodes.set.size/2).times do |i|
         @nodes_ko.push(@nodes.set[i])
       end
-      raise_nodes(@nodes_ko,'KO')
+      raise_nodes(@nodes_ko,:KO)
     end
 
     sleep(time/2)
