@@ -166,6 +166,7 @@ module Managers
       @queue_broadcast_environment = Queue.new
       @queue_boot_new_environment = Queue.new
       @queue_process_finished_nodes = Queue.new
+      Thread.abort_on_exception = true
     end
 
     # Increment the number of active threads

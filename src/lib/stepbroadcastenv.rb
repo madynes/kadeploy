@@ -28,50 +28,50 @@ module MacroSteps
   end
 
   class BroadcastEnvChain < BroadcastEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.send_environment("chain")
-      ret = ret && @step.manage_admin_post_install("tree")
-      ret = ret && @step.manage_user_post_install("tree")
-      ret = ret && @step.send_key("tree")
-      ret = ret && @step.install_bootloader
+      ret = ret && step.send_environment(:chain)
+      ret = ret && step.manage_admin_post_install(:tree)
+      ret = ret && step.manage_user_post_install(:tree)
+      ret = ret && step.send_key(:tree)
+      ret = ret && step.install_bootloader
       return ret
     end
   end
 
   class BroadcastEnvKastafior < BroadcastEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.send_environment("kastafior")
-      ret = ret && @step.manage_admin_post_install("tree")
-      ret = ret && @step.manage_user_post_install("tree")
-      ret = ret && @step.send_key("tree")
-      ret = ret && @step.install_bootloader
+      ret = ret && step.send_environment(:kastafior)
+      ret = ret && step.manage_admin_post_install(:tree)
+      ret = ret && step.manage_user_post_install(:tree)
+      ret = ret && step.send_key(:tree)
+      ret = ret && step.install_bootloader
       return ret
     end
   end
 
   class BroadcastEnvTree < BroadcastEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.send_environment("tree")
-      ret = ret && @step.manage_admin_post_install("tree")
-      ret = ret && @step.manage_user_post_install("tree")
-      ret = ret && @step.send_key("tree")
-      ret = ret && @step.install_bootloader
+      ret = ret && step.send_environment(:tree)
+      ret = ret && step.manage_admin_post_install(:tree)
+      ret = ret && step.manage_user_post_install(:tree)
+      ret = ret && step.send_key(:tree)
+      ret = ret && step.install_bootloader
       return ret
     end
   end
 
   class BroadcastEnvBittorrent < BroadcastEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.mount_tmp_part #we need /tmp to store the tarball
-      ret = ret && @step.send_environment("bittorrent")
-      ret = ret && @step.manage_admin_post_install("tree")
-      ret = ret && @step.manage_user_post_install("tree")
-      ret = ret && @step.send_key("tree")
-      ret = ret && @step.install_bootloader
+      ret = ret && step.mount_tmp_part #we need /tmp to store the tarball
+      ret = ret && step.send_environment(:bittorrent)
+      ret = ret && step.manage_admin_post_install(:tree)
+      ret = ret && step.manage_user_post_install(:tree)
+      ret = ret && step.send_key(:tree)
+      ret = ret && step.install_bootloader
       return ret
     end
   end
@@ -86,7 +86,7 @@ module MacroSteps
       return tid
     end
 
-    def microsteps()
+    def microsteps(step)
       return true
     end
   end

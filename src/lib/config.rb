@@ -725,6 +725,7 @@ module ConfigInformation
 
           @cluster_specific[clname] = ClusterSpecificConfig.new
           conf = @cluster_specific[clname]
+          conf.name = clname
 
           conf.partition_file = cp.value(
             'partition_file',String,nil,{ :type => 'file', :readable => true }
@@ -2919,6 +2920,7 @@ module ConfigInformation
 
   
   class ClusterSpecificConfig
+    attr_accessor :name
     attr_accessor :deploy_kernel
     attr_accessor :deploy_kernel_args
     attr_accessor :deploy_initrd
@@ -2961,6 +2963,7 @@ module ConfigInformation
     # Output
     # * nothing        
     def initialize
+      @name = nil
       @workflow_steps = Array.new
       @deploy_kernel = nil
       @deploy_kernel_args = ""
@@ -3006,6 +3009,7 @@ module ConfigInformation
     # Output
     # * nothing      
     def duplicate_but_steps(dest, workflow_steps)
+      dest.name = @name
       dest.workflow_steps = workflow_steps
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_kernel_args = @deploy_kernel_args.clone
@@ -3049,6 +3053,7 @@ module ConfigInformation
     # Output
     # * nothing      
     def duplicate_all(dest)
+      dest.name = @name
       dest.workflow_steps = Array.new
       @workflow_steps.each_index { |i|
         dest.workflow_steps[i] = @workflow_steps[i].clone

@@ -28,85 +28,85 @@ module MacroSteps
   end
 
   class SetDeploymentEnvUntrusted < SetDeploymentEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("prod_to_deploy_env", "")
-      ret = ret && @step.set_vlan("DEFAULT")
-      ret = ret && @step.reboot("soft", (@currentretry == 0))
-      ret = ret && @step.wait_reboot
-      ret = ret && @step.send_key_in_deploy_env("tree")
-      ret = ret && @step.create_partition_table("untrusted_env")
-      ret = ret && @step.format_deploy_part
-      ret = ret && @step.mount_deploy_part
-      ret = ret && @step.format_tmp_part
-      ret = ret && @step.format_swap_part
+      ret = ret && step.switch_pxe("prod_to_deploy_env", "")
+      ret = ret && step.set_vlan("DEFAULT")
+      ret = ret && step.reboot("soft", (@currentretry == 0))
+      ret = ret && step.wait_reboot
+      ret = ret && step.send_key_in_deploy_env(:tree)
+      ret = ret && step.create_partition_table("untrusted_env")
+      ret = ret && step.format_deploy_part
+      ret = ret && step.mount_deploy_part
+      ret = ret && step.format_tmp_part
+      ret = ret && step.format_swap_part
       return ret
     end
   end
 
   class SetDeploymentEnvKexec < SetDeploymentEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("prod_to_deploy_env", "")
-      ret = ret && @step.set_vlan("DEFAULT")
-      ret = ret && @step.create_kexec_repository
-      ret = ret && @step.send_deployment_kernel("tree")
-      ret = ret && @step.kexec(
+      ret = ret && step.switch_pxe("prod_to_deploy_env", "")
+      ret = ret && step.set_vlan("DEFAULT")
+      ret = ret && step.create_kexec_repository
+      ret = ret && step.send_deployment_kernel(:tree)
+      ret = ret && step.kexec(
         'linux',
-        @config.cluster_specific[@cluster].kexec_repository,
-        @config.cluster_specific[@cluster].deploy_kernel,
-        @config.cluster_specific[@cluster].deploy_initrd,
-        @config.cluster_specific[@cluster].deploy_kernel_args
+        @cluster_config.kexec_repository,
+        @cluster_config.deploy_kernel,
+        @cluster_config.deploy_initrd,
+        @cluster_config.deploy_kernel_args
       )
-      ret = ret && @step.wait_reboot("kexec")
-      ret = ret && @step.send_key_in_deploy_env("tree")
-      ret = ret && @step.create_partition_table("untrusted_env")
-      ret = ret && @step.format_deploy_part
-      ret = ret && @step.mount_deploy_part
-      ret = ret && @step.format_tmp_part
-      ret = ret && @step.format_swap_part
+      ret = ret && step.wait_reboot("kexec")
+      ret = ret && step.send_key_in_deploy_env(:tree)
+      ret = ret && step.create_partition_table("untrusted_env")
+      ret = ret && step.format_deploy_part
+      ret = ret && step.mount_deploy_part
+      ret = ret && step.format_tmp_part
+      ret = ret && step.format_swap_part
       return ret
     end
   end
 
   class SetDeploymentEnvUntrustedCustomPreInstall < SetDeploymentEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("prod_to_deploy_env")
-      ret = ret && @step.set_vlan("DEFAULT")
-      ret = ret && @step.reboot("soft", (@currentretry == 0))
-      ret = ret && @step.wait_reboot
-      ret = ret && @step.send_key_in_deploy_env("tree")
-      ret = ret && @step.manage_admin_pre_install("tree")
+      ret = ret && step.switch_pxe("prod_to_deploy_env")
+      ret = ret && step.set_vlan("DEFAULT")
+      ret = ret && step.reboot("soft", (@currentretry == 0))
+      ret = ret && step.wait_reboot
+      ret = ret && step.send_key_in_deploy_env(:tree)
+      ret = ret && step.manage_admin_pre_install(:tree)
       return ret
     end
   end
 
   class SetDeploymentEnvProd < SetDeploymentEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.check_nodes("prod_env_booted")
-      ret = ret && @step.create_partition_table("prod_env")
-      ret = ret && @step.format_deploy_part
-      ret = ret && @step.mount_deploy_part
-      ret = ret && @step.format_tmp_part
+      ret = ret && step.check_nodes("prod_env_booted")
+      ret = ret && step.create_partition_table("prod_env")
+      ret = ret && step.format_deploy_part
+      ret = ret && step.mount_deploy_part
+      ret = ret && step.format_tmp_part
       return ret
     end
   end
 
   class SetDeploymentEnvNfsroot < SetDeploymentEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("prod_to_nfsroot_env")
-      ret = ret && @step.set_vlan("DEFAULT")
-      ret = ret && @step.reboot("soft", (@currentretry == 0))
-      ret = ret && @step.wait_reboot
-      ret = ret && @step.send_key_in_deploy_env("tree")
-      ret = ret && @step.create_partition_table("untrusted_env")
-      ret = ret && @step.format_deploy_part
-      ret = ret && @step.mount_deploy_part
-      ret = ret && @step.format_tmp_part
-      ret = ret && @step.format_swap_part
+      ret = ret && step.switch_pxe("prod_to_nfsroot_env")
+      ret = ret && step.set_vlan("DEFAULT")
+      ret = ret && step.reboot("soft", (@currentretry == 0))
+      ret = ret && step.wait_reboot
+      ret = ret && step.send_key_in_deploy_env(:tree)
+      ret = ret && step.create_partition_table("untrusted_env")
+      ret = ret && step.format_deploy_part
+      ret = ret && step.mount_deploy_part
+      ret = ret && step.format_tmp_part
+      ret = ret && step.format_swap_part
       return ret
     end
   end
@@ -121,7 +121,7 @@ module MacroSteps
       return tid
     end
 
-    def microsteps()
+    def microsteps(step)
       return true
     end
   end

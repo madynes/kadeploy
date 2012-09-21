@@ -39,10 +39,10 @@ module MacroSteps
         if (@config.exec_specific.block_device != "") then
           return @config.exec_specific.block_device + @config.exec_specific.deploy_part
         else
-          return @config.cluster_specific[@cluster].block_device + @config.exec_specific.deploy_part
+          return @cluster_config.block_device + @config.exec_specific.deploy_part
         end
       else
-        return @config.cluster_specific[@cluster].block_device + @config.cluster_specific[@cluster].deploy_part
+        return @cluster_config.block_device + @cluster_config.deploy_part
       end
     end
 
@@ -58,8 +58,8 @@ module MacroSteps
       if (@config.exec_specific.environment.kernel_params != nil) then
         kernel_params = @config.exec_specific.environment.kernel_params
       #Otherwise we eventually check in the cluster specific configuration
-      elsif (@config.cluster_specific[@cluster].kernel_params != nil) then
-        kernel_params = @config.cluster_specific[@cluster].kernel_params
+      elsif (@cluster_config.kernel_params != nil) then
+        kernel_params = @cluster_config.kernel_params
       else
         kernel_params = ""
       end
@@ -71,50 +71,50 @@ module MacroSteps
       return kernel_params
     end
 
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("deploy_to_deployed_env")
-      ret = ret && @step.umount_deploy_part
-      ret = ret && @step.mount_deploy_part
-      ret = ret && @step.kexec(
+      ret = ret && step.switch_pxe("deploy_to_deployed_env")
+      ret = ret && step.umount_deploy_part
+      ret = ret && step.mount_deploy_part
+      ret = ret && step.kexec(
         @config.exec_specific.environment.environment_kind,
         @config.common.environment_extraction_dir,
         @config.exec_specific.environment.kernel,
         @config.exec_specific.environment.initrd,
         get_kernel_params()
       )
-      ret = ret && @step.set_vlan
-      ret = ret && @step.wait_reboot("kexec","user",true)
+      ret = ret && step.set_vlan
+      ret = ret && step.wait_reboot("kexec","user",true)
       return ret
     end
   end
 
   class BootNewEnvPivotRoot < BootNewEnv
-    def microsteps()
+    def microsteps(step)
       @output.verbosel(0, "BootNewEnvPivotRoot is not yet implemented")
       return false
     end
   end
 
   class BootNewEnvClassical < BootNewEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("deploy_to_deployed_env")
-      ret = ret && @step.umount_deploy_part
-      ret = ret && @step.reboot_from_deploy_env
-      ret = ret && @step.set_vlan
-      ret = ret && @step.wait_reboot("classical","user",true)
+      ret = ret && step.switch_pxe("deploy_to_deployed_env")
+      ret = ret && step.umount_deploy_part
+      ret = ret && step.reboot_from_deploy_env
+      ret = ret && step.set_vlan
+      ret = ret && step.wait_reboot("classical","user",true)
       return ret
     end
   end
 
   class BootNewEnvHardReboot < BootNewEnv
-    def microsteps()
+    def microsteps(step)
       ret = true
-      ret = ret && @step.switch_pxe("deploy_to_deployed_env")
-      ret = ret && @step.reboot("hard", false)
-      ret = ret && @step.set_vlan
-      ret = ret && @step.wait_reboot("classical","user",true)
+      ret = ret && step.switch_pxe("deploy_to_deployed_env")
+      ret = ret && step.reboot("hard", false)
+      ret = ret && step.set_vlan
+      ret = ret && step.wait_reboot("classical","user",true)
       return ret
     end
   end
@@ -129,7 +129,7 @@ module MacroSteps
       return tid
     end
 
-    def microsteps()
+    def microsteps(step)
       return true
     end
   end
