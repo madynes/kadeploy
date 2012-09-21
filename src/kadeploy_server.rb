@@ -6,7 +6,7 @@
 # For details on use and redistribution please refer to License.txt
 
 #Kadeploy libs
-require 'managers'
+require 'workflow'
 require 'debug'
 require 'microsteps'
 require 'process_management'
