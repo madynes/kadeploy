@@ -99,6 +99,10 @@ module Task
     raise 'Should be reimplemented'
   end
 
+  def nodes_brk()
+    raise 'Should be reimplemented'
+  end
+
   def nodes_ok()
     raise 'Should be reimplemented'
   end
@@ -154,7 +158,7 @@ end
 class QueueTask
   include Task
 
-  attr_reader :name, :nodes, :idx, :subidx, :nodes_ok, :nodes_ko, :context, :mqueue, :mutex
+  attr_reader :name, :nodes, :idx, :subidx, :nodes_brk, :nodes_ok, :nodes_ko, :context, :mqueue, :mutex
 
   def initialize(name, idx, subidx, nodes, manager_queue, context = {}, params = [])
     @name = name.to_sym
@@ -166,6 +170,7 @@ class QueueTask
     @params = params
     @mutex = Mutex.new
 
+    @nodes_brk = Nodes::NodeSet.new(@nodes.id)
     @nodes_ok = Nodes::NodeSet.new(@nodes.id)
     @nodes_ko = Nodes::NodeSet.new(@nodes.id)
   end
@@ -255,6 +260,12 @@ class TaskManager
     @nodes_done.add(nodeset)
   end
 
+  def break_task(task,nodeset)
+    #debug("BREAKPOINT #{nodeset.to_s_fold}")
+    done_task(task,nodeset)
+    nodeset.linked_copy(@nodes_brk)
+  end
+
   def success_task(task,nodeset)
     #debug("SUCCESS #{nodeset.to_s_fold}")
     done_task(task,nodeset)
@@ -330,6 +341,12 @@ class TaskManager
   end
 
   def run_task(task)
+    if @config[task.name] and @config[task.name][:breakpoint]
+      clean_nodeset(task.nodes)
+      @queue.push({ :task => task, :status => :BRK, :nodes => task.nodes})
+      return
+    end
+
     #debug("RUN_TASK/#{task.name} #{task.nodes.to_s_fold}")
     thr = Thread.new { task.run }
 
@@ -428,7 +445,10 @@ class TaskManager
 
       if query[:status] and curtask
         #debug("TREAT_STATUS #{query[:nodes].to_s_fold}")
-        if query[:status] == :OK
+        if query[:status] == :BRK
+          break_task(curtask,query[:nodes])
+          continue = false
+        elsif query[:status] == :OK
           #debug("TREAT_OK #{query[:nodes].to_s_fold}")
           if (curtask.idx + 1) < tasks().length
             newtask[:idx] = curtask.idx + 1
@@ -496,7 +516,7 @@ end
 class TaskedTaskManager < TaskManager
   include Task
 
-  attr_reader :name, :nodes, :idx, :subidx, :nodes_ok, :nodes_ko, :context, :mqueue, :mutex
+  attr_reader :name, :nodes, :idx, :subidx, :nodes_brk, :nodes_ok, :nodes_ko, :context, :mqueue, :mutex
 
   def initialize(name, idx, subidx, nodes, manager_queue, context = {}, params = [])
     super(nodes)
@@ -508,8 +528,14 @@ class TaskedTaskManager < TaskManager
     @params = params
     @mutex = Mutex.new
 
+    @nodes_brk = Nodes::NodeSet.new(@nodes.id)
     @nodes_ok = Nodes::NodeSet.new(@nodes.id)
     @nodes_ko = Nodes::NodeSet.new(@nodes.id)
+  end
+
+  def break_task(task,nodeset)
+    super(task,nodeset)
+    raise_nodes(@nodes_brk,:BRK)
   end
 
   def success_task(task,nodeset)
@@ -549,18 +575,25 @@ end
 # Now the implementation in Kadeploy
 
 class Workflow < TaskManager
-  attr_reader :nodes_ok, :nodes_ko
+  attr_reader :nodes_brk, :nodes_ok, :nodes_ko
 
   def initialize(nodeset)
     super(nodeset)
     @@tstart = Time.now
 
+    @nodes_brk = Nodes::NodeSet.new
     @nodes_ok = Nodes::NodeSet.new
     @nodes_ko = Nodes::NodeSet.new
   end
 
   def tasks()
     raise 'Should be reimplemented'
+  end
+
+  def break_task(task,nodeset)
+    super(task,nodeset)
+
+    debug("### Add #{nodeset.to_s_fold} to BRK nodeset")
   end
 
   def success_task(task,nodeset)
