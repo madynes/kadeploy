@@ -172,13 +172,14 @@ class QueueTask
 end
 
 class TaskManager
-  attr_reader :nodes, :nodes_done
+  attr_reader :nodes, :nodes_done, :static_context
 
   TIMER_CKECK_PITCH = 0.5
   QUEUE_CKECK_PITCH = 0.1
 
-  def initialize(nodeset)
+  def initialize(nodeset,static_context = {})
     @config = {}
+    @static_context = {}
     @queue = Queue.new
     @threads = {}
     @nodes = nodeset #all nodes
@@ -419,9 +420,9 @@ class TaskManager
       newtask = {
         :idx => 0,
         :subidx => 0,
-        :context => (curtask ? curtask.context.dup : { })
+        :context => (curtask ? curtask.context.dup : { :local => {} })
       }
-      newtask[:context][:retries] = 0 unless newtask[:context][:retries]
+      newtask[:context][:local][:retries] = 0 unless newtask[:context][:local][:retries]
 
       continue = true
 
@@ -431,7 +432,7 @@ class TaskManager
           #debug("TREAT_OK #{query[:nodes].to_s_fold}")
           if (curtask.idx + 1) < tasks().length
             newtask[:idx] = curtask.idx + 1
-            newtask[:context][:retries] = 0
+            newtask[:context][:local][:retries] = 0
           else
             #debug("SUCCESS #{query[:nodes].to_s_fold}")
             curtask.mutex.synchronize do
@@ -442,17 +443,17 @@ class TaskManager
           end
         elsif query[:status] == :KO
           #debug("TREAT_KO #{query[:nodes].to_s_fold}")
-          if curtask.context[:retries] < (@config[curtask.name][:retries])
+          if curtask.context[:local][:retries] < (@config[curtask.name][:retries])
             newtask[:idx] = curtask.idx
             newtask[:subidx] = curtask.subidx
-            newtask[:context][:retries] += 1
+            newtask[:context][:local][:retries] += 1
           else
             tasks = tasks()
             if multi_task?(curtask.idx,tasks) \
             and curtask.subidx < (tasks[curtask.idx].size - 1)
               newtask[:idx] = curtask.idx
               newtask[:subidx] = curtask.subidx + 1
-              newtask[:context][:retries] = 0
+              newtask[:context][:local][:retries] = 0
             else
               curtask.mutex.synchronize do
                 fail_task(curtask,query[:nodes])
@@ -472,7 +473,7 @@ class TaskManager
           newtask[:idx],
           newtask[:subidx],
           query[:nodes],
-          newtask[:context]
+          @static_context.merge(newtask[:context])
         )
 
         @threads[task] = Thread.new { run_task(task) }
