@@ -27,7 +27,7 @@ cleanapi:
 install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DESTDIR)/usr/local/kadeploy3/src
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/lib
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/contrib
+	#@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DESTDIR)/usr/local/kadeploy3/src/contrib
 
 install_db:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(DB)/db_creation.sql $(DESTDIR)/usr/local/kadeploy3/db
@@ -91,7 +91,7 @@ tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/src/lib
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/db
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/test
-	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/src/contrib
+	#@mkdir -p $(DESTDIR)/usr/local/kadeploy3/src/contrib
 	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 

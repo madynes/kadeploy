@@ -42,7 +42,7 @@ default: package_all
 install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src/lib
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src/contrib
+	#@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src/contrib
 
 install_conf_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf.yml $(DEB_ROOT_CLIENT)$(SUFFIX)/etc/kadeploy3$(SUFFIX)/client_conf.yml
@@ -130,7 +130,7 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src/lib
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/db
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/test
-	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src/contrib
+	#@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/src/contrib
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 ifeq (${DEV},)
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/man
