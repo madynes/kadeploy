@@ -7,6 +7,31 @@ require 'automata_test_case'
 class TestWorkflow < Test::Unit::TestCase
   include AutomataTestCase
 
+  def test_kill
+    Workflow.any_instance.stubs(:tasks).returns([
+      [ :Macro1 ],
+      [ :Macro2 ]
+    ])
+    Macro1.any_instance.stubs(:tasks).returns([
+      [ :success ],
+      [ :never ]
+    ])
+    Macro2.any_instance.stubs(:tasks).returns([ [ :never ] ])
+    Microstep.any_instance.stubs(:success).once.lasts(4).returns(true)
+    Microstep.any_instance.stubs(:never).never
+
+    workflow = Workflow.new(@nodeset)
+    Thread.new { workflow.start }
+    sleep(2)
+    workflow.kill
+
+    assert(Thread.list.size == 1)
+    assert_same(workflow.nodes,@nodeset)
+    assert_same(workflow.nodes_done,@nodeset)
+    assert_same(workflow.nodes_ko,@nodeset)
+    assert(workflow.nodes_ok.empty?)
+  end
+
   def test_scenario
     Workflow.any_instance.stubs(:tasks).returns(
       [
