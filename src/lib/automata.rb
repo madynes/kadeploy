@@ -127,6 +127,10 @@ module Task
     raise 'Should be reimplemented'
   end
 
+  def kill()
+    raise 'Should be reimplemented'
+  end
+
   def raise_nodes(nodeset,status)
     # Nodes of this nodeset are not threated by this task anymore
     nodeset.set.each do |node|
@@ -183,6 +187,7 @@ class TaskManager
     @threads = {}
     @nodes = nodeset #all nodes
     @nodes_done = Nodes::NodeSet.new(@nodes.id)
+    @runthread = nil
 
     nodeset = Nodes::NodeSet.new
     @nodes.linked_copy(nodeset)
@@ -328,9 +333,33 @@ class TaskManager
     @nodes.empty? or @nodes_done.equal?(@nodes)
   end
 
+  def clean_threads
+    @threads.each_pair do |task,threads|
+      threads.each_pair do |key,thread|
+        unless thread.alive?
+          thread.join
+          threads.delete(key)
+        end
+      end
+      @threads.delete(task) if @threads[task].empty?
+    end
+  end
+
+  def join_threads
+    @threads.each_pair do |task,threads|
+      threads.each_pair do |key,thread|
+        thread.join
+        threads.delete(key)
+      end
+      @threads.delete(task) if @threads[task].empty?
+    end
+  end
+
   def run_task(task)
     #debug("RUN_TASK/#{task.name} #{task.nodes.to_s_fold}")
     thr = Thread.new { task.run }
+    @threads[task] = {} unless @threads[task]
+    @threads[task][:run] = thr
 
     timeout = (@config[task.name] ? @config[task.name][:timeout] : nil)
     success = true
@@ -340,13 +369,17 @@ class TaskManager
       sleep(TIMER_CKECK_PITCH) while ((Time.now - timestart) < timeout) and (thr.alive?)
       if thr.alive?
         thr.kill
+        task.kill
         success = false
       end
     end
 
     debug("(#{task.nodes.id}) !!! Timeout in #{task.name} with #{task.nodes.to_s_fold}") unless success
 
+    thr.join
     success = success && thr.value
+    @threads[task].delete(:run)
+    @threads.delete(task) if @threads[task].empty?
 
     task.mutex.synchronize do
       #debug("RUN_JOIN #{task.name} #{task.nodes.to_s_fold}")
@@ -393,6 +426,7 @@ class TaskManager
   def start()
     #debug("START")
     @nodes_done.clean()
+    @runthread = Thread.current
 
     until (done?)
       #debug("WAIT_POP #{@nodes_done.set.size}/#{@nodes.set.size}")
@@ -406,9 +440,7 @@ class TaskManager
 
       #debug("NEW_TASK/#{(query[:task] ? query[:task].name : 'nil')}")
 
-      @threads.each_value do |thread|
-        thread.join unless thread.alive?
-      end
+      clean_threads()
 
       # Don't do anything if the nodes was already treated
       clean_nodeset(query[:nodes])
@@ -475,24 +507,47 @@ class TaskManager
           newtask[:context]
         )
 
-        @threads[task] = Thread.new { run_task(task) }
+        @threads[task] = {
+          :treatment => Thread.new { run_task(task) }
+        }
       end
 
     end
+
+    clean_threads()
+    join_threads()
+    @runthread = nil
 
     #debug("QUIT #{@nodes_done.set.size}/#{@nodes.set.size}")
   end
 
   def kill()
-    @threads.each do |thread|
-      thread.kill
-      thread.join
+    clean_threads()
+
+    unless @runthread.nil?
+      @runthread.kill if @runthread.alive?
+      @runthread.join
+      @runthread = nil
     end
-    @nodes_done.free()
+
+    @threads.each_pair do |task,threads|
+      threads.each_pair do |key,thread|
+        thread.kill
+        thread.join
+      end
+      task.kill
+    end
+
+    @threads = {}
+    @nodes_done.clean()
+    @nodes.linked_copy(@nodes_done)
+
+    debug("(#{@nodes.id}) !!! Killing #{self.class.name} instance")
   end
 end
 
 class TaskedTaskManager < TaskManager
+  alias_method :__kill__, :kill
   include Task
 
   attr_reader :name, :nodes, :idx, :subidx, :nodes_ok, :nodes_ko, :context, :mqueue, :mutex
@@ -541,6 +596,12 @@ class TaskedTaskManager < TaskManager
         @nodes_done.remove(node)
       end
     end
+  end
+
+  def kill()
+    __kill__()
+    @nodes_ok.clean()
+    @nodes.linked_copy(@nodes_ko)
   end
 end
 
@@ -593,6 +654,12 @@ class Workflow < TaskManager
       nil
     ).config(@config[taskval[0].to_sym][:config])
   end
+
+  def kill
+    super()
+    @nodes_ok.clean()
+    @nodes.linked_copy(@nodes_ko)
+  end
 end
 
 class Microstep < QueueTask
@@ -605,6 +672,9 @@ class Microstep < QueueTask
 
     #debug("\trun #{@name}/#{@params.inspect}")
     return send("ms_#{@name}".to_sym,*@params)
+  end
+
+  def kill()
   end
 
   # ...
