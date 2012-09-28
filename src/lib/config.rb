@@ -10,6 +10,11 @@ require 'debug'
 require 'checkrights'
 require 'error'
 require 'configparser'
+require 'macrostep'
+require 'stepdeployenv'
+require 'stepbroadcastenv'
+require 'stepbootnewenv'
+require 'microsteps'
 
 #Ruby libs
 require 'optparse'
@@ -17,8 +22,6 @@ require 'ostruct'
 require 'fileutils'
 require 'resolv'
 require 'yaml'
-
-#require 'pp'
 
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 R_HTTP = /^http[s]?:\/\//
@@ -629,7 +632,6 @@ module ConfigInformation
         return false
       end
 
-      #pp @common
       cp.unused().each do |path|
         puts "Warning(#{configfile}) Unused field '#{path}'"
       end
@@ -733,6 +735,7 @@ module ConfigInformation
           clfile = cp.value(
             'conf_file',String,nil,{ :type => 'file', :readable => true }
           )
+          conf.prefix = cp.value('prefix',String,'')
           return false unless load_cluster_specific_config_file(clname,clfile)
 
           cp.parse('nodes',true,Array) do |info|
@@ -781,8 +784,6 @@ module ConfigInformation
         puts "Error(#{configfile}) #{ae.message}"
         return false
       end
-
-      #pp @common.nodes_desc
 
       if @common.nodes_desc.empty? then
         puts "The nodes list is empty"
@@ -1021,52 +1022,96 @@ module ConfigInformation
 
         cp.parse('automata',true) do
           cp.parse('macrosteps',true) do
-            macroname = ''
-            insts = []
-            treatmacro = Proc.new do
+            microsteps = Microstep.instance_methods.select{ |name| name =~ /^ms_/ }
+            microsteps.collect!{ |name| name.sub(/^ms_/,'') }
+
+            treatcustom = Proc.new do |info,microname,ret|
+              unless info[:empty]
+                op = {
+                  :name => "#{microname}-#{cp.value('name',String)}",
+                  :action => cp.value('action',String,nil,['exec','send'])
+                }
+                if op[:action] == 'exec'
+                  op[:command] = cp.value('command',String)
+                  op[:timeout] = cp.value('timeout',Fixnum,0)
+                  op[:retries] = cp.value('retries',Fixnum,0)
+                  op[:scattering] = cp.value('scattering',String,:tree)
+                else
+                  op[:file] = cp.value('file',String)
+                  op[:destination] = cp.value('destination',String)
+                  op[:timeout] = cp.value('timeout',Fixnum,0)
+                  op[:retries] = cp.value('retries',Fixnum,0)
+                  op[:scattering] = cp.value('scattering',String,:tree)
+                end
+                op[:action] = op[:action].to_sym
+                ret << op
+              end
+            end
+
+            treatmacro = Proc.new do |macroname|
+              insts = ObjectSpace.each_object(Class).select { |klass|
+                klass.ancestors.include?(Module.const_get(macroname))
+              } unless macroname.empty?
+              insts.collect!{ |klass| klass.name.sub(/^#{macroname}/,'') }
               macroinsts = []
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]
+                  microconf = nil
+                  cp.parse('microsteps',false,Array) do |info|
+                    unless info[:empty]
+                      microconf = {} unless microconf
+                      microname = cp.value('name',String,nil,microsteps)
+
+                      custom_sub = []
+                      cp.parse('substitute',false,Array) do |info|
+                        treatcustom.call(info,microname,custom_sub)
+                      end
+                      custom_sub = nil if custom_sub.empty?
+
+                      custom_pre = []
+                      cp.parse('pre-ops',false,Array) do |info|
+                        treatcustom.call(info,microname,custom_pre)
+                      end
+                      custom_pre = nil if custom_pre.empty?
+
+                      custom_post = []
+                      cp.parse('post-ops',false,Array) do |info|
+                        treatcustom.call(info,microname,custom_post)
+                      end
+                      custom_post = nil if custom_post.empty?
+
+                      microconf[microname.to_sym] = {
+                        :timeout => cp.value('timeout',Fixnum,0),
+                        :raisable => cp.value(
+                          'raisable',[TrueClass,FalseClass],true
+                        ),
+                        :breakpoint => cp.value(
+                          'breakpoint',[TrueClass,FalseClass],false
+                        ),
+                        :retries => cp.value('retries',Fixnum,0),
+                        :custom_sub => custom_sub,
+                        :custom_pre => custom_pre,
+                        :custom_post => custom_post,
+                      }
+                    end
+                  end
+
                   macroinsts << [
                     macroname + cp.value('type',String,nil,insts),
-                    cp.value('retries',Fixnum),
-                    cp.value('timeout',Fixnum),
+                    cp.value('retries',Fixnum,0),
+                    cp.value('timeout',Fixnum,0),
+                    cp.value('raisable',[TrueClass,FalseClass],true),
+                    cp.value('breakpoint',[TrueClass,FalseClass],false),
+                    microconf,
                   ]
                 end
               end
               conf.workflow_steps << MacroStep.new(macroname,macroinsts)
             end
 
-            macroname = 'SetDeploymentEnv'
-            insts = [
-              'Untrusted',
-              'Kexec',
-              'UntrustedCustomPreInstall',
-              'Prod',
-              'Nfsroot',
-              'Dummy'
-            ]
-            treatmacro.call
-
-            macroname = 'BroadcastEnv'
-            insts = [
-              'Chain',
-              'Kastafior',
-              'Tree',
-              'Bittorrent',
-              'Dummy',
-            ]
-            treatmacro.call
-
-            macroname = 'BootNewEnv'
-            insts = [
-              'Kexec',
-              'PivotRoot',
-              'Classical',
-              'HardReboot',
-              'Dummy',
-            ]
-            treatmacro.call
+            treatmacro.call('SetDeploymentEnv')
+            treatmacro.call('BroadcastEnv')
+            treatmacro.call('BootNewEnv')
           end
         end
 
@@ -1098,7 +1143,6 @@ module ConfigInformation
       end
 
 
-      #pp @cluster_specific[cluster]
       cp.unused().each do |path|
         puts "Warning(#{configfile}) Unused field '#{path}'"
       end
@@ -1173,7 +1217,7 @@ module ConfigInformation
       return true unless config
 
       unless config.is_a?(Hash)
-        puts "Invalid file format'#{configfile}'"
+        puts "Invalid file format '#{configfile}'"
         return false
       end
 
@@ -1185,12 +1229,12 @@ module ConfigInformation
             if (node.cmd.instance_variable_defined?("@#{kind}")) then
               node.cmd.instance_variable_set("@#{kind}", val)
             else
-              puts "Unknown command kind: #{content[2]}"
+              puts "Unknown command kind: #{kind}"
               return false
             end
           end
         else
-          puts "The node #{content[1]} does not exist"
+          puts "The node #{nodename} does not exist"
           return false
         end
       end
@@ -1358,6 +1402,168 @@ module ConfigInformation
 ##################################
 #       Kadeploy specific        #
 ##################################
+
+    def Config.check_macrostep_interface(name)
+      macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+        klass.superclass == Macrostep
+      }
+      return macrointerfaces.include?(name)
+    end
+
+    def Config.check_macrostep_instance(name)
+      # Gathering a list of availables macrosteps
+      macrosteps = ObjectSpace.each_object(Class).select { |klass|
+        klass.ancestors.include?(Macrostep)
+      }
+
+      # Do not consider rought step names as valid
+      macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+        klass.superclass == Macrostep
+      }
+      macrointerfaces.each { |interface| macrosteps.delete(interface) }
+
+      macrosteps.collect!{ |klass| klass.name }
+
+      return macrosteps.include?(name)
+    end
+
+    def Config.check_microstep(name)
+      # Gathering a list of availables microsteps
+      microsteps = Microstep.instance_methods.select{
+        |microname| microname =~ /^ms_/
+      }
+      microsteps.collect!{ |microname| microname.sub(/^ms_/,'') }
+
+      return microsteps.include?(name)
+    end
+
+    def Config.load_custom_ops_file(exec_specific,file)
+      if not File.readable?(file) then
+        error("The file #{file} cannot be read")
+        return false
+      end
+      exec_specific.custom_operations_file = file
+
+      begin
+        config = YAML.load_file(file)
+      rescue ArgumentError
+        puts "Invalid YAML file '#{file}'"
+        return false
+      rescue Errno::ENOENT
+        return true
+      end
+
+      unless config.is_a?(Hash)
+        puts "Invalid file format '#{file}'"
+        return false
+      end
+      #example of line: macro_step,microstep@cmd1%arg%dir,cmd2%arg%dir,...,cmdN%arg%dir
+      exec_specific.custom_operations = { :operations => {}, :overrides => {}}
+      customops = exec_specific.custom_operations[:operations]
+      customover = exec_specific.custom_operations[:overrides]
+
+      config.each_pair do |macro,micros|
+        unless micros.is_a?(Hash)
+          puts "Invalid file format '#{file}'"
+          return false
+        end
+        unless check_macrostep_instance(macro)
+          error("[#{file}] Invalid macrostep '#{macro}'")
+          return false
+        end
+        customops[macro.to_sym] = {} unless customops[macro.to_sym]
+        micros.each_pair do |micro,operations|
+          unless operations.is_a?(Hash)
+            puts "Invalid file format '#{file}'"
+            return false
+          end
+          unless check_microstep(micro)
+            error("[#{file}] Invalid microstep '#{micro}'")
+            return false
+          end
+          customops[macro.to_sym][micro.to_sym] = [] unless customops[macro.to_sym][micro.to_sym]
+          operations.each_pair do |operation,ops|
+            unless ['pre-ops','post-ops','substitute','override'].include?(operation)
+              error("[#{file}] Invalid operation '#{operation}'")
+              return false
+            end
+
+            if operation == 'override'
+              customover[macro.to_sym] = {} unless customover[macro.to_sym]
+              customover[macro.to_sym][micro.to_sym] = true
+              next
+            end
+
+            ops.each do |op|
+              unless op['name']
+                error("[#{file}] Operation #{operation}: 'name' field missing")
+                return false
+              end
+              unless op['action']
+                error("[#{file}] Operation #{operation}: 'action' field missing")
+                return false
+              end
+              unless ['exec','send'].include?(op['action'])
+                error("[#{file}] Invalid action '#{op['action']}'")
+                return false
+              end
+
+              scattering = op['scattering'] || 'tree'
+              timeout = op['timeout'] || 0
+              begin
+                timeout = Integer(timeout)
+              rescue ArgumentError
+                error("[#{file}] The field 'timeout' shoud be an integer")
+                return false
+              end
+              retries = op['retries'] || 0
+              begin
+                retries = Integer(retries)
+              rescue ArgumentError
+                error("[#{file}] The field 'retries' shoud be an integer")
+                return false
+              end
+
+              if op['action'] == 'send'
+                unless op['file']
+                  error("[#{file}] Operation #{operation}: 'file' field missing")
+                  return false
+                end
+                unless op['destination']
+                  error("[#{file}] Operation #{operation}: 'destination' field missing")
+                  return false
+                end
+                customops[macro.to_sym][micro.to_sym] << {
+                  :action => op['action'].to_sym,
+                  :name => "#{micro}-#{op['name']}",
+                  :file => op['file'],
+                  :destination => op['destination'],
+                  :timeout => timeout,
+                  :retries => retries,
+                  :scattering => scattering.to_sym,
+                  :target => operation.to_sym
+                }
+              else
+                unless op['command']
+                  error("[#{file}] Operation #{operation}: 'command' field missing")
+                  return false
+                end
+                customops[macro.to_sym][micro.to_sym] << {
+                  :action => op['action'].to_sym,
+                  :name => "#{micro}-#{op['name']}",
+                  :command => op['command'],
+                  :timeout => timeout,
+                  :retries => retries,
+                  :scattering => scattering.to_sym,
+                  :target => operation.to_sym
+                }
+              end
+            end
+          end
+        end
+      end
+      return true
+    end
 
     # Load the command-line options of kadeploy
     #
@@ -1543,36 +1749,21 @@ module ConfigInformation
           exec_specific.disable_disk_partitioning = true
         }
         opt.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
-          if (m =~ /\A[a-zA-Z0-9_]+:[a-zA-Z0-9_]+\Z/)
-            exec_specific.breakpoint_on_microstep = m
+          tmp = m.split(':',2)
+          if check_macrostep_instance(tmp[0])
+            if check_microstep(tmp[1])
+              exec_specific.breakpoint_on_microstep = m
+            else
+              error("The microstep #{tmp[1]} for the breakpoint entry is invalid")
+              return false
+            end
           else
-            error("The value #{m} for the breakpoint entry is invalid")
+            error("The macrostep #{tmp[0]} for the breakpoint entry is invalid")
             return false
           end
         }
         opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
-          exec_specific.custom_operations_file = file
-          if not File.readable?(file) then
-            error("The file #{file} cannot be read")
-            return false
-          else
-            exec_specific.custom_operations = Hash.new
-            #example of line: macro_step,microstep@cmd1%arg%dir,cmd2%arg%dir,...,cmdN%arg%dir
-            IO.readlines(file).each { |line|
-              if (line =~ /\A\w+,\w+@\w+%.+%.+(,\w+%.+%.+)*\Z/) then
-                step = line.split("@")[0]
-                cmds = line.split("@")[1]
-                macro_step = step.split(",")[0]
-                micro_step = step.split(",")[1]
-                exec_specific.custom_operations[macro_step] = Hash.new if (not exec_specific.custom_operations.has_key?(macro_step))
-                exec_specific.custom_operations[macro_step][micro_step] = Array.new if (not exec_specific.custom_operations[macro_step].has_key?(micro_step))
-                cmds.split(",").each { |cmd|
-                  entry = cmd.split("%")
-                  exec_specific.custom_operations[macro_step][micro_step].push(entry)
-                }
-              end
-            }
-          end
+          return false unless Config.load_custom_ops_file(exec_specific,file)
         }
         opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
           if (t =~ /\A\d+\Z/) then
@@ -1589,24 +1780,64 @@ module ConfigInformation
           end
         }
         opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
+          # Gathering a list of availables microsteps
+          microsteps = Microstep.instance_methods.select{
+            |name| name =~ /^ms_/
+          }
+          microsteps.collect!{ |name| name.sub(/^ms_/,'') }
+
+          # Gathering a list of availables macrosteps
+          macrosteps = ObjectSpace.each_object(Class).select { |klass|
+            klass.ancestors.include?(Macrostep)
+          }
+          macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+            klass.superclass == Macrostep
+          }
+          # Do not consider rought step names as valid
+          macrointerfaces.each { |interface| macrosteps.delete(interface) }
+          macrointerfaces.collect! { |klass| klass.name }
+          macrosteps.collect!{ |klass| klass.name }
+
           s.split("&").each { |macrostep|
-            macrostep_name = macrostep.split("|")[0]
-            microstep_list = macrostep.split("|")[1]
-            tmp = Array.new
-            microstep_list.split(",").each { |instance_infos|
-              instance_name = instance_infos.split(":")[0]
-              instance_max_retries = instance_infos.split(":")[1].to_i
-              instance_timeout = instance_infos.split(":")[2].to_i
-              tmp.push([instance_name, instance_max_retries, instance_timeout])
+            macroname = macrostep.split("|")[0]
+            unless macrointerfaces.include?(macroname)
+              error("Invalid macrostep kind '#{macroname}'")
+              return false
+            end
+            instances = macrostep.split("|")[1]
+            insts = []
+
+            instances.split(",").each { |instance|
+              inst_name = instance.split(":")[0]
+              unless macrosteps.include?(inst_name)
+                error("Invalid macrostep instance '#{inst_name}'")
+                return false
+              end
+              inst_retries = instance.split(":")[1]
+              begin
+                inst_retries = Integer(inst_retries)
+              rescue ArgumentError
+                error("The number of retries '#{inst_retries}' is not an integer")
+                return false
+              end
+              inst_timeout = instance.split(":")[2]
+              begin
+                inst_timeout = Integer(inst_timeout)
+              rescue ArgumentError
+                error("The timeout '#{inst_timeout}' is not an integer")
+                return false
+              end
+
+              insts << [inst_name, inst_retries, inst_timeout]
             }
-            exec_specific.steps.push(MacroStep.new(macrostep_name, tmp))
+            exec_specific.steps.push(MacroStep.new(macroname, insts))
           }
         }
       end
       @opts = opts
       begin
         opts.parse!(ARGV)
-      rescue 
+      rescue
         error("Option parsing error: #{$!}")
         return false
       end
@@ -2947,6 +3178,7 @@ module ConfigInformation
     attr_accessor :group_of_nodes #Hashtable (key is a command name)
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
+    attr_accessor :prefix
     attr_accessor :drivers
     attr_accessor :pxe_header
     attr_accessor :kernel_params
@@ -2997,6 +3229,7 @@ module ConfigInformation
       @admin_post_install = nil
       @partition_creation_kind = nil
       @partition_file = nil
+      @prefix = nil
       @use_ip_to_deploy = false
     end
     
@@ -3043,6 +3276,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
     
@@ -3090,6 +3324,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
 

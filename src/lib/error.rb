@@ -3,6 +3,21 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+class KadeployError < Exception
+  attr_reader :errno, :context
+  def initialize(errno,context={})
+    super('')
+    @errno = errno
+    @context = context
+  end
+end
+
+class TempfileException < RuntimeError
+end
+
+class MoveException < RuntimeError
+end
+
 class FetchFileError
   NO_ERROR = 100
   INVALID_ENVIRONMENT_TARBALL = 101
