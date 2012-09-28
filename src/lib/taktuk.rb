@@ -330,6 +330,7 @@ module TakTuk
       @status = nil
 
       @exec = nil
+      @curthread = nil
     end
 
     def opts!(opts={})
@@ -337,6 +338,7 @@ module TakTuk
     end
 
     def run!
+      @curthread = Thread.current
       @args = []
       @args += @options.to_cmd
       @streams.each_pair do |name,stream|
@@ -350,7 +352,10 @@ module TakTuk
       @exec = Execute[@binary,*@args].run!
       @status, @stdout, @stderr = @exec.wait
 
-      return false unless @status.success?
+      unless @status.success?
+        @curthread = nil
+        return false
+      end
 
       results = {}
       @streams.each_pair do |name,stream|
@@ -360,10 +365,14 @@ module TakTuk
           results[name] = nil
         end
       end
+
+      @curthread = nil
+
       results
     end
 
     def kill!()
+      @curthread.kill! if @curthread.alive?
       unless @exec.nil?
         @exec.kill
         @exec = nil
