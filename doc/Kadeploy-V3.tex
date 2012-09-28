@@ -564,6 +564,7 @@ Warning, a cluster-specific configuration file and a partition file must be defi
 --- 
 clusters:
 - name: graphene
+  prefix: gra
   conf_file: cluster_conf-graphene.yml
   partition_file: cluster_partition-graphene
   nodes: 
@@ -589,6 +590,7 @@ clusters:
   \item \ypath{/clusters}
   \begin{itemize}
     \item \yfield{name}{String} the name of the cluster
+    \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
     \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
     \item \yfield{partition\_file}{String} the partition file for this cluster (see section \ref{sec:partfiles})
   \end{itemize}
@@ -687,18 +689,37 @@ automata:
   macrosteps:
     SetDeploymentEnv:
       - type: Prod
-        retries: 1
         timeout: 200
+        microsteps:
+          - name: reboot
+            timeout: 10
+          - name: format_deploy_part
+            substitute:
+              - action: send
+                file: partition_file
+                destination: /
+                timeout: 10
+                scattering: chain
+              - action: exec
+                command: cat /partition_file | fdisk
+                retries: 1
       - type: Untrusted
-        retries: 1
         timeout: 400
     BroadcastEnv: 
       - type: Kastafior
         retries: 1
         timeout: 900
+        microsteps:
+          - name: send_environment
+            post-ops:
+              - action: send
+                file: my_custom_file
+                destination: /mnt/dest
+                retries: 1
+                timeout: 10
+                scattering: chain
     BootNewEnv: 
       - type: Kexec
-        retries: 1
         timeout: 100
 #     - type: Classical
 #       retries: 1
@@ -709,7 +730,7 @@ automata:
 \end{verbatim}
 \end{small}
 
-\subsection{Explanation of the fields used in the cluster-specific configuration file}
+\subsection{Explanation of the fields used in the cluster-specific configuration file\label{sec:specific_config}}
 
 \begin{itemize}
   \item \ypath{/partitioning}
@@ -818,24 +839,67 @@ automata:
   \item \ypath{/automata/macrosteps/[SetDeploymentEnv]} the macro-step in charge of rebooting the nodes on the deployment environment
   \begin{itemize}
     \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Untrusted}, \emph{Kexec}, \emph{Prod}, \emph{Nfsroot}, \emph{UntrustedCustomPreInstall} and \emph{Dummy})
-    \item \yfield{retries}{Integer} the number of retries for this macro-step
+    \item \yfieldd{retries}{Integer}{0} the number of retries for this macro-step (by default, one single attempt with no retries)
     \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
   \end{itemize}
+  \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]} Microsteps specific configuration (this field is not mandatory)
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the micro-step, see the list bellow to get the different micro-steps names.
+    \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this micro-step
+    \item \yfieldd{retries}{Integer}{0} the number of retries for this micro-step. Since most of micro-steps perform some modifications on the running system and are do not perform any cleaning operation before their execution, be very careful when using this setting.
+  \end{itemize} 
+  \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/[substitute]} Substitute this micro-step with some custom operations (see the paragraph bellow for custom operations description)
+  \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/[pre-ops]} A list of operations that have to be done before executing the micro-step (see the paragraph bellow for custom operation description)
+  \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see the paragraph bellow for custom operation description)
+
 
   \item \ypath{/automata/macrosteps/[BroadcastEnv]} the macro-step in charge of broadcasting the image of the user's environment image on the nodes
   \begin{itemize}
     \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Kastafior}, \emph{Chain}, \emph{Tree}, \emph{Bittorrent} and \emph{Dummy})
-    \item \yfield{retries}{Integer} the number of retries for this macro-step
-    \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
+    \item \yfieldd{retries}{Integer}{0} the number of retries for this macro-step
+    \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step (0 for no timeout)
   \end{itemize}
+  \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]} Microsteps specific configuration (this field is not mandatory)
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the micro-step, see the list bellow to get the different micro-steps names.
+    \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this micro-step
+    \item \yfieldd{retries}{Integer}{0} the number of retries for this micro-step. Since most of micro-steps perform some modifications on the running system and are do not perform any cleaning operation before their execution, be very careful when using this setting.
+  \end{itemize} 
+  \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]/[substitute]} Substitute this micro-step with some custom operations (see the paragraph bellow for custom operations description)
+  \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]/[pre-ops]} A list of operations that have to be done before executing the micro-step (see the paragraph bellow for custom operation description)
+  \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see the paragraph bellow for custom operation description)
+
 
   \item \ypath{/automata/macrosteps/[BootNewEnv]} the macro-step in charge of rebooting the nodes after the installation of the environment
   \begin{itemize}
     \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Classical}, \emph{Kexec}, \emph{HardReboot}, \emph{PivotRoot} (not implemented yet) and \emph{Dummy})
-    \item \yfield{retries}{Integer} the number of retries for this macro-step
+    \item \yfieldd{retries}{Integer}{0} the number of retries for this macro-step
     \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
   \end{itemize} 
+  \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]} Microsteps specific configuration (this field is not mandatory)
+  \begin{itemize}
+    \item \yfield{name}{String} the name of the micro-step, see the list bellow to get the different micro-steps names.
+    \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this micro-step
+    \item \yfieldd{retries}{Integer}{0} the number of retries for this micro-step. Since most of micro-steps perform some modifications on the running system and are do not perform any cleaning operation before their execution, be very careful when using this setting.
+  \end{itemize} 
+  \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]/[substitute]} Substitute this micro-step with some custom operations (see the paragraph bellow for custom operations description)
+  \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]/[pre-ops]} A list of operations that have to be done before executing the micro-step (see the paragraph bellow for custom operation description)
+  \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see the paragraph bellow for custom operation description)
 \end{itemize}
+\paragraph{Custom operations\label{custom-op}\\}
+With custom operations you can send files or execute commands.
+
+Here is a custom operation description:
+\begin{itemize}
+  \item \yfield{name}{String} The name of the custom operation
+  \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send} and \emph{exec})
+  \item \yfield{file}{String} \small{(To be specified if the action is \emph{send})} The path to the file to be send
+  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination on the nodes
+  \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed
+  \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
+  \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
+  \item \yfieldd{scattering}{String}{'tree'} The scattering kind for this custom operation (expected values are \emph{tree} and \emph{chain})
+\end{itemize} 
 \paragraph{The automata macro-steps\\}
 Here is the list of the macro-step and their implementation:
 \begin{itemize}
@@ -1109,7 +1173,7 @@ All the Kadeploy tools use the Kadeploy server. On a well configured system, the
 > kadeploy3d
 \end{verbatim}
 
-\subsection{Kadeploy client}
+\subsection{Kadeploy client}\label{sec:kadeploy_client}
 The Kadeploy client is actually the user interface for the Kadeploy software. It can be used by using the \texttt{kadeploy3} command. The CLI looks like this:
 \begin{small}
 \begin{verbatim}
@@ -1280,18 +1344,50 @@ If you are a power user, you can specify the full Kadeploy workflow and bypass t
 
 \paragraph{Use case 10 - expert usage - insert custom operations in the deployment workflow}
 \begin{verbatim}
-> kadeploy3 -m gdx-5.orsay.grid5000.fr \
-            -e lenny-x64-nfs-1.0 \
-            --set-custom-operations ~/custom_ops
+> kadeploy3 -m griffon-1.nancy.grid5000.fr \
+            -e squeeze-x64-base \
+            --set-custom-operations ~/custom_ops.yml
 \end{verbatim}
-For very specific purpose, you can add some custom operations in the deployment workflow. To do this, you have to specify these operations in a file where each line specify the operations that must be executed at the beginning of a micro-step. The syntax is: \texttt{macrostep,microstep@cmd1\%arg\%dir,cmd2\%arg\%dir,...,cmdN\%arg\%dir}. You can specify two kinds of operations: \textit{send} and \textit{exec}. For the \textit{send} operation, \texttt{arg} is used to specify a file name and \texttt{dir} is used to specify the destination directory. Concerning the \textit{exec} operation, \texttt{arg} is used to specify the command to execute and \texttt{dir} must be empty.
+For very specific purpose, you can add some custom operations in the deployment workflow. To do this, you have to specify these operations in a YAML file where you can specify the operations that must be executed before/after/instead a micro-step.
+
+Here is a description of the YAML file:
+\begin{itemize}
+  \item \ypath{/MacroStepName} The name of the target macro-step (see section \ref{sec:specific_config} for a list of allowed macro-steps)
+  \item \ypath{/MacroStepName/MicroStepName} The name of the target micro-step (see section \ref{sec:specific_config} for a list of allowed micro-steps)
+  \begin{itemize}
+    \item \yfieldd{override}{Boolean}{false} Override custom steps that have been defined in the cluster configuration.
+  \end{itemize}
+  \item \ypath{/MicroStepName/MicroStepName/[substitute]} Substitute this micro-step with some custom operations (see section \ref{sec:specific_config} for custom operations description)
+  \item \ypath{/MicroStepName/MicroStepName/[pre-ops]} A list of operations that have to be done before executing the micro-step (see section \ref{sec:specific_config} for custom operation description)
+  \item \ypath{/MicroStepName/MicroStepName/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see section \ref{sec:specific_config} for custom operation description)
+\end{itemize}
 
 Here is an example of a file that contains custom operations:
 \begin{small}
 \begin{verbatim}
-> cat ~/custom_ops
-SetDeploymentEnvUntrusted,format_tmp_part@send%/tmp/script.sh%/dest,exec%/dest/script.sh%
-BootNewEnvKexec,reboot@exec%echo "s" > /proc/sysrq-trigger%
+    > cat ~/custom_ops.yml
+    SetDeploymentEnvUntrusted:
+      format_deploy_part:
+        substitute:
+          - action: send
+            name: send_partition_file
+            file: partition_file
+            destination: /
+            timeout: 10
+            scattering: chain
+          - action: exec
+            name: format_with_fdisk
+            command: "cat /partition_file | fdisk"
+            retries: 1
+    BroadcastEnvKastafior:
+      send_environment:
+        post-ops:
+          - action: send
+            file: my_custom_file
+            destination: /mnt/dest
+            retries: 1
+            timeout: 10
+            scattering: chain
 \end{verbatim}
 \end{small}
 
@@ -1857,6 +1953,68 @@ You can do want you want in the pre-install but you must know that Kadeploy will
 \end{itemize}
 
 If you choose to mount more than one partition in the pre-install, remember to umount all the partitions excepted the one mounted on \ypath{/environments/deployment/extraction\_dir} (\texttt{/mnt/dest} in principle) in the post-install step. Indeed, the common Kadeploy workflow will automatically umount the partition mounted on \ypath{/environments/deployment/extraction\_dir}. Thus, if other partitions are mounted, the umount will fail.
+
+
+\section{Do a custom partitioning}\label{sec:custom-partitioning}
+To perform a custom partitioning, you can use a substitute custom operation. There is two ways to setup this kind of operation: in the cluster-specific configuration file (Administrator) or using the Kadeploy3 client (User).
+
+\subsection{Custom partitioning with cluster-specific configuration}\
+The setting to modify in the cluster-specific configuration file (see section \ref{sec:specific_config}) is \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/format\_deploy\_part/[substitute]}.
+
+Here is a sample of the configuration file setting:
+\begin{small}
+\begin{verbatim}
+    ...
+    automata:
+      macrosteps:
+        SetDeploymentEnv:
+          - type: Untrusted
+            timeout: 200
+            microsteps:
+              - name: format_deploy_part
+                substitute:
+                  - action: send
+                    file: partition_file
+                    destination: /
+                    timeout: 10
+                    scattering: chain
+                  - action: exec
+                    command: cat /partition_file | fdisk
+                    retries: 1
+\end{verbatim}
+\end{small}
+
+\subsection{Custom partitioning with Kadeploy3 client}
+You can use the Kadeploy3 client's option \emph{--set-custom-operations} (see \ref{sec:kadeploy_client}) to setup custom micro-step operations.
+
+The field to configure is the field \ypath{/SetDeploymentEnv/format\_deploy\_part/[substitute]}.
+
+Here is a sample of the client command:
+\begin{verbatim}
+    > kadeploy3 -m griffon-1.nancy.grid5000.fr \
+                -e squeeze-x64-base \
+                --set-custom-operations ~/custom_ops.yml
+\end{verbatim}
+
+Here is a sample of a the custom operations file:
+\begin{small}
+\begin{verbatim}
+    > cat ~/custom_ops.yml
+    SetDeploymentEnvUntrusted:
+      format_deploy_part:
+        substitute:
+          - action: send
+            name: send_partition_file
+            file: partition_file
+            destination: /
+            timeout: 10
+            scattering: chain
+          - action: exec
+            name: format_with_fdisk
+            command: "cat /partition_file | fdisk"
+            retries: 1
+\end{verbatim}
+\end{small}
 
 
 \end{document}

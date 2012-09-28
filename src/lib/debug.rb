@@ -56,6 +56,7 @@ module Debug
     @syslog_dbg_level = nil
     @syslog_lock = nil
     @client_output = nil
+    @cluster_id = nil
 
     # Constructor of OutputControl
     #
@@ -70,7 +71,7 @@ module Debug
     # * syslog_lock: mutex on Syslog
     # Output
     # * nothing
-    def initialize(verbose_level, debug, client, user, deploy_id, syslog, syslog_dbg_level, syslog_lock)
+    def initialize(verbose_level, debug, client, user, deploy_id, syslog, syslog_dbg_level, syslog_lock, cluster_id=nil)
       @verbose_level = verbose_level
       @debug = debug
       @client = client
@@ -80,6 +81,7 @@ module Debug
       @syslog_dbg_level = syslog_dbg_level
       @syslog_lock = syslog_lock
       @client_output = (client != nil)
+      @cluster_id = cluster_id
     end
 
     # Disable the output redirection on the client
@@ -92,6 +94,18 @@ module Debug
       @client_output = false
     end
 
+    def Debug.prefix(clid,nsid=nil)
+      ns = nsid if !nsid.nil? and nsid > 0
+
+      if !clid.nil? and !clid.empty?
+        "[#{clid}#{(ns.nil? ? '' : ".#{ns}")}] "
+      elsif !ns.nil?
+        "[#{ns}] "
+      else
+        ''
+      end
+    end
+
     # Print a message according to a specified debug level
     #
     # Arguments
@@ -100,11 +114,14 @@ module Debug
     # * nodeset: print with this NodeSet id
     # Output
     # * prints the message on the server and on the client
-    def verbosel(l, msg, nodeset=nil)
-      msg = "(#{nodeset.id}) #{msg}" if nodeset and nodeset.id > 0
+    def verbosel(l, msg, nsid=nil, print_prefix = true)
+      msg = "#{Debug.prefix(@cluster_id,nsid)}#{msg}" if print_prefix
 
       if ((l <= @verbose_level) && @client_output)
-        @client.print(msg)
+        begin
+          @client.print(msg)
+        rescue DRb::DRbConnError
+        end
       end
       server_str = "#{@deploy_id}|#{@user} -> #{msg}"
       puts server_str
@@ -448,6 +465,23 @@ module Debug
       rescue
         puts "Cannot write in the log file #{@config.common.log_to_file}"
       end
+    end
+  end
+end
+
+
+module Printer
+  def debug(level,msg,nodesetid=nil,opts={})
+    return unless output()
+    output().verbosel(level,msg,nodesetid)
+  end
+
+  def log(operation,value=nil,nodeset=nil,opts={})
+    return unless logger()
+    if opts[:increment]
+      logger().increment(operation, nodeset)
+    else
+      logger().set(operation,value,nodeset)
     end
   end
 end
