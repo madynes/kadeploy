@@ -5,16 +5,6 @@ require 'nodes'
 
 Thread::abort_on_exception = true
 
-TIMING = true
-
-@@tstart = Time.now
-
-def debug(msg)
-  prefix = "[#{sprintf("%.3f",Time.now - @@tstart)}] " if TIMING
-  #puts "#{prefix}#{self.class.name}:\t#{msg}"
-  puts "#{prefix} #{msg}"
-end
-
 module Nodes
   class NodeSet
     @@ids = 0
@@ -144,7 +134,6 @@ module Task
     tmpnodeset = Nodes::NodeSet.new(nodeset.id)
     nodeset.move(tmpnodeset)
 
-    #debug("RAISE #{status} #{tmpnodeset.to_s_fold}")
     mqueue().push({ :task => self, :status => status, :nodes => tmpnodeset})
   end
 
@@ -209,6 +198,33 @@ class TaskManager
     raise 'Should be reimplemented'
   end
 
+  def break!(task,nodeset)
+  end
+
+  def success!(task,nodeset)
+  end
+
+  def fail!(task,nodeset)
+  end
+
+  def timeout!(task)
+  end
+
+  def retry!(task)
+  end
+
+  def split!(ns,ns1,ns2)
+  end
+
+  def kill!()
+  end
+
+  def start!()
+  end
+
+  def done!()
+  end
+
   def init_config()
     tasks = tasks()
 
@@ -266,21 +282,21 @@ class TaskManager
   end
 
   def break_task(task,nodeset)
-    #debug("BREAKPOINT #{nodeset.to_s_fold}")
     done_task(task,nodeset)
     nodeset.linked_copy(@nodes_brk)
+    break!(task,nodeset)
   end
 
   def success_task(task,nodeset)
-    #debug("SUCCESS #{nodeset.to_s_fold}")
     done_task(task,nodeset)
     nodeset.linked_copy(@nodes_ok)
+    success!(task,nodeset)
   end
 
   def fail_task(task,nodeset)
-    #debug("FAIL #{nodeset.to_s_fold}")
     done_task(task,nodeset)
     nodeset.linked_copy(@nodes_ko)
+    fail!(task,nodeset)
   end
 
   def get_task(idx,subidx)
@@ -313,9 +329,7 @@ class TaskManager
       #tmpns.linked_copy(allns)
       #newns.linked_copy(allns)
 
-      debug(">-< Nodeset(#{startns.id}) split into :")
-      debug(">-<   Nodeset(#{tmpns.id}): #{tmpns.to_s_fold}")
-      debug(">-<   Nodeset(#{newns.id}): #{newns.to_s_fold}")
+      split!(startns,tmpns,newns)
 
       startns.id = tmpns.id
     end
@@ -374,42 +388,41 @@ class TaskManager
       return
     end
 
-    #debug("RUN_TASK/#{task.name} #{task.nodes.to_s_fold}")
+    timeout = (@config[task.name] ? @config[task.name][:timeout] : nil)
+    task.context[:local][:timeout] = timeout
+
+    timestart = Time.now
     thr = Thread.new { task.run }
     @threads[task] = {} unless @threads[task]
     @threads[task][:run] = thr
 
-    timeout = (@config[task.name] ? @config[task.name][:timeout] : nil)
     success = true
 
     if timeout and timeout > 0
-      timestart = Time.now
       sleep(TIMER_CKECK_PITCH) while ((Time.now - timestart) < timeout) and (thr.alive?)
       if thr.alive?
         thr.kill
         task.kill
         success = false
+        timeout!(task)
       end
     end
-
-    debug("(#{task.nodes.id}) !!! Timeout in #{task.name} with #{task.nodes.to_s_fold}") unless success
-
     thr.join
+
+    task.context[:local][:duration] = Time.now - timestart
+
     success = success && thr.value
     @threads[task].delete(:run)
     @threads.delete(task) if @threads[task].empty?
 
     task.mutex.synchronize do
-      #debug("RUN_JOIN #{task.name} #{task.nodes.to_s_fold}")
       clean_nodeset(task.nodes)
 
-      #debug("RUN_SETS #{task.name} success:#{success} #{task.nodes.to_s_fold}:#{task.nodes.empty?} ok:#{task.nodes_ok.to_s_fold} ko:#{task.nodes_ko.to_s_fold}")
       if success
         treated = Nodes::NodeSet.new
 
         unless task.nodes_ko.empty?
           clean_nodeset(task.nodes_ko)
-          #debug("RUN_PUSH KO #{task.name} #{task.nodes_ko.to_s_fold}")
           task.nodes_ko.linked_copy(treated)
         end
 
@@ -417,7 +430,6 @@ class TaskManager
           # by default if nodes are present in nodes_ok and nodes_ko,
           # consider them as KO
           clean_nodeset(task.nodes_ok,treated)
-          #debug("RUN_PUSH OK #{task.name} #{task.nodes_ok.to_s_fold}")
           task.nodes_ok.linked_copy(treated)
           @queue.push({ :task => task, :status => :OK, :nodes => task.nodes_ok})
         end
@@ -425,38 +437,31 @@ class TaskManager
         # Set nodes with no status as KO
         unless treated.equal?(task.nodes)
           tmp = task.nodes.diff(treated)
-          #debug("RUN_TREATED diff:#{tmp.to_s_fold} nodes_ko:#{task.nodes_ko.to_s_fold}")
           tmp.move(task.nodes_ko)
         end
 
         @queue.push({ :task => task, :status => :KO, :nodes => task.nodes_ko}) unless task.nodes_ko.empty?
 
       elsif !task.nodes.empty?
-        #debug("RUN_PUSH ALL KO #{task.name} #{task.nodes.to_s_fold}")
         task.nodes_ko().clean()
         task.nodes().linked_copy(task.nodes_ko())
         @queue.push({ :task => task, :status => :KO, :nodes => task.nodes_ko})
       end
-      #debug("DONE_TASK #{task.name} #{task.nodes.to_s_fold}")
     end
   end
 
   def start()
-    #debug("START")
+    start!
     @nodes_done.clean()
     @runthread = Thread.current
 
     until (done?)
-      #debug("WAIT_POP #{@nodes_done.set.size}/#{@nodes.set.size}")
-
       begin
         sleep(QUEUE_CKECK_PITCH)
         query = @queue.pop
       rescue ThreadError
         retry unless done?
       end
-
-      #debug("NEW_TASK/#{(query[:task] ? query[:task].name : 'nil')}")
 
       clean_threads()
 
@@ -476,17 +481,14 @@ class TaskManager
       continue = true
 
       if query[:status] and curtask
-        #debug("TREAT_STATUS #{query[:nodes].to_s_fold}")
         if query[:status] == :BRK
           break_task(curtask,query[:nodes])
           continue = false
         elsif query[:status] == :OK
-          #debug("TREAT_OK #{query[:nodes].to_s_fold}")
           if (curtask.idx + 1) < tasks().length
             newtask[:idx] = curtask.idx + 1
             newtask[:context][:local][:retries] = 0
           else
-            #debug("SUCCESS #{query[:nodes].to_s_fold}")
             curtask.mutex.synchronize do
               success_task(curtask,query[:nodes])
               curtask.clean_nodes(query[:nodes])
@@ -494,11 +496,11 @@ class TaskManager
             continue = false
           end
         elsif query[:status] == :KO
-          #debug("TREAT_KO #{query[:nodes].to_s_fold}")
           if curtask.context[:local][:retries] < (@config[curtask.name][:retries])
             newtask[:idx] = curtask.idx
             newtask[:subidx] = curtask.subidx
             newtask[:context][:local][:retries] += 1
+            retry!(curtask)
           else
             tasks = tasks()
             if multi_task?(curtask.idx,tasks) \
@@ -518,9 +520,7 @@ class TaskManager
         curtask.mutex.synchronize { curtask.clean_nodes(query[:nodes]) } if continue
       end
 
-      #debug("TREAT_CONT #{continue}")
       if continue
-        #debug("TREAT_PARAMS #{newtask.inspect}")
         task = create_task(
           newtask[:idx],
           newtask[:subidx],
@@ -539,7 +539,7 @@ class TaskManager
     join_threads()
     @runthread = nil
 
-    #debug("QUIT #{@nodes_done.set.size}/#{@nodes.set.size}")
+    done!
   end
 
   def kill()
@@ -563,7 +563,7 @@ class TaskManager
     @nodes_done.clean()
     @nodes.linked_copy(@nodes_done)
 
-    debug("(#{@nodes.id}) !!! Killing #{self.class.name} instance")
+    kill!
   end
 end
 
@@ -625,6 +625,11 @@ class TaskedTaskManager < TaskManager
     end
   end
 
+  def run()
+    start()
+    return true
+  end
+
   def kill()
     __kill__()
     @nodes_ok.clean()
@@ -635,13 +640,22 @@ end
 
 # Now the implementation in Kadeploy
 
+module Printer
+  def debug(level,msg,opts={})
+    puts "[dbg-#{level}] #{msg}"
+  end
+
+  def log(nodeset,operation,value=nil,opts={})
+    puts "[log] #{nodeset.to_s_fold}: #{operation}->#{value}"
+  end
+end
+
 class Workflow < TaskManager
+  include Printer
   attr_reader :nodes_brk, :nodes_ok, :nodes_ko
 
-  def initialize(nodeset)
-    super(nodeset)
-    @@tstart = Time.now
-
+  def initialize(nodeset,context={})
+    super(nodeset,context)
     @nodes_brk = Nodes::NodeSet.new
     @nodes_ok = Nodes::NodeSet.new
     @nodes_ko = Nodes::NodeSet.new
@@ -651,26 +665,9 @@ class Workflow < TaskManager
     raise 'Should be reimplemented'
   end
 
-  def break_task(task,nodeset)
-    super(task,nodeset)
-
-    debug("### Add #{nodeset.to_s_fold} to BRK nodeset")
-  end
-
-  def success_task(task,nodeset)
-    super(task,nodeset)
-
-    debug("### Add #{nodeset.to_s_fold} to OK nodeset")
-  end
-
-  def fail_task(task,nodeset)
-    super(task,nodeset)
-
-    debug("### Add #{nodeset.to_s_fold} to KO nodeset")
-  end
-
   def create_task(idx,subidx,nodes,context)
     taskval = get_task(idx,subidx)
+    taskconf = @config[taskval[0].to_sym][:config]
 
     begin
       klass = Module.const_get(taskval[0].to_s)
@@ -686,7 +683,7 @@ class Workflow < TaskManager
       @queue,
       context,
       nil
-    ).config(@config[taskval[0].to_sym][:config])
+    ).config(taskconf)
   end
 
   def kill
@@ -694,38 +691,67 @@ class Workflow < TaskManager
     @nodes_ok.clean()
     @nodes.linked_copy(@nodes_ko)
   end
+
+  def break!(task,nodeset)
+    debug(4,"<<< Add #{nodeset.to_s_fold} from #{task.name} to BRK nodeset")
+  end
+
+  def success!(task,nodeset)
+    debug(4,"<<< Add #{nodeset.to_s_fold} from #{task.name} to OK nodeset")
+  end
+
+  def fail!(task,nodeset)
+    debug(4,"<<< Add #{nodeset.to_s_fold} from #{task.name} to KO nodeset")
+  end
+
+  def retry!(task)
+    log(task.nodes, "step#{task.idx}_retry") do |curval|
+      curval + 1
+    end
+  end
+
+  def timeout!(task)
+    debug(1,
+      "Timeout in #{task.name} before the end of the step, "\
+      "let's kill the instance"
+    )
+    task.nodes.set_error_msg("Timeout in the #{task.name} step")
+  end
+
+  def split!(ns,ns1,ns2)
+    debug(1,"Nodeset(#{ns.id}) split into :")
+    debug(1,"  Nodeset(#{ns1.id}): #{ns1.to_s_fold}")
+    debug(1,"  Nodeset(#{ns2.id}): #{ns2.to_s_fold}")
+  end
+
+  def kill!()
+    debug(2,"!!! Kill a #{self.class.name} instance")
+  end
 end
 
 class Microstep < QueueTask
+  include Printer
+
   def initialize(name, idx, subidx, nodes, manager_queue, context = {}, params = [])
     super(name, idx, subidx, nodes, manager_queue, context, params)
   end
 
   def run()
-    debug("(#{@nodes.id})   --- Launching #{@name} on #{@nodes.to_s_fold}")
+    debug(3,"--- #{@name}")
+    debug(3,"  >>> #{@nodes.to_s_fold}")
 
-    #debug("\trun #{@name}/#{@params.inspect}")
     return send("ms_#{@name}".to_sym,*@params)
   end
 
   def kill()
   end
-
-  # ...
-  # microstep methods
-  # ...
 end
 
 class Macrostep < TaskedTaskManager
+  include Printer
+
   def microclass
     Microstep
-  end
-
-  def run()
-    debug("(#{@nodes.id}) === Launching #{self.class.name} on #{@nodes.to_s_fold}")
-
-    start()
-    return true
   end
 
   def create_task(idx,subidx,nodes,context)
@@ -742,20 +768,33 @@ class Macrostep < TaskedTaskManager
     )
   end
 
-  def success_task(task,nodeset)
-    super(task,nodeset)
-    debug("(#{nodeset.id}) <<< Raising #{nodeset.to_s_fold} from #{self.class.name}")
+  def break!(task,nodeset)
+    debug(4,"<<< Raising BRK nodes #{nodeset.to_s_fold} from #{self.class.name}") if @config[task.name][:raisable]
   end
 
-  def fail_task(task,nodeset)
-    super(task,nodeset)
-    debug("(#{nodeset.id}) <<< Raising #{nodeset.to_s_fold} from #{self.class.name}")
+  def success!(task,nodeset)
+    debug(4,"<<< Raising OK nodes #{nodeset.to_s_fold} from #{self.class.name}") if @config[task.name][:raisable]
   end
 
-  ## to be defined in each macrostep class
-  # def conf_task_default()
-  # end
-  #
-  # def tasks()
-  # end
+  def fail!(task,nodeset)
+    debug(4,"<<< Raising KO nodes #{nodeset.to_s_fold} from #{self.class.name}") if @config[task.name][:raisable]
+  end
+
+  def split!(ns,ns1,ns2)
+    debug(1,"Nodeset(#{ns.id}) split into :")
+    debug(1,"  Nodeset(#{ns1.id}): #{ns1.to_s_fold}")
+    debug(1,"  Nodeset(#{ns2.id}): #{ns2.to_s_fold}")
+  end
+
+  def start!()
+    debug(1,
+      "Performing a #{self.class.name} step on the nodes: #{nodes.to_s_fold}"
+    )
+    log(nodes, "step#{idx}", self.class.name)
+    log(nodes, "step#{idx}_timeout", context[:local][:timeout] || 0)
+  end
+
+  def done!()
+    log(nodes, "step#{idx}_duration", context[:local][:duration])
+  end
 end
