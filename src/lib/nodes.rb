@@ -144,6 +144,64 @@ module Nodes
       @id = id
     end
 
+    def self.newid(context)
+      context[:nodesetsid] += 1
+    end
+
+    def equal?(sub)
+      ret = true
+
+      @set.each do |node|
+        if (sub.get_node_by_host(node.hostname) == nil) then
+          ret = false
+          break
+        end
+      end
+
+      if ret
+        sub.set.each do |node|
+          if (get_node_by_host(node.hostname) == nil) then
+            ret = false
+            break
+          end
+        end
+      end
+
+      return ret
+    end
+
+    # nodes in sub but not in self
+    def diff(sub)
+      dest = NodeSet.new
+      @set.each { |node|
+        if (sub.get_node_by_host(node.hostname) == nil) then
+          dest.push(node)
+        end
+      }
+      return dest
+    end
+
+=begin
+    def diff(sub)
+      dest = NodeSet.new
+      @set.each { |node|
+        if (sub.get_node_by_host(node.hostname) == nil) then
+          dest.push(node.dup)
+        end
+      }
+      sub.set.each { |node|
+        if (get_node_by_host(node.hostname) == nil) and !dest.set.include?(node) then
+          dest.push(node.dup)
+        end
+      }
+      return dest
+    end
+=end
+
+    def clean()
+      @set.clear()
+    end
+
     private
 
     # Sort hostname
@@ -508,7 +566,9 @@ module Nodes
     # * nothing
     def linked_copy(dest)
       @set.each { |node|
-        dest.push(node)
+        if (dest.get_node_by_host(node.hostname) == nil) then
+          dest.push(node)
+        end
       }
       dest.id = @id
     end
@@ -788,6 +848,7 @@ module Nodes
     # * sub: NodeSet that contains the nodes to remove
     # Output
     # * return the NodeSet that contains the diff
+=begin
     def diff(sub)
       dest = NodeSet.new
       @set.each { |node|
@@ -797,6 +858,7 @@ module Nodes
       }
       return dest
     end
+=end
 
     # Check if some nodes are currently in deployment
     #
@@ -816,7 +878,7 @@ module Nodes
       )
 
       res.each_array do |row|
-        bad_nodes.push(get_node_by_host(row[0]).dup)
+        bad_nodes.push(get_node_by_host(row[0]))
       end
       good_nodes = diff(bad_nodes)
 

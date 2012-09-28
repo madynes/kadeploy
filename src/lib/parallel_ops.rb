@@ -16,8 +16,7 @@ require 'ping'
   class ParallelOperation
     @nodes = nil
     @output = nil
-    @config = nil
-    @cluster_config = nil
+    @context = nil
     @taktuk = nil
     @waitreboot_threads = nil
 
@@ -31,10 +30,9 @@ require 'ping'
     # * process_container: process container
     # Output
     # * nothing
-    def initialize(nodes, config, cluster_config, output)
+    def initialize(nodes, context, output)
       @nodes = nodes
-      @config = config
-      @cluster_config = cluster_config
+      @context = context
       @output = output
       @taktuk = nil
     end
@@ -139,7 +137,7 @@ require 'ping'
             thr = Thread.new do
               nodeid = get_nodeid(node,vlan)
 
-              if Ping.pingecho(nodeid, 1, @config.common.ssh_port) then
+              if Ping.pingecho(nodeid, 1, @context[:common].ssh_port) then
                 unless ports_test(nodeid,ports_up,true)
                   node.state = 'KO'
                   next
@@ -187,7 +185,7 @@ require 'ping'
 
     def nodes_array()
       ret = @nodes.make_sorted_array_of_nodes
-      if @cluster_config.use_ip_to_deploy then
+      if @context[:cluster].use_ip_to_deploy then
         ret.collect!{ |node| node.ip }
       else
         ret.collect!{ |node| node.hostname }
@@ -198,7 +196,7 @@ require 'ping'
     # Get a node object by it's host
     def node_get(host)
       ret = nil
-      if @cluster_config.use_ip_to_deploy then
+      if @context[:cluster].use_ip_to_deploy then
         ret = @nodes.get_node_by_ip(host)
       else
         ret = @nodes.get_node_by_host(host)
@@ -211,15 +209,15 @@ require 'ping'
       node.last_cmd_stderr = opts[:stderr] unless opts[:stderr].nil?
       node.last_cmd_exit_status = opts[:status] unless opts[:status].nil?
       node.state = opts[:state] unless opts[:state].nil?
-      @config.set_node_state(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
+      @context[:config].set_node_state(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
     end
 
     # Get the identifier that allow to contact a node (hostname|ip)
     def get_nodeid(node,vlan=false)
-      if vlan and !@config.exec_specific.vlan.nil?
-        ret = @config.exec_specific.ip_in_vlan[node.hostname]
+      if vlan and !@context[:execution].vlan.nil?
+        ret = @context[:execution].ip_in_vlan[node.hostname]
       else
-        if (@cluster_config.use_ip_to_deploy) then
+        if (@context[:cluster].use_ip_to_deploy) then
           ret = node.ip
         else
           ret = node.hostname
@@ -296,12 +294,12 @@ require 'ping'
     def taktuk_init(opts={})
       taktuk_opts = {}
 
-      connector = @config.common.taktuk_connector
+      connector = @context[:common].taktuk_connector
       taktuk_opts[:connector] = connector unless connector.empty?
 
-      taktuk_opts[:self_propagate] = nil if @config.common.taktuk_auto_propagate
+      taktuk_opts[:self_propagate] = nil if @context[:common].taktuk_auto_propagate
 
-      tree_arity = @config.common.taktuk_tree_arity
+      tree_arity = @context[:common].taktuk_tree_arity
       unless opts[:scattering].nil?
         case opts[:scattering]
         when :chain
