@@ -451,3 +451,20 @@ module Debug
     end
   end
 end
+
+
+module Printer
+  def debug(level,msg,opts={})
+    return unless output()
+    output().verbosel(level,msg,nodes())
+  end
+
+  def log(operation,value=nil,nodeset=nil,opts={})
+    return unless logger()
+    if opts[:increment]
+      logger().increment(operation, nodeset)
+    else
+      logger().set(operation,value,nodeset)
+    end
+  end
+end
