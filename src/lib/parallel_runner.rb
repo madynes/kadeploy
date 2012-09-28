@@ -23,7 +23,7 @@ require 'thread'
     # * output: instance of OutputControl
     # Output
     # * nothing
-    def initialize(output, nodesetid=0)
+    def initialize(output, nodesetid=-1)
       @execs = {}
       @output = output
       @nodesetid = nodesetid
@@ -71,15 +71,14 @@ require 'thread'
       @threads.list.each do |thr|
         thr.join
       end
-      @threads = nil
+      @threads = ThreadGroup.new
     end
 
     # Kill every running process
     def kill
-      unless @threads.nil?
-        @threads.list.each do |thr|
-          Thread.kill(thr)
-        end
+      @threads.list.each do |thr|
+        thr.kill! if thr.alive?
+        thr.join
       end
       @execs.each_value do |exec|
         exec.kill

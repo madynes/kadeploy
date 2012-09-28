@@ -10,6 +10,11 @@ require 'debug'
 require 'checkrights'
 require 'error'
 require 'configparser'
+require 'macrostep'
+require 'stepdeployenv'
+require 'stepbroadcastenv'
+require 'stepbootnewenv'
+require 'microsteps'
 
 #Ruby libs
 require 'optparse'
@@ -17,8 +22,6 @@ require 'ostruct'
 require 'fileutils'
 require 'resolv'
 require 'yaml'
-
-#require 'pp'
 
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 R_HTTP = /^http[s]?:\/\//
@@ -629,7 +632,6 @@ module ConfigInformation
         return false
       end
 
-      #pp @common
       cp.unused().each do |path|
         puts "Warning(#{configfile}) Unused field '#{path}'"
       end
@@ -733,6 +735,7 @@ module ConfigInformation
           clfile = cp.value(
             'conf_file',String,nil,{ :type => 'file', :readable => true }
           )
+          conf.prefix = cp.value('prefix',String,'')
           return false unless load_cluster_specific_config_file(clname,clfile)
 
           cp.parse('nodes',true,Array) do |info|
@@ -781,8 +784,6 @@ module ConfigInformation
         puts "Error(#{configfile}) #{ae.message}"
         return false
       end
-
-      #pp @common.nodes_desc
 
       if @common.nodes_desc.empty? then
         puts "The nodes list is empty"
@@ -1021,52 +1022,49 @@ module ConfigInformation
 
         cp.parse('automata',true) do
           cp.parse('macrosteps',true) do
-            macroname = ''
-            insts = []
-            treatmacro = Proc.new do
+            microsteps = Microstep.instance_methods.select{ |name| name =~ /^ms_/ }
+            microsteps.collect!{ |name| name.sub(/^ms_/,'') }
+
+            treatmacro = Proc.new do |macroname|
+              insts = ObjectSpace.each_object(Class).select { |klass|
+                klass.ancestors.include?(Module.const_get(macroname))
+              } unless macroname.empty?
+              insts.collect!{ |klass| klass.name.sub(/^#{macroname}/,'') }
               macroinsts = []
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]
+                  microconf = nil
+                  cp.parse('microsteps',false,Array) do |info|
+                    unless info[:empty]
+                      microconf = {} unless microconf
+                      microconf[cp.value('name',String,nil,microsteps).to_sym]={
+                        :timeout => cp.value('timeout',Fixnum,0),
+                        :raisable => cp.value(
+                          'raisable',[TrueClass,FalseClass],true
+                        ),
+                        :breakpoint => cp.value(
+                          'breakpoint',[TrueClass,FalseClass],false
+                        ),
+                        :retries => cp.value('retries',Fixnum,0),
+                      }
+                    end
+                  end
                   macroinsts << [
                     macroname + cp.value('type',String,nil,insts),
-                    cp.value('retries',Fixnum),
-                    cp.value('timeout',Fixnum),
+                    cp.value('retries',Fixnum,0),
+                    cp.value('timeout',Fixnum,0),
+                    cp.value('raisable',[TrueClass,FalseClass],true),
+                    cp.value('breakpoint',[TrueClass,FalseClass],false),
+                    microconf
                   ]
                 end
               end
               conf.workflow_steps << MacroStep.new(macroname,macroinsts)
             end
 
-            macroname = 'SetDeploymentEnv'
-            insts = [
-              'Untrusted',
-              'Kexec',
-              'UntrustedCustomPreInstall',
-              'Prod',
-              'Nfsroot',
-              'Dummy'
-            ]
-            treatmacro.call
-
-            macroname = 'BroadcastEnv'
-            insts = [
-              'Chain',
-              'Kastafior',
-              'Tree',
-              'Bittorrent',
-              'Dummy',
-            ]
-            treatmacro.call
-
-            macroname = 'BootNewEnv'
-            insts = [
-              'Kexec',
-              'PivotRoot',
-              'Classical',
-              'HardReboot',
-              'Dummy',
-            ]
-            treatmacro.call
+            treatmacro.call('SetDeploymentEnv')
+            treatmacro.call('BroadcastEnv')
+            treatmacro.call('BootNewEnv')
           end
         end
 
@@ -1098,7 +1096,6 @@ module ConfigInformation
       end
 
 
-      #pp @cluster_specific[cluster]
       cp.unused().each do |path|
         puts "Warning(#{configfile}) Unused field '#{path}'"
       end
@@ -1185,12 +1182,12 @@ module ConfigInformation
             if (node.cmd.instance_variable_defined?("@#{kind}")) then
               node.cmd.instance_variable_set("@#{kind}", val)
             else
-              puts "Unknown command kind: #{content[2]}"
+              puts "Unknown command kind: #{kind}"
               return false
             end
           end
         else
-          puts "The node #{content[1]} does not exist"
+          puts "The node #{nodename} does not exist"
           return false
         end
       end
@@ -1543,7 +1540,25 @@ module ConfigInformation
           exec_specific.disable_disk_partitioning = true
         }
         opt.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
-          if (m =~ /\A[a-zA-Z0-9_]+:[a-zA-Z0-9_]+\Z/)
+          # Gathering a list of availables microsteps
+          microsteps = Microstep.instance_methods.select{
+            |name| name =~ /^ms_/
+          }
+          microsteps.collect!{ |name| name.sub(/^ms_/,'') }
+
+          # Gathering a list of availables macrosteps
+          macrosteps = ObjectSpace.each_object(Class).select { |klass|
+            klass.ancestors.include?(Macrostep)
+          }
+          macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+            klass.superclass == Macrostep
+          }
+          # Do not consider rought step names as valid
+          macrointerfaces.each { |interface| macrosteps.delete(interface) }
+          macrosteps.collect!{ |klass| klass.name }
+
+          tmp = m.split(':',2)
+          if macrosteps.include?(tmp[0]) and microsteps.include?(tmp[1])
             exec_specific.breakpoint_on_microstep = m
           else
             error("The value #{m} for the breakpoint entry is invalid")
@@ -1589,17 +1604,57 @@ module ConfigInformation
           end
         }
         opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
+          # Gathering a list of availables microsteps
+          microsteps = Microstep.instance_methods.select{
+            |name| name =~ /^ms_/
+          }
+          microsteps.collect!{ |name| name.sub(/^ms_/,'') }
+
+          # Gathering a list of availables macrosteps
+          macrosteps = ObjectSpace.each_object(Class).select { |klass|
+            klass.ancestors.include?(Macrostep)
+          }
+          macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+            klass.superclass == Macrostep
+          }
+          # Do not consider rought step names as valid
+          macrointerfaces.each { |interface| macrosteps.delete(interface) }
+          macrointerfaces.collect! { |klass| klass.name }
+          macrosteps.collect!{ |klass| klass.name }
+
           s.split("&").each { |macrostep|
-            macrostep_name = macrostep.split("|")[0]
-            microstep_list = macrostep.split("|")[1]
-            tmp = Array.new
-            microstep_list.split(",").each { |instance_infos|
-              instance_name = instance_infos.split(":")[0]
-              instance_max_retries = instance_infos.split(":")[1].to_i
-              instance_timeout = instance_infos.split(":")[2].to_i
-              tmp.push([instance_name, instance_max_retries, instance_timeout])
+            macroname = macrostep.split("|")[0]
+            unless macrointerfaces.include?(macroname)
+              error("Invalid macrostep kind '#{macroname}'")
+              return false
+            end
+            instances = macrostep.split("|")[1]
+            insts = []
+
+            instances.split(",").each { |instance|
+              inst_name = instance.split(":")[0]
+              unless macrosteps.include?(inst_name)
+                error("Invalid macrostep instance '#{inst_name}'")
+                return false
+              end
+              inst_retries = instance.split(":")[1]
+              begin
+                inst_retries = Integer(inst_retries)
+              rescue ArgumentError
+                error("The number of retries '#{inst_retries}' is not an integer")
+                return false
+              end
+              inst_timeout = instance.split(":")[2]
+              begin
+                inst_timeout = Integer(inst_timeout)
+              rescue ArgumentError
+                error("The timeout '#{inst_timeout}' is not an integer")
+                return false
+              end
+
+              insts << [inst_name, inst_retries, inst_timeout]
             }
-            exec_specific.steps.push(MacroStep.new(macrostep_name, tmp))
+            exec_specific.steps.push(MacroStep.new(macroname, insts))
           }
         }
       end
@@ -2947,6 +3002,7 @@ module ConfigInformation
     attr_accessor :group_of_nodes #Hashtable (key is a command name)
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
+    attr_accessor :prefix
     attr_accessor :drivers
     attr_accessor :pxe_header
     attr_accessor :kernel_params
@@ -2997,6 +3053,7 @@ module ConfigInformation
       @admin_post_install = nil
       @partition_creation_kind = nil
       @partition_file = nil
+      @prefix = nil
       @use_ip_to_deploy = false
     end
     
@@ -3043,6 +3100,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
     
@@ -3090,6 +3148,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
 
