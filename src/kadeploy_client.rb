@@ -234,7 +234,7 @@ if (exec_specific_config != nil) then
   
   tid_array = Array.new
   Signal.trap("INT") do
-    puts "SIGINT trapped, let's clean everything ..."
+    puts "\nSIGINT trapped, let's clean everything ..."
     exit(1)
   end
 

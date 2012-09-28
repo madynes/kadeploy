@@ -733,6 +733,7 @@ module ConfigInformation
           clfile = cp.value(
             'conf_file',String,nil,{ :type => 'file', :readable => true }
           )
+          conf.prefix = cp.value('prefix',String,'')
           return false unless load_cluster_specific_config_file(clname,clfile)
 
           cp.parse('nodes',true,Array) do |info|
@@ -1027,10 +1028,21 @@ module ConfigInformation
               macroinsts = []
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]
+                  microconf = nil
+                  cp.parse('microsteps') do |info|
+                    unless info[:empty]
+                      microconf = [] unless microconf
+                      microconf << {
+                        :name => cp.value('name',String),
+                        :timeout => cp.value('timeout',Fixnum)
+                      }
+                    end
+                  end
                   macroinsts << [
                     macroname + cp.value('type',String,nil,insts),
-                    cp.value('retries',Fixnum),
+                    cp.value('retries',Fixnum,0),
                     cp.value('timeout',Fixnum),
+                    microconf
                   ]
                 end
               end
@@ -2947,6 +2959,7 @@ module ConfigInformation
     attr_accessor :group_of_nodes #Hashtable (key is a command name)
     attr_accessor :partition_creation_kind
     attr_accessor :partition_file
+    attr_accessor :prefix
     attr_accessor :drivers
     attr_accessor :pxe_header
     attr_accessor :kernel_params
@@ -2997,6 +3010,7 @@ module ConfigInformation
       @admin_post_install = nil
       @partition_creation_kind = nil
       @partition_file = nil
+      @prefix = nil
       @use_ip_to_deploy = false
     end
     
@@ -3043,6 +3057,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
     
@@ -3090,6 +3105,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partition_creation_kind = @partition_creation_kind.clone
       dest.partition_file = @partition_file.clone
+      dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
 

@@ -18,7 +18,7 @@ class Execute
     self.new(*cmd)
   end
 
-  def self.init_ios
+  def self.init_ios(opts={})
     in_r, in_w = IO::pipe
     in_w.sync = true
 
@@ -28,8 +28,8 @@ class Execute
     [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
   end
 
-  def run()
-    @child_io, @parent_io = Execute.init_ios() unless @child_io and @parent_io
+  def run(opts={})
+    @child_io, @parent_io = Execute.init_ios(opts) unless @child_io and @parent_io
     @exec_pid = fork {
       @parent_io.each { |io| io.close unless io.closed? }
       std = [STDIN, STDOUT, STDERR]
@@ -46,22 +46,22 @@ class Execute
       begin
         return yield(*result)
       ensure
-        wait()
+        wait(opts)
       end
     end
     result
   end
 
-  def run!()
+  def run!(opts={})
     if block_given?
-      run(Proc.new)
+      run(opts,Proc.new)
     else
-      run()
+      run(opts)
     end
     self
   end
 
-  def wait()
+  def wait(opts={})
     unless @exec_pid.nil?
       begin
         Process.wait(@exec_pid)
@@ -69,9 +69,16 @@ class Execute
       rescue Errno::ECHILD
         @status = nil
       ensure
-        @exec_pid = nil
-        @stdout = @parent_io[1].read unless @parent_io[1].closed?
-        @stderr = @parent_io[2].read unless @parent_io[2].closed?
+        if opts[:stdout_size]
+          @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
+        else
+          @stdout = @parent_io[1].read unless @parent_io[1].closed?
+        end
+        if opts[:stderr_size]
+          @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
+        else
+          @stderr = @parent_io[2].read unless @parent_io[2].closed?
+        end
         @parent_io.each { |io| io.close unless io.closed? }
         @child_io = nil
         @parent_io = nil
@@ -84,7 +91,14 @@ class Execute
   def kill()
     @parent_io.each { |io| io.close unless io.closed? } if @parent_io
     @child_io.each { |io| io.close unless io.closed? } if @child_io
-    Process.kill('TERM',@exec_pid) unless @exec_pid.nil?
+    unless @exec_pid.nil?
+      begin
+        Process.kill('TERM',@exec_pid)
+        Process.wait(@exec_pid)
+      rescue Errno::ESRCH
+      end
+      @exec_pid = nil
+    end
   end
 
   def self.do(*cmd,&block)
