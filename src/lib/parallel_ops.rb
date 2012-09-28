@@ -16,10 +16,8 @@ require 'ping'
   class ParallelOperation
     @nodes = nil
     @output = nil
-    @config = nil
-    @cluster_config = nil
+    @context = nil
     @taktuk = nil
-    @waitreboot_threads = nil
 
     # Constructor of ParallelOps
     #
@@ -31,21 +29,15 @@ require 'ping'
     # * process_container: process container
     # Output
     # * nothing
-    def initialize(nodes, config, cluster_config, output)
+    def initialize(nodes, context, output)
       @nodes = nodes
-      @config = config
-      @cluster_config = cluster_config
+      @context = context
       @output = output
       @taktuk = nil
     end
 
     def kill
       @taktuk.kill unless @taktuk.nil?
-      unless @waitreboot_threads.nil?
-        @waitreboot_threads.list.each do |thr|
-          Thread.kill(thr)
-        end
-      end
     end
 
     # Exec a command with TakTuk
@@ -101,81 +93,6 @@ require 'ping'
       end
     end
 
-    # Wait for several nodes after a reboot command and wait a give time the effective reboot
-    #
-    # Arguments
-    # * timeout: time to wait
-    # * ports_up: array of ports that must be up on the rebooted nodes to test
-    # * ports_down: array of ports that must be down on the rebooted nodes to test
-    # * nodes_check_window: instance of WindowManager
-    # * specify if the nodes are in a VLAN
-    # Output
-    # * returns an array that contains two arrays ([0] is the nodes OK and [1] is the nodes KO)
-    def wait_nodes_after_reboot(timeout, ports_up, ports_down, nodes_check_window, vlan = false)
-      nodes_init(
-        :stdout => '',
-        :stderr => 'Unreachable after the reboot',
-        :state => 'KO',
-        :node_state => 'reboot_in_progress'
-      )
-
-      start = Time.now.tv_sec
-      sleep(20)
-
-      t = eval(timeout).to_i
-
-      while (((Time.now.tv_sec - start) < t) && (not @nodes.all_ok?))
-        sleep(5)
-
-        nodes_to_test = Nodes::NodeSet.new
-        @nodes.set.each do |node|
-          nodes_to_test.push(node) if node.state == 'KO'
-        end
-
-        nodes_check_window.launch_on_node_set(nodes_to_test) do |ns|
-          @waitreboot_threads = ThreadGroup.new
-
-          ns.set.each do |node|
-            thr = Thread.new do
-              nodeid = get_nodeid(node,vlan)
-
-              if Ping.pingecho(nodeid, 1, @config.common.ssh_port) then
-                unless ports_test(nodeid,ports_up,true)
-                  node.state = 'KO'
-                  next
-                end
-
-                unless ports_test(nodeid,ports_down,false)
-                  node.state = 'KO'
-                  next
-                end
-
-                node_set(
-                  node,
-                  :state => 'OK',
-                  :status => '0',
-                  :stderr => '',
-                  :node_state => 'rebooted'
-                )
-
-                @output.verbosel(4,"  *** #{node.hostname} is here after #{Time.now.tv_sec - start}s",@nodes)
-              end
-            end
-            @waitreboot_threads.add(thr)
-          end
-
-          #let's wait everybody
-          @waitreboot_threads.list.each do |thr|
-            thr.join
-          end
-          @waitreboot_threads = nil
-        end
-        nodes_to_test = nil
-      end
-
-      nodes_sort(:state => 'OK')
-    end
-
 
     private
 
@@ -187,7 +104,7 @@ require 'ping'
 
     def nodes_array()
       ret = @nodes.make_sorted_array_of_nodes
-      if @cluster_config.use_ip_to_deploy then
+      if @context[:cluster].use_ip_to_deploy then
         ret.collect!{ |node| node.ip }
       else
         ret.collect!{ |node| node.hostname }
@@ -198,7 +115,7 @@ require 'ping'
     # Get a node object by it's host
     def node_get(host)
       ret = nil
-      if @cluster_config.use_ip_to_deploy then
+      if @context[:cluster].use_ip_to_deploy then
         ret = @nodes.get_node_by_ip(host)
       else
         ret = @nodes.get_node_by_host(host)
@@ -211,21 +128,7 @@ require 'ping'
       node.last_cmd_stderr = opts[:stderr] unless opts[:stderr].nil?
       node.last_cmd_exit_status = opts[:status] unless opts[:status].nil?
       node.state = opts[:state] unless opts[:state].nil?
-      @config.set_node_state(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
-    end
-
-    # Get the identifier that allow to contact a node (hostname|ip)
-    def get_nodeid(node,vlan=false)
-      if vlan and !@config.exec_specific.vlan.nil?
-        ret = @config.exec_specific.ip_in_vlan[node.hostname]
-      else
-        if (@cluster_config.use_ip_to_deploy) then
-          ret = node.ip
-        else
-          ret = node.hostname
-        end
-      end
-      ret
+      @context[:config].set_node_state(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
     end
 
     # Set information about a Taktuk command execution
@@ -296,12 +199,12 @@ require 'ping'
     def taktuk_init(opts={})
       taktuk_opts = {}
 
-      connector = @config.common.taktuk_connector
+      connector = @context[:common].taktuk_connector
       taktuk_opts[:connector] = connector unless connector.empty?
 
-      taktuk_opts[:self_propagate] = nil if @config.common.taktuk_auto_propagate
+      taktuk_opts[:self_propagate] = nil if @context[:common].taktuk_auto_propagate
 
-      tree_arity = @config.common.taktuk_tree_arity
+      tree_arity = @context[:common].taktuk_tree_arity
       unless opts[:scattering].nil?
         case opts[:scattering]
         when :chain
@@ -320,30 +223,6 @@ require 'ping'
       @taktuk = taktuk_init(opts)
       yield(@taktuk)
       @taktuk = nil
-    end
-
-    # Test if a node accept or refuse connections on every ports of a list (TCP)
-    def ports_test(nodeid, ports, accept=true)
-      ret = true
-      ports.each do |port|
-        begin
-          s = TCPsocket.open(nodeid, port)
-          s.close
-          unless accept
-            ret = false
-            break
-          end
-        rescue Errno::ECONNREFUSED
-          if accept
-            ret = false
-            break
-          end
-        rescue Errno::EHOSTUNREACH
-          ret = false
-          break
-        end
-      end
-      ret
     end
   end
 #end

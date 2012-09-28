@@ -225,8 +225,13 @@ class KadeployServer
   # Output
   # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
   def async_deploy_ended?(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.ended?
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      res = true
+      workflows.each do |workflow|
+        res = res && workflow.done?
+        break unless res
+      end
+      res
     }
   end
 
@@ -237,8 +242,13 @@ class KadeployServer
   # Output
   # * return true if the workflow encountered and error, false if not, and nil if the workflow does not exist
   def async_deploy_file_error?(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.async_file_error
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      res = FetchFileError::NO_ERROR
+      workflows.each do |workflow|
+        res = workflow.errno
+        break unless res == FetchFileError::NO_ERROR
+      end
+      res
     }
   end
 
@@ -249,8 +259,17 @@ class KadeployServer
   # Output
   # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
   def async_deploy_get_results(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.get_results
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      res = {
+        'nodes_ok' => {},
+        'nodes_ko' => {},
+      }
+      workflows.each do |workflow|
+        res['nodes_ok'].merge!(workflow.nodes_ok)
+        res['nodes_ok'].merge!(workflow.nodes_brk)
+        res['nodes_ko'].merge!(workflow.nodes_ko)
+      end
+      res
     }
   end
 
@@ -261,12 +280,9 @@ class KadeployServer
   # Output
   # * return true if the deployment has been freed and nil if workflow id does no exist
   def async_deploy_free(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.db.disconnect
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      workflows.first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      #let's free memory at the end of the workflow
-      workflow.finalize()
-      workflow = nil
       GC.start
       true
     }
@@ -279,13 +295,12 @@ class KadeployServer
   # Output
   # * return true if the deployment has been killed and nil if workflow id does no exist
   def async_deploy_kill(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.kill()
-      workflow.db.disconnect
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      workflows.each do |workflow|
+        workflow.kill()
+      end
+      workflows[0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      #let's free memory at the end of the workflow
-      workflow.finalize()
-      workflow = nil
       GC.start
       true
     }
@@ -386,6 +401,97 @@ class KadeployServer
 
 
   private
+  def run_kadeploy(db, exec_specific, client=nil)
+    config = ConfigInformation::Config.new(true)
+    config.common = @config.common
+    config.exec_specific = exec_specific
+    config.cluster_specific = Hash.new
+
+    exec_specific.node_set.group_by_cluster.each_key do |cluster|
+      config.cluster_specific[cluster] =
+        ConfigInformation::ClusterSpecificConfig.new
+      @config.cluster_specific[cluster].duplicate_all(
+        config.cluster_specific[cluster]
+      )
+    end
+
+    context = {
+      :deploy_id => nil,
+      :database => db,
+      :client => client,
+      :syslock => @syslog_lock,
+      :dblock => @deployments_table_lock,
+      :config => config,
+      :common => config.common,
+      :execution => config.exec_specific,
+      :windows => {
+        :reboot => @reboot_window,
+        :check => @nodes_check_window,
+      },
+      :nodesets_id => 0,
+    }
+
+    @workflow_info_hash_lock.lock
+    workflow_id = Digest::SHA1.hexdigest(
+      config.exec_specific.true_user \
+      + Time.now.to_s \
+      + exec_specific.node_set.to_s
+    )
+    context[:deploy_id] = workflow_id
+
+    workflows = []
+    clusters = exec_specific.node_set.group_by_cluster
+    if clusters.size > 1
+      clid = 1
+    else
+      clid = 0
+    end
+    clusters.each_pair do |cluster,nodeset|
+      context[:cluster] = config.cluster_specific[cluster]
+      if clusters.size > 1
+        if context[:cluster].prefix.empty?
+          context[:cluster].prefix = "c#{clid}"
+          clid += 1
+        end
+      else
+        context[:cluster].prefix = ''
+      end
+
+      begin
+        workflow = Workflow.new(nodeset,context.dup)
+      rescue KadeployError
+        @workflow_info_hash_lock.unlock
+        raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+      end
+      kadeploy_add_workflow_info(workflow, workflow_id)
+      workflows << workflow
+    end
+    @workflow_info_hash_lock.unlock
+
+    if clusters.size > 1
+      tmp = ''
+      workflows.each do |workflow|
+        tmp += "  #{Debug.prefix(workflow.context[:cluster].prefix)}: #{workflow.context[:cluster].name}\n"
+      end
+      workflows.first.output.verbosel(0,"\nClusters involved in the deployment:\n#{tmp}\n",nil,false)
+    end
+
+    # Run workflows
+    if block_given?
+      begin
+        yield(workflow_id,workflows)
+      ensure
+        #let's free memory at the end of the workflow
+        @workflow_info_hash_lock.lock
+        kadeploy_delete_workflow_info(workflow_id)
+        @workflow_info_hash_lock.unlock
+        config = nil
+      end
+      true
+    else
+      [workflow_id,workflows]
+    end
+  end
 
   ##################################
   #         Kadeploy Sync          #
@@ -400,87 +506,57 @@ class KadeployServer
   # Output
   # * return true
   def run_kadeploy_sync(db, client, exec_specific, drb_server)
-    #We create a new instance of Config with a specific exec_specific part
-    config = ConfigInformation::Config.new(true)
-    config.common = @config.common
-    config.exec_specific = exec_specific
-    config.cluster_specific = Hash.new
+    begin
+      run_kadeploy(db,exec_specific,client) do |wid,workflows|
+        # Prepare client
+        client.set_workflow_id(wid)
+        client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
 
-    #Overide the configuration if the steps are specified in the command line
-    if (not exec_specific.steps.empty?) then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
-      }
-      #If the environment specifies a preinstall, we override the automata to use specific preinstall
-    elsif (exec_specific.environment.preinstall != nil) then
-      Debug::distant_client_error("A specific presinstall will be used with this environment", client)
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-        instance = config.cluster_specific[cluster].get_macro_step("SetDeploymentEnv").get_instance
-        max_retries = instance[1]
-        timeout = instance[2]
-        config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
-      }
-    else
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-      }
-    end
-
-    # Crappy: Kexec optimization can only be used with linux environments -> automata overriding...
-    if (exec_specific.environment.environment_kind != "linux") then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        instances = config.cluster_specific[cluster].get_macro_step("BootNewEnv").get_instances
-        kexec = false
-        instances.each { |instance| kexec = true if (instance[0] == "BootNewEnvKexec") }
-        #retries and timeout should not be hardcoded
-        config.cluster_specific[cluster].replace_macro_step("BootNewEnv", 
-                                                            ["BootNewEnvClassical", 
-                                                             2, 
-                                                             config.cluster_specific[cluster].timeout_reboot_classical.to_i + 200]
-                                                            ) if kexec
-      }
-    end
-
-    @workflow_info_hash_lock.lock
-    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
-    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
-    kadeploy_add_workflow_info(workflow, workflow_id)
-    @workflow_info_hash_lock.unlock
-    client.set_workflow_id(workflow_id)
-    client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
-    finished = false
-    Thread.new {
-      while (not finished) do
-        begin
-          client.test()
-        rescue DRb::DRbConnError
-          workflow.output.disable_client_output()
-          workflow.output.verbosel(3, "Client disconnection")
-          workflow.kill()
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+        # Client disconnection fallback
+        finished = false
+        Thread.new do
+          while (not finished) do
+            begin
+              client.test()
+            rescue DRb::DRbConnError
+              workflows.each do |workflow|
+                workflow.output.disable_client_output()
+              end
+              workflows.first.output.verbosel(3, "Client disconnection")
+              kadeploy_sync_kill_workflow(wid)
+              drb_server.stop_service()
+              db.disconnect()
+              finished = true
+            end
+            sleep(1)
+          end
         end
-        sleep(1)
+
+        # Run workflows
+        threads = []
+        workflows.each { |workflow| threads << workflow.run! }
+        threads.each { |thread| thread.join }
+        workflows.each do |workflow|
+          clname = workflow.context[:cluster].name
+          unless workflow.nodes_brk.empty?
+            client.print("Nodes breakpointed on cluster #{clname}")
+            client.print(workflow.nodes_brk.to_s(false,false,"\n"))
+          end
+          unless workflow.nodes_ok.empty?
+            client.print("Nodes correctly deployed on cluster #{clname}")
+            client.print(workflow.nodes_ok.to_s(false,false,"\n"))
+          end
+          unless workflow.nodes_ko.empty?
+            client.print("Nodes not correctly deployed on cluster #{clname}")
+            client.print(workflow.nodes_ko.to_s(false,true,"\n"))
+          end
+        end
+        finished = true
       end
-    }
-    if (workflow.prepare() && workflow.manage_files(false)) then
-      workflow.run_sync()
-    else
-      workflow.output.verbosel(0, "Cannot run the deployment")
+    rescue KadeployError => ke
+      Debug::distant_client_error("Cannot run the deployment",client)
+      kadeploy_sync_kill_workflow(ke.context[:wid])
     end
-    finished = true
-    #let's free memory at the end of the workflow
-    @workflow_info_hash_lock.lock
-    kadeploy_delete_workflow_info(workflow_id)
-    @workflow_info_hash_lock.unlock
-    workflow.finalize()
-    workflow = nil
-    config = nil
     return true
   end
 
@@ -494,8 +570,9 @@ class KadeployServer
     # id == -1 means that the workflow has not been launched yet
     @workflow_info_hash_lock.synchronize {
       if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
-        workflow = @workflow_info_hash[workflow_id]
-        workflow.kill()
+        @workflow_info_hash[workflow_id].each do |workflow|
+          workflow.kill()
+        end
         kadeploy_delete_workflow_info(workflow_id)
       end
     }
@@ -509,7 +586,8 @@ class KadeployServer
   # Output
   # * nothing
   def kadeploy_add_workflow_info(workflow_ptr, workflow_id)
-    @workflow_info_hash[workflow_id] = workflow_ptr
+    @workflow_info_hash[workflow_id] = [] unless @workflow_info_hash[workflow_id]
+    @workflow_info_hash[workflow_id] << workflow_ptr
   end
 
   # Delete the information of a workflow
@@ -521,10 +599,6 @@ class KadeployServer
   def kadeploy_delete_workflow_info(workflow_id)
     @workflow_info_hash.delete(workflow_id)
   end
-
-
-
-
 
   ##################################
   #        Kadeploy Async          #
@@ -538,61 +612,18 @@ class KadeployServer
   # Output
   # * return a workflow (id, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded)
   def run_kadeploy_async(db, exec_specific)
-    #We create a new instance of Config with a specific exec_specific part
-    config = ConfigInformation::Config.new("empty")
-    config.common = @config.common
-    config.exec_specific = exec_specific
-    config.cluster_specific = Hash.new
-    #Overide the configuration if the steps are specified in the command line
-    if (not exec_specific.steps.empty?) then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
-      }
-    #If the environment specifies a preinstall, we override the automata to use specific preinstall
-    elsif (exec_specific.environment.preinstall != nil) then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-        instance = config.cluster_specific[cluster].get_macro_step("SetDeploymentEnv").get_instance
-        max_retries = instance[1]
-        timeout = instance[2]
-        config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
-      }
-    else
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-      }
+    wid, workflows = nil
+    begin
+      wid, workflows = run_kadeploy(db,exec_specific)
+    rescue KadeployError => ke
+      async_deploy_kill(ke.context[:wid])
+      async_deploy_free(ke.context[:wid])
+      return nil, ke.errno
     end
 
-    # Crappy: Kexec optimization can only be used with linux environments -> automata overriding...
-    if (exec_specific.environment.environment_kind != "linux") then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        instances = config.cluster_specific[cluster].get_macro_step("BootNewEnv").get_instances
-        kexec = false
-        instances.each { |instance| kexec = true if (instance[0] == "BootNewEnvKexec") }
-        #retries and timeout should not be hardcoded
-        config.cluster_specific[cluster].replace_macro_step("BootNewEnv",
-                                                            ["BootNewEnvClassical",
-                                                             2,
-                                                             config.cluster_specific[cluster].timeout_reboot_classical.to_i + 200]
-                                                            ) if kexec
-      }
-    end
+    workflows.each { |workflow| workflow.run! }
 
-    @workflow_info_hash_lock.lock
-    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
-    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
-    kadeploy_add_workflow_info(workflow, workflow_id)
-    @workflow_info_hash_lock.unlock
-    if workflow.prepare() then
-      workflow.run_async()
-      return workflow_id, KadeployAsyncError::NO_ERROR
-    else
-      async_deploy_free(workflow_id)
-      return nil, KadeployAsyncError::NODES_DISCARDED # all the nodes are involved in another deployment
-    end
+    return wid, KadeployAsyncError::NO_ERROR
   end
 
   # Take a lock on the workflow_info_hash and execute a block with the given workflow_id
@@ -1338,13 +1369,28 @@ class KadeployServer
     @workflow_info_hash_lock.lock
     if (@workflow_info_hash.has_key?(workflow_id)) then
       hash = Hash.new
-      hash[workflow_id] = @workflow_info_hash[workflow_id].get_state
+
+      workflows = @workflow_info_hash[workflow_id]
+      states = nil
+      workflows.each do |workflow|
+        state = workflow.get_state
+        states = tmp if states.nil?
+        states['nodes'].merge!(state['nodes'])
+      end
+      hash[workflow_id] = states
+
       str = hash.to_yaml
       hash = nil
     elsif (workflow_id == "") then
       hash = Hash.new
       @workflow_info_hash.each_pair { |key,workflow_info_hash|
-        hash[key] = workflow_info_hash.get_state
+        states = nil
+        workflow_info_hash.each do |workflow|
+          state = workflow.get_state
+          states = tmp if states.nil?
+          states['nodes'].merge!(state['nodes'])
+        end
+        hash[key] = states
       }
       str = hash.to_yaml
       hash = nil
