@@ -7,23 +7,10 @@
 require 'debug'
 require 'macrostep'
 
-module MacroSteps
-  class BootNewEnv < MacroStep
-    def initialize(max_retries, timeout, cluster, nodes, queue_manager, reboot_window, nodes_check_window, output, logger)
-
-      super(
-        max_retries,
-        timeout,
-        cluster,
-        nodes,
-        queue_manager,
-        reboot_window,
-        nodes_check_window,
-        output,
-        logger,
-        3
-      )
-
+#module MacroSteps
+  class BootNewEnv < Macrostep
+    def load_config()
+      super()
     end
   end
 
@@ -71,66 +58,62 @@ module MacroSteps
       return kernel_params
     end
 
-    def microsteps(step)
-      ret = true
-      ret = ret && step.switch_pxe("deploy_to_deployed_env")
-      ret = ret && step.umount_deploy_part
-      ret = ret && step.mount_deploy_part
-      ret = ret && step.kexec(
-        @config.exec_specific.environment.environment_kind,
-        @config.common.environment_extraction_dir,
-        @config.exec_specific.environment.kernel,
-        @config.exec_specific.environment.initrd,
-        get_kernel_params()
-      )
-      ret = ret && step.set_vlan
-      ret = ret && step.wait_reboot("kexec","user",true)
-      return ret
+    def tasks()
+      [
+        [ :switch_pxe, "deploy_to_deployed_env" ],
+        [ :umount_deploy_part ],
+        [ :mount_deploy_part ],
+        [ :kexec,
+          @config.exec_specific.environment.environment_kind,
+          @config.common.environment_extraction_dir,
+          @config.exec_specific.environment.kernel,
+          @config.exec_specific.environment.initrd,
+          get_kernel_params()
+        ],
+        [ :set_vlan ],
+        [ :wait_reboot, "kexec", "user", true ],
+      ]
     end
   end
 
   class BootNewEnvPivotRoot < BootNewEnv
-    def microsteps(step)
-      @output.verbosel(0, "BootNewEnvPivotRoot is not yet implemented")
+    def start!
+      debug(0, "#{self.class.name} is not yet implemented")
+      kill()
       return false
     end
   end
 
   class BootNewEnvClassical < BootNewEnv
-    def microsteps(step)
-      ret = true
-      ret = ret && step.switch_pxe("deploy_to_deployed_env")
-      ret = ret && step.umount_deploy_part
-      ret = ret && step.reboot_from_deploy_env
-      ret = ret && step.set_vlan
-      ret = ret && step.wait_reboot("classical","user",true)
-      return ret
+    def tasks()
+      [
+        [ :switch_pxe, "deploy_to_deployed_env" ],
+        [ :umount_deploy_part ],
+        [ :reboot_from_deploy_env ],
+        [ :set_vlan ],
+        [ :wait_reboot, "classical", "user", true ],
+      ]
     end
   end
 
   class BootNewEnvHardReboot < BootNewEnv
-    def microsteps(step)
-      ret = true
-      ret = ret && step.switch_pxe("deploy_to_deployed_env")
-      ret = ret && step.reboot("hard", false)
-      ret = ret && step.set_vlan
-      ret = ret && step.wait_reboot("classical","user",true)
-      return ret
+    def tasks()
+      [
+        [ :switch_pxe, "deploy_to_deployed_env" ],
+        [ :reboot, "hard", false ],
+        [ :set_vlan ],
+        [ :wait_reboot, "classical", "user", true ],
+      ]
     end
   end
 
   class BootNewEnvDummy < BootNewEnv
-    def run
-      tid = Thread.new {
-        @queue_manager.next_macro_step(get_macro_step_name, @nodes)
-        @queue_manager.decrement_active_threads
-        finalize()
-      }
-      return tid
+    def start()
+      true
     end
 
-    def microsteps(step)
-      return true
+    def tasks()
+      []
     end
   end
 end

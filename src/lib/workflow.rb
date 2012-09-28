@@ -6,6 +6,7 @@
 #Kadeploy libs
 require 'debug'
 require 'nodes'
+require 'automata'
 require 'config'
 require 'cache'
 require 'macrostep'
@@ -23,6 +24,187 @@ require 'thread'
 require 'uri'
 require 'tempfile'
 
+class Workflow < TaskManager
+  include Printer
+  attr_reader :nodes_brk, :nodes_ok, :nodes_ko, :tasks
+
+  def initialize(nodeset,context={})
+    super(nodeset,context)
+    @nodes_brk = Nodes::NodeSet.new
+    @nodes_ok = Nodes::NodeSet.new
+    @nodes_ko = Nodes::NodeSet.new
+    @tasks = []
+
+    @output = Debug::OutputControl.new(
+      context[:execution].verbose_level || context[:common].verbose_level,
+      context[:execution].debug,
+      context[:client],
+      context[:execution].true_user,
+      context[:deploy_id],
+      context[:common].dbg_to_syslog,
+      context[:common].dbg_to_syslog_level,
+      context[:syslock]
+    )
+
+    @logger = Debug::Logger.new(
+      nodes,
+      context[:config],
+      context[:database],
+      context[:execution].true_user,
+      context[:deploy_id],
+      Time.now,
+      "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}",
+      context[:execution].load_env_kind == "file",
+      context[:syslock]
+    )
+  end
+
+  def load_tasks()
+    context[:cluster].workflow_steps.each do |instance|
+      @tasks << [ instance[0].to_sym ]
+    end
+  end
+
+  def load_config()
+    context[:cluster].workflow_steps.each do |instance|
+      conf_task(instance[0].to_sym, {
+        :retries => instance[1],
+        :timeout => instance[2],
+      })
+    end
+
+    if context[:execution].breakpoint_on_microstep
+      macro,micro = context[:execution].breakpoint_on_microstep.split(':')
+      conf_task(macro.to_sym, {
+        :config => {
+          micro.to_sym => {
+            :breakpoint => true
+          }
+        }
+      })
+    end
+  end
+
+=begin
+  def load_context(config,rebootw,checkw)
+    @static_context.merge({
+      :deploy_id => deploy_id,
+      :database => db,
+      :client => client,
+      :syslock => syslock,
+      :config => config
+      :common => config.common,
+      :cluster => nil,
+      :cluster => config.cluster_specific[task.nodes.set.first.cluster]
+      :execution => config.exec_specific,
+      :windows => {
+        :reboot => rebootw,
+        :check => checkw,
+      }
+    })
+  end
+
+
+  @nodes_ko.group_by_cluster.each_pair { |cluster, set|
+    @output.verbosel(0, "Nodes not correctly deployed on cluster #{cluster}")
+    @output.verbosel(0, set.to_s(false, true, "\n"))
+  }
+  @client.generate_files(@nodes_ok, @nodes_ko) if @client != nil
+  Cache::remove_files(@config.common.kadeploy_cache_dir, /#{@config.exec_specific.prefix_in_cache}/, @output) if @config.exec_specific.load_env_kind == "file"
+  @logger.dump
+
+
+  if ((@async_deployment) && (@config.common.async_end_of_deployment_hook != "")) then
+    tmp = cmd = @config.common.async_end_of_deployment_hook.clone
+    while (tmp.sub!("WORKFLOW_ID", @deploy_id) != nil)  do
+      cmd = tmp
+    end
+    system(cmd)
+  end
+}
+=end
+
+  def create_task(idx,subidx,nodes,context)
+    taskval = get_task(idx,subidx)
+    taskconf = @config[taskval[0].to_sym][:config]
+
+    begin
+      klass = Module.const_get(taskval[0].to_s)
+    rescue NameError
+      raise "Invalid kind of Macrostep #{taskval[0]}"
+    end
+
+    ret << klass.new(
+      taskval[0],
+      idx,
+      subidx,
+      set,
+      @queue,
+      context,
+      nil
+    ).config(taskconf)
+  end
+
+  def get_state
+    {
+      'user' => context[:execution].true_user,
+      'deploy_id' => @deploy_id,
+      'environment_name' => context[:execution].environment.name,
+      'environment_version' => context[:execution].environment.version,
+      'environment_user' => context[:execution].user,
+      'anonymous_environment' => (context[:execution].load_env_kind == "file"),
+      'nodes' => context[:execution].nodes_state,
+    }
+  end
+
+  def kill
+    super()
+    @nodes_ok.clean()
+    @nodes.linked_copy(@nodes_ko)
+  end
+
+  def break!(task,nodeset)
+    debug(4,"<<< Add #{nodeset.to_s_fold} from #{task.name} to BRK nodeset")
+  end
+
+  def success!(task,nodeset)
+    @logger.set('success', true, nodeset)
+    debug(4,"<<< Add #{nodeset.to_s_fold} from #{task.name} to OK nodeset")
+  end
+
+  def fail!(task,nodeset)
+    @logger.set('success', false, nodeset)
+    @logger.error(nodeset)
+    debug(4,"<<< Add #{nodeset.to_s_fold} from #{task.name} to KO nodeset")
+  end
+
+  def done!()
+    context[:client].generate_files(@nodes_ok, @nodes_ko) if @client != nil
+  end
+
+  def retry!(task)
+    log(task.nodes, "retry_step#{task.idx+1}",nil, :increment => true)
+  end
+
+  def timeout!(task)
+    debug(1,
+      "Timeout in [#{task.name}] before the end of the step, "\
+      "let's kill the instance"
+    )
+    task.nodes.set_error_msg("Timeout in the #{task.name} step")
+  end
+
+  def split!(ns,ns1,ns2)
+    debug(1,"Nodeset(#{ns.id}) split into :")
+    debug(1,"  Nodeset(#{ns1.id}): #{ns1.to_s_fold}")
+    debug(1,"  Nodeset(#{ns2.id}): #{ns2.to_s_fold}")
+  end
+
+  def kill!()
+    debug(2,"!!! Kill a #{self.class.name} instance")
+  end
+end
+
 module Managers
   class MagicCookie
   end
@@ -31,189 +213,6 @@ module Managers
   end
 
   class MoveException < RuntimeError
-  end
-
-  class QueueManager
-    @queue_deployment_environment = nil
-    @queue_broadcast_environment = nil
-    @queue_boot_new_environment = nil
-    @queue_process_finished_nodes = nil
-    attr_reader :config
-    @nodes_ok = nil
-    @nodes_ko = nil
-    @mutex = nil
-    attr_accessor :nb_active_threads
-
-    # Constructor of QueueManager
-    #
-    # Arguments
-    # * config: instance of Config
-    # * nodes_ok: NodeSet of nodes OK
-    # * nodes_ko: NodeSet of nodes KO
-    # Output
-    # * nothing
-    def initialize(config, nodes_ok, nodes_ko)
-      @config = config
-      @nodes_ok = nodes_ok
-      @nodes_ko = nodes_ko
-      @mutex = Mutex.new
-      @nb_active_threads = 0
-      @queue_deployment_environment = Queue.new
-      @queue_broadcast_environment = Queue.new
-      @queue_boot_new_environment = Queue.new
-      @queue_process_finished_nodes = Queue.new
-      Thread.abort_on_exception = true
-    end
-
-    # Increment the number of active threads
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def increment_active_threads
-      @mutex.synchronize {
-        @nb_active_threads += 1
-      }
-    end
-
-    # Decrement the number of active threads
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def decrement_active_threads
-      @mutex.synchronize {
-        @nb_active_threads -= 1
-      }
-    end
-
-    # Test if the there is only one active thread
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * returns true if there is only one active thread
-    def one_last_active_thread?
-      @mutex.synchronize {
-        return (@nb_active_threads == 1)
-      }
-    end
-
-    # Go to the next macro step in the automata
-    #
-    # Arguments
-    # * current: name of the current macro step (SetDeploymentEnv, BroadcastEnv, BootNewEnv)
-    # * nodes: NodeSet that must be involved in the next step
-    # Output
-    # * raises an exception if a wrong step name is given
-    def next_macro_step(current_step, nodes)
-      if (nodes.set.empty?)
-        raise "Empty node set"
-      else
-        increment_active_threads
-        case current_step
-        when nil
-          @queue_deployment_environment.push(nodes)
-        when "SetDeploymentEnv"
-          @queue_broadcast_environment.push(nodes)
-        when "BroadcastEnv"
-          @queue_boot_new_environment.push(nodes)
-        when "BootNewEnv"
-          @queue_process_finished_nodes.push(nodes)
-        else
-          raise "Wrong step name"
-        end
-      end
-    end
-
-    # Replay a step with another instance
-    #
-    # Arguments
-    # * current: name of the current macro step (SetDeploymentEnv, BroadcastEnv, BootNewEnv)
-    # * cluster: name of the cluster whose the nodes belongs
-    # * nodes: NodeSet that must be involved in the replay
-    # Output
-    # * returns true if the step can be replayed with another instance, false if no other instance is available
-    # * raises an exception if a wrong step name is given    
-    def replay_macro_step_with_next_instance(current_step, cluster, nodes)
-      macro_step = @config.cluster_specific[cluster].get_macro_step(current_step)
-      if not macro_step.use_next_instance then
-        return false
-      else
-        case current_step
-        when "SetDeploymentEnv"
-          @queue_deployment_environment.push(nodes)
-        when "BroadcastEnv"
-          @queue_broadcast_environment.push(nodes)
-        when "BootNewEnv"
-          @queue_boot_new_environment.push(nodes)
-        else
-          raise "Wrong step name"
-        end
-        return true
-      end
-    end
-
-    # Add some nodes in a bad NodeSet
-    #
-    # Arguments
-    # * nodes: NodeSet that must be added in the bad node set
-    # Output
-    # * nothing
-    def add_to_bad_nodes_set(nodes)
-      @nodes_ko.add(nodes)
-      if one_last_active_thread? then
-        #We add an empty node_set to the last state queue
-        @queue_process_finished_nodes.push(Nodes::NodeSet.new)
-      end
-    end
-
-    # Get a new task in the given queue
-    #
-    # Arguments
-    # * queue: name of the queue in which a new task must be taken (SetDeploymentEnv, BroadcastEnv, BootNewEnv, ProcessFinishedNodes)
-    # Output
-    # * raises an exception if a wrong queue name is given
-    def get_task(queue)
-      case queue
-      when "SetDeploymentEnv"
-        return @queue_deployment_environment.pop
-      when "BroadcastEnv"
-        return @queue_broadcast_environment.pop
-      when "BootNewEnv"
-        return @queue_boot_new_environment.pop
-      when "ProcessFinishedNodes"
-        return @queue_process_finished_nodes.pop
-      else
-        raise "Wrong queue name"
-      end
-    end
-
-    # Send an exit signal in order to ask the terminaison of the threads (used to avoid deadlock)
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def send_exit_signal
-      @queue_deployment_environment.push(MagicCookie.new)
-      @queue_broadcast_environment.push(MagicCookie.new)
-      @queue_boot_new_environment.push(MagicCookie.new) 
-      @queue_process_finished_nodes.push(MagicCookie.new)
-    end
-
-    # Check if there are some pending events 
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true if there is no more pending events
-    def empty?
-      return @queue_deployment_environment.empty? && @queue_broadcast_environment.empty? && 
-        @queue_boot_new_environment.empty? && @queue_process_finished_nodes.empty?
-    end
   end
 
   class WorkflowManager
