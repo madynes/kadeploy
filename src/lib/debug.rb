@@ -100,11 +100,14 @@ module Debug
     # * nodeset: print with this NodeSet id
     # Output
     # * prints the message on the server and on the client
-    def verbosel(l, msg, nodeset=nil)
-      msg = "(#{nodeset.id}) #{msg}" if nodeset and nodeset.id > 0
+    def verbosel(l, msg, nsid=nil)
+      msg = "(#{nsid}) #{msg}" if !nsid.nil? and nsid > 0
 
       if ((l <= @verbose_level) && @client_output)
-        @client.print(msg)
+        begin
+          @client.print(msg)
+        rescue DRb::DRbConnError
+        end
       end
       server_str = "#{@deploy_id}|#{@user} -> #{msg}"
       puts server_str
@@ -448,6 +451,23 @@ module Debug
       rescue
         puts "Cannot write in the log file #{@config.common.log_to_file}"
       end
+    end
+  end
+end
+
+
+module Printer
+  def debug(level,msg,nodesetid=nil,opts={})
+    return unless output()
+    output().verbosel(level,msg,nodesetid)
+  end
+
+  def log(operation,value=nil,nodeset=nil,opts={})
+    return unless logger()
+    if opts[:increment]
+      logger().increment(operation, nodeset)
+    else
+      logger().set(operation,value,nodeset)
     end
   end
 end

@@ -19,6 +19,7 @@ require 'tempfile'
 
 module Managers
   class GrabFileManager
+    include Printer
     @config = nil
     @output = nil
     @client = nil

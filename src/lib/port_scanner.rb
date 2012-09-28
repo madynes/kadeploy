@@ -36,4 +36,28 @@ module PortScanner
       return res
     end
   end
+
+  # Test if a node accept or refuse connections on every ports of a list (TCP)
+  def self.ports_test(nodeid, ports, accept=true)
+    ret = true
+    ports.each do |port|
+      begin
+        s = TCPsocket.open(nodeid, port)
+        s.close
+        unless accept
+          ret = false
+          break
+        end
+      rescue Errno::ECONNREFUSED
+        if accept
+          ret = false
+          break
+        end
+      rescue Errno::EHOSTUNREACH
+        ret = false
+        break
+      end
+    end
+    ret
+  end
 end
