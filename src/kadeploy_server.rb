@@ -225,8 +225,13 @@ class KadeployServer
   # Output
   # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
   def async_deploy_ended?(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.ended?
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      res = true
+      workflows.each do |workflow|
+        res = res && workflow.done?
+        break unless res
+      end
+      res
     }
   end
 
@@ -237,8 +242,13 @@ class KadeployServer
   # Output
   # * return true if the workflow encountered and error, false if not, and nil if the workflow does not exist
   def async_deploy_file_error?(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.async_file_error
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      res = FetchFileError::NO_ERROR
+      workflows.each do |workflow|
+        res = workflow.errno
+        break unless res == FetchFileError::NO_ERROR
+      end
+      res
     }
   end
 
@@ -249,8 +259,20 @@ class KadeployServer
   # Output
   # * return a hastable containing the state of all the nodes involved in the deployment or nil if the workflow does not exist
   def async_deploy_get_results(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.get_results
+    nodes_ok = Nodes::NodeSet.new
+    nodes_ko = Nodes::NodeSet.new
+
+    async_deploy_lock_wid(workflow_id) do |workflows|
+      workflows.each do |workflow|
+        nodes_ok.add(workflow.nodes_ok)
+        nodes_ok.add(workflow.nodes_brk)
+        nodes_ko.add(workflow.nodes_ko)
+      end
+    end
+
+    return {
+      'nodes_ok' => nodes_ok.to_h,
+      'nodes_ko' => nodes_ko.to_h,
     }
   end
 
@@ -261,12 +283,9 @@ class KadeployServer
   # Output
   # * return true if the deployment has been freed and nil if workflow id does no exist
   def async_deploy_free(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.db.disconnect
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      workflows.first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      #let's free memory at the end of the workflow
-      workflow.finalize()
-      workflow = nil
       GC.start
       true
     }
@@ -279,13 +298,12 @@ class KadeployServer
   # Output
   # * return true if the deployment has been killed and nil if workflow id does no exist
   def async_deploy_kill(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflow|
-      workflow.kill()
-      workflow.db.disconnect
+    return async_deploy_lock_wid(workflow_id) { |workflows|
+      workflows.each do |workflow|
+        workflow.kill()
+      end
+      workflows[0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      #let's free memory at the end of the workflow
-      workflow.finalize()
-      workflow = nil
       GC.start
       true
     }
@@ -300,7 +318,7 @@ class KadeployServer
   def async_power_ended?(power_id)
     r = nil
     @power_info_hash_lock.synchronize {
-      r = @power_info_hash[power_id][2][0] if @power_info_hash.has_key?(power_id)
+      r = @power_info_hash[power_id][2] if @power_info_hash.has_key?(power_id)
     }
     return r
   end
@@ -332,7 +350,10 @@ class KadeployServer
   # * return an array containing two arrays (0: nodes_ok, 1: nodes_ko) or nil if the power id does not exist
   def async_power_get_results(power_id)
     if @power_info_hash.has_key?(power_id) then
-      return [@power_info_hash[power_id][0],@power_info_hash[power_id][1]]
+      return {
+        'nodes_ok' => @power_info_hash[power_id][0].to_h,
+        'nodes_ko' => @power_info_hash[power_id][1].to_h
+      }
     else
       return nil
     end
@@ -348,7 +369,7 @@ class KadeployServer
     r = nil
     @reboot_info_hash_lock.synchronize {
       if @reboot_info_hash.has_key?(reboot_id)
-        r = @reboot_info_hash[reboot_id][2][0]
+        r = @reboot_info_hash[reboot_id][2]
       end
     }
     return r
@@ -378,7 +399,10 @@ class KadeployServer
   # * return an array containing two arrays (0: nodes_ok, 1: nodes_ko) or nil if the reboot id does not exist
   def async_reboot_get_results(reboot_id)
     if @reboot_info_hash.has_key?(reboot_id) then
-      return [@reboot_info_hash[reboot_id][0],@reboot_info_hash[reboot_id][1]]
+      return {
+        'nodes_ok' => @reboot_info_hash[reboot_id][0].to_h,
+        'nodes_ko' => @reboot_info_hash[reboot_id][1].to_h
+      }
     else
       return nil
     end
@@ -386,6 +410,97 @@ class KadeployServer
 
 
   private
+  def run_kadeploy(db, exec_specific, client=nil)
+    config = ConfigInformation::Config.new(true)
+    config.common = @config.common
+    config.exec_specific = exec_specific
+    config.cluster_specific = Hash.new
+
+    exec_specific.node_set.group_by_cluster.each_key do |cluster|
+      config.cluster_specific[cluster] =
+        ConfigInformation::ClusterSpecificConfig.new
+      @config.cluster_specific[cluster].duplicate_all(
+        config.cluster_specific[cluster]
+      )
+    end
+
+    context = {
+      :deploy_id => nil,
+      :database => db,
+      :client => client,
+      :syslock => @syslog_lock,
+      :dblock => @deployments_table_lock,
+      :config => config,
+      :common => config.common,
+      :execution => config.exec_specific,
+      :windows => {
+        :reboot => @reboot_window,
+        :check => @nodes_check_window,
+      },
+      :nodesets_id => 0,
+    }
+
+    @workflow_info_hash_lock.lock
+    workflow_id = Digest::SHA1.hexdigest(
+      config.exec_specific.true_user \
+      + Time.now.to_s \
+      + exec_specific.node_set.to_s
+    )
+    context[:deploy_id] = workflow_id
+
+    workflows = []
+    clusters = exec_specific.node_set.group_by_cluster
+    if clusters.size > 1
+      clid = 1
+    else
+      clid = 0
+    end
+    clusters.each_pair do |cluster,nodeset|
+      context[:cluster] = config.cluster_specific[cluster]
+      if clusters.size > 1
+        if context[:cluster].prefix.empty?
+          context[:cluster].prefix = "c#{clid}"
+          clid += 1
+        end
+      else
+        context[:cluster].prefix = ''
+      end
+
+      begin
+        workflow = Workflow.new(nodeset,context.dup)
+      rescue KadeployError
+        @workflow_info_hash_lock.unlock
+        raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+      end
+      kadeploy_add_workflow_info(workflow, workflow_id)
+      workflows << workflow
+    end
+    @workflow_info_hash_lock.unlock
+
+    if clusters.size > 1
+      tmp = ''
+      workflows.each do |workflow|
+        tmp += "  #{Debug.prefix(workflow.context[:cluster].prefix)}: #{workflow.context[:cluster].name}\n"
+      end
+      workflows.first.output.verbosel(0,"\nClusters involved in the deployment:\n#{tmp}\n",nil,false)
+    end
+
+    # Run workflows
+    if block_given?
+      begin
+        yield(workflow_id,workflows)
+      ensure
+        #let's free memory at the end of the workflow
+        @workflow_info_hash_lock.synchronize {
+          kadeploy_delete_workflow_info(workflow_id)
+        }
+        config = nil
+      end
+      true
+    else
+      [workflow_id,workflows]
+    end
+  end
 
   ##################################
   #         Kadeploy Sync          #
@@ -400,87 +515,58 @@ class KadeployServer
   # Output
   # * return true
   def run_kadeploy_sync(db, client, exec_specific, drb_server)
-    #We create a new instance of Config with a specific exec_specific part
-    config = ConfigInformation::Config.new(true)
-    config.common = @config.common
-    config.exec_specific = exec_specific
-    config.cluster_specific = Hash.new
+    begin
+      run_kadeploy(db,exec_specific,client) do |wid,workflows|
+        # Prepare client
+        client.set_workflow_id(wid)
+        client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
 
-    #Overide the configuration if the steps are specified in the command line
-    if (not exec_specific.steps.empty?) then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
-      }
-      #If the environment specifies a preinstall, we override the automata to use specific preinstall
-    elsif (exec_specific.environment.preinstall != nil) then
-      Debug::distant_client_error("A specific presinstall will be used with this environment", client)
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-        instance = config.cluster_specific[cluster].get_macro_step("SetDeploymentEnv").get_instance
-        max_retries = instance[1]
-        timeout = instance[2]
-        config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
-      }
-    else
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-      }
-    end
-
-    # Crappy: Kexec optimization can only be used with linux environments -> automata overriding...
-    if (exec_specific.environment.environment_kind != "linux") then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        instances = config.cluster_specific[cluster].get_macro_step("BootNewEnv").get_instances
-        kexec = false
-        instances.each { |instance| kexec = true if (instance[0] == "BootNewEnvKexec") }
-        #retries and timeout should not be hardcoded
-        config.cluster_specific[cluster].replace_macro_step("BootNewEnv", 
-                                                            ["BootNewEnvClassical", 
-                                                             2, 
-                                                             config.cluster_specific[cluster].timeout_reboot_classical.to_i + 200]
-                                                            ) if kexec
-      }
-    end
-
-    @workflow_info_hash_lock.lock
-    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
-    workflow = Managers::WorkflowManager.new(config, client, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
-    kadeploy_add_workflow_info(workflow, workflow_id)
-    @workflow_info_hash_lock.unlock
-    client.set_workflow_id(workflow_id)
-    client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
-    finished = false
-    Thread.new {
-      while (not finished) do
-        begin
-          client.test()
-        rescue DRb::DRbConnError
-          workflow.output.disable_client_output()
-          workflow.output.verbosel(3, "Client disconnection")
-          workflow.kill()
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+        # Client disconnection fallback
+        finished = false
+        Thread.new do
+          while (not finished) do
+            begin
+              client.test()
+            rescue DRb::DRbConnError
+              workflows.each do |workflow|
+                workflow.output.disable_client_output()
+              end
+              workflows.first.output.verbosel(3, "Client disconnection")
+              kadeploy_sync_kill_workflow(wid)
+              drb_server.stop_service()
+              db.disconnect()
+              finished = true
+            end
+            sleep(1)
+          end
         end
-        sleep(1)
+
+        # Run workflows
+        threads = []
+        workflows.each { |workflow| threads << workflow.run! }
+        threads.each { |thread| thread.join }
+        workflows.each do |workflow|
+          clname = workflow.context[:cluster].name
+          client.print("")
+          unless workflow.nodes_brk.empty?
+            client.print("Nodes breakpointed on cluster #{clname}")
+            client.print(workflow.nodes_brk.to_s(false,false,"\n"))
+          end
+          unless workflow.nodes_ok.empty?
+            client.print("Nodes correctly deployed on cluster #{clname}")
+            client.print(workflow.nodes_ok.to_s(false,false,"\n"))
+          end
+          unless workflow.nodes_ko.empty?
+            client.print("Nodes not correctly deployed on cluster #{clname}")
+            client.print(workflow.nodes_ko.to_s(false,true,"\n"))
+          end
+        end
+        finished = true
       end
-    }
-    if (workflow.prepare() && workflow.manage_files(false)) then
-      workflow.run_sync()
-    else
-      workflow.output.verbosel(0, "Cannot run the deployment")
+    rescue KadeployError => ke
+      Debug::distant_client_error("Cannot run the deployment",client)
+      kadeploy_sync_kill_workflow(ke.context[:wid])
     end
-    finished = true
-    #let's free memory at the end of the workflow
-    @workflow_info_hash_lock.lock
-    kadeploy_delete_workflow_info(workflow_id)
-    @workflow_info_hash_lock.unlock
-    workflow.finalize()
-    workflow = nil
-    config = nil
     return true
   end
 
@@ -494,8 +580,9 @@ class KadeployServer
     # id == -1 means that the workflow has not been launched yet
     @workflow_info_hash_lock.synchronize {
       if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
-        workflow = @workflow_info_hash[workflow_id]
-        workflow.kill()
+        @workflow_info_hash[workflow_id].each do |workflow|
+          workflow.kill()
+        end
         kadeploy_delete_workflow_info(workflow_id)
       end
     }
@@ -509,7 +596,8 @@ class KadeployServer
   # Output
   # * nothing
   def kadeploy_add_workflow_info(workflow_ptr, workflow_id)
-    @workflow_info_hash[workflow_id] = workflow_ptr
+    @workflow_info_hash[workflow_id] = [] unless @workflow_info_hash[workflow_id]
+    @workflow_info_hash[workflow_id] << workflow_ptr
   end
 
   # Delete the information of a workflow
@@ -521,10 +609,6 @@ class KadeployServer
   def kadeploy_delete_workflow_info(workflow_id)
     @workflow_info_hash.delete(workflow_id)
   end
-
-
-
-
 
   ##################################
   #        Kadeploy Async          #
@@ -538,61 +622,18 @@ class KadeployServer
   # Output
   # * return a workflow (id, or nil if all the nodes have been discarded) and an integer (0: no error, 1: nodes discarded)
   def run_kadeploy_async(db, exec_specific)
-    #We create a new instance of Config with a specific exec_specific part
-    config = ConfigInformation::Config.new("empty")
-    config.common = @config.common
-    config.exec_specific = exec_specific
-    config.cluster_specific = Hash.new
-    #Overide the configuration if the steps are specified in the command line
-    if (not exec_specific.steps.empty?) then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_but_steps(config.cluster_specific[cluster], exec_specific.steps)
-      }
-    #If the environment specifies a preinstall, we override the automata to use specific preinstall
-    elsif (exec_specific.environment.preinstall != nil) then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-        instance = config.cluster_specific[cluster].get_macro_step("SetDeploymentEnv").get_instance
-        max_retries = instance[1]
-        timeout = instance[2]
-        config.cluster_specific[cluster].replace_macro_step("SetDeploymentEnv", ["SetDeploymentEnvUntrustedCustomPreInstall", max_retries, timeout])
-      }
-    else
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        config.cluster_specific[cluster] = ConfigInformation::ClusterSpecificConfig.new
-        @config.cluster_specific[cluster].duplicate_all(config.cluster_specific[cluster])
-      }
+    wid, workflows = nil
+    begin
+      wid, workflows = run_kadeploy(db,exec_specific)
+    rescue KadeployError => ke
+      async_deploy_kill(ke.context[:wid])
+      async_deploy_free(ke.context[:wid])
+      return nil, ke.errno
     end
 
-    # Crappy: Kexec optimization can only be used with linux environments -> automata overriding...
-    if (exec_specific.environment.environment_kind != "linux") then
-      exec_specific.node_set.group_by_cluster.each_key { |cluster|
-        instances = config.cluster_specific[cluster].get_macro_step("BootNewEnv").get_instances
-        kexec = false
-        instances.each { |instance| kexec = true if (instance[0] == "BootNewEnvKexec") }
-        #retries and timeout should not be hardcoded
-        config.cluster_specific[cluster].replace_macro_step("BootNewEnv",
-                                                            ["BootNewEnvClassical",
-                                                             2,
-                                                             config.cluster_specific[cluster].timeout_reboot_classical.to_i + 200]
-                                                            ) if kexec
-      }
-    end
+    workflows.each { |workflow| workflow.run! }
 
-    @workflow_info_hash_lock.lock
-    workflow_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
-    workflow = Managers::WorkflowManager.new(config, nil, @reboot_window, @nodes_check_window, db, @deployments_table_lock, @syslog_lock, workflow_id)
-    kadeploy_add_workflow_info(workflow, workflow_id)
-    @workflow_info_hash_lock.unlock
-    if workflow.prepare() then
-      workflow.run_async()
-      return workflow_id, KadeployAsyncError::NO_ERROR
-    else
-      async_deploy_free(workflow_id)
-      return nil, KadeployAsyncError::NODES_DISCARDED # all the nodes are involved in another deployment
-    end
+    return wid, KadeployAsyncError::NO_ERROR
   end
 
   # Take a lock on the workflow_info_hash and execute a block with the given workflow_id
@@ -618,6 +659,209 @@ class KadeployServer
   #         Kareboot Sync          #
   ##################################
 
+  def run_kareboot(output, db, exec_specific, client=nil)
+    nodes_ok = Nodes::NodeSet.new
+    nodes_ko = Nodes::NodeSet.new
+    global_nodes_mutex = Mutex.new
+    threads = []
+
+    #We create a new instance of Config with a specific exec_specific part
+    config = ConfigInformation::Config.new("empty")
+    config.common = @config.common.clone
+    config.cluster_specific = @config.cluster_specific.clone
+    config.exec_specific = exec_specific
+
+    reboot_id = Digest::SHA1.hexdigest(
+      config.exec_specific.true_user \
+      + Time.now.to_s \
+      + exec_specific.node_set.to_s
+    )
+    @reboot_info_hash_lock.synchronize {
+      kareboot_add_reboot_info(reboot_id, nodes_ok, nodes_ko, false)
+    }
+
+    if (exec_specific.reboot_kind == "env_recorded") && 
+        exec_specific.check_prod_env && 
+        exec_specific.node_set.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
+      output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
+      raise KadeployError.new(KarebootAsyncError::DEMOLISHING_ENV,{:rid => reboot_id})
+    end
+
+    if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
+      gfm = Managers::GrabFileManager.new(config, output, client, db)
+      exec_specific.pxe_upload_files.each { |pxe_file|
+        user_prefix = "pxe-#{config.exec_specific.true_user}--"
+        local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
+        if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels), config.common.pxe_repository_kernels_max_size, false) then
+          output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
+          raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,{:rid => reboot_id})
+        end
+=begin
+        if not system("chmod +r #{local_pxe_file}") then
+          output.verbosel(0, "Cannot add read rights on the pxe file")
+          return 3
+        end
+=end
+      }
+      gfm = nil
+    end
+    if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
+      gfm = Managers::GrabFileManager.new(config, output, client, db)
+      user_prefix = "u-#{exec_specific.true_user}--"
+      key = exec_specific.key
+      case key
+      when /^http[s]?:\/\//
+        local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
+      else
+        local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
+      end
+      if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
+                                           config.common.kadeploy_cache_size, false) then
+        output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
+        raise KadeployError.new(FetchFileError::INVALID_KEY,{:rid => reboot_id})
+      end
+      exec_specific.key = local_key
+      gfm = nil
+    end
+
+    context = {
+      :reboot_id => reboot_id,
+      :database => db,
+      :client => client,
+      :syslock => @syslog_lock,
+      :dblock => @deployments_table_lock,
+      :config => config,
+      :common => config.common,
+      :execution => config.exec_specific,
+      :windows => {
+        :reboot => @reboot_window,
+        :check => @nodes_check_window,
+      },
+      :nodesets_id => 0,
+      :local => { :parent => KadeployServer, :retries => 0 }
+    }
+
+    clusters = exec_specific.node_set.group_by_cluster
+    if clusters.size > 1
+      clid = 1
+    else
+      clid = 0
+    end
+
+    clusters.each_key do |cluster|
+      context[:cluster] = config.cluster_specific[cluster]
+      if clusters.size > 1
+        if context[:cluster].prefix.empty?
+          context[:cluster].prefix = "c#{clid}"
+          clid += 1
+        end
+      else
+        context[:cluster].prefix = ''
+      end
+    end
+
+    if clusters.size > 1
+      tmp = ''
+      clusters.each_key do |cluster|
+        tmp += "  #{Debug.prefix(config.cluster_specific[cluster].prefix)}: #{config.cluster_specific[cluster].name}\n"
+      end
+      output.verbosel(0,"\nClusters involved in the reboot operation:\n#{tmp}\n",nil,false)
+    end
+
+    micros = []
+    clusters.each_pair do |cluster, set|
+      context[:cluster] = config.cluster_specific[cluster]
+      threads << Thread.new do
+        ret = KarebootAsyncError::NO_ERROR
+        micro = CustomMicrostep.new(set, context)
+        Thread.current[:micro] = micro
+        micros << micro
+        micro.debug(0,"Rebooting the nodes #{set.to_s_fold}",nil)
+        case exec_specific.reboot_kind
+        when "env_recorded"
+          #This should be the same case than a deployed env
+          micro.switch_pxe("deploy_to_deployed_env")
+        when "set_pxe"
+          micro.switch_pxe("set_pxe", exec_specific.pxe_profile_msg)
+        when "simple_reboot"
+          #no need to change the PXE profile
+        when "deploy_env"
+          micro.switch_pxe("prod_to_deploy_env")
+        else
+          raise "Invalid kind of reboot: #{@reboot_kind}"
+        end
+        micro.reboot(exec_specific.reboot_level)
+        micro.set_vlan unless exec_specific.vlan.nil?
+        if exec_specific.wait then
+          if (exec_specific.reboot_classical_timeout == nil) then
+            timeout = @config.cluster_specific[cluster].timeout_reboot_classical
+          else
+            timeout = exec_specific.reboot_classical_timeout
+          end
+          if (exec_specific.reboot_kind == "deploy_env") then
+            micro.wait_reboot("classical","deploy",true,timeout)
+            micro.send_key_in_deploy_env("tree")
+            set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
+          else
+            micro.wait_reboot(
+              "classical",
+              "user",
+              true,
+              timeout,
+              [@config.common.ssh_port],
+              []
+            )
+
+            if (exec_specific.reboot_kind == "env_recorded") then
+              part = String.new
+              if (exec_specific.block_device == "") then
+                part = @config.cluster_specific[cluster].block_device + exec_specific.deploy_part
+              else
+                part = exec_specific.block_device + exec_specific.deploy_part
+              end
+              #Reboot on the production environment
+              if (part == @config.cluster_specific[cluster].prod_part) then
+                micro.check_nodes("prod_env_booted")
+                set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
+                if (exec_specific.check_prod_env) then
+                  step.nodes_ko.tag_demolishing_env(db) if @config.common.demolishing_env_auto_tag
+                  ret = KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES if not step.nodes_ko.empty?
+                end
+              else
+                set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
+              end
+            end
+          end
+          if not micro.nodes_ok.empty? then
+            global_nodes_mutex.synchronize {
+              nodes_ok.add(micro.nodes_ok)
+            }
+          end
+          if not micro.nodes_ko.empty? then
+            global_nodes_mutex.synchronize {
+              nodes_ko.add(micro.nodes_ko)
+            }
+          end
+        end
+        micro.debug(0,"Done rebooting the nodes #{set.to_s_fold}",nil)
+        ret
+      end
+    end
+
+    if block_given?
+      begin
+        yield(reboot_id,threads)
+      ensure
+        @reboot_info_hash_lock.synchronize {
+          kareboot_delete_reboot_info(reboot_id)
+        }
+        config = nil
+      end
+    else
+      [reboot_id,threads]
+    end
+  end
+
   # Reboot a set of nodes from the client side in an synchronous way
   #
   # Arguments
@@ -627,176 +871,80 @@ class KadeployServer
   # Output
   # * return 0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed, 4 if the ssh key file cannot be grabbed
   def run_kareboot_sync(db, client, exec_specific, drb_server)
-    client_disconnected = false
-    finished = false    
-
-    ret = 0
-    if (exec_specific.verbose_level != "") then
+    disconnected = false
+    if (exec_specific.verbose_level != nil) then
       vl = exec_specific.verbose_level
     else
       vl = @config.common.verbose_level
     end
-    output = Debug::OutputControl.new(vl, exec_specific.debug, client, exec_specific.true_user, -1, 
-                                      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
-    if (exec_specific.reboot_kind == "env_recorded") && 
-        exec_specific.check_prod_env && 
-        exec_specific.node_set.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
-      output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
-      return 2
-    else
-      #We create a new instance of Config with a specific exec_specific part
-      config = ConfigInformation::Config.new("empty")
-      config.common = @config.common.clone
-      config.cluster_specific = @config.cluster_specific.clone
-      config.exec_specific = exec_specific
-      nodes_ok = Nodes::NodeSet.new
-      nodes_ko = Nodes::NodeSet.new
-      global_nodes_mutex = Mutex.new
-      tid_array = Array.new
+    output = Debug::OutputControl.new(vl,
+      exec_specific.debug, client, exec_specific.true_user, -1,
+      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level,
+      @syslog_lock
+    )
 
-      if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
-        gfm = Managers::GrabFileManager.new(config, output, client, db)
-        exec_specific.pxe_upload_files.each { |pxe_file|
-          user_prefix = "pxe-#{config.exec_specific.true_user}--"
-          local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
-          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                               File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
-                                               config.common.pxe_repository_kernels_max_size, false) then
-            output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
-            return 3
-          end
-          if not system("chmod +r #{local_pxe_file}") then
-            output.verbosel(0, "Cannot add read rights on the pxe file")
-            return 3
-          end
-        }
-        gfm = nil
-      end
-      if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
-        gfm = Managers::GrabFileManager.new(config, output, client, db)
-        user_prefix = "u-#{exec_specific.true_user}--"
-        key = exec_specific.key
-        case key
-        when /^http[s]?:\/\//
-          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
-        else
-          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
+    begin
+      run_kareboot(output, db, exec_specific, client) do |rid,microthreads|
+        # Client disconnection fallback
+        micros = []
+        microthreads.each do |microthread|
+          micros << microthread[:micro]
         end
-        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
-                                             config.common.kadeploy_cache_size, false) then
-          output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
-          return 4
-        end
-        exec_specific.key = local_key
-        gfm = nil
-      end
 
-      exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
-        tid_array << Thread.new {
-          step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
-          case exec_specific.reboot_kind
-          when "env_recorded"
-            #This should be the same case than a deployed env
-            step.switch_pxe("deploy_to_deployed_env")
-          when "set_pxe"
-            step.switch_pxe("set_pxe", exec_specific.pxe_profile_msg)
-          when "simple_reboot"
-            #no need to change the PXE profile
-          when "deploy_env"
-            step.switch_pxe("prod_to_deploy_env")
-          else
-            raise "Invalid kind of reboot: #{@reboot_kind}"
-          end
-          step.reboot(exec_specific.reboot_level, true)
-          step.set_vlan
-          if exec_specific.wait then
-            if (exec_specific.reboot_classical_timeout == nil) then
-              timeout = @config.cluster_specific[cluster].timeout_reboot_classical
-            else
-              timeout = exec_specific.reboot_classical_timeout
-            end
-            if (exec_specific.reboot_kind == "deploy_env") then
-              step.wait_reboot("classical","deploy",true,timeout)
-              step.send_key_in_deploy_env("tree")
-              set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
-            else
-              step.wait_reboot(
-                "classical",
-                "user",
-                true,
-                timeout,
-                [@config.common.ssh_port],
-                []
-              )
-
-              if (exec_specific.reboot_kind == "env_recorded") then
-                part = String.new
-                if (exec_specific.block_device == "") then
-                  part = @config.cluster_specific[cluster].block_device + exec_specific.deploy_part
-                else
-                  part = exec_specific.block_device + exec_specific.deploy_part
-                end
-                #Reboot on the production environment
-                if (part == @config.cluster_specific[cluster].prod_part) then
-                  step.check_nodes("prod_env_booted")
-                  set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
-                  if (exec_specific.check_prod_env) then
-                    step.nodes_ko.tag_demolishing_env(db) if @config.common.demolishing_env_auto_tag
-                    ret = 1 if not step.nodes_ko.empty?
-                  end
-                else
-                  set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
-                end
+        finished = false
+        Thread.new do
+          while (not finished) do
+            begin
+              client.test()
+            rescue DRb::DRbConnError
+              disconnected = true
+              output.disable_client_output()
+              output.verbosel(3, "Client disconnection")
+              client_disconnected = true
+              microthreads.each { |thread| thread.kill! }
+              micros.each do |micro|
+                micro.output.disable_client_output()
+                micro.debug(3,"Kill a reboot step")
+                micro.kill
               end
-            end
-            if not step.nodes_ok.empty? then
-              output.verbosel(0, "Nodes correctly rebooted on cluster #{cluster}:")
-              output.verbosel(0, step.nodes_ok.to_s(false, false, "\n"))
-              global_nodes_mutex.synchronize {
-                nodes_ok.add(step.nodes_ok)
+              @reboot_info_hash_lock.synchronize {
+                kareboot_delete_reboot_info(rid)
               }
+              drb_server.stop_service()
+              db.disconnect()
+              finished = true
             end
-            if not step.nodes_ko.empty? then
-              output.verbosel(0, "Nodes not correctly rebooted on cluster #{cluster}:")
-              output.verbosel(0, step.nodes_ko.to_s(false, true, "\n"))
-              global_nodes_mutex.synchronize {
-                nodes_ko.add(step.nodes_ko)
-              }
-            end
+            sleep(1)
           end
-        }
-      }
-      Thread.new {
-        while (not finished) do
-          begin
-            client.test()
-          rescue DRb::DRbConnError
-            output.disable_client_output()
-            output.verbosel(3, "Client disconnection")
-            client_disconnected = true
-            tid_array.each { |tid|
-              output.verbosel(3, " *** Kill a reboot thread")
-              Thread.kill(tid)
-            }
-            drb_server.stop_service()
-            db.disconnect()
-            finished = true
-          end
-          sleep(1)
         end
-      }
-      tid_array.each { |tid|
-        tid.join
-      }
-      if (exec_specific.wait && (not client_disconnected)) then
-        client.generate_files(nodes_ok, nodes_ko)
+
+        # Join threads
+        microthreads.each { |thread| thread.join }
+        micros.each do |micro|
+          clname = micro.context[:cluster].name
+          client.print("")
+          if not micro.nodes_ok.empty? then
+            client.print("Nodes correctly rebooted on cluster #{clname}")
+            client.print(micro.nodes_ok.to_s(false, false, "\n"))
+          end
+          if not micro.nodes_ko.empty? then
+            client.print("Nodes not correctly rebooted on cluster #{clname}")
+            client.print(micro.nodes_ko.to_s(false, true, "\n"))
+          end
+        end
+        finished = true
+
+        if (not disconnected) then
+          client.generate_files(@reboot_info_hash[rid][0],@reboot_info_hash[rid][1])
+        end
       end
+    rescue KadeployError => ke
+      Debug::distant_client_error("Cannot run the reboot",client)
+      @reboot_info_hash_lock.synchronize {
+        kareboot_delete_reboot_info(ke.context[:rid])
+      }
     end
-    finished = true
-    nodes_ok.free()
-    nodes_ko.free()
-    config = nil
-    return ret
+    return true
   end
 
 
@@ -813,148 +961,20 @@ class KadeployServer
   # Output
   # * return a reboot id or nil if no reboot has been performed and an error code (0 in case of success, 1 if the reboot failed on some nodes, 2 if the reboot has not been launched, 3 if some pxe files cannot be grabbed)
   def run_kareboot_async(db, exec_specific)
-    finished = [false]
-    output = Debug::OutputControl.new(@config.common.verbose_level, 
-                                      exec_specific.debug, nil, 
-                                      exec_specific.true_user, -1, 
-                                      @config.common.dbg_to_syslog, 
-                                      @config.common.dbg_to_syslog_level, @syslog_lock)
-    if (exec_specific.reboot_kind == "env_recorded") && 
-        exec_specific.check_prod_env && 
-        exec_specific.node_set.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
-      output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
-      db.disconnect()
-      return nil,KarebootAsyncError::DEMOLISHING_ENV
-    else
-      #We create a new instance of Config with a specific exec_specific part
-      config = ConfigInformation::Config.new("empty")
-      config.common = @config.common.clone
-      config.cluster_specific = @config.cluster_specific.clone
-      config.exec_specific = exec_specific
-      nodes_ok = Nodes::NodeSet.new
-      nodes_ko = Nodes::NodeSet.new
-      global_nodes_mutex = Mutex.new
-      tid_array = Array.new
-
-
-      reboot_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
-      @reboot_info_hash_lock.synchronize {
-        kareboot_add_reboot_info(reboot_id, nodes_ok, nodes_ko, finished)
-      }
-      
-      error = KarebootAsyncError::NO_ERROR
-      if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
-        gfm = Managers::GrabFileManager.new(config, output, nil, db)
-        exec_specific.pxe_upload_files.each { |pxe_file|
-          user_prefix = "pxe-#{config.exec_specific.true_user}-"
-          local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
-          if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
-                                               File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
-                                               config.common.pxe_repository_kernels_max_size, true) then
-            output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
-            error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
-          end
-        }
-        gfm = nil
-      end
-      if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
-        gfm = Managers::GrabFileManager.new(config, output, nil, db)
-        user_prefix = "u-#{exec_specific.true_user}--"
-        key = exec_specific.key
-        case key
-        when /^http[s]?:\/\//
-          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
-        else
-          local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
-        end
-        if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
-                                             config.common.kadeploy_cache_size, true) then
-          output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
-          error = FetchFileError::INVALID_KEY
-        else
-          exec_specific.key = local_key
-        end
-        gfm = nil
-      end
-      if (error == KarebootAsyncError::NO_ERROR) then
-        Thread.new {
-          exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
-            tid_array << Thread.new {
-              step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kareboot")
-              case exec_specific.reboot_kind
-              when "env_recorded"
-                #This should be the same case than a deployed env
-                step.switch_pxe("deploy_to_deployed_env")
-              when "set_pxe"
-                step.switch_pxe("set_pxe", exec_specific.pxe_profile_msg)
-              when "simple_reboot"
-                #no need to change the PXE profile
-              when "deploy_env"
-                step.switch_pxe("prod_to_deploy_env")
-              else
-                raise "Invalid kind of reboot: #{@reboot_kind}"
-              end
-              step.reboot(exec_specific.reboot_level, true)
-              step.set_vlan
-              if exec_specific.wait then
-                if (exec_specific.reboot_kind == "deploy_env") then
-                  step.wait_reboot("classical","deploy",true)
-
-                  step.send_key_in_deploy_env("tree")
-                  set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
-                else
-                  step.wait_reboot(
-                    "classical",
-                    "user",
-                    true,
-                    nil,
-                    [@config.common.ssh_port],
-                    []
-                  )
-
-                  if (exec_specific.reboot_kind == "env_recorded") then
-                    part = String.new
-                    if (exec_specific.block_device == "") then
-                      part = @config.cluster_specific[cluster].block_device + exec_specific.deploy_part
-                    else
-                      part = exec_specific.block_device + exec_specific.deploy_part
-                    end
-                    #Reboot on the production environment
-                    if (part == @config.cluster_specific[cluster].prod_part) then
-                      step.check_nodes("prod_env_booted")
-                      set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
-                      if (exec_specific.check_prod_env) then
-                        step.nodes_ko.tag_demolishing_env(db) if @config.common.demolishing_env_auto_tag
-                        error = KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
-                      end
-                    else
-                      set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
-                    end
-                  end
-                end
-                if not step.nodes_ok.empty? then
-                  output.verbosel(0, "Nodes correctly rebooted on cluster #{cluster}:")
-                  output.verbosel(0, step.nodes_ok.to_s(false, false, "\n"))
-                  global_nodes_mutex.synchronize {
-                    nodes_ok.add(step.nodes_ok)
-                  }
-                end
-                if not step.nodes_ko.empty? then
-                  output.verbosel(0, "Nodes not correctly rebooted on cluster #{cluster}:")
-                  output.verbosel(0, step.nodes_ko.to_s(false, true, "\n"))
-                  global_nodes_mutex.synchronize {
-                    nodes_ko.add(step.nodes_ko)
-                  }
-                end
-              end
-            }
-          }
-          tid_array.each { |tid|
-            tid.join
-          }
-          @reboot_info_hash_lock.synchronize {
-            finished[0] = true
-          }
+    output = Debug::OutputControl.new(
+      @config.common.verbose_level,
+      exec_specific.debug, nil,
+      exec_specific.true_user, -1,
+      @config.common.dbg_to_syslog,
+      @config.common.dbg_to_syslog_level, @syslog_lock
+    )
+    rid, microthreads = nil
+    begin
+      rid, microthreads = run_kareboot(output, db, exec_specific)
+      Thread.new do
+        microthreads.each { |thread| thread.join }
+        @reboot_info_hash_lock.synchronize {
+          @reboot_info_hash[rid][2] = true
         }
         if (@config.common.async_end_of_reboot_hook != "") then
           tmp = cmd = @config.common.async_end_of_reboot_hook.clone
@@ -963,13 +983,22 @@ class KadeployServer
           end
           system(cmd)
         end
-        config = nil
-      else
-        reboot_id = nil
+        db.disconnect()
       end
-      db.disconnect()
-      return reboot_id,error
+    rescue KadeployError => ke
+      microthreads.each do |microthread|
+        microthread.kill!
+        microthread[:micro].output.disable_client_output()
+        microthread[:micro].debug(3,"Kill a reboot step")
+        microthread[:micro].kill
+      end
+      @reboot_info_hash_lock.synchronize {
+        kareboot_delete_reboot_info(ke.context[:rid])
+      }
+      GC.start
+      return nil, ke.errno
     end
+    return rid, KarebootAsyncError::NO_ERROR
   end
 
   # Record reboot information
@@ -1338,13 +1367,28 @@ class KadeployServer
     @workflow_info_hash_lock.lock
     if (@workflow_info_hash.has_key?(workflow_id)) then
       hash = Hash.new
-      hash[workflow_id] = @workflow_info_hash[workflow_id].get_state
+
+      workflows = @workflow_info_hash[workflow_id]
+      states = nil
+      workflows.each do |workflow|
+        state = workflow.get_state
+        states = tmp if states.nil?
+        states['nodes'].merge!(state['nodes'])
+      end
+      hash[workflow_id] = states
+
       str = hash.to_yaml
       hash = nil
     elsif (workflow_id == "") then
       hash = Hash.new
       @workflow_info_hash.each_pair { |key,workflow_info_hash|
-        hash[key] = workflow_info_hash.get_state
+        states = nil
+        workflow_info_hash.each do |workflow|
+          state = workflow.get_state
+          states = tmp if states.nil?
+          states['nodes'].merge!(state['nodes'])
+        end
+        hash[key] = states
       }
       str = hash.to_yaml
       hash = nil
@@ -2226,6 +2270,106 @@ class KadeployServer
   ##################################
   #        Kapower Sync            #
   ##################################
+  def run_kapower(output, db, exec_specific, client = nil)
+    #We create a new instance of Config with a specific exec_specific part
+    config = ConfigInformation::Config.new("empty")
+    config.common = @config.common.clone
+    config.cluster_specific = @config.cluster_specific.clone
+    config.exec_specific = exec_specific
+    nodes_ok = Nodes::NodeSet.new
+    nodes_ko = Nodes::NodeSet.new
+    global_nodes_mutex = Mutex.new
+    threads = []
+
+    power_id = Digest::SHA1.hexdigest(
+      config.exec_specific.true_user \
+      + Time.now.to_s \
+      + exec_specific.node_set.to_s
+    )
+    @power_info_hash_lock.synchronize {
+      kapower_add_power_info(power_id, nodes_ok, nodes_ko, false)
+    }
+
+    context = {
+      :power_id => power_id,
+      :database => db,
+      :client => client,
+      :syslock => @syslog_lock,
+      :dblock => @deployments_table_lock,
+      :config => config,
+      :common => config.common,
+      :execution => config.exec_specific,
+      :windows => {
+        :reboot => @reboot_window,
+        :check => @nodes_check_window,
+      },
+      :nodesets_id => 0,
+      :local => { :parent => KadeployServer, :retries => 0 }
+    }
+
+    clusters = exec_specific.node_set.group_by_cluster
+    if clusters.size > 1
+      clid = 1
+    else
+      clid = 0
+    end
+
+    clusters.each_key do |cluster|
+      context[:cluster] = config.cluster_specific[cluster]
+      if clusters.size > 1
+        if context[:cluster].prefix.empty?
+          context[:cluster].prefix = "c#{clid}"
+          clid += 1
+        end
+      else
+        context[:cluster].prefix = ''
+      end
+    end
+
+    if clusters.size > 1
+      tmp = ''
+      clusters.each_key do |cluster|
+        tmp += "  #{Debug.prefix(config.cluster_specific[cluster].prefix)}: #{config.cluster_specific[cluster].name}\n"
+      end
+      output.verbosel(0,"\nClusters involved in the power operation:\n#{tmp}\n",nil,false)
+    end
+
+    micros = []
+    clusters.each_pair do |cluster, set|
+      context[:cluster] = config.cluster_specific[cluster]
+      threads << Thread.new do
+        micro = CustomMicrostep.new(set, context)
+        Thread.current[:micro] = micro
+        micros << micro
+        micro.debug(0,"Power operation on the nodes #{set.to_s_fold}",nil)
+        micro.power(exec_specific.operation, exec_specific.level)
+        if not micro.nodes_ok.empty? then
+          global_nodes_mutex.synchronize {
+            nodes_ok.add(micro.nodes_ok)
+          }
+        end
+        if not micro.nodes_ko.empty? then
+          global_nodes_mutex.synchronize {
+            nodes_ko.add(micro.nodes_ko)
+          }
+        end
+        micro.debug(0,"Done power operation on the nodes #{set.to_s_fold}",nil)
+      end
+    end
+
+    if block_given?
+      begin
+        yield(power_id,threads)
+      ensure
+        @power_info_hash_lock.synchronize {
+          kapower_delete_power_info(power_id)
+        }
+        config = nil
+      end
+    else
+      [power_id,threads]
+    end
+  end
 
   # Run a synchronous Kapower command
   #
@@ -2236,81 +2380,85 @@ class KadeployServer
   # Output
   # * return true if everything is ok, false otherwise  
   def run_kapower_sync(db, client, exec_specific, drb_server)
-    client_disconnected = false
-    finished = false    
-    ret = 0
-    if (exec_specific.verbose_level != "") then
+    disconnected = false
+    if (exec_specific.verbose_level != nil) then
       vl = exec_specific.verbose_level
     else
       vl = @config.common.verbose_level
     end
-    output = Debug::OutputControl.new(vl, exec_specific.debug, client, exec_specific.true_user, -1, 
-                                      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level, @syslog_lock)
+    output = Debug::OutputControl.new(vl,
+      exec_specific.debug, client, exec_specific.true_user, -1,
+      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level,
+      @syslog_lock
+    )
 
-    #We create a new instance of Config with a specific exec_specific part
-    config = ConfigInformation::Config.new("empty")
-    config.common = @config.common.clone
-    config.cluster_specific = @config.cluster_specific.clone
-    config.exec_specific = exec_specific
-    nodes_ok = Nodes::NodeSet.new
-    nodes_ko = Nodes::NodeSet.new
-    global_nodes_mutex = Mutex.new
-    tid_array = Array.new
+    begin
+      run_kapower(output, db, exec_specific, client) do |pid,microthreads|
+        # Client disconnection fallback
+        micros = []
+        microthreads.each do |microthread|
+          micros << microthread[:micro]
+        end
 
-    exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
-      tid_array << Thread.new {
-        step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kapower")
-        step.power(exec_specific.operation, exec_specific.level)
-        if not step.nodes_ok.empty? then
-          output.verbosel(0, "Operation correctly performed on cluster #{cluster}:")
-          if (exec_specific.operation != "status") then
-            output.verbosel(0, step.nodes_ok.to_s(false, false, "\n"))
-          else
-            output.verbosel(0, step.nodes_ok.to_s(true, false, "\n"))
-          end
-          global_nodes_mutex.synchronize {
-            nodes_ok.add(step.nodes_ok)
-          }
-        end
-        if not step.nodes_ko.empty? then
-          output.verbosel(0, "Operation not correctly performed on cluster #{cluster}:")
-          output.verbosel(0, step.nodes_ko.to_s(false, true, "\n"))
-          global_nodes_mutex.synchronize {
-            nodes_ko.add(step.nodes_ko)
-          }
-        end
-      }
-      Thread.new {
-        while (not finished) do
-          begin
-            client.test()
-          rescue DRb::DRbConnError
-            output.disable_client_output()
-            output.verbosel(3, "Client disconnection")
-            client_disconnected = true
-            drb_server.stop_service()
-            db.disconnect()
-            tid_array.each { |tid|
-              output.verbosel(3, " *** Kill a power operation thread")
-              Thread.kill(tid)
-            }
+        finished = false
+        Thread.new do
+          while (not finished) do
+            begin
+              client.test()
+            rescue DRb::DRbConnError
             finished = true
+              disconnected = true
+              output.disable_client_output()
+              output.verbosel(3, "Client disconnection")
+              client_disconnected = true
+              microthreads.each { |thread| thread.kill! }
+              micros.each do |micro|
+                micro.output.disable_client_output()
+                micro.debug(3,"Kill a power step")
+                micro.kill
+              end
+              @power_info_hash_lock.synchronize {
+                kapower_delete_power_info(pid)
+              }
+              drb_server.stop_service()
+              db.disconnect()
+              finished = true
+            end
+            sleep(1)
           end
-          sleep(1)
         end
-      }
-      tid_array.each { |tid|
-        tid.join
-      }
-      if (not client_disconnected) then
-        client.generate_files(nodes_ok, nodes_ko)
+
+        # Join threads
+        microthreads.each { |thread| thread.join }
+        micros.each do |micro|
+          clname = micro.context[:cluster].name
+          client.print("")
+          if not micro.nodes_ok.empty? then
+            client.print("Operation correctly performed on cluster #{clname}")
+            if (exec_specific.operation != "status") then
+              client.print(micro.nodes_ok.to_s(false, false, "\n"))
+            else
+              client.print(micro.nodes_ok.to_s(true, false, "\n"))
+            end
+          end
+          if not micro.nodes_ko.empty? then
+            client.print("Operation not correctly performed on cluster #{clname}")
+            client.print(micro.nodes_ko.to_s(false, true, "\n"))
+          end
+        end
+        finished = true
+
+        if (not disconnected) then
+          client.generate_files(@power_info_hash[pid][0],@power_info_hash[pid][1])
+        end
       end
-    }
-    finished = true
-    nodes_ok.free()
-    nodes_ko.free()
-    config = nil
-    return ret
+    rescue KadeployError => ke
+      Debug::distant_client_error("Cannot run the power operation",client)
+      @power_info_hash_lock.synchronize {
+        kapower_delete_power_info(ke.context[:pid])
+      }
+    end
+    return true
   end
 
 
@@ -2327,68 +2475,44 @@ class KadeployServer
   # Output
   # * return a power id
   def run_kapower_async(db, exec_specific)
-    finished = [false]
-    output = Debug::OutputControl.new(@config.common.verbose_level,
-                                      exec_specific.debug, nil,
-                                      exec_specific.true_user, -1, 
-                                      @config.common.dbg_to_syslog,
-                                      @config.common.dbg_to_syslog_level, @syslog_lock)
-    #We create a new instance of Config with a specific exec_specific part
-    config = ConfigInformation::Config.new("empty")
-    config.common = @config.common.clone
-    config.cluster_specific = @config.cluster_specific.clone
-    config.exec_specific = exec_specific
-    nodes_ok = Nodes::NodeSet.new
-    nodes_ko = Nodes::NodeSet.new
-    global_nodes_mutex = Mutex.new
-    tid_array = Array.new
-
-    power_id = Digest::SHA1.hexdigest(config.exec_specific.true_user + Time.now.to_s + exec_specific.node_set.to_s)
-    @power_info_hash_lock.synchronize {
-      kapower_add_power_info(power_id, nodes_ok, nodes_ko, finished)
-    }
-
-    Thread.new {
-      exec_specific.node_set.group_by_cluster.each_pair { |cluster, set|
-        tid_array << Thread.new {
-          step = MicroStepsLibrary::MicroSteps.new(set, Nodes::NodeSet.new, @reboot_window, @nodes_check_window, config, cluster, output, "Kapower")
-          step.power(exec_specific.operation, exec_specific.level)
-          if not step.nodes_ok.empty? then
-            output.verbosel(0, "Operation correctly performed on cluster #{cluster}:")
-            if (exec_specific.operation != "status") then
-              output.verbosel(0, step.nodes_ok.to_s(false, false, "\n"))
-            else
-              output.verbosel(0, step.nodes_ok.to_s(true, false, "\n"))
-            end
-            global_nodes_mutex.synchronize {
-              nodes_ok.add(step.nodes_ok)
-            }
-          end
-          if not step.nodes_ko.empty? then
-            output.verbosel(0, "Operation not correctly performed on cluster #{cluster}:")
-            output.verbosel(0, step.nodes_ko.to_s(false, true, "\n"))
-            global_nodes_mutex.synchronize {
-              nodes_ko.add(step.nodes_ko)
-            }
-          end
+    output = Debug::OutputControl.new(
+      @config.common.verbose_level,
+      exec_specific.debug, nil,
+      exec_specific.true_user, -1,
+      @config.common.dbg_to_syslog,
+      @config.common.dbg_to_syslog_level, @syslog_lock
+    )
+    rid, microthreads = nil
+    begin
+      rid, microthreads = run_kapower(output, db, exec_specific)
+      Thread.new do
+        microthreads.each { |thread| thread.join }
+        @power_info_hash_lock.synchronize {
+          @power_info_hash[rid][2] = true
         }
-        tid_array.each { |tid|
-          tid.join
-        }
-      }
-      @power_info_hash_lock.synchronize {
-        finished[0] = true
-      }
-      if (@config.common.async_end_of_power_hook != "") then
-        tmp = cmd = @config.common.async_end_of_power_hook.clone
-        while (tmp.sub!("POWER_ID", power_id) != nil)  do
-          cmd = tmp
+        if (@config.common.async_end_of_power_hook != "") then
+          tmp = cmd = @config.common.async_end_of_power_hook.clone
+          while (tmp.sub!("POWER_ID", power_id) != nil)  do
+            cmd = tmp
+          end
+          system(cmd)
         end
-        system(cmd)
+        db.disconnect()
       end
-      config = nil
-    }
-    return power_id
+    rescue KadeployError => ke
+      microthreads.each do |microthread|
+        microthread.kill!
+        microthread[:micro].output.disable_client_output()
+        microthread[:micro].debug(3,"Kill a reboot step")
+        microthread[:micro].kill
+      end
+      @power_info_hash_lock.synchronize {
+        kapower_delete_power_info(ke.context[:pid])
+      }
+      GC.start
+      return nil, ke.errno
+    end
+    return rid, KapowerAsyncError::NO_ERROR
   end
 
   # Record power information
