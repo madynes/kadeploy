@@ -260,13 +260,13 @@ module EnvironmentManagement
         subquery += " AND visibility <> 'private'" if mask_private_env
         query += " AND version = (#{subquery})"
       else
-        query += "AND version = ?"
-        args << version
+        query += " AND version = ?"
+        args << version.to_i
       end
 
       res = dbh.run_query(query, *args)
-      tmp = res.to_hash
-      unless tmp.empty? #We only take the first result since no other result should be returned
+      tmp = res.to_hash if res
+      if tmp and !tmp.empty? #We only take the first result since no other result should be returned
         load_from_hash(tmp[0])
         return true
       end
@@ -284,14 +284,14 @@ module EnvironmentManagement
           args << user
           query += " AND version = (#{subquery})"
         else
-          query = " AND version = ?"
+          query += " AND version = ?"
           args << version
         end
 
         res = dbh.run_query(query, *args)
 
-        tmp = res.to_hash
-        unless tmp.empty? #We only take the first result since no other result should be returned
+        tmp = res.to_hash if res
+        if tmp and !tmp.empty? #We only take the first result since no other result should be returned
           load_from_hash(tmp[0])
           return true
         end
