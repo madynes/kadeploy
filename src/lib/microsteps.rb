@@ -1244,108 +1244,79 @@ class Microstep < Automata::QueueTask
       else
         case context[:common].bootloader
         when "pure_pxe"
-          case context[:execution].environment.environment_kind
-          when "linux"
-            kernel = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.kernel)
-            initrd = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.initrd) if (context[:execution].environment.initrd != nil)
-            images_dir = File.join(context[:common].pxe_repository, context[:common].pxe_repository_kernels)
-            if not command("touch -a #{File.join(images_dir, kernel)}") then
-              failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
+          images_dir = File.join(
+            context[:common].pxe_repository,
+            context[:common].pxe_repository_kernels
+          )
+
+          kernel = context[:execution].prefix_in_cache \
+            + File.basename(context[:execution].environment.kernel)
+
+          unless command("touch -a #{File.join(images_dir, kernel)}")
+            failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
+            return false
+          end
+
+          if (context[:execution].environment.initrd != nil)
+            initrd = context[:execution].prefix_in_cache \
+              + File.basename(context[:execution].environment.initrd)
+
+            unless command("touch -a #{File.join(images_dir, initrd)}")
+              failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
               return false
             end
-            if (context[:execution].environment.initrd != nil) then
-              if not command("touch -a #{File.join(images_dir, initrd)}") then
-                failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
-                return false
-              end
-            end
-            if not context[:common].pxe.set_pxe_for_linux(nodes,
+          end
+
+
+          case context[:execution].environment.environment_kind
+          when "linux"
+            unless context[:common].pxe.set_pxe_for_linux(
+              nodes,
               kernel,
               get_kernel_params(),
               initrd,
               get_deploy_part_str(),
-              context[:cluster].pxe_header) then
+              context[:cluster].pxe_header
+            )
               failed_microstep("Cannot perform the set_pxe_for_linux operation")
               return false
             end
           when "xen"
-            kernel = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.kernel)
-            initrd = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.initrd) if (context[:execution].environment.initrd != nil)
-            hypervisor = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.hypervisor)
-            images_dir = File.join(context[:common].pxe_repository, context[:common].pxe_repository_kernels)
-            if not command("touch -a #{File.join(images_dir, kernel)}") then
-              failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
-              return false
-            end
-            if (context[:execution].environment.initrd != nil) then
-              if not command("touch -a #{File.join(images_dir, initrd)}") then
-                failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
-                return false
-              end
-            end
-            if not command("touch -a #{File.join(images_dir, hypervisor)}") then
+            hypervisor = context[:execution].prefix_in_cache \
+              + File.basename(context[:execution].environment.hypervisor)
+
+            unless command("touch -a #{File.join(images_dir, hypervisor)}")
               failed_microstep("Cannot touch #{File.join(images_dir, hypervisor)}")
               return false
             end
-            if not context[:common].pxe.set_pxe_for_xen(nodes,
-                                                      hypervisor,
-                                                      context[:execution].environment.hypervisor_params,
-                                                      kernel,
-                                                      get_kernel_params(),
-                                                      initrd,
-                                                      get_deploy_part_str(),
-                                                      context[:cluster].pxe_header) then
+
+            unless context[:common].pxe.set_pxe_for_xen(
+              nodes,
+              hypervisor,
+              context[:execution].environment.hypervisor_params,
+              kernel,
+              get_kernel_params(),
+              initrd,
+              get_deploy_part_str(),
+              context[:cluster].pxe_header
+            )
               failed_microstep("Cannot perform the set_pxe_for_xen operation")
               return false
             end
           end
-          Cache::clean_cache(File.join(context[:common].pxe_repository, context[:common].pxe_repository_kernels),
-                             context[:common].pxe_repository_kernels_max_size * 1024 * 1024,
-                             1,
-                             /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/,
-                             @output)
+          Cache::clean_cache(
+            images_dir,
+            context[:common].pxe_repository_kernels_max_size * 1024 * 1024,
+            1,
+            /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/,
+            @output
+          )
         when "chainload_pxe"
-          if (context[:execution].environment.environment_kind != "xen") then
-            context[:common].pxe.set_pxe_for_chainload(nodes,
-                                                     get_deploy_part_num(),
-                                                     context[:cluster].pxe_header)
-          else
-            # debug(3, "Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
-            kernel = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.kernel)
-            initrd = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.initrd) if (context[:execution].environment.initrd != nil)
-            hypervisor = context[:execution].prefix_in_cache + File.basename(context[:execution].environment.hypervisor)
-            images_dir = File.join(context[:common].pxe_repository, context[:common].pxe_repository_kernels)
-            if not command("touch -a #{File.join(images_dir, kernel)}") then
-              failed_microstep("Cannot touch #{File.join(images_dir, kernel)}")
-              return false
-            end
-            if (context[:execution].environment.initrd != nil) then
-              if not command("touch -a #{File.join(images_dir, initrd)}") then
-                failed_microstep("Cannot touch #{File.join(images_dir, initrd)}")
-                return false
-              end
-            end
-            if not command("touch -a #{File.join(images_dir, hypervisor)}") then
-              failed_microstep("Cannot touch #{File.join(images_dir, hypervisor)}")
-              return false
-            end
-            if not context[:common].pxe.set_pxe_for_xen(nodes,
-                                                      hypervisor,
-                                                      context[:execution].environment.hypervisor_params,
-                                                      kernel,
-                                                      get_kernel_params(),
-                                                      initrd,
-                                                      get_deploy_part_str(),
-                                                      context[:cluster].pxe_header) then
-              failed_microstep("Cannot perform the set_pxe_for_xen operation")
-              return false
-            end
-            Cache::clean_cache(File.join(context[:common].pxe_repository, context[:common].pxe_repository_kernels),
-                               context[:common].pxe_repository_kernels_max_size * 1024 * 1024,
-                               1,
-                               /^(e\d+--.+)|(e-anon--.+)|(pxe-.+)$/,
-                               @output)
-          end
+          context[:common].pxe.set_pxe_for_chainload(
+            nodes,
+            get_deploy_part_num(),
+            context[:cluster].pxe_header
+          )
         end
       end
     end
@@ -1822,12 +1793,7 @@ class Microstep < Automata::QueueTask
       when "linux"
         return install_grub_on_nodes("linux")
       when "xen"
-#            return install_grub_on_nodes("xen")
-        debug(3, "   Hack, Grub2 cannot boot a Xen Dom0, so let's use the pure PXE fashion")
-        return copy_kernel_initrd_to_pxe([context[:execution].environment.kernel,
-                                          context[:execution].environment.initrd,
-                                          context[:execution].environment.hypervisor])
-
+        return install_grub_on_nodes("xen")
       when "other"
         #in this case, the bootloader must be installed by the user (dd partition)
         return true
