@@ -13,7 +13,7 @@ require 'error'
 require 'thread'
 require 'drb'
 require 'socket'
-require 'pp'
+require 'yaml'
 
 # Disable reverse lookup to prevent lag in case of DNS failure
 Socket.do_not_reverse_lookup = true
@@ -40,7 +40,10 @@ if (exec_specific_config != nil) then
     if (error != FetchFileError::NO_ERROR) then
       puts "Error while grabbing the files (error #{error})"
     else
-      pp kadeploy_server.async_deploy_get_results(workflow_id)
+      res = kadeploy_server.async_deploy_get_results(workflow_id)
+      res['nodes_ok'] = res['nodes_ok'].keys
+      res['nodes_ko'] = res['nodes_ko'].keys
+      puts res.to_yaml
     end
     kadeploy_server.async_deploy_free(workflow_id)
   else

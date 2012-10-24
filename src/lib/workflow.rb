@@ -484,7 +484,7 @@ class Workflow < Automata::TaskManager
 
             if entry[:action] == :send
               grab_file(
-                gfm, entry[:args], user_prefix, 'custom_file',
+                gfm, entry[:file], user_prefix, 'custom_file',
                 FetchFileError::INVALID_CUSTOM_FILE, :caching => false
               )
               target << {
