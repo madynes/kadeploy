@@ -13,7 +13,7 @@ require 'error'
 require 'thread'
 require 'drb'
 require 'socket'
-require 'pp'
+require 'yaml'
 
 # Disable reverse lookup to prevent lag in case of DNS failure
 Socket.do_not_reverse_lookup = true
@@ -35,7 +35,11 @@ if (exec_specific_config != nil) then
     while (not kadeploy_server.async_power_ended?(power_id)) do
       sleep(10)
     end
-    pp kadeploy_server.async_power_get_results(power_id)
+    res = kadeploy_server.async_power_get_results(power_id)
+    res['nodes_ok'] = res['nodes_ok'].keys
+    res['nodes_ko'] = res['nodes_ko'].keys
+    puts res.to_yaml
+
     kadeploy_server.async_power_free(power_id)
   else
     puts "You do not have the right to deploy on all the nodes"
