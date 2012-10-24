@@ -1,0 +1,12 @@
+---
+binaries:
+  kadeploy: kadeploy3
+  kaenv: kaenv3
+environments:
+  base: squeeze-x64-base
+  xen: squeeze-x64-xen
+  min: squeeze-x64-min
+  big: squeeze-x64-big
+  http: debian-http
+  nfs: squeeze-x64-min
+deployuser: deploy
