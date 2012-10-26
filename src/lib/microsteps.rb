@@ -729,15 +729,25 @@ class Microstep < Automata::QueueTask
   # * nothing
   # Output
   # * return the name of the deployment partition
+  def get_block_device_str
+    if (context[:execution].deploy_part != "") then
+      context[:execution].block_device
+    else
+      context[:cluster].block_device
+    end
+  end
+
+  # Get the name of the deployment partition
+  #
+  # Arguments
+  # * nothing
+  # Output
+  # * return the name of the deployment partition
   def get_deploy_part_str
     if (context[:execution].deploy_part != "") then
-      if (context[:execution].block_device != "") then
-        return context[:execution].block_device + context[:execution].deploy_part
-      else
-        return context[:cluster].block_device + context[:execution].deploy_part
-      end
+      get_block_device_str + context[:execution].deploy_part
     else
-      return context[:cluster].block_device + context[:cluster].deploy_part
+      get_block_device_str + context[:cluster].deploy_part
     end
   end
 
@@ -1071,7 +1081,7 @@ class Microstep < Automata::QueueTask
     case op[:action]
     when :exec
       debug(4,'Executing custom command')
-      return parallel_exec(op[:command],{ :scattering => op[:scattering] })
+      return parallel_exec("#{set_env()} && #{op[:command]}",{ :scattering => op[:scattering] })
     when :send
       debug(4,'Sending custom file')
       return parallel_sendfile(
@@ -1103,10 +1113,19 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the string containing the environment variables for pre/post installs
   def set_env
+    blockdev = get_block_device_str()
     env = String.new
     env = "KADEPLOY_CLUSTER=\"#{context[:cluster].name}\""
     env += " KADEPLOY_ENV=\"#{context[:execution].environment.name}\""
+    env += " KADEPLOY_ENV_KERNEL=\"#{context[:execution].environment.kernel}\""
+    env += " KADEPLOY_ENV_INITRD=\"#{context[:execution].environment.initrd}\""
+    env += " KADEPLOY_ENV_KERNEL_PARAMS=\"#{get_kernel_params()}\""
     env += " KADEPLOY_DEPLOY_PART=\"#{get_deploy_part_str()}\""
+    env += " KADEPLOY_BLOCK_DEVICE=\"#{blockdev}\""
+    env += " KADEPLOY_DEPLOY_PART_NUM=\"#{get_deploy_part_num()}\""
+    env += " KADEPLOY_SWAP_PART_NUM=\"#{context[:cluster].swap_part}\""
+    env += " KADEPLOY_PROD_PART_NUM=\"#{context[:cluster].prod_part}\""
+    env += " KADEPLOY_TMP_PART_NUM=\"#{context[:cluster].tmp_part}\""
     env += " KADEPLOY_ENV_EXTRACTION_DIR=\"#{context[:common].environment_extraction_dir}\""
     env += " KADEPLOY_PREPOST_EXTRACTION_DIR=\"#{context[:common].rambin_path}\""
     return env
