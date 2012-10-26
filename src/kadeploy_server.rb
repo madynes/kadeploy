@@ -692,7 +692,19 @@ class KadeployServer
       exec_specific.pxe_upload_files.each { |pxe_file|
         user_prefix = "pxe-#{config.exec_specific.true_user}--"
         local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
-        if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels), config.common.pxe_repository_kernels_max_size, false) then
+        unless gfm.grab_file_without_caching(
+          pxe_file,
+          local_pxe_file,
+          "pxe_file",
+          user_prefix,
+          File.join(
+            @config.common.pxe_repository,
+            @config.common.pxe_repository_kernels
+          ),
+          config.common.pxe_repository_kernels_max_size,
+          false,
+          /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
+        ) then
           output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
           raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,{:rid => reboot_id})
         end
@@ -715,8 +727,16 @@ class KadeployServer
       else
         local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
       end
-      if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
-                                           config.common.kadeploy_cache_size, false) then
+      unless gfm.grab_file_without_caching(
+        key,
+        local_key,
+        "key",
+        user_prefix,
+        config.common.kadeploy_cache_dir,
+        config.common.kadeploy_cache_size,
+        false,
+        /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
+      ) then
         output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
         raise KadeployError.new(FetchFileError::INVALID_KEY,{:rid => reboot_id})
       end
