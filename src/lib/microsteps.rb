@@ -1071,7 +1071,7 @@ class Microstep < Automata::QueueTask
     case op[:action]
     when :exec
       debug(4,'Executing custom command')
-      return parallel_exec(op[:command],{ :scattering => op[:scattering] })
+      return parallel_exec("#{set_env()} && #{op[:command]}",{ :scattering => op[:scattering] })
     when :send
       debug(4,'Sending custom file')
       return parallel_sendfile(
