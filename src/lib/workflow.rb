@@ -336,7 +336,7 @@ class Workflow < Automata::TaskManager
   def grab_file(gfm,remotepath,prefix,filetag,errno,opts={})
     return unless remotepath
 
-    cachedir,cachesize = nil
+    cachedir,cachesize,pattern = nil
     case opts[:cache]
       when :kernels
         cachedir = File.join(
@@ -344,10 +344,12 @@ class Workflow < Automata::TaskManager
           context[:common].pxe_repository_kernels
         )
         cachesize = context[:common].pxe_repository_kernels_max_size
+        pattern = /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
       #when :kadeploy
       else
         cachedir = context[:common].kadeploy_cache_dir
         cachesize = context[:common].kadeploy_cache_size
+        pattern = /./
     end
 
     localpath = File.join(cachedir, "#{prefix}#{File.basename(remotepath)}")
@@ -364,7 +366,8 @@ class Workflow < Automata::TaskManager
           prefix,
           cachedir,
           cachesize,
-          context[:async]
+          context[:async],
+          pattern
         )
       else
         res = gfm.grab_file_without_caching(
@@ -374,7 +377,8 @@ class Workflow < Automata::TaskManager
           prefix,
           cachedir,
           cachesize,
-          context[:async]
+          context[:async],
+          pattern
         )
       end
 
