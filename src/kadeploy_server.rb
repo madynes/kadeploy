@@ -661,7 +661,7 @@ class KadeployServer
           local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
                                                File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
-                                               config.common.pxe_repository_kernels_max_size, false) then
+                                               config.common.pxe_repository_kernels_max_size, false, /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             return 3
           end
@@ -850,7 +850,7 @@ class KadeployServer
           local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
           if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
                                                File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels),
-                                               config.common.pxe_repository_kernels_max_size, true) then
+                                               config.common.pxe_repository_kernels_max_size, true, /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/) then
             output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
             error = KarebootAsyncError::PXE_FILE_FETCH_ERROR
           end

@@ -354,7 +354,7 @@ module Managers
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false)
+    def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false, cache_pattern=/./)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
@@ -365,7 +365,7 @@ module Managers
         end
         Cache::clean_cache(cache_dir,
                            (cache_size * 1024 * 1024) -  file_size,
-                           0.5, /./,
+                           0.5, cache_pattern,
                            @output)
         if (not File.exist?(local_file)) then
           resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
@@ -420,7 +420,7 @@ module Managers
           if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
             Cache::clean_cache(cache_dir,
                                (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                               0.5, /./,
+                               0.5, cache_pattern,
                                @output)
             @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
@@ -439,7 +439,7 @@ module Managers
             else
               Cache::clean_cache(cache_dir,
                                  (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                                 0.5, /./,
+                                 0.5, cache_pattern,
                                  @output)
               @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
               if (@client.get_file_md5(client_file) != expected_md5) then
@@ -495,7 +495,7 @@ module Managers
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async)
+    def grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async=false, cache_pattern=/./)
       #http fetch
       if (client_file =~ /^http[s]?:\/\//) then
         @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
@@ -506,7 +506,7 @@ module Managers
         end
         Cache::clean_cache(cache_dir,
                            (cache_size * 1024 * 1024) -  file_size,
-                           0.5, /./,
+                           0.5, cache_pattern,
                            @output)
         resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
         case resp
@@ -527,7 +527,7 @@ module Managers
         if File.readable?(client_file) then
           Cache::clean_cache(cache_dir,
                              (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                             0.5, /./,
+                             0.5, cache_pattern,
                              @output)
           @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
           if not system("cp #{client_file} #{local_file}") then
@@ -547,7 +547,7 @@ module Managers
             @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
             Cache::clean_cache(cache_dir,
                                (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                               0.5, /./,
+                               0.5, cache_pattern,
                                @output)
             if not @client.get_file(client_file, prefix, cache_dir) then
               @output.verbosel(0, "Unable to grab the file #{client_file}")
@@ -572,13 +572,13 @@ module Managers
     # * async (opt) : specify if the caller client is asynchronous
     # Output
     # * return true if everything is successfully performed, false otherwise
-    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false)
+    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false, pattern=/./)
       #anonymous environment
       if (@config.exec_specific.load_env_kind == "file") then
-        return grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async)
+        return grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async, pattern)
       #recorded environement
       else
-        return grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async)
+        return grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async, pattern)
       end
     end
   end
@@ -912,13 +912,13 @@ module Managers
           @config.exec_specific.pxe_upload_files.each { |pxe_file|
             user_prefix = "pxe-#{@config.exec_specific.true_user}--"
             local_pxe_file = File.join(@config.common.pxe_repository, 
-                                       @common.pxe_repository_kernels,
+                                       @config.common.pxe_repository_kernels,
                                        "#{user_prefix}#{File.basename(pxe_file)}")
             begin
               if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,
                                                    File.join(@config.common.pxe_repository,
-                                                             @common.pxe_repository_kernels), 
-                                                   @config.common.pxe_repository_kernels_max_size, async) then
+                                                             @config.common.pxe_repository_kernels), 
+                                                   @config.common.pxe_repository_kernels_max_size, async, /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/) then
                 @async_file_error = FetchFileError::INVALID_PXE_FILE if async
                 return false
               end
