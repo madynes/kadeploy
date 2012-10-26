@@ -1362,6 +1362,23 @@ Here is a description of the YAML file:
   \item \ypath{/MicroStepName/MicroStepName/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see section \ref{sec:specific_config} for custom operation description)
 \end{itemize}
 
+When you are executing a command or a script (via the \texttt{exec} action), you can use the following environment variables :
+\begin{itemize}
+\item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
+\item \texttt{KADEPLOY\_ENV} : environment deployed
+\item \texttt{KADEPLOY\_ENV\_KERNEL} : the path to the kernel file inside the deployed environment directory
+\item \texttt{KADEPLOY\_ENV\_INITRD} : the path to the initrd file inside the deployed environment directory
+\item \texttt{KADEPLOY\_ENV\_KERNEL\_PARAMS} : the deployed environment kernel parameters
+\item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
+\item \texttt{KADEPLOY\_BLOCK\_DEVICE} : the block device used in deployment
+\item \texttt{KADEPLOY\_DEPLOY\_PART\_NUM} : the deployment parition number
+\item \texttt{KADEPLOY\_SWAP\_PART\_NUM} : the swap partition number
+\item \texttt{KADEPLOY\_PROD\_PART\_NUM} : the production partition number
+\item \texttt{KADEPLOY\_TMP\_PART\_NUM} : the tmp partition number
+\item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
+\item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
+\end{itemize}
+
 Here is an example of a file that contains custom operations:
 \begin{small}
 \begin{verbatim}
@@ -1928,7 +1945,15 @@ When writing a script for an admin pre-install, an admin post-install and a user
 \begin{itemize}
 \item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
 \item \texttt{KADEPLOY\_ENV} : environment deployed
+\item \texttt{KADEPLOY\_ENV\_KERNEL} : the path to the kernel file inside the deployed environment directory
+\item \texttt{KADEPLOY\_ENV\_INITRD} : the path to the initrd file inside the deployed environment directory
+\item \texttt{KADEPLOY\_ENV\_KERNEL\_PARAMS} : the deployed environment kernel parameters
 \item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
+\item \texttt{KADEPLOY\_BLOCK\_DEVICE} : the block device used in deployment
+\item \texttt{KADEPLOY\_DEPLOY\_PART\_NUM} : the deployment parition number
+\item \texttt{KADEPLOY\_SWAP\_PART\_NUM} : the swap partition number
+\item \texttt{KADEPLOY\_PROD\_PART\_NUM} : the production partition number
+\item \texttt{KADEPLOY\_TMP\_PART\_NUM} : the tmp partition number
 \item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
 \item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
 \end{itemize}
