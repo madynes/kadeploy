@@ -213,7 +213,7 @@ class KadeployServer
       exec_specific_config = nil
       distant.stop_service()
       client = nil
-      GC.start
+      #GC.start
       return res
     end
   end
@@ -286,7 +286,7 @@ class KadeployServer
     return async_deploy_lock_wid(workflow_id) { |workflows|
       workflows.first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      GC.start
+      #GC.start
       true
     }
   end
@@ -304,7 +304,7 @@ class KadeployServer
       end
       workflows[0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      GC.start
+      #GC.start
       true
     }
   end
@@ -692,7 +692,19 @@ class KadeployServer
       exec_specific.pxe_upload_files.each { |pxe_file|
         user_prefix = "pxe-#{config.exec_specific.true_user}--"
         local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
-        if not gfm.grab_file_without_caching(pxe_file, local_pxe_file, "pxe_file", user_prefix,File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels), config.common.pxe_repository_kernels_max_size, false) then
+        unless gfm.grab_file_without_caching(
+          pxe_file,
+          local_pxe_file,
+          "pxe_file",
+          user_prefix,
+          File.join(
+            @config.common.pxe_repository,
+            @config.common.pxe_repository_kernels
+          ),
+          config.common.pxe_repository_kernels_max_size,
+          false,
+          /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
+        ) then
           output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
           raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,{:rid => reboot_id})
         end
@@ -715,8 +727,16 @@ class KadeployServer
       else
         local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
       end
-      if not gfm.grab_file_without_caching(key, local_key, "key", user_prefix, config.common.kadeploy_cache_dir, 
-                                           config.common.kadeploy_cache_size, false) then
+      unless gfm.grab_file_without_caching(
+        key,
+        local_key,
+        "key",
+        user_prefix,
+        config.common.kadeploy_cache_dir,
+        config.common.kadeploy_cache_size,
+        false,
+        /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
+      ) then
         output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
         raise KadeployError.new(FetchFileError::INVALID_KEY,{:rid => reboot_id})
       end
@@ -995,7 +1015,7 @@ class KadeployServer
       @reboot_info_hash_lock.synchronize {
         kareboot_delete_reboot_info(ke.context[:rid])
       }
-      GC.start
+      #GC.start
       return nil, ke.errno
     end
     return rid, KarebootAsyncError::NO_ERROR
@@ -2509,7 +2529,7 @@ class KadeployServer
       @power_info_hash_lock.synchronize {
         kapower_delete_power_info(ke.context[:pid])
       }
-      GC.start
+      #GC.start
       return nil, ke.errno
     end
     return rid, KapowerAsyncError::NO_ERROR
