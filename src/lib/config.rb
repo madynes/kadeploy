@@ -16,6 +16,7 @@ require 'stepbroadcastenv'
 require 'stepbootnewenv'
 require 'microsteps'
 require 'netboot'
+require 'grabfile'
 
 #Ruby libs
 require 'optparse'
@@ -399,7 +400,6 @@ module ConfigInformation
       exec_specific.nodes_state = Hash.new
       exec_specific.write_workflow_id = String.new
       exec_specific.get_version = false
-      exec_specific.prefix_in_cache = String.new
       exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
       exec_specific.multi_server = false
@@ -539,19 +539,23 @@ module ConfigInformation
         end
 
         cp.parse('cache',true) do
-          conf.kadeploy_cache_size = cp.value('size', Fixnum)
           conf.kadeploy_disable_cache = cp.value(
             'disabled',[TrueClass, FalseClass],false
           )
-          conf.kadeploy_cache_dir = cp.value('directory',String,'/tmp',
-            {
-              :type => 'dir',
-              :readable => true,
-              :writable => true,
-              :create => true,
-              :mode => 0700
-            }
-          )
+          unless conf.kadeploy_disable_cache
+            directory = cp.value('directory',String,'/tmp',
+              {
+                :type => 'dir',
+                :readable => true,
+                :writable => true,
+                :create => true,
+                :mode => 0700
+              }
+            )
+            size = cp.value('size', Fixnum)
+            conf.cache[:global] = Cache.new(directory,size*1024*1024,
+              CacheIndexPVHash,true)
+          end
         end
 
         cp.parse('network',true) do
@@ -597,13 +601,13 @@ module ConfigInformation
               'tarball_dir',String,'/tmp',Pathname
             )
           end
-          conf.max_preinstall_size = cp.value('max_preinstall_size',Fixnum,20)
-          conf.max_postinstall_size = cp.value('max_postinstall_size',Fixnum,20)
+          conf.max_preinstall_size =
+            cp.value('max_preinstall_size',Fixnum,20) *1024 * 1024
+          conf.max_postinstall_size =
+            cp.value('max_postinstall_size',Fixnum,20) * 1024 * 1024
         end
 
         cp.parse('pxe',true) do
-          conf.cache[:netboot] = {} unless conf.cache[:netboot]
-
           chain = nil
           pxemethod = Proc.new do |name,info|
             unless info[:empty]
@@ -633,8 +637,10 @@ module ConfigInformation
                     {:type => 'dir', :prefix => repo}
                   )
                   args << files
-                  conf.cache[:netboot][:directory] = File.join(repo,files)
-                  conf.cache[:netboot][:size] = cp.value('max_size',Fixnum)
+                  directory = File.join(repo,files)
+                  size = cp.value('max_size',Fixnum)
+                  conf.cache[:netboot] = Cache.new(directory,size*1024*1024,
+                    CacheIndexPVHash,false)
                 end
               else
                 args << 'PXE_CUSTOM'
@@ -1463,54 +1469,38 @@ module ConfigInformation
     # Output
     # * return String in case of success, false otherwise
     def self.load_envfile(srcfile)
-      tmpfile = nil
-      if (srcfile =~ /^http[s]?:\/\//) then
-        begin
-          tmpfile = Tempfile.new("env_file")
-        rescue StandardError
-          error("Cannot write to the temporary directory on the server side, please contact the administrator")
-          return false
-        end
-
-        http_response, _ = HTTP::fetch_file(srcfile, tmpfile.path, nil, nil)
-        case http_response
-        when -1
-          error("The file #{srcfile} cannot be fetched: impossible to create a tempfile in the cache directory")
-          return false
-        when -2
-          error("The file #{srcfile} cannot be fetched: impossible to move the file in the cache directory")
-          return false
-        when "200"
-          file = tmpfile.path
-        else
-          error("The file #{srcfile} cannot be fetched: http_response #{http_response}")
-          return false
-        end
-      else
-        if File.readable?(srcfile)
-          file = srcfile
-        else
-          error("The file #{srcfile} does not exist or is not readable")
-          return false
-        end
+      tmpfile = Tempfile.new("env_file")
+      begin
+        Managers::Fetch[srcfile,KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR].grab(tmpfile.path)
+        tmpfile.close
+      rescue KadeployError => ke
+        msg = KadeployError.to_msg(ke.errno) || ''
+        msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
+        msg += ke.message if ke.message and !ke.message.empty?
+        error(msg)
+        tmpfile.unlink
+        return false
       end
 
-      unless `file --mime-type --brief #{file}`.chomp == "text/plain"
+      unless `file --mime-type --brief #{tmpfile.path}`.chomp == "text/plain"
         error("The file #{srcfile} should be in plain text format")
+        tmpfile.unlink
         return false
       end
 
       begin
-        ret = YAML.load_file(file)
+        ret = YAML.load_file(tmpfile.path)
       rescue ArgumentError
-        error("Invalid YAML file '#{file}'")
+        error("Invalid YAML file '#{srcfile}'")
+        tmpfile.unlink
         ret = nil
       rescue Errno::ENOENT
-        error("File not found '#{file}'")
+        error("File not found '#{srcfile}'")
+        tmpfile.unlink
         ret = nil
       end
 
-      tmpfile.unlink if tmpfile
+      tmpfile.unlink
       return ret
     end
 
@@ -3175,8 +3165,6 @@ module ConfigInformation
     attr_accessor :kadeploy_server
     attr_accessor :kadeploy_server_port
     attr_accessor :kadeploy_tcp_buffer_size
-    attr_accessor :kadeploy_cache_dir
-    attr_accessor :kadeploy_cache_size
     attr_accessor :max_preinstall_size
     attr_accessor :max_postinstall_size
     attr_accessor :kadeploy_disable_cache

@@ -68,14 +68,13 @@ class KadeployClient
   #
   # Arguments
   # * file_name: name of the file on the client side
-  # * prefix: prefix to add to the file_name
-  # * cache_dir: cache directory
+  # * dest: destination file on the server
   # Output
   # * return true if the file has been successfully transfered, false otherwise
-  def get_file(file_name, prefix, cache_dir)
+  def get_file(file_name, dest)
     if (File.exist?(file_name)) then
       if (File.readable?(file_name)) then
-        port = @kadeploy_server.create_a_socket_server(prefix + File.basename(file_name), cache_dir)
+        port = @kadeploy_server.create_socket_server(dest)
         if port != -1 then
           sock = TCPSocket.new(@kadeploy_server.dest_host, port)
           file = File.open(file_name)

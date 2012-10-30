@@ -525,7 +525,7 @@ For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
 
 The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For example, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
-  \item \ypath{/pxe/dhcp/userfiles}
+  \item \ypath{/pxe/dhcp/userfiles} PXE user custom files (option \emph{--upload-pxe-files}). \textbf{Be careful}, this directory is emptied at each server launch.
   \begin{itemize}
     \item \yfield{directory}{String} The directory where PXE user custom files (option \emph{--upload-pxe-files}) are to be saved. This path is relative to the PXE repository path.
     \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE user custom files sub-directory
