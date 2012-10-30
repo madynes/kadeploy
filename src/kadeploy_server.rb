@@ -122,7 +122,7 @@ class KadeployServer
   # * cache_dir: cache directory
   # Output
   # * return the port allocated to the socket server
-  def create_a_socket_server(filename, cache_dir)
+  def create_socket_server(dest)
     sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
     sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
     begin
@@ -135,7 +135,7 @@ class KadeployServer
       sock.listen(10)
       begin
         session = sock.accept
-        file = File.new(File.join(cache_dir, filename), "w")
+        file = File.new(dest, "w")
         while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
           file.write(buf)
         end
@@ -326,14 +326,13 @@ class KadeployServer
       output = info[:workflows].first.output
       context = info[:workflows].first.context
 
-      # Clean cache files
-      unless context[:common].kadeploy_disable_cache
-        Cache::remove_files(
-          context[:common].kadeploy_cache_dir,
-          /#{context[:execution].prefix_in_cache}/,
-          output
-        ) if context[:execution].load_env_kind == "file"
+      # Unlock the cached files
+      info[:cached_files].each do |file|
+        file.lock.unlock
       end
+
+      # Clean cache
+      @config.common.cache[:global].clean
 
       info[:workflows].first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
@@ -525,15 +524,6 @@ class KadeployServer
 
     tmpoutput = nil
     unless context[:common].kadeploy_disable_cache
-      # Set the prefix of the files in the cache
-      if context[:execution].load_env_kind == 'file'
-        context[:execution].prefix_in_cache =
-          "e-anon-#{context[:execution].true_user}-#{Time.now.to_i}--"
-      else
-        context[:execution].prefix_in_cache =
-          "e-#{context[:execution].environment.id}--"
-      end
-
       tmpoutput = Debug::OutputControl.new(
         context[:execution].verbose_level || context[:common].verbose_level,
         context[:execution].debug,
@@ -548,7 +538,12 @@ class KadeployServer
 
       @workflow_info_hash[workflow_id][:grabthread] = Thread.new do
         begin
-          Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+          @workflow_info_hash[workflow_id][:cached_files] = []
+          @workflow_info_hash[workflow_id][:cached_files] =
+            Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+          @workflow_info_hash[workflow_id][:cached_files].each do |file|
+            file.lock.lock
+          end
         rescue KadeployError => ke
           exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
           raise KadeployError.new(ke.errno,{ :wid => workflow_id })
@@ -597,18 +592,16 @@ class KadeployServer
     if block_given?
       begin
         yield(workflow_id,workflows)
-
-        # Clean cache files
-        unless context[:common].kadeploy_disable_cache
-          Cache::remove_files(
-            context[:common].kadeploy_cache_dir,
-            /#{context[:execution].prefix_in_cache}/,
-            tmpoutput
-          ) if context[:execution].load_env_kind == "file"
-        end
       ensure
         #let's free memory at the end of the workflow
         @workflow_info_hash_lock.synchronize {
+          # Unlock the cached files
+          @workflow_info_hash[workflow_id][:cached_files].each do |file|
+            file.lock.unlock
+          end
+          # Clean cache
+          @config.common.cache[:global].clean
+
           kadeploy_delete_workflow_info(workflow_id)
         }
         config = nil
@@ -725,6 +718,10 @@ class KadeployServer
         @workflow_info_hash[workflow_id][:workflows].each do |workflow|
           workflow.kill()
         end
+        @workflow_info_hash[workflow_id][:cached_files].each do |file|
+          file.lock.unlock
+        end
+        @config.common.cache[:global].clean
         kadeploy_delete_workflow_info(workflow_id)
       end
     }

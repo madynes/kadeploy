@@ -5,8 +5,8 @@
 
 class KadeployError < Exception
   attr_reader :errno, :context
-  def initialize(errno,context={})
-    super('')
+  def initialize(errno,context={},msg='')
+    super(msg)
     @errno = errno
     @context = context
   end
@@ -30,6 +30,8 @@ class FetchFileError
   INVALID_PXE_FILE = 108
   TEMPFILE_CANNOT_BE_CREATED_IN_CACHE = 109
   FILE_CANNOT_BE_MOVED_IN_CACHE = 110
+  CACHE_INTERNAL_ERROR = 111
+  FILE_TOO_BIG = 112
 end
 
 class KadeployAsyncError
