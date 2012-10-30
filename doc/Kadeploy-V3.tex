@@ -1302,9 +1302,11 @@ DISPLAY messages
 TIMEOUT 50
 
 label bootlabel
-        KERNEL kernels/pxe-ejeanvoine-custom-kernel
-        APPEND initrd=kernels/pxe-ejeanvoine-custom-initrd root=/dev/sda3 node_id=NODE_SINGULARITY
+        KERNEL KERNELS_DIR/FILES_PREFIXcustom-kernel
+        APPEND initrd=KERNELS_DIR/FILES_PREFIXcustom-initrd root=/dev/sda3 node_id=NODE_SINGULARITY
 \end{verbatim}
+
+In this example, \texttt{KERNELS\_DIR} will be replaced by the directory where the kernels are located inside of the TFTP directory; \texttt{FILES\_PREFIX} will be replaced by the prefix added to each files sent into the TFTP repository via the \texttt{-x|--upload-pxe-files} option.
 
 You can notice the \texttt{NODE\_SINGULARITY} pattern used in the PXE profile. Thanks to the \texttt{--set-pxe-pattern} option, you can also provide a file that defines a value in the PXE profile that depends on the node concerned. This file must define on each line a couple of value as follows : hostname,node singularity. In our example, the file \texttt{~/singularities} can contains something like:
 \begin{verbatim}

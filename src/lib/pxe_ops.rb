@@ -69,12 +69,14 @@ module PXEOperations
     # * returns true in case of success, false otherwise
     # Fixme
     # * should do something if the PXE configuration cannot be written
-    def write_pxe(nodes_info, msg, singularities = nil)
+    def write_pxe(nodes_info, msg, singularities = nil, username = nil)
       nodes_info.each { |node|
         msg_dup = msg.dup
-        if (singularities != nil) then
-          msg_dup = msg_dup.gsub("NODE_SINGULARITY", singularities[node['ip']])
-        end
+
+        msg_dup.gsub("KERNELS_DIR", @pxe_repository_kernels)
+        msg_dup.gsub!("NODE_SINGULARITY", singularities[node['ip']]) if (singularities != nil) then
+        msg_dup.gsub("FILES_PREFIX", "pxe-#{username}--") if username
+
         file = node['dest']
         #prevent from overwriting some linked files
         if File.exist?(file) then
@@ -150,7 +152,7 @@ module PXEOperations
     # * singularities: hashtable containing the singularity to be replaced in the pxe profile for each node
     # Output
     # * returns the value of write_pxe
-    def set_pxe_for_custom(nodes, msg, singularities)
+    def set_pxe_for_custom(nodes, msg, singularities, username)
     end
   end
 
@@ -208,11 +210,11 @@ module PXEOperations
       return write_pxe(nodes_info, msg)
     end
 
-    def set_pxe_for_custom(nodes, msg, singularities)
+    def set_pxe_for_custom(nodes, msg, singularities,username)
       nodes_info = nodes.collect { |node|
         { 'ip' => node['ip'], 'dest' => File.join(@pxe_repository, 'pxelinux.cfg', hexalize_ip(node['ip'])) }
       }
-      return write_pxe(nodes_info, msg, singularities)
+      return write_pxe(nodes_info, msg, singularities, username)
     end
   end
 
@@ -270,11 +272,11 @@ module PXEOperations
       return write_pxe(nodes_info, msg)
     end
 
-    def set_pxe_for_custom(nodes, msg, singularities)
+    def set_pxe_for_custom(nodes, msg, singularities, username)
       nodes_info = nodes.collect { |node|
         { 'ip' => node['ip'], 'dest' => File.join(@pxe_repository, 'pxelinux.cfg', hexalize_ip(node['ip'])) }
       }
-      return write_pxe(nodes_info, msg, singularities)
+      return write_pxe(nodes_info, msg, singularities, username)
     end
 
   end
@@ -343,12 +345,12 @@ module PXEOperations
       return write_pxe(nodes_info, msg)
     end
 
-    def set_pxe_for_custom(nodes, msg, singularities)
+    def set_pxe_for_custom(nodes, msg, singularities, username)
       nodes_info = nodes.collect { |node|
         { 'ip' => node['ip'], 'dest' => File.join(@pxe_repository, 'pxelinux.cfg', hexalize_ip(node['ip'])) }
       }
 
-      return false if not write_pxe(nodes_info, msg, singularities)
+      return false if not write_pxe(nodes_info, msg, singularities, username)
 
       msg = "#{IPXEHEADER}chain pxelinux.0\nboot\n"
       nodes_info = nodes.collect { |node|

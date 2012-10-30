@@ -1244,18 +1244,24 @@ class Microstep < Automata::QueueTask
       end
     when "set_pxe"
       nodes = get_nodes.call(false)
-      if not context[:common].pxe.set_pxe_for_custom(nodes,
-                                                   pxe_profile_msg,
-                                                   context[:execution].pxe_profile_singularities) then
+      unless context[:common].pxe.set_pxe_for_custom(
+        nodes,
+        pxe_profile_msg,
+        context[:execution].pxe_profile_singularities,
+        context[:execution].true_user
+      ) then
         failed_microstep("Cannot perform the set_pxe_for_custom operation")
         return false
       end
     when "deploy_to_deployed_env"
       nodes = get_nodes.call(true)
       if (context[:execution].pxe_profile_msg != "") then
-        if not context[:common].pxe.set_pxe_for_custom(nodes,
-                                                     context[:execution].pxe_profile_msg,
-                                                     context[:execution].pxe_profile_singularities) then
+        unless context[:common].pxe.set_pxe_for_custom(
+          nodes,
+          context[:execution].pxe_profile_msg,
+          context[:execution].pxe_profile_singularities,
+          context[:execution].true_user
+        ) then
           failed_microstep("Cannot perform the set_pxe_for_custom operation")
           return false
         end
