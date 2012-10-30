@@ -107,6 +107,7 @@ module EnvironmentManagement
     attr_reader :demolishing_env
     attr_reader :multipart
     attr_reader :options
+    attr_reader :recorded
 
     def debug(client,msg)
       Debug::distant_client_print(msg,client)
@@ -138,6 +139,10 @@ module EnvironmentManagement
       return [true,'']
     end
 
+    def recorded?
+      @recorded
+    end
+
     # Load an environment file
     #
     # Arguments
@@ -149,6 +154,7 @@ module EnvironmentManagement
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
     def load_from_file(description, almighty_env_users, user, client, setmd5, filename=nil)
+      @recorded = false
       @user = user
       @preinstall = nil
       @postinstall = []
@@ -157,7 +163,13 @@ module EnvironmentManagement
       filemd5 = Proc.new do |f|
         ret = nil
         if f =~ /^http[s]?:\/\//
-          ret = ''
+          resp, etag = HTTP.check_file(f)
+          case resp
+          when 200,304
+          else
+            error(client,"Unable to GET the file #{f} (http error ##{resp})")
+          end
+          ret = etag
         else
           if setmd5
             ret = client.get_file_md5(f)
@@ -473,6 +485,7 @@ module EnvironmentManagement
       @filesystem = env.filesystem
       @multipart = env.multipart
       @options = env.options
+      @recorded = env.recorded
       self
     end
 
@@ -485,6 +498,7 @@ module EnvironmentManagement
         private_env,
         public_env
       )
+
       if ret
         load_from_env(ret[0])
       else
@@ -522,6 +536,7 @@ module EnvironmentManagement
       @filesystem = hash['filesystem']
       @multipart = (hash['multipart'] == 0 ? false : true)
       @options = (!hash['options'] or hash['options'].empty? ? {} : YAML.load(hash['options']))
+      @recorded = true
       self
     end
 
@@ -773,9 +788,9 @@ module EnvironmentManagement
       when "tarball"
         tarball = "#{@tarball["file"]}|#{@tarball["kind"]}|#{hash}"
         query = "UPDATE environments SET tarball=\"#{tarball}\""
-      when "presinstall"
+      when "preinstall"
         preinstall = "#{@preinstall["file"]}|#{@preinstall["kind"]}|#{hash}"
-        query = "UPDATE environments SET presinstall=\"#{preinstall}\""
+        query = "UPDATE environments SET preinstall=\"#{preinstall}\""
       when "postinstall"
         postinstall_array = Array.new
         @postinstall.each { |p|

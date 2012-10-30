@@ -47,6 +47,25 @@ module HTTP
     end
     etag = `grep "ETag" #{wget_output.path}|cut -f 2 -d' '`.chomp
     wget_output.unlink
+    return http_response.to_i, etag
+  end
+
+  def HTTP::check_file(uri, expected_etag=nil)
+    http_response = String.new
+    etag = String.new
+    wget_output = Tempfile.new("wget_output")
+
+    cmd = "LANG=C wget --debug --spider #{uri} --no-check-certificate"
+    if expected_etag
+      cmd += " --header='If-None-Match: \"#{expected_etag}\"'"
+    end
+    cmd += " 2>#{wget_output.path}"
+    system(cmd)
+
+    http_response = `grep "^HTTP/1\.." #{wget_output.path}|tail -1|cut -f 2 -d' '`.chomp
+    etag = `grep "ETag" #{wget_output.path}|cut -f 2 -d' '`.chomp
+    wget_output.unlink
+
     return http_response, etag
   end
 
