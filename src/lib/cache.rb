@@ -6,6 +6,120 @@
 #Ruby libs
 require 'ftools'
 
+class CacheFile
+  PREFIX_BASE = '_kacache'
+  attr_reader :user, :priority, :md5, :size, :mtime, :lock
+  
+  def initialize(file,user,priority)
+    raise ArgumentError.new("Invalid file '#{path}'") if !File.file?(file) \
+      or !File.readable?(file) or !File.readable_real?(file)
+    @file = file
+    @priority = priority
+    @user = user
+    load()
+  end
+
+  def load()
+    @mtime = File.mtime(@file)
+    @md5 = MD5::get_md5_sum(@file)
+    @size = File.size(@file)
+    @lock = Mutex.new
+  end
+
+  def fileid()
+    "#{prefix(@user,@priority)}#{File.basename(@file)}-#{@md5}-#{@mtime.to_i}"
+  end
+
+  def touch()
+    Execute["touch -m #{@path}"].run!
+    @mtime = File.mtime(@path)
+  end
+
+  def self.prefix(user,priority)
+    "#{PREFIX_BASE}_p-#{priority}_u-#{user}_"
+  end
+
+  def self.parse_user(file)
+    filename = File.basename(file)
+    if filename ~= /^#{PREFIX_BASE}_p-\d+_u-(.+)_.*$/
+      Regexp.last_match(1)
+    else
+      nil
+    end
+  end
+
+  def self.parse_priority(file)
+    filename = File.basename(file)
+    if filename ~= /^#{PREFIX_BASE}_p-(\d+)_u-.+_.*$/
+      Regexp.last_match(1)
+    else
+      nil
+    end
+  end
+end
+
+class Cache
+  PRIORITIES = {
+    :anon => 1,
+    :db => 2,
+  }
+
+  def initialize(directory, maxsize = 0)
+    @directory = directory # TODO: absolute path
+    @cursize = 0 # Bytes
+    @maxsize = maxsize # TODO: in Bytes
+    @files = {}
+    load()
+  end
+
+  # Cache a file and get a path to the cached version
+  def cache(file)
+  end
+
+  # Free (at least) a specific amout of memory in the cache
+  def free(amount)
+  end
+
+  # Clean every cache values that are freeable and have a priority lesser than max_priority
+  def clean(max_priority)
+  end
+
+  def load()
+    exclude = [ '.', '..' ]
+    Dir.foreach(@directory) do |file|
+      rfile = File.join(@directory,file)
+      if !exclude.include?(file) \
+        and File.file?(rfile) \
+        and File.readable?(rfile) \
+        and File.readable_real?(rfile) \
+        and file =~ /^#{PREFIX_BASE}\[(\d+)\].*$/ \
+      then
+        add(rfile,CacheFile.parse_user(rfile),CacheFile.parse_priority(rfile))
+      end
+    end
+  end
+
+  protected
+  def add(filepath,user,priority)
+    file = CacheFile.new(filepath,user,priority)
+    @files[file.fileid] = file
+    @cursize += file.size
+    file
+  end
+
+  def delete(fileid)
+    @files.delete(fileid)
+  end
+
+  def include?(file)
+  end
+
+  def full?()
+  end
+end
+
+=begin
+
 module Cache
   private
 
@@ -129,3 +243,4 @@ module Cache
     }
   end
 end
+=end
