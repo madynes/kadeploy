@@ -15,15 +15,136 @@ require 'error'
 #Ruby libs
 require 'thread'
 require 'uri'
+require 'fileutils'
 require 'tempfile'
 
 module Managers
+  class Fetch
+    def initialize(path,client)
+      @path = path
+      @client = client
+    end
+
+    def error(errno,msg)
+      @client.print("Error: #{msg}")
+      raise KadeployError.new(errno,nil,msg)
+    end
+
+    def size
+    end
+
+    def checksum
+    end
+
+    def mtime
+    end
+
+    def grab(dest,errno,dir=nil)
+    end
+
+    def uptodate?(fchecksum,fmtime=nil)
+    end
+  end
+
+  class LocalFetch < Fetch
+    def size
+      if File.readable?(@path)
+        File.size(@path)
+      else
+        @client.get_file_size(@path)
+      end
+    end
+
+    def checksum
+      if File.readable?(@path)
+        MD5::get_md5_sum(@path)
+      else
+        @client.get_file_md5(@path)
+      end
+    end
+
+    def mtime
+      if File.readable?(@path)
+        File.mtime(@path).to_i
+      else
+        @client.get_file_mtime(@path)
+      end
+    end
+
+    def grab(dest,errno,dir=nil)
+      if File.readable?(@path)
+        begin
+          FileUtils.cp(@path,dest)
+        rescue => e
+          error(errno,"Unable to grab the file #{@path}")
+        end
+      else
+        begin
+          @client.get_file(@path,dest)
+        rescue
+          error(errno,"Unable to grab the file #{@path}")
+        end
+      end
+    end
+
+    def uptodate?(fchecksum,fmtime=nil)
+      !((mtime > fmtime) and (checksum != fchecksum))
+    end
+  end
+
+  class HTTPFetch < Fetch
+    def initialize(path,client)
+      super(path,client)
+    end
+
+    def size
+      HTTP::get_file_size(@path)
+    end
+
+    def checksum
+      resp, etag = HTTP.check_file(@path)
+      case resp
+      when 200,304
+      else
+        error(errno,"Unable to grab the file #{@path} (http error ##{resp})")
+      end
+      etag
+    end
+
+    def mtime
+      nil
+    end
+
+    def grab(dest,errno,dir=nil)
+      resp, etag = HTTP.fetch_file(
+        @path,dest,dir,nil
+      )
+      case resp
+      when -1
+        error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,
+          "Tempfiles cannot be created")
+      when -2
+        error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE,
+          "Environment file cannot be moved")
+      when 200
+      else
+        error(errno,"Unable to grab the file #{@path} (http error ##{resp})")
+      end
+    end
+
+    def uptodate?(fchecksum,fmtime=nil)
+      (checksum == fchecksum)
+    end
+  end
+
   class GrabFileManager
     include Printer
     @config = nil
     @output = nil
     @client = nil
+    @files = nil
     @db = nil
+    attr_accessor :files
 
     # Constructor of GrabFileManager
     #
@@ -34,382 +155,150 @@ module Managers
     # * db: database handler
     # Output
     # * nothing
-    def initialize(config, output, client, db)
-      @config = config
+    def initialize(cache, output, client, db, mode=0640)
+      @cache = cache
       @output = output
       @client = client
       @db = db
+      @mode = mode
+      @files = []
     end
 
-    # Grab a file from the client side or locally with recording the hash of the file
-    #
-    # Arguments
-    # * client_file: client file to grab
-    # * local_file: path to local cached file
-    # * expected_md5: expected md5 for the client file
-    # * file_tag: tag used to specify the kind of file to grab
-    # * prefix: prefix used to store the file in the cache
-    # * cache_dir: cache directory
-    # * cache_size: cache size
-    # * async (opt) : specify if the caller client is asynchronous
-    # Output
-    # * return true if everything is successfully performed, false otherwise
-    def grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false, cache_pattern = /./)
-      #http fetch
-      if (client_file =~ /^http[s]?:\/\//) then
-        @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
-        file_size = HTTP::get_file_size(client_file)
-        if file_size == nil then
-          @output.verbosel(0, "Cannot reach the file at #{client_file}")
-          return false
-        end
-        Cache::clean_cache(cache_dir,
-                           (cache_size * 1024 * 1024) -  file_size,
-                           0.5, cache_pattern,
-                           @output)
-        if (not File.exist?(local_file)) then
-          resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
-          case resp
-          when -1
-            @output.verbosel(0, "Tempfiles cannot be created")
-            raise TempfileException
-          when -2
-            @output.verbosel(0, "Environment file cannot be moved")
-            raise MoveException
-          when "200"
-            @output.verbosel(5, "File #{client_file} fetched")
-          else
-            @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error #{resp}")
-            return false
-          end
+    def error(errno,msg)
+      @output.verbosel(0, "Error: #{msg}")
+      clean()
+      raise KadeployError.new(errno,nil,msg)
+    end
 
-          if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
-            @output.verbosel(0, "Cannot update the md5 of #{client_file}")
-            return false
-          end
-        else
-          resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, expected_md5)
-          case resp
-          when -1
-            @output.verbosel(0, "Tempfiles cannot be created")
-            raise TempfileException
-          when -2
-            @output.verbosel(0, "Environment file cannot be moved")
-            raise MoveException
-          when "200"
-            @output.verbosel(5, "File #{client_file} fetched")
-            if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
-              @output.verbosel(0, "Cannot update the md5 of #{client_file}")
-              return false
-            end
-          when "304"
-            @output.verbosel(5, "File #{client_file} already in cache")
-            if not system("touch -a #{local_file}") then
-              @output.verbosel(0, "Unable to touch the local file")
-              return false
-            end
-          else
-            @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error: #{resp}")
-            return false
-          end
-        end
-      #classical fetch
-      else
-        if ((not File.exist?(local_file)) || (MD5::get_md5_sum(local_file) != expected_md5)) then
-          #We first check if the file can be reached locally
-          if (File.readable?(client_file) && (MD5::get_md5_sum(client_file) == expected_md5)) then
-            Cache::clean_cache(cache_dir,
-                               (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                               0.5, cache_pattern,
-                               @output)
-            @output.verbosel(3, "Caching the #{file_tag} file #{client_file}")
-            if not system("cp #{client_file} #{local_file}") then
-              @output.verbosel(0, "Unable to cache (#{client_file} to #{local_file})")
-              return false
-            else
-              if not system("chmod 640 #{local_file}") then
-                @output.verbosel(0, "Unable to change the rights on #{local_file}")
-                return false
-              end
-            end
-          else
-            if async then
-              @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
-              return false
-            else
-              Cache::clean_cache(cache_dir,
-                                 (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                                 0.5, cache_pattern,
-                                 @output)
-              @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
-              if (@client.get_file_md5(client_file) != expected_md5) then
-                @output.verbosel(0, "The md5 of #{client_file} does not match with the one recorded in the database, please consider to update your environment")
-                return false
-              end
-              if not @client.get_file(client_file, prefix, cache_dir) then
-                @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}")
-                return false
-              end
-            end
-          end
-        else
-          if (not async) then
-            if (File.readable?(client_file)) then
-              #the file is reachable on the local filesystem
-              get_mtime = lambda { return File.mtime(client_file).to_i }
-              get_md5 = lambda { return MD5::get_md5_sum(client_file) }
-            else
-              #the file is only reachable by the client
-              get_mtime = lambda { return @client.get_file_mtime(client_file) }
-              get_md5 = lambda { return @client.get_file_md5(client_file) }
-            end
-            if (File.mtime(local_file).to_i < get_mtime.call) then
-              if (get_md5.call  != expected_md5) then
-                @output.verbosel(0, "!!! Warning !!! The file #{client_file} has been modified, you should run kaenv3 to update its MD5")
-              else
-                if not system("touch -m #{local_file}") then
-                  @output.verbosel(0, "Unable to touch the local file")
-                  return false
-                end
-              end
-            end
-          end
-          if not system("touch -a #{local_file}") then
-            @output.verbosel(0, "Unable to touch the local file")
-            return false
-          end
-        end
+    def debug(msg)
+      @output.verbosel(0, "Warning: #{msg}")
+    end
+
+    def clean()
+      @files.each do |file|
+        file.release
       end
-      return true
+      @cache.clean()
     end
 
-    # Grab a file from the client side or locally without recording the hash of the file
-    #
-    # Arguments
-    # * client_file: client file to grab
-    # * local_file: path to local cached file
-    # * file_tag: tag used to specify the kind of file to grab
-    # * prefix: prefix used to store the file in the cache
-    # * cache_dir: cache directory
-    # * cache_size: cache size
-    # * async (opt) : specify if the caller client is asynchronous
-    # Output
-    # * return true if everything is successfully performed, false otherwise
-    def grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async = false, cache_pattern = /./)
-      #http fetch
-      if (client_file =~ /^http[s]?:\/\//) then
-        @output.verbosel(3, "Grab the #{file_tag} file #{client_file} over http")
-        file_size = HTTP::get_file_size(client_file)
-        if file_size == nil then
-          @output.verbosel(0, "Cannot reach the file at #{client_file}")
-          return false
-        end
-        Cache::clean_cache(cache_dir,
-                           (cache_size * 1024 * 1024) -  file_size,
-                           0.5, cache_pattern,
-                           @output)
-        resp,_ = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
-        case resp
-        when -1
-          @output.verbosel(0, "Tempfiles cannot be created")
-          raise TempfileException
-        when -2
-          @output.verbosel(0, "Environment file cannot be moved")
-          raise MoveException
-        when "200"
-          @output.verbosel(5, "File #{client_file} fetched")
-        else
-          @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}, http error #{resp}")
-          return false
-        end
-      #classical fetch
-      else
-        if File.readable?(client_file) then
-          Cache::clean_cache(cache_dir,
-                             (cache_size * 1024 * 1024) -  File.stat(client_file).size,
-                             0.5, cache_pattern,
-                             @output)
-          @output.verbosel(3, "Caching the #{file_tag} file #{client_file}")
-          if not system("cp #{client_file} #{local_file}") then
-            @output.verbosel(0, "Unable to cache (#{client_file} to #{local_file})")
-            return false
-          else
-            if not system("chmod 640 #{local_file}") then
-              @output.verbosel(0, "Unable to change the rights on #{local_file}")
-              return false
-            end
-          end
-        else
-          if async then
-            @output.verbosel(0, "Only http transfer is allowed in asynchronous mode")
-            return false
-          else
-            @output.verbosel(3, "Grab the #{file_tag} file #{client_file}")
-            Cache::clean_cache(cache_dir,
-                               (cache_size * 1024 * 1024) - @client.get_file_size(client_file),
-                               0.5, cache_pattern,
-                               @output)
-            if not @client.get_file(client_file, prefix, cache_dir) then
-              @output.verbosel(0, "Unable to grab the file #{client_file}")
-              return false
-            end
-          end
-        end
-      end
-      return true
-    end
-
-    # Grab a file from the client side or locally
-    #
-    # Arguments
-    # * client_file: client file to grab
-    # * local_file: path to local cached file
-    # * expected_md5: expected md5 for the client file
-    # * file_tag: tag used to specify the kind of file to grab
-    # * prefix: prefix used to store the file in the cache
-    # * cache_dir: cache directory
-    # * cache_size: cache size
-    # * async (opt) : specify if the caller client is asynchronous
-    # Output
-    # * return true if everything is successfully performed, false otherwise
-    def grab_file(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async = false,cache_pattern=/./)
-      #anonymous environment
-      if (@config.exec_specific.load_env_kind == "file") then
-        return grab_file_without_caching(client_file, local_file, file_tag, prefix, cache_dir, cache_size, async, cache_pattern)
-      #recorded environement
-      else
-        return grab_file_with_caching(client_file, local_file, expected_md5, file_tag, prefix, cache_dir, cache_size, async, cache_pattern)
-      end
-    end
-
-    def self.error(errno,context)
-      #@errno = errno
-      #@nodes.set_deployment_state('aborted',nil,context[:database],'') if abrt
-      raise KadeployError.new(errno,context)
-    end
-
-    def self.grab_file_client(gfm,context,remotepath,prefix,filetag,errno,opts={})
-      return unless remotepath
-
-      cachedir,cachesize,pattern = nil
-      case opts[:cache]
-        when :kernels
-          cachedir = File.join(
-            context[:common].pxe_repository,
-            context[:common].pxe_repository_kernels
-          )
-          cachesize = context[:common].pxe_repository_kernels_max_size
-          pattern = /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
-        #when :kadeploy
-        else
-          cachedir = context[:common].kadeploy_cache_dir
-          cachesize = context[:common].kadeploy_cache_size
-          pattern = /./
-      end
-
-      localpath = File.join(cachedir, "#{prefix}#{File.basename(remotepath)}")
-
+    def grab(path,version,user,priority,tag,errno,checksum=nil,env=nil)
+      cf = nil
       begin
-        res = nil
-
-        if opts[:caching]
-          res = gfm.grab_file(
-            remotepath,
-            localpath,
-            opts[:md5],
-            filetag,
-            prefix,
-            cachedir,
-            cachesize,
-            context[:async],
-            pattern
-          )
-        else
-          res = gfm.grab_file_without_caching(
-            remotepath,
-            localpath,
-            filetag,
-            prefix,
-            cachedir,
-            cachesize,
-            context[:async],
-            pattern
-          )
+        fetcher = nil
+        kind = URI.parse(path).scheme || 'local'
+        case kind
+        when 'local'
+          fetcher = LocalFetch.new(path,@client)
+        when 'http','https'
+          fetcher = HTTPFetch.new(path,@client)
         end
 
-        if res and opts[:maxsize]
-          if (File.size(localpath) / 1024**2) > opts[:maxsize]
-            debug(0,
-              "The #{filetag} file #{remotepath} is too big "\
-              "(#{opts[:maxsize]} MB is the maximum size allowed)"
-            )
-            File.delete(localpath)
-            error(opts[:error_maxsize],context)
-          end
+        if fetcher.size > @cache.maxsize
+          error(FetchFileError::FILE_TOO_BIG,
+            "Impossible to cache the file '#{path}', the file is too big")
         end
 
-        error(errno,context) unless res
-      rescue TempfileException
-        error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,context)
-      rescue MoveException
-        error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE,context)
+        cf = @cache.cache(path,version,user,priority,tag) do |file|
+          # The file isnt in the cache, grab it
+          @output.verbosel(3, "Grab the #{kind} #{tag} file #{path}")
+          fetcher.grab(file,errno,@cache.directory)
+          FileUtils.chmod(@mode,file)
+        end
+        cf.acquire
+        @files << cf
+
+        if checksum and !checksum.empty? \
+          and !fetcher.uptodate?(checksum,cf.mtime.to_i)
+        then
+          error(errno,"Checksum of the file '#{path}' does not match "\
+            "(an update is necessary)")
+        end
+
+        # Update md5 for HTTP env
+        if ['http','https'].include?(kind) and env and env.recorded?
+          env.set_md5(file.tag, file.path, fetcher.checksum, @db)
+        end
+      rescue Exception => e
+        clean()
+        raise e
       end
-
-      if opts[:mode]
-        if not system("chmod #{opts[:mode]} #{localpath}") then
-          debug(0, "Unable to change the rights on #{localpath}")
-          return false
-        end
-      end
-
-      remotepath.gsub!(remotepath,localpath) if !opts[:noaffect] and localpath
+      cf
     end
 
-    def self.grab_user_files(context,output)
-      env_prefix = context[:execution].prefix_in_cache
-      user_prefix = "u-#{context[:execution].true_user}--"
+    def self.grab(gfm,context,path,prio,tag,errno,opts={})
+      version,user = nil
+      if opts[:env] and opts[:env].recorded?
+        #version = "#{opts[:env].name}/#{opts[:env].version.to_s}"
+        version = 'env'
+        user = opts[:env].user
+      elsif prio != :anon
+        version = 'file'
+      else
+        version = context[:deploy_id].to_s
+      end
 
-      gfm = Managers::GrabFileManager.new(
-        context[:config], output,
-        context[:client], context[:database]
+      user = context[:execution].true_user unless user
+
+      file = gfm.grab(
+        path,
+        version,
+        user,
+        Cache::PRIORITIES[prio],
+        tag,
+        errno,
+        opts[:md5],
+        opts[:env]
       )
 
-      # Env tarball
-      file = context[:execution].environment.tarball
-      grab_file_client(
-        gfm, context, file['file'], env_prefix, 'tarball',
-        FetchFileError::INVALID_ENVIRONMENT_TARBALL,
-        :md5 => file['md5'], :caching => true
-      )
-
-      # SSH key file
-      if file = context[:execution].key and !file.empty?
-        grab_file_client(
-          gfm, context, file, user_prefix, 'key',
-          FetchFileError::INVALID_KEY, :caching => false
+      # TODO: in bytes
+      if opts[:maxsize] and (file.size > opts[:maxsize])
+        gfm.error(opts[:maxsize_errno],
+          "The #{file.tag} file '#{file.path}' is too big "\
+          "(#{opts[:maxsize]/(1024*1024)} MB is the max size)"
         )
       end
 
+      path.gsub!(path,file.file) unless opts[:noaffect]
+
+      file
+    end
+
+    def self.grab_user_files(context,output)
+      gfm = Managers::GrabFileManager.new(
+        context[:common].cache[:global], output,
+        context[:client], context[:database], 0640
+      )
+      env = context[:execution].environment
+
+#context[:deploy_id]
+      # Env tarball
+      if tmp = env.tarball
+        grab(gfm,context,tmp['file'],:db,'tarball',
+          FetchFileError::INVALID_ENVIRONMENT_TARBALL,
+          :md5=>tmp['md5'], :env => env
+        )
+      end
+
+      # SSH key file
+      grab(gfm,context,context[:execution].key,:anon,'key',
+        FetchFileError::INVALID_KEY)
+
       # Preinstall archive
-      if file = context[:execution].environment.preinstall
-        grab_file_client(
-          gfm, context, file['file'], env_prefix, 'preinstall',
-          FetchFileError::INVALID_PREINSTALL,
-          :md5 => file['md5'], :caching => true,
+      if tmp = env.preinstall
+        grab(gfm,context,tmp['file'],:db,'preinstall',
+          FetchFileError::INVALID_PREINSTALL, :md5 => tmp['md5'], :env => env,
           :maxsize => context[:common].max_preinstall_size,
-          :error_maxsize => FetchFileError::PREINSTALL_TOO_BIG
+          :maxsize_errno => FetchFileError::PREINSTALL_TOO_BIG
         )
       end
 
       # Postinstall archive
-      if context[:execution].environment.postinstall
-        context[:execution].environment.postinstall.each do |f|
-          grab_file_client(
-            gfm, context, f['file'], env_prefix, 'postinstall',
-            FetchFileError::INVALID_POSTINSTALL,
-            :md5 => f['md5'], :caching => true,
+      if env.postinstall
+        env.postinstall.each do |f|
+          grab(gfm,context,f['file'],:db,'postinstall',
+            FetchFileError::INVALID_POSTINSTALL, :md5 => f['md5'], :env => env,
             :maxsize => context[:common].max_postinstall_size,
-            :error_maxsize => FetchFileError::POSTINSTALL_TOO_BIG
+            :maxsize_errno => FetchFileError::POSTINSTALL_TOO_BIG
           )
         end
       end
@@ -421,33 +310,38 @@ module Managers
             entries.each do |entry|
               if entry[:action] == :send
                 entry[:filename] = File.basename(entry[:file].dup)
-                grab_file_client(
-                  gfm, context, entry[:file], user_prefix, 'custom_file',
-                  FetchFileError::INVALID_CUSTOM_FILE, :caching => false
-                )
+                grab(gfm,context,entry[:file],:anon,'custom_file',
+                  FetchFileError::INVALID_CUSTOM_FILE)
               elsif entry[:action] == :run
-                grab_file_client(
-                  gfm, context, entry[:file], user_prefix, 'custom_file',
-                  FetchFileError::INVALID_CUSTOM_FILE, :caching => false
-                )
+                grab(gfm,context,entry[:file],:anon,'custom_file',
+                  FetchFileError::INVALID_CUSTOM_FILE)
               end
             end
           end
         end
       end
 
+      gfmk = Managers::GrabFileManager.new(
+        context[:common].cache[:netboot], output,
+        context[:client], context[:database], 0744
+      )
+
       # Custom PXE files
-      if context[:execution].pxe_profile_msg != ''
-        unless context[:execution].pxe_upload_files.empty?
-          context[:execution].pxe_upload_files.each do |pxefile|
-            grab_file_client(
-              gfm, context, pxefile, "pxe-#{context[:execution].true_user}--", 'pxe_file',
-              FetchFileError::INVALID_PXE_FILE, :caching => false,
-              :cache => :kernels, :noaffect => true, :mode => '744'
-            )
+      begin
+        if context[:execution].pxe_profile_msg != ''
+          unless context[:execution].pxe_upload_files.empty?
+            context[:execution].pxe_upload_files.each do |pxefile|
+              grab(gfm,context,pxefile,:anon,'pxe_file',
+                FetchFileError::INVALID_PXE_FILE, :noaffect => true)
+            end
           end
         end
+      rescue Exception => e
+        gfm.clean
+        raise e
       end
+
+      gfm.files += gfmk.files
     end
   end
 end
