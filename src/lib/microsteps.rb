@@ -968,7 +968,7 @@ class Microstep < Automata::QueueTask
     if context[:common].kadeploy_disable_cache then
       seed_pid = Bittorrent::launch_seed(torrent, File.dirname(tarball_file))
     else
-      seed_pid = Bittorrent::launch_seed(torrent, context[:common].kadeploy_cache_dir)
+      seed_pid = Bittorrent::launch_seed(torrent, context[:common].cache[:global].directory)
     end
     if (seed_pid == -1) then
       failed_microstep("The seed of #{torrent} has not been launched")
@@ -1234,6 +1234,7 @@ class Microstep < Automata::QueueTask
         context[:cluster].pxe_header,
         pxe_profile_msg,
         context[:execution].true_user,
+        context[:deploy_id],
         context[:execution].pxe_profile_singularities
       ) then
         failed_microstep("Cannot perform the set_pxe_for_custom operation")
@@ -1248,6 +1249,7 @@ class Microstep < Automata::QueueTask
           context[:cluster].pxe_header,
           context[:execution].pxe_profile_msg,
           context[:execution].true_user,
+          context[:deploy_id],
           context[:execution].pxe_profile_singularities
         ) then
           failed_microstep("Cannot perform the set_pxe_for_custom operation")

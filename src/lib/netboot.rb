@@ -1,6 +1,10 @@
 require 'pathname'
 
 module NetBoot
+  def self.custom_prefix(user,id)
+    "#{user}-#{id.to_s}--"
+  end
+
   def self.Factory(kind, binary, export_kind, export_server, repository_dir, custom_dir, profiles_dir, profiles_kind, chain=nil)
     begin
       c = NetBoot.class_eval(kind)
@@ -89,14 +93,14 @@ module NetBoot
       raise 'Should be reimplemented'
     end
 
-    def boot_custom(profile, user=nil, singularities=nil)
+    def boot_custom(profile, user, id, singularities=nil)
       [
         profile,
         lambda do |prof,node|
           prof.gsub!("PXE_EXPORT",export_path(@custom_dir))
           prof.gsub!("NODE_SINGULARITY",singularities[node[:hostname]].to_s) \
             if singularities
-          prof.gsub!("FILES_PREFIX","pxe-#{user}") if user
+          prof.gsub!("FILES_PREFIX",NetBoot.custom_prefix(user,id))
           prof
         end
       ]

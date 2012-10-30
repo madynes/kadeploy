@@ -23,6 +23,7 @@ require 'workflow'
 require 'debug'
 require 'microsteps'
 require 'process_management'
+require 'grabfile'
 require 'error'
 
 #Ruby libs
@@ -30,6 +31,7 @@ require 'drb'
 require 'socket'
 require 'yaml'
 require 'digest/sha1'
+require 'uri'
 
 class KadeployServer
   @config = nil
@@ -122,7 +124,7 @@ class KadeployServer
   # * cache_dir: cache directory
   # Output
   # * return the port allocated to the socket server
-  def create_a_socket_server(filename, cache_dir)
+  def create_socket_server(dest)
     sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
     sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
     begin
@@ -135,7 +137,7 @@ class KadeployServer
       sock.listen(10)
       begin
         session = sock.accept
-        file = File.new(File.join(cache_dir, filename), "w")
+        file = File.new(dest, "w")
         while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
           file.write(buf)
         end
@@ -326,14 +328,15 @@ class KadeployServer
       output = info[:workflows].first.output
       context = info[:workflows].first.context
 
-      # Clean cache files
-      unless context[:common].kadeploy_disable_cache
-        Cache::remove_files(
-          context[:common].kadeploy_cache_dir,
-          /#{context[:execution].prefix_in_cache}/,
-          output
-        ) if context[:execution].load_env_kind == "file"
+      # Unlock the cached files
+      if info[:cached_files]
+        info[:cached_files].each do |file|
+          file.release
+        end
       end
+
+      # Clean cache
+      @config.common.cache[:global].clean
 
       info[:workflows].first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
@@ -443,9 +446,17 @@ class KadeployServer
       if @reboot_info_hash.has_key?(reboot_id) then
         @reboot_info_hash[reboot_id][0].free()
         @reboot_info_hash[reboot_id][1].free()
+        # Unlock the cached files
+        if @reboot_info_hash[reboot_id].size >= 4
+          @reboot_info_hash[reboot_id][4].each do |file|
+            file.release
+          end
+        end
         kareboot_delete_reboot_info(reboot_id)
       end
     }
+    # Clean cache
+    @config.common.cache[:global].clean
   end
 
   # Get the results of a reboot operation (RPC: only for async execution)
@@ -525,15 +536,6 @@ class KadeployServer
 
     tmpoutput = nil
     unless context[:common].kadeploy_disable_cache
-      # Set the prefix of the files in the cache
-      if context[:execution].load_env_kind == 'file'
-        context[:execution].prefix_in_cache =
-          "e-anon-#{context[:execution].true_user}-#{Time.now.to_i}--"
-      else
-        context[:execution].prefix_in_cache =
-          "e-#{context[:execution].environment.id}--"
-      end
-
       tmpoutput = Debug::OutputControl.new(
         context[:execution].verbose_level || context[:common].verbose_level,
         context[:execution].debug,
@@ -548,10 +550,11 @@ class KadeployServer
 
       @workflow_info_hash[workflow_id][:grabthread] = Thread.new do
         begin
-          Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+          @workflow_info_hash[workflow_id][:cached_files] =
+            Managers::GrabFileManager.grab_user_files(context,tmpoutput)
         rescue KadeployError => ke
           exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
-          raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+          raise KadeployError.new(ke.errno,{ :wid => workflow_id },ke.message)
         end
       end
     end
@@ -578,7 +581,7 @@ class KadeployServer
         workflow = Workflow.new(nodeset,context.dup)
       rescue KadeployError => ke
         @workflow_info_hash_lock.unlock
-        raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+        raise KadeployError.new(ke.errno,{ :wid => workflow_id },ke.message)
       end
       kadeploy_add_workflow_info(workflow, workflow_id)
       workflows << workflow
@@ -597,20 +600,20 @@ class KadeployServer
     if block_given?
       begin
         yield(workflow_id,workflows)
-
-        # Clean cache files
-        unless context[:common].kadeploy_disable_cache
-          Cache::remove_files(
-            context[:common].kadeploy_cache_dir,
-            /#{context[:execution].prefix_in_cache}/,
-            tmpoutput
-          ) if context[:execution].load_env_kind == "file"
-        end
       ensure
         #let's free memory at the end of the workflow
         @workflow_info_hash_lock.synchronize {
+          # Unlock the cached files
+          if @workflow_info_hash[workflow_id] and @workflow_info_hash[workflow_id][:cached_files]
+            @workflow_info_hash[workflow_id][:cached_files].each do |file|
+              file.release
+            end
+          end
+
           kadeploy_delete_workflow_info(workflow_id)
         }
+        # Clean cache
+        @config.common.cache[:global].clean
         config = nil
       end
       true
@@ -697,10 +700,13 @@ class KadeployServer
         finthr.join
       end
     rescue KadeployError => ke
-      msg = KadeployAsyncError.to_msg(ke.errno)
+      msg = KadeployError.to_msg(ke.errno)
       Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
       #Debug::distant_client_error("Cannot run the deployment",client)
       kadeploy_sync_kill_workflow(ke.context[:wid],false)
+    rescue
+
     end
     return true
   end
@@ -725,6 +731,12 @@ class KadeployServer
         @workflow_info_hash[workflow_id][:workflows].each do |workflow|
           workflow.kill()
         end
+        if @workflow_info_hash[workflow_id][:cached_files]
+          @workflow_info_hash[workflow_id][:cached_files].each do |file|
+            file.release
+          end
+        end
+        @config.common.cache[:global].clean
         kadeploy_delete_workflow_info(workflow_id)
       end
     }
@@ -735,6 +747,7 @@ class KadeployServer
     @workflow_info_hash[workflow_id][:runthread] = Thread.current
     @workflow_info_hash[workflow_id][:grabthread] = nil
     @workflow_info_hash[workflow_id][:workflows] = []
+    @workflow_info_hash[workflow_id][:cached_files] = []
   end
 
   # Record a Managers::WorkflowManager pointer
@@ -842,69 +855,10 @@ class KadeployServer
       + Time.now.to_s \
       + exec_specific.node_set.to_s
     )
+
     @reboot_info_hash_lock.synchronize {
       kareboot_add_reboot_info(reboot_id, nodes_ok, nodes_ko, false)
     }
-
-    if (exec_specific.reboot_kind == "env_recorded") && 
-        exec_specific.check_demolishing && 
-        exec_specific.node_set.check_demolishing_env(db) then
-      output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
-      raise KadeployError.new(KarebootAsyncError::DEMOLISHING_ENV,:rid => reboot_id, :status => 2)
-    end
-
-    if ((exec_specific.reboot_kind == "set_pxe") && (not exec_specific.pxe_upload_files.empty?)) then
-      gfm = Managers::GrabFileManager.new(config, output, client, db)
-      exec_specific.pxe_upload_files.each { |pxe_file|
-        user_prefix = "pxe-#{config.exec_specific.true_user}--"
-        local_pxe_file = File.join(@config.common.cache[:netboot][:directory], "#{user_prefix}#{File.basename(pxe_file)}")
-        unless gfm.grab_file_without_caching(
-          pxe_file,
-          local_pxe_file,
-          "pxe_file",
-          user_prefix,
-          @config.common.cache[:netboot][:directory],
-          @config.common.cache[:netboot][:size],
-          false,
-          /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
-        ) then
-          output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
-          raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,:rid => reboot_id, :status => 3)
-        end
-
-        if not system("chmod +r #{local_pxe_file}") then
-          output.verbosel(0, "Cannot add read rights on the pxe file")
-          raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,:rid => reboot_id, :status => 3)
-        end
-      }
-      gfm = nil
-    end
-    if ((exec_specific.key != "") && (exec_specific.reboot_kind == "deploy_env")) then
-      gfm = Managers::GrabFileManager.new(config, output, client, db)
-      user_prefix = "u-#{exec_specific.true_user}--"
-      key = exec_specific.key
-      case key
-      when /^http[s]?:\/\//
-        local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + key.slice((key.rindex("/") + 1)..(key.length - 1)))
-      else
-        local_key = File.join(config.common.kadeploy_cache_dir, user_prefix + File.basename(key))
-      end
-      unless gfm.grab_file_without_caching(
-        key,
-        local_key,
-        "key",
-        user_prefix,
-        config.common.kadeploy_cache_dir,
-        config.common.kadeploy_cache_size,
-        false,
-        /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
-      ) then
-        output.verbosel(0, "Reboot not performed since the SSH key file cannot be grabbed")
-        raise KadeployError.new(FetchFileError::INVALID_KEY, rid => reboot_id, :status => 4)
-      end
-      exec_specific.key = local_key
-      gfm = nil
-    end
 
     context = {
       :reboot_id => reboot_id,
@@ -922,6 +876,65 @@ class KadeployServer
       :nodesets_id => 0,
       :local => { :parent => KadeployServer, :retries => 0 }
     }
+
+    if (exec_specific.reboot_kind == "env_recorded") \
+      and exec_specific.check_demolishing \
+      and exec_specific.node_set.check_demolishing_env(db)
+    then
+      output.verbosel(0, "Reboot not performed since some nodes have been "\
+        "deployed with a demolishing environment")
+      raise KadeployError.new(KarebootAsyncError::DEMOLISHING_ENV,
+        :rid => reboot_id, :status => 2)
+    end
+
+    if (exec_specific.reboot_kind == "set_pxe") and (!exec_specific.pxe_upload_files.empty?) then
+      gfm = Managers::GrabFileManager.new(context[:common].cache[:netboot],
+        output,client,db,0744)
+
+      exec_specific.pxe_upload_files.each do |pxefile|
+        begin
+          Managers::GrabFileManager::grab(gfm,context,pxefile,:anon,'pxe',
+            KarebootAsyncError::PXE_FILE_FETCH_ERROR,
+            :file => File.join(context[:common].cache[:netboot].directory,
+              (
+                NetBoot.custom_prefix(
+                  context[:execution].true_user,
+                  context[:deploy_id]
+                ) + File.basename(pxefile)
+              )
+            )
+          )
+        rescue KadeployError => ke
+          gfm.clean
+          output.verbosel(0,
+            "Reboot not performed since some pxe files cannot be grabbed")
+          raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,
+            :rid => reboot_id, :status => 3)
+        end
+      end
+      gfm = nil
+    end
+    if (exec_specific.key != "") and (exec_specific.reboot_kind == "deploy_env")
+      begin
+        gfm = Managers::GrabFileManager.new(context[:common].cache[:global],
+          output,client,db, 0640)
+        Managers::GrabFileManager::grab(gfm,context,exec_specific.key,:anon,
+          'key',FetchFileError::INVALID_KEY)
+        gfm = nil
+      rescue KadeployError => ke
+        gfm.clean
+        output.verbosel(0, "Reboot not performed since the SSH key file "\
+          "cannot be grabbed")
+        raise KadeployError.new(FetchFileError::INVALID_KEY, rid => reboot_id,
+          :status => 4)
+      end
+    end
+
+    @reboot_info_hash_lock.synchronize {
+      @reboot_info_hash[reboot_id][4] = gfm.files.clone
+    }
+
+    gfm = nil
 
     clusters = exec_specific.node_set.group_by_cluster
     if clusters.size > 1
@@ -1027,8 +1040,16 @@ class KadeployServer
         yield(reboot_id,threads)
       ensure
         @reboot_info_hash_lock.synchronize {
+          # Unlock the cached files
+          if @reboot_info_hash[reboot_id].size >= 4
+            @reboot_info_hash[reboot_id][4].each do |file|
+              file.release
+            end
+          end
           kareboot_delete_reboot_info(reboot_id)
         }
+        # Clean cache
+        @config.common.cache[:global].clean
         config = nil
       end
     else
@@ -1122,8 +1143,16 @@ class KadeployServer
     rescue KadeployError => ke
       Debug::distant_client_error("Cannot run the reboot",client)
       @reboot_info_hash_lock.synchronize {
+        # Unlock the cached files
+        if @reboot_info_hash[reboot_id].size >= 4
+          @reboot_info_hash[reboot_id][4].each do |file|
+            file.release
+          end
+        end
         kareboot_delete_reboot_info(ke.context[:rid])
       }
+      # Clean cache
+      @config.common.cache[:global].clean
       ret = (ke.context[:status].nil? ? -1 : ke.context[:status])
     end
     return ret
@@ -1175,8 +1204,16 @@ class KadeployServer
         microthread[:micro].kill
       end
       @reboot_info_hash_lock.synchronize {
+        # Unlock the cached files
+        if @reboot_info_hash[reboot_id].size >= 4
+          @reboot_info_hash[reboot_id][4].each do |file|
+            file.release
+          end
+        end
         kareboot_delete_reboot_info(ke.context[:rid])
       }
+      # Clean cache
+      @config.common.cache[:global].clean
       begin
         GC.start
       rescue TypeError
@@ -2235,9 +2272,18 @@ class KadeployServer
       ret = nil
       if env.tarball
         tar = env.tarball.dup
-        md5 = client.get_file_md5(tar['file'])
+        md5 = nil
+        begin
+          md5 = Managers::Fetch[tar['file'],FetchFileError::INVALID_ENVIRONMENT_TARBALL,client].checksum
+        rescue KadeployError => ke
+          msg = KadeployError.to_msg(ke.errno)
+          Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+            if msg and !msg.empty?
+          client.print(ke.message) if ke.message and !ke.message.empty?
+          return nil
+        end
 
-        if tar['md5'] == 0
+        if tar['md5'] == 0 or !md5 or md5.empty?
           Debug::distant_client_error(
             "The md5 of the file #{tar['file']} cannot be obtained",
             client
@@ -2271,9 +2317,18 @@ class KadeployServer
       ret = nil
       if env.preinstall
         pre = env.preinstall.dup
-        md5 = client.get_file_md5(pre['file'])
+        md5 = nil
+        begin
+          md5 = Managers::Fetch[pre['file'],FetchFileError::INVALID_PREINSTALL,client].checksum
+        rescue KadeployError => ke
+          msg = KadeployError.to_msg(ke.errno)
+          Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+            if msg and !msg.empty?
+          client.print(ke.message) if ke.message and !ke.message.empty?
+          return nil
+        end
 
-        if pre['md5'] == 0
+        if pre['md5'] == 0 or !md5 or md5.empty?
           Debug::distant_client_error(
             "The md5 of the file #{pre['file']} cannot be obtained",
             client
@@ -2308,9 +2363,18 @@ class KadeployServer
       if env.postinstall and !env.postinstall.empty?
         posts = env.postinstall.dup
         posts.each do |post|
-          md5 = client.get_file_md5(post['file'])
+          md5 = nil
+          begin
+            md5 = Managers::Fetch[post['file'],FetchFileError::INVALID_POSTINSTALL,client].checksum
+          rescue KadeployError => ke
+            msg = KadeployError.to_msg(ke.errno)
+            Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+              if msg and !msg.empty?
+            client.print(ke.message) if ke.message and !ke.message.empty?
+            return nil
+          end
 
-          if md5 == 0
+          if md5 == 0 or !md5 or md5.empty?
             Debug::distant_client_error(
               "The md5 of the file #{post['file']} cannot be obtained",
               client
@@ -2455,23 +2519,30 @@ class KadeployServer
       exec_specific.files_to_move.each do |file|
         ['tarball', 'preinstall', 'postinstall'].each do |kind|
           next if !row[kind] or row[kind].empty?
+          except = nil
+          case kind
+          when 'tarball'
+            except = FetchFileError::INVALID_ENVIRONMENT_TARBALL
+          when 'preinstall'
+            except = FetchFileError::INVALID_PREINSTALL
+          when 'postinstall'
+            except = FetchFileError::INVALID_POSTINSTALL
+          end
 
           update = Proc.new do |updatefile|
             if updatefile['file'] =~ /^#{file['src']}/
               ret = updatefile
               upf = updatefile['file'].gsub(file['src'],'')
               updatefile['file'] = File.join(file['dest'],upf)
-              if updatefile['file'] =~ /^http[s]?:\/\//
-                updatefile['md5'] = ''
-              else
-                updatefile['md5'] = client.get_file_md5(updatefile['file'])
-                if updatefile['md5'] == 0
-                  Debug::distant_client_error(
-                    "The md5 of the file #{updatefile['file']} cannot be obtained",
-                    client
-                  )
-                  ret = nil
-                end
+
+              begin
+                updatefile['md5'] = Managers::Fetch[updatefile['file'],except,client].checksum
+              rescue KadeployError => ke
+                msg = KadeployError.to_msg(ke.errno)
+                Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+                  if msg and !msg.empty?
+                client.print(ke.message) if ke.message and !ke.message.empty?
+                ret = nil
               end
               ret
             else

@@ -7,6 +7,7 @@
 require 'tempfile'
 require 'pathname'
 require 'yaml'
+require 'uri'
 
 #Kadeploy libs
 require 'db'
@@ -14,6 +15,8 @@ require 'md5'
 require 'http'
 require 'debug'
 require 'configparser'
+require 'grabfile'
+require 'error'
 
 module EnvironmentManagement
   OS_KIND = [
@@ -107,6 +110,7 @@ module EnvironmentManagement
     attr_reader :demolishing_env
     attr_reader :multipart
     attr_reader :options
+    attr_reader :recorded
 
     def debug(client,msg)
       Debug::distant_client_print(msg,client)
@@ -138,6 +142,10 @@ module EnvironmentManagement
       return [true,'']
     end
 
+    def recorded?
+      @recorded
+    end
+
     # Load an environment file
     #
     # Arguments
@@ -149,23 +157,34 @@ module EnvironmentManagement
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
     def load_from_file(description, almighty_env_users, user, client, setmd5, filename=nil)
+      @recorded = false
       @user = user
       @preinstall = nil
       @postinstall = []
       @id = description['id'] || -1
 
-      filemd5 = Proc.new do |f|
+      filemd5 = Proc.new do |f,kind|
         ret = nil
-        if f =~ /^http[s]?:\/\//
-          ret = ''
-        else
-          if setmd5
-            ret = client.get_file_md5(f)
-            if ret == 0
-              error(client,"The image file #{f} cannot be read")
-              return false
-            end
+        except = nil
+        case kind
+        when 'tarball'
+          except = FetchFileError::INVALID_ENVIRONMENT_TARBALL
+        when 'preinstall'
+          except = FetchFileError::INVALID_PREINSTALL
+        when 'postinstall'
+          except = FetchFileError::INVALID_POSTINSTALL
+        end
+        begin
+          ret = Managers::Fetch[f,except].checksum()
+        rescue KadeployError => ke
+          msg = KadeployError.to_msg(ke.errno)
+          error(client,"#{msg} (error ##{ke.errno})") if msg and !msg.empty?
+          if ke.message and !ke.message.empty?
+            debug(client,ke.message)
+          else
+            error(client,"Unable to get the file #{f}")
           end
+          return false
         end
         ret
       end
@@ -193,7 +212,7 @@ module EnvironmentManagement
           else
             compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
           end
-          md5 = filemd5.call(file)
+          md5 = filemd5.call(file,'tarball')
           shortkind = EnvironmentManagement.image_type_short(kind,compress)
           @tarball = {
             'kind' => shortkind,
@@ -218,7 +237,7 @@ module EnvironmentManagement
                 'tar',
                 cp.value('compression',String,nil,IMAGE_COMPRESSION)
               ),
-              'md5' => filemd5.call(file),
+              'md5' => filemd5.call(file,'preinstall'),
               'script' => cp.value('script',String,'none'),
             }
           end
@@ -233,7 +252,7 @@ module EnvironmentManagement
                 cp.value('compression',String,nil,IMAGE_COMPRESSION)
               ),
               'file' => file,
-              'md5' => filemd5.call(file),
+              'md5' => filemd5.call(file,'postinstall'),
               'script' => cp.value('script',String,'none'),
             }
           end
@@ -473,6 +492,7 @@ module EnvironmentManagement
       @filesystem = env.filesystem
       @multipart = env.multipart
       @options = env.options
+      @recorded = env.recorded
       self
     end
 
@@ -485,6 +505,7 @@ module EnvironmentManagement
         private_env,
         public_env
       )
+
       if ret
         load_from_env(ret[0])
       else
@@ -522,6 +543,7 @@ module EnvironmentManagement
       @filesystem = hash['filesystem']
       @multipart = (hash['multipart'] == 0 ? false : true)
       @options = (!hash['options'] or hash['options'].empty? ? {} : YAML.load(hash['options']))
+      @recorded = true
       self
     end
 
@@ -768,14 +790,15 @@ module EnvironmentManagement
     # Output
     # * return true
     def set_md5(kind, file, hash, dbh)
+      return false unless @recorded
       query = ""
       case kind
       when "tarball"
         tarball = "#{@tarball["file"]}|#{@tarball["kind"]}|#{hash}"
         query = "UPDATE environments SET tarball=\"#{tarball}\""
-      when "presinstall"
+      when "preinstall"
         preinstall = "#{@preinstall["file"]}|#{@preinstall["kind"]}|#{hash}"
-        query = "UPDATE environments SET presinstall=\"#{preinstall}\""
+        query = "UPDATE environments SET preinstall=\"#{preinstall}\""
       when "postinstall"
         postinstall_array = Array.new
         @postinstall.each { |p|
