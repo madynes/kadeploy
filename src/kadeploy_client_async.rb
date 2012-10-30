@@ -47,7 +47,7 @@ if (exec_specific_config != nil) then
     end
     kadeploy_server.async_deploy_free(workflow_id)
   else
-    $stderr.puts KadeployAsyncError.to_msg(error) + " (error ##{error})"
+    $stderr.puts KadeployError.to_msg(error) + " (error ##{error})"
   end
 
   distant.stop_service()
