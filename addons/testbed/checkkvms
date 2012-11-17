@@ -3,8 +3,10 @@
 require 'socket'
 require 'resolv'
 
+MAX_VMS=24
+
 # Constraints
-MAX_VM_PER_CORE = 3
+MAX_VM_PER_CORE = 2.5
 
 # Sizes in Mo
 RAM_SIZE = 350
@@ -50,4 +52,10 @@ nbvm = (totmem-HOST_FREE_MEM_SIZE)/(FS_SIZE + RAM_SIZE)
 
 maxvms = (MAX_VM_PER_CORE * totcores)
 
-puts (nbvm <= maxvms ? nbvm : maxvms).to_i
+ret = (nbvm <= maxvms ? nbvm : maxvms).to_i
+
+if ret < MAX_VMS
+  puts ret
+else
+  puts MAX_VMS
+end
