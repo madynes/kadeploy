@@ -11,6 +11,8 @@ NODENB = 4
 NODENAME_PREFIX = 'node-'
 MACADDR_START_VAL = '00:16:3E:00:00:00'
 
+MONITOR_PORT_START_VAL = 25301
+
 MACADDR_LENGTH = 12
 MACADDR_GR_SEP = ':'
 
@@ -63,6 +65,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-e', '--exclude-list <nodelist_file>', 'Specify a file containing a list of nodes that IP should be excluded from the pool of IPs used for the VMs' ) do |h|
   	options[:excl_list] = h
+	end
+
+	opts.on( '-m', '--addr-list <addrlist_file>', 'Specify a file containing the list of ip/macs association' ) do |h|
+  	options[:addr_list] = h
 	end
 end
 
@@ -149,6 +155,22 @@ if options[:excl_list]
   end
 end
 
+addrlist = {}
+if options[:addr_list]
+  begin
+    File.open(options[:addr_list] , 'r') do |f|
+      f.each do |line|
+        tmp = line.strip.split(' ',2)
+        excllist[ipv42int(tmp[0])] = mac2int(tmp[1])
+      end
+    end
+  rescue Errno::ENOENT
+    $stderr.puts "File '#{options[:addr_list]}' not found"
+    exit 1
+  end
+end
+  
+
 tmp = $network.to_range
 exclips = [
   ipv42int(tmp.first.to_s),
@@ -214,13 +236,31 @@ end
 
 itermac = mac2int(MACADDR_START_VAL)
 
+exclmacs = []
 count=1
+port = MONITOR_PORT_START_VAL 
 $hosts.each do |host|
   iters = host[:nbnodes]
   while iters > 0 do
-    unless exclips.include?(host[:site][:iterip])
-      puts "#{NODENAME_PREFIX}#{count} #{int2ipv4(host[:site][:iterip])} #{int2mac(itermac)} #{host[:ipv4str]}"
+    if !exclips.include?(host[:site][:iterip])
+      unless addr_list.emtpy?
+        if mac = addr_list[host[:site][:iterip]]
+          if exclmacs.include?(mac)
+            begin
+              mac += 1
+            end while exclmacs.include?(mac)
+          end
+        else
+          mac = intermac
+        end
+      else
+        mac = intermac
+      end
+      exclmacs << mac
+        
+      puts "#{NODENAME_PREFIX}#{count} #{int2ipv4(host[:site][:iterip])} #{int2mac(itermac)} #{host[:ipv4str]} #{port}"
       count += 1
+      port += 1
       itermac += 1
       iters -= 1
     end

@@ -281,12 +281,11 @@ def cfg_kadeploy_kaconsole_cmd(user=ENV['USER'])
   "ssh -t #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{user}@#{getgw()} \"kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`\""
 end
 
-
 def cfg_kadeploy_kvm_cmd(cmd,user='root')
   host = nil
 	case $mode
 		when :VLANKVM
-      host = "`cat #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,'HOSTNAME_FQDN')}`"
+      host = "`cat #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,'HOSTNAME_FQDN')} | cut -f 1 -d' '`"
 		when :KVM
       host = getgw()
 		else
@@ -323,7 +322,11 @@ def cfg_kadeploy_kvm_procs_get_pid(psechocmd)
 end
 
 def cfg_kadeploy_kvm_procs_get_params(psechocmd)
-  "#{psechocmd} | cut -f 8- -d' ' | sed -e 's/^SCREEN/screen/g'"
+  "#{psechocmd} | cut -f 8- -d' '"
+end
+
+def cfg_kadeploy_kvm_monitor(cmd)
+  "echo '#{cmd}' | nc `cat #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,'HOSTNAME_FQDN')}`"
 end
 
 def cfg_kadeploy_power_on_cmd()
@@ -387,11 +390,11 @@ def cfg_kadeploy_reboot_cmd()
 		when :KAVLAN
       ret = "#{cfg_kadeploy_power_off_cmd()} && sleep 2 && #{cfg_kadeploy_power_on_cmd()}"
 		when :KVM, :VLANKVM
-      ret = cfg_kadeploy_kvm_cmd(
-        "KVMPS=\\`#{cfg_kadeploy_kvm_ps()}\\` "\
-        "&& kill \\`#{cfg_kadeploy_kvm_procs_get_pid('echo \$KVMPS')}\\` "\
-        "&& \\`#{cfg_kadeploy_kvm_procs_get_params('echo \$KVMPS')}\\`"
-      )
+      ret = cfg_kadeploy_kvm_cmd('system_reset')
+#        "KVMPS=\\`#{cfg_kadeploy_kvm_ps()}\\` "\
+#        "&& kill \\`#{cfg_kadeploy_kvm_procs_get_pid('echo \$KVMPS')}\\` "\
+#        "&& \\`#{cfg_kadeploy_kvm_procs_get_params('echo \$KVMPS')}\\`"
+#      )
 		else
 			msg('Unknown mode',MSG_ERROR,true)
 	end
@@ -2061,6 +2064,8 @@ begin
             $kanodes.delete(name.to_sym)
             next
           end
+          $kanodes[name.to_sym][:monport] = tmp[4].strip if tmp[4]
+          end
         end
       end
     else
@@ -2764,7 +2769,7 @@ sshgw.ssh(servername,'root') do |session|
       select_type($kanodes,:NODE).each do |node|
         cmds << "echo '#{node[:fqdn]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:basename])}"
         cmds << "echo '#{node[:basename]}' > #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,node[:fqdn])}"
-        cmds << "echo '#{node[:host][:ipv4]}' > #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,node[:fqdn])}" if $mode == :VLANKVM
+        cmds << "echo '#{node[:host][:ipv4]} #{node[:host][:monport]}' > #{File.join(CFG_KADEPLOY_KVM_HOSTS_PATH,node[:fqdn])}" if $mode == :VLANKVM
       end
     end
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_PATH}")
