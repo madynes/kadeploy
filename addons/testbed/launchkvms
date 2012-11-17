@@ -17,6 +17,8 @@ HOST_FREE_MEM_SIZE = 1024
 
 TMP_DIR = '/tmp/katestbed'
 
+MONITOR_PORT=12345
+
 def cmd(cmd,critical=true)
   ret = `#{cmd}`
   if critical and !$?.success?
@@ -56,10 +58,11 @@ cmd("rm -Rf #{TMP_DIR}")
 cmd("mkdir -p #{TMP_DIR}")
 count = 0
 ARGF.each do |line|
-  if line =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s+#{myip}\s*$/
+  if line =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s+#{myip}\s*(\d+)\s*$/
     vmname = Regexp.last_match(1)
     vmip = Regexp.last_match(2)
     vmmac = Regexp.last_match(3)
+    vmmonport = Regexp.last_match(4)
 
     fsdir = File.join(TMP_DIR,vmname)
     cmd("mkdir -p #{fsdir}")
@@ -67,7 +70,7 @@ ARGF.each do |line|
     fsfile = File.join(fsdir,FS_FILE)
     cmd("rm -f #{fsfile}")
     cmd("qemu-img create -f #{FS_TYPE} #{fsfile} #{FS_SIZE}M")
-    cmd("screen -d -m -S #{vmname} kvm -net nic,macaddr=#{vmmac} -net tap -boot d -cdrom #{IPXE_ISO_FILE} -m #{RAM_SIZE}M -drive file=#{fsfile} -name #{vmname} -curses")
+    cmd("nohup kvm -net nic,macaddr=#{vmmac} -net tap -boot d -cdrom #{IPXE_ISO_FILE} -m #{RAM_SIZE}M -drive file=#{fsfile} -name #{vmname} -monitor tcp::#{vmmonport},server,nowait -vnc :#{count} 1>/dev/null 2>/dev/null &")
     sleep(0.3)
     #puts "Started #{vmname} (mac:#{vmmac})"
     count += 1
