@@ -23,8 +23,7 @@ SSH_KEYS        = ["#{ENV['HOME']}/.ssh/id_dsa", "#{ENV['HOME']}/.ssh/id_rsa","#
 SSH_OPTIONS			= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3'
 HTTP_PROXY_ADDR   = 'proxy'
 HTTP_PROXY_PORT   = 3128
-#DEB_REPOSITORY   	= 'http://apt.grid5000.fr/kadeploy'
-DEB_REPOSITORY   	= 'http://public.nancy.grid5000.fr/~ejeanvoine/debian/kadeploy'
+DEB_REPOSITORY   	= 'http://apt.grid5000.fr/kadeploy'
 
 if g5k?
   G5K_API       	= 'https://api.grid5000.fr/2.0'
@@ -52,7 +51,7 @@ KVM_G5K_SITE = 'access.nancy.grid5000.fr'
 KVM_PACKAGES = [ 'kvm', 'qemu', 'qemu-kvm' , 'bridge-utils' ]
 KVM_BRIDGE_DEV = 'br0'
 
-DEFAULT_CONSOLE_BAUD_RATE = '38400'
+DEFAULT_CONSOLE_BAUD_RATE = '19200'
 DEFAULT_CONSOLE_TTY_ID = '0'
 DEFAULT_RAMDISK_SIZE = 290000
 
@@ -77,32 +76,32 @@ CFG_KADEPLOY_SOFT_REBOOT = false
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 2,
-  :timeout => 600
+  :timeout => 300
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
   :retries => 1,
-  :timeout => 900
+  :timeout => 500
 }
 CFG_KADEPLOY_MACROSTEP3 = [
   {
     :name => 'BootNewEnv|BootNewEnvClassical',
     :retries => 1,
-    :timeout => 600
+    :timeout => 300
   },
   {
     :name => 'BootNewEnvHardReboot',
     :retries => 1,
-    :timeout => 400
+    :timeout => 350
   }
 ]
 
 CFG_KADEPLOY_PARTITION_SWAP_ID = 3
-CFG_KADEPLOY_PARTITION_SWAP_SIZE = '1G'
+CFG_KADEPLOY_PARTITION_SWAP_SIZE = '48M'
 CFG_KADEPLOY_PARTITION_PROD_ID = 1
-CFG_KADEPLOY_PARTITION_PROD_SIZE = '4G'
+CFG_KADEPLOY_PARTITION_PROD_SIZE = '2M'
 CFG_KADEPLOY_PARTITION_DEPLOY_ID = 2
-CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '4G'
+CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '512M'
 CFG_KADEPLOY_PARTITION_TMP_ID = 4
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
 
@@ -207,7 +206,7 @@ def cfg_kadeploy_conf()
   "dbg_to_syslog = true\n"\
   "dbg_to_syslog_level = 3\n"\
   "reboot_window = 50\n"\
-  "reboot_window_sleep_time = 5\n"\
+  "reboot_window_sleep_time = 10\n"\
   "nodes_check_window = 100\n"\
   "bootloader = chainload_pxe\n"\
   "purge_deployment_timer = 900\n"\
