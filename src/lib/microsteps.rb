@@ -216,10 +216,12 @@ class Microstep < Automata::QueueTask
         ParallelOperation.new(
           nodeset,
           context,
-          @output
+          @output,
+          context[:local][:taktuk]
         )
       ) do |op|
         res = op.taktuk_exec(cmd,opts,expects)
+        context[:local][:taktuk] = op.taktuk
       end
       classify_nodes(res)
     end
@@ -253,10 +255,12 @@ class Microstep < Automata::QueueTask
       ParallelOperation.new(
         nodeset,
         context,
-        @output
+        @output,
+        context[:local][:taktuk]
       )
     ) do |op|
       res = op.taktuk_sendfile(src_file,dest_dir,opts)
+      context[:local][:taktuk] = op.taktuk
     end
     classify_nodes(res)
 
@@ -1355,6 +1359,10 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true (should be false sometimes :D)
   def ms_reboot(reboot_kind)
+    if context[:local][:taktuk]
+      context[:local][:taktuk].quit.run!
+      context[:local][:taktuk] = nil
+    end
     first_attempt = (context[:local][:retries] == 0)
     case reboot_kind
     when "soft"

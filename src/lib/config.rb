@@ -592,6 +592,9 @@ module ConfigInformation
           cp.parse('taktuk',true) do
             conf.taktuk_connector = cp.value('connector',String)
             conf.taktuk_tree_arity = cp.value('tree_arity',Fixnum,0)
+            conf.taktuk_keep_connections = cp.value(
+              'keep_connections',[TrueClass,FalseClass],true
+            )
             conf.taktuk_auto_propagate = cp.value(
               'auto_propagate',[TrueClass,FalseClass],true
             )
@@ -3025,6 +3028,7 @@ module ConfigInformation
     attr_accessor :nodes_desc     #information about all the nodes
     attr_accessor :taktuk_connector
     attr_accessor :taktuk_tree_arity
+    attr_accessor :taktuk_keep_connections
     attr_accessor :taktuk_auto_propagate
     attr_accessor :tarball_dest_dir
     attr_accessor :kadeploy_server

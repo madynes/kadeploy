@@ -1,4 +1,4 @@
-require 'thread'
+equire 'thread'
 require 'timeout'
 
 require 'nodes'

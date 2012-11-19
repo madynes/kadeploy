@@ -14,6 +14,8 @@ require 'ping'
 #module ParallelOperations
   #class ParallelOps
   class ParallelOperation
+    attr_reader :taktuk
+
     @nodes = nil
     @output = nil
     @context = nil
@@ -29,11 +31,11 @@ require 'ping'
     # * process_container: process container
     # Output
     # * nothing
-    def initialize(nodes, context, output)
+    def initialize(nodes, context, output, taktuk = nil)
       @nodes = nodes
       @context = context
       @output = output
-      @taktuk = nil
+      @taktuk = taktuk
     end
 
     def kill
@@ -91,6 +93,11 @@ require 'ping'
       else
         [[],@nodes.set.dup]
       end
+    end
+
+    # Quit taktuk if in interactive mode
+    def taktuk_quit()
+      @taktuk.quit.run! if @taktuk and @taktuk.options[:interactive]
     end
 
 
@@ -161,7 +168,7 @@ require 'ping'
       end
       nodes_update(results[:connector]) do |node,val|
         val.each do |v|
-          if !(v =~ /^Warning:.*$/)
+          unless v =~ /^Warning:.*$/
             node.last_cmd_exit_status = "256"
             node.last_cmd_stderr = "The node #{node.hostname} is unreachable"
             break
@@ -203,6 +210,7 @@ require 'ping'
       taktuk_opts[:connector] = connector unless connector.empty?
 
       taktuk_opts[:self_propagate] = nil if @context[:common].taktuk_auto_propagate
+      taktuk_opts[:interactive] = true if @context[:common].taktuk_keep_connections
 
       tree_arity = @context[:common].taktuk_tree_arity
       unless opts[:scattering].nil?
@@ -220,9 +228,9 @@ require 'ping'
     end
 
     def do_taktuk(opts={})
-      @taktuk = taktuk_init(opts)
+      @taktuk = taktuk_init(opts) if !@taktuk or (@taktuk and @taktuk.options[:interactive])
       yield(@taktuk)
-      @taktuk = nil
+      @taktuk = nil unless @taktuk.options[:interactive]
     end
   end
 #end

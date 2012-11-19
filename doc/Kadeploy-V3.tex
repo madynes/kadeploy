@@ -393,6 +393,7 @@ hooks:
 external:
   taktuk: 
     auto_propagate: false
+    keep_connections: true
     connector: |-
       ssh -q -o StrictHostKeyChecking=no \
       -o UserKnownHostsFile=/dev/null \
@@ -527,6 +528,7 @@ external:
     \item \yfield{connector}{String} connector used by Taktuk
     \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
     \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
+    \item \yfieldd{keep\_connections}{Boolean}{true} use Taktuk in interactive mode in order to keep the connections between the nodes open when executing several commands.
   \end{itemize}
 
   \item \ypath{/external/bittorrent}

@@ -217,7 +217,7 @@ module TakTuk
       'send-files', 'taktuk-command', 'path-value', 'command-separator',
       'escape-character', 'option-separator', 'output-redirect',
       'worksteal-behavior', 'time-granularity', 'no-numbering', 'timeout',
-      'cache-limit', 'window','window-adaptation','not-root','debug'
+      'cache-limit', 'window','window-adaptation','not-root','debug', 'interactive'
     ]
 
     def check(optname)
@@ -308,7 +308,7 @@ module TakTuk
 
   class TakTuk
     attr_accessor :streams,:binary
-    attr_reader :stdout,:stderr,:status, :args, :exec
+    attr_reader :stdout,:stderr,:status, :args, :exec, :options
 
     def initialize(hostlist,options = {:connector => 'ssh'})
       @binary = 'taktuk'
@@ -329,11 +329,13 @@ module TakTuk
       @commands = Commands.new
 
       @args = nil
+      @pipes = {}
       @stdout = nil
       @stderr = nil
       @status = nil
 
       @exec = nil
+      @execthread = nil
       @curthread = nil
     end
 
@@ -343,23 +345,58 @@ module TakTuk
 
     def run!
       @curthread = Thread.current
-      @args = []
-      @args += @options.to_cmd
-      @streams.each_pair do |name,stream|
-        temp = (stream.is_a?(Stream) ? "=#{stream.to_cmd}" : '')
-        @args << '-o'
-        @args << "#{name.to_s}#{temp}"
+      irun = lambda do
+        @pipes[:stdin].write("#{@commands.to_cmd}\n") if !@commands.empty? and !@pipes[:stdin].closed?
+        sleep(0.5)
+        @stdout = @pipes[:stdout].read unless @pipes[:stdout].closed?
+        @stderr = @pipes[:stderr].read unless @pipes[:stderr].closed?
+        unless @execthread.alive?
+          @exec = nil
+          @execthread.join 
+          status = @execthread.value
+          @execthread = nil
+          return false unless status
+        end
       end
-      @args += @hostlist.to_cmd
-      @args += @commands.to_cmd
 
-      @exec = Execute[@binary,*@args].run!
-      @status, @stdout, @stderr = @exec.wait
+      if @execthread
+        irun.call
+      else
+        @args = []
+        @args += @options.to_cmd
+        @streams.each_pair do |name,stream|
+          temp = (stream.is_a?(Stream) ? "=#{stream.to_cmd}" : '')
+          @args << '-o'
+          @args << "#{name.to_s}#{temp}"
+        end
+        @args += @hostlist.to_cmd
 
-      unless @status.success?
-        @curthread = nil
-        return false
+        if @options[:interactive]
+          @execthread = Thread.new do
+            @exec = Execute[@binary,*@args]
+            pid, @pipes[:stdin], @pipes[:stdout], @pipes[:stderr] = @exec.run
+            @exec.wait
+            unless @status.success?
+              @curthread = nil
+              @execthread = nil
+              return false
+            end
+          end
+          irun.call
+        else
+          @args += @commands.to_cmd
+          @exec = Execute[@binary,*@args].run!
+          @status, @stdout, @stderr = @exec.wait
+          @exec = nil
+
+          unless @status.success?
+            @curthread = nil
+            return false
+          end
+        end
       end
+
+      @commands.clear
 
       results = {}
       @streams.each_pair do |name,stream|
@@ -377,6 +414,7 @@ module TakTuk
 
     def kill!()
       @curthread.kill! if @curthread.alive?
+      @execthread.kill! if @execthread and @execthread.alive?
       unless @exec.nil?
         @exec.kill
         @exec = nil
