@@ -1,8 +1,5 @@
 #!/bin/bash
 
-BW_PER_WWW=120
-NETWORK_DEFAULT_CIDR=20
-
 TMP_DIR="${HOME}/.kabootstrap"
 
 SSH_KEY=~/.ssh/id_rsa
@@ -43,7 +40,7 @@ then
   network=$2
   newnet=1
 else
-  network=`dig +short $(echo "$hosts" | sed -n '1p')`/$NETWORK_DEFAULT_CIDR
+  network=`g5k-subnets -ps`
   if [ $? -ne 0 ]
   then
     echo 'Failed to get network'
@@ -98,7 +95,7 @@ let stime=`date +%s`-stime
 echo "... done in ${stime} seconds"
 
 
-if [ -n "$newnet" ]
+if [ -z "$newnet" ]
 then
   echo ""
   echo "Configuring `cat $servicefile | wc -l` service hosts"
