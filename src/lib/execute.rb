@@ -64,11 +64,6 @@ class Execute
   def wait(opts={})
     unless @exec_pid.nil?
       begin
-        Process.wait(@exec_pid)
-        @status = $?
-      rescue Errno::ECHILD
-        @status = nil
-      ensure
         if opts[:stdout_size]
           @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
         else
@@ -78,6 +73,23 @@ class Execute
           @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
         else
           @stderr = @parent_io[2].read unless @parent_io[2].closed?
+        end
+
+        pid, @status = Process.wait2(@exec_pid)
+      rescue Errno::ECHILD
+        @status = nil
+      ensure
+        if opts[:stdout_size]
+          size = opts[:stdout_size] - @stdout.size
+          @stdout += @parent_io[1].read(size) if !@parent_io[1].closed? and size > 0
+        else
+          @stdout += @parent_io[1].read unless @parent_io[1].closed?
+        end
+        if opts[:stderr_size]
+          size = opts[:stderr_size] - @stderr.size
+          @stderr += @parent_io[2].read(size) if !@parent_io[2].closed? and size > 0
+        else
+          @stderr += @parent_io[2].read unless @parent_io[2].closed?
         end
         @parent_io.each { |io| io.close unless io.closed? }
         @child_io = nil
