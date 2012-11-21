@@ -1115,19 +1115,19 @@ class Microstep < Automata::QueueTask
   def set_env
     blockdev = get_block_device_str()
 
-    "set KADEPLOY_CLUSTER=\"#{context[:cluster].name}\" && "\
-    "set KADEPLOY_ENV=\"#{context[:execution].environment.name}\" && "\
-    "set KADEPLOY_ENV_KERNEL=\"#{context[:execution].environment.kernel}\" && "\
-    "set KADEPLOY_ENV_INITRD=\"#{context[:execution].environment.initrd}\" && "\
-    "set KADEPLOY_ENV_KERNEL_PARAMS=\"#{get_kernel_params()}\" && "\
-    "set KADEPLOY_DEPLOY_PART=\"#{get_deploy_part_str()}\" && "\
-    "set KADEPLOY_BLOCK_DEVICE=\"#{blockdev}\" && "\
-    "set KADEPLOY_DEPLOY_PART_NUM=\"#{get_deploy_part_num()}\" && "\
-    "set KADEPLOY_SWAP_PART_NUM=\"#{context[:cluster].swap_part}\" && "\
-    "set KADEPLOY_PROD_PART_NUM=\"#{context[:cluster].prod_part}\" && "\
-    "set KADEPLOY_TMP_PART_NUM=\"#{context[:cluster].tmp_part}\" && "\
-    "set KADEPLOY_ENV_EXTRACTION_DIR=\"#{context[:common].environment_extraction_dir}\" && "\
-    "set KADEPLOY_PREPOST_EXTRACTION_DIR=\"#{context[:common].rambin_path}\""
+    "KADEPLOY_CLUSTER=\"#{context[:cluster].name}\" "\
+    "KADEPLOY_ENV=\"#{context[:execution].environment.name}\" "\
+    "KADEPLOY_ENV_KERNEL=\"#{context[:execution].environment.kernel}\" "\
+    "KADEPLOY_ENV_INITRD=\"#{context[:execution].environment.initrd}\" "\
+    "KADEPLOY_ENV_KERNEL_PARAMS=\"#{get_kernel_params()}\" "\
+    "KADEPLOY_DEPLOY_PART=\"#{get_deploy_part_str()}\" "\
+    "KADEPLOY_BLOCK_DEVICE=\"#{blockdev}\" "\
+    "KADEPLOY_DEPLOY_PART_NUM=\"#{get_deploy_part_num()}\" "\
+    "KADEPLOY_SWAP_PART_NUM=\"#{context[:cluster].swap_part}\" "\
+    "KADEPLOY_PROD_PART_NUM=\"#{context[:cluster].prod_part}\" "\
+    "KADEPLOY_TMP_PART_NUM=\"#{context[:cluster].tmp_part}\" "\
+    "KADEPLOY_ENV_EXTRACTION_DIR=\"#{context[:common].environment_extraction_dir}\" "\
+    "KADEPLOY_PREPOST_EXTRACTION_DIR=\"#{context[:common].rambin_path}\""
   end
 
   # Perform a fdisk on the nodes
@@ -1906,7 +1906,7 @@ class Microstep < Automata::QueueTask
         return false
       end
       if (preinstall["script"] != "none")
-        if not parallel_exec("#{set_env()} && #{context[:common].rambin_path}/#{preinstall["script"]}") then
+        if not parallel_exec("#{set_env()} #{context[:common].rambin_path}/#{preinstall["script"]}") then
           return false
         end
       end
@@ -1917,7 +1917,7 @@ class Microstep < Automata::QueueTask
           return false
         end
         if (preinstall["script"] != "none")
-          if not parallel_exec("#{set_env()} && #{context[:common].rambin_path}/#{preinstall["script"]}") then
+          if not parallel_exec("#{set_env()} #{context[:common].rambin_path}/#{preinstall["script"]}") then
             return false
           end
         end
@@ -1939,7 +1939,7 @@ class Microstep < Automata::QueueTask
         return false
       end
       if (postinstall["script"] != "none")
-        if not parallel_exec("#{set_env()} && #{context[:common].rambin_path}/#{postinstall["script"]}") then
+        if not parallel_exec("#{set_env()} #{context[:common].rambin_path}/#{postinstall["script"]}") then
           return false
         end
       end
@@ -1959,7 +1959,7 @@ class Microstep < Automata::QueueTask
         return false
       end
       if (postinstall["script"] != "none")
-        if not parallel_exec("#{set_env()} && #{context[:common].rambin_path}/#{postinstall["script"]}") then
+        if not parallel_exec("#{set_env()} #{context[:common].rambin_path}/#{postinstall["script"]}") then
           return false
         end
       end
