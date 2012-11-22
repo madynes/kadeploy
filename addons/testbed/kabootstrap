@@ -101,7 +101,7 @@ CFG_KADEPLOY_PARTITION_SWAP_SIZE = '8M'
 CFG_KADEPLOY_PARTITION_PROD_ID = 1
 CFG_KADEPLOY_PARTITION_PROD_SIZE = '2M'
 CFG_KADEPLOY_PARTITION_DEPLOY_ID = 2
-CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '552M'
+CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '512M'
 CFG_KADEPLOY_PARTITION_TMP_ID = 4
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
 
@@ -2496,6 +2496,9 @@ msg("Disconnected from #{server[:basename]}",MSG_INFO)
 msg("",MSG_INFO)
 
 msg('=== Setting up DNS server(s)',MSG_INFO)
+tempfile(cfg_dns_master()) do |masterpath|
+tempfile(cfg_dns_reverse()) do |reversepath|
+tempfile($configs[:bind]) do |custompath|
 select_server_type($kanodes,:dns).each do |server|
   servername=getnode(server[:basename])
   sshgw.ssh(servername,'root') do |session|
@@ -2515,10 +2518,12 @@ select_server_type($kanodes,:dns).each do |server|
       msg('Configuring DNS server',MSG_INFO)
 
 
-      tempfile(cfg_dns_master()) {|path| scp(servername,path,cfg_bind_master_file())}
+      scp(servername,masterpath,cfg_bind_master_file())
+      #tempfile(cfg_dns_master()) {|path| scp(servername,path,cfg_bind_master_file())}
       sexec(session,"chown bind #{cfg_bind_master_file()}")
 
-      tempfile(cfg_dns_reverse()) {|path| scp(servername,path,cfg_bind_reverse_file())}
+      scp(servername,reversepath,cfg_bind_reverse_file())
+      #tempfile(cfg_dns_reverse()) {|path| scp(servername,path,cfg_bind_reverse_file())}
       sexec(session,"chown bind #{cfg_bind_reverse_file()}")
 
 =begin
@@ -2532,13 +2537,14 @@ select_server_type($kanodes,:dns).each do |server|
 =end
       # Assume that default DNS server is the network gateway
       tmp = $network[:dns]
-      tempfile(cfg_bind((tmp != server[:ipv4] ? tmp : ''))) do |path|
-        scp(servername,path,CFG_BIND_NAMED_FILE)
-      end
+      #tempfile(cfg_bind((tmp != server[:ipv4] ? tmp : ''))) do |path|
+      tempfile(cfg_bind((tmp != server[:ipv4] ? tmp : ''))) { |bindpath| scp(servername,bindpath,CFG_BIND_NAMED_FILE) }
+      #end
 
 
       if $configs[:bind]
-        tempfile($configs[:bind]) { |path| scp(servername,path,CFG_BIND_CUSTOM_FILE) }
+        scp(servername,custompath,CFG_BIND_CUSTOM_FILE)
+        #tempfile($configs[:bind]) { |path| scp(servername,path,CFG_BIND_CUSTOM_FILE) }
         sexec(session,"chown bind #{CFG_BIND_CUSTOM_FILE}")
       end
 
@@ -2550,6 +2556,9 @@ select_server_type($kanodes,:dns).each do |server|
   end
   msg("Disconnected from #{server[:basename]}",MSG_INFO)
   msg("",MSG_INFO)
+end
+end
+end
 end
 
 server=select_server_type($kanodes,:dns)[0]
@@ -2580,6 +2589,7 @@ end
 
 
 msg('=== Setting up DHCP server(s)',MSG_INFO)
+tempfile(cfg_dhcp(net)) do |path|
 select_server_type($kanodes,:dhcp).each do |server|
   servername=getnode(server[:basename])
   sshgw.ssh(servername,'root') do |session|
@@ -2607,7 +2617,8 @@ select_server_type($kanodes,:dhcp).each do |server|
       net = nil if net == $network[:ipaddr]
 
       msg('Configuring DHCP server',MSG_INFO)
-      tempfile(cfg_dhcp(net)) {|path| scp(servername,path,CFG_DHCP_CONF_FILE)}
+      scp(servername,path,CFG_DHCP_CONF_FILE)
+      #tempfile(cfg_dhcp(net)) {|path| scp(servername,path,CFG_DHCP_CONF_FILE)}
       sexec(session,'service isc-dhcp-server restart')
 
       #msg('Reloading network interfaces',MSG_INFO)
@@ -2639,6 +2650,7 @@ select_server_type($kanodes,:dhcp).each do |server|
   end
   msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
   msg("",MSG_INFO)
+end
 end
 
 
