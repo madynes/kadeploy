@@ -4,6 +4,7 @@
 # For details on use and redistribution please refer to License.txt
 
 require 'drb/drb'
+require 'thread'
 
 module Nodes
   class NodeCmd
@@ -131,6 +132,7 @@ module Nodes
   end
 
   class NodeSet
+    @@idlock = Mutex.new
     attr_accessor :set, :id
 
     # Constructor of NodeSet
@@ -145,7 +147,9 @@ module Nodes
     end
 
     def self.newid(context)
-      context[:nodesets_id] += 1
+      @@idlock.synchronize do
+        context[:nodesets_id] += 1
+      end
     end
 
     def equal?(sub)
