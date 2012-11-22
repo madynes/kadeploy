@@ -156,4 +156,4 @@ echo "Services:"
 cat $serviceyamlfile | grep -v '\-\-\-' | grep -v 'newip:'
 echo ""
 
-echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile"
+echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile --no-tunnels"

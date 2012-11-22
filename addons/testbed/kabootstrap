@@ -981,6 +981,7 @@ $subnetworks = {}
 $gateway = nil
 $deploysendmeth = :HTTP
 $configs = {}
+$tunnels = true
 
 options = {}
 
@@ -1223,7 +1224,12 @@ def apt_cmd(session,shcmd,aptcmd,aptopts,params='')
 	aptproxy = nil
 	case $mode
 		when :KAVLAN, :VLANKVM
-			aptproxy = 'Acquire::http::Proxy=\"http://localhost:3128\"'
+      if $tunnels
+        aptproxy = 'Acquire::http::Proxy=\"http://localhost:3128\"'
+      else
+        #aptproxy = "Acquire::http::Proxy=\\\"http://#{HTTP_PROXY_ADDR}:#{HTTP_PROXY_PORT}\\\""
+        aptproxy = ''
+      end
 		when :KVM
 			aptproxy = ''
 		else
@@ -1289,33 +1295,37 @@ def get_open_port()
 end
 
 def scp(dsthost,srcfile,dstfile)
-	case $mode
-		when :KAVLAN, :VLANKVM
-			randport=get_open_port()
-			cmd="ssh #{SSH_OPTIONS} -N -L #{randport}:#{dsthost}:22 -i #{$sshkeyfile} #{ENV['USER']}@#{getgw()} &>/dev/null & echo $!"
-			msg(cmd) if $debug
-			pid=`#{cmd}`
-			#pid=`ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -N -L #{randport}:#{dsthost}:22 #{ENV['USER']}@#{getgw()} &>/dev/null & echo $!`
+  if $tunnels
+    case $mode
+      when :KAVLAN, :VLANKVM
+        randport=get_open_port()
+        cmd="ssh #{SSH_OPTIONS} -N -L #{randport}:#{dsthost}:22 -i #{$sshkeyfile} #{ENV['USER']}@#{getgw()} &>/dev/null & echo $!"
+        msg(cmd) if $debug
+        pid=`#{cmd}`
+        #pid=`ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -N -L #{randport}:#{dsthost}:22 #{ENV['USER']}@#{getgw()} &>/dev/null & echo $!`
 
-			time_start = Time.now
-			begin
-				tmp = `lsof -i4 -n | grep LISTEN | grep 127.0.0.1:#{randport}`
-				sleep(0.1)
-				msg("SSH tunnel creation on localhost:#{randport} failed",MSG_ERROR,true) \
-					if Time.now - time_start > 4
-			end while !tmp or tmp.empty?
+        time_start = Time.now
+        begin
+          tmp = `lsof -i4 -n | grep LISTEN | grep 127.0.0.1:#{randport}`
+          sleep(0.1)
+          msg("SSH tunnel creation on localhost:#{randport} failed",MSG_ERROR,true) \
+            if Time.now - time_start > 4
+        end while !tmp or tmp.empty?
 
-			cmd="scp -P #{randport} -r #{SSH_OPTIONS} -i #{$sshkeyfile} #{srcfile} root@localhost:#{dstfile} 2>&1 | grep -v 'Warning: Permanently added'"
-			msg(cmd) if $debug
-			`#{cmd}`
-			`kill #{pid}`
+        cmd="scp -P #{randport} -r #{SSH_OPTIONS} -i #{$sshkeyfile} #{srcfile} root@localhost:#{dstfile} 2>&1 | grep -v 'Warning: Permanently added'"
+        msg(cmd) if $debug
+        `#{cmd}`
+        `kill #{pid}`
 
-		when :KVM
-			cmd="scp -r -i #{$sshkeyfile} #{SSH_OPTIONS} #{srcfile} root@#{dsthost}:#{dstfile} 2>&1 | grep -v 'Warning: Permanently added'"
-			msg(cmd) if $debug
-			`#{cmd}`
-		else
-	end
+      when :KVM
+        cmd="scp -r -i #{$sshkeyfile} #{SSH_OPTIONS} #{srcfile} root@#{dsthost}:#{dstfile} 2>&1 | grep -v 'Warning: Permanently added'"
+        msg(cmd) if $debug
+        `#{cmd}`
+      else
+    end
+  else
+    `scp -r -i #{$sshkeyfile} #{SSH_OPTIONS} #{srcfile} root@#{dsthost}:#{dstfile} 2>&1 | grep -v 'Warning: Permanently added'`
+  end
 end
 
 def kadeploy_update(session,mountpath)
@@ -1368,44 +1378,48 @@ def tempfile(content)
 end
 
 def http_tunnel(host,session, verbose=true)
-  host = host[:basename] if host.is_a?(Hash)
-	case $mode
-		when :KAVLAN, :VLANKVM
-			msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
-			ssh_tunnel_create(session,HTTP_PROXY_PORT,HTTP_PROXY_ADDR)
+  if $tunnels
+    host = host[:basename] if host.is_a?(Hash)
+    case $mode
+      when :KAVLAN, :VLANKVM
+        msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
+        ssh_tunnel_create(session,HTTP_PROXY_PORT,HTTP_PROXY_ADDR)
 
-			yield
+        yield
 
-			msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
-			ssh_tunnel_destroy(session,3128,getnode(host))
-		when :KVM
-			msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
-			tmp = sexec(session,'route -n')
-			msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
-			gateway = nil
-			iface = nil
-			routed=false
-			tmp.each do |line|
-				if line =~ /^(\S+)\s+0\.0\.0\.0\s+\S+\s+.+$/
-					routed = true if $network[:ipaddr].include?(Regexp.last_match(1))
-				elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/
-					gateway = Regexp.last_match(1)
-					iface = Regexp.last_match(2)
-					break
-				end
-			end
-			sexec(session,"route add -host #{$network[:gateway]} dev #{$netiface}") unless routed
-			sexec(session,'route del default') if gateway
-			sexec(session,"route add default gw #{$network[:gateway]}")
+        msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
+        ssh_tunnel_destroy(session,3128,getnode(host))
+      when :KVM
+        msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
+        tmp = sexec(session,'route -n')
+        msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
+        gateway = nil
+        iface = nil
+        routed=false
+        tmp.each do |line|
+          if line =~ /^(\S+)\s+0\.0\.0\.0\s+\S+\s+.+$/
+            routed = true if $network[:ipaddr].include?(Regexp.last_match(1))
+          elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/
+            gateway = Regexp.last_match(1)
+            iface = Regexp.last_match(2)
+            break
+          end
+        end
+        sexec(session,"route add -host #{$network[:gateway]} dev #{$netiface}") unless routed
+        sexec(session,'route del default') if gateway
+        sexec(session,"route add default gw #{$network[:gateway]}")
 
-			yield
+        yield
 
-			msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
-			sexec(session,'route del default')
-			sexec(session,"route add default gw #{gateway} dev #{iface}") if gateway
-		else
-			msg('Unknown mode',MSG_ERROR,true)
-	end
+        msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
+        sexec(session,'route del default')
+        sexec(session,"route add default gw #{gateway} dev #{iface}") if gateway
+      else
+        msg('Unknown mode',MSG_ERROR,true)
+    end
+  else
+    yield
+  end
 end
 
 def set_default_route(session)
@@ -1592,6 +1606,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-n', '--network-config <network_config_file>', 'The network configuration that should be used for the testbed. Need to be a YAML file with fields "network" and "subnetworks" (list of "name","address"). Subnetworks are only used to optimise services configuration, they are not created/routed. Address have to be in CIDR notation (default: the network hosts are currently in)' ) do |n|
   	options[:network_config] = n
+	end
+
+	opts.on( '', '--no-tunnels', 'Disable SSH tunnels (VLAN connections should be routed)' ) do
+  	$tunnels = false
 	end
 
 	opts.on( '', '--debug', 'Verbose display of every instruction sent' ) do

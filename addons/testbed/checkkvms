@@ -3,10 +3,10 @@
 require 'socket'
 require 'resolv'
 
-MAX_VMS=24
+MAX_VMS=18
 
 # Constraints
-MAX_VM_PER_CORE = 2.5
+MAX_VM_PER_CORE = 2
 
 # Sizes in Mo
 RAM_SIZE = 350
