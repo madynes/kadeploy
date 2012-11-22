@@ -35,17 +35,11 @@ else
   exit 1
 fi
 
-if [ $# -ge 2 ] && [ -n "$2" ]
+network=`g5k-subnets -ps`
+if [ $? -ne 0 ]
 then
-  network=$2
-  newnet=1
-else
-  network=`g5k-subnets -ps`
-  if [ $? -ne 0 ]
-  then
-    echo 'Failed to get network'
-    exit 1
-  fi
+  echo 'Failed to get network'
+  exit 1
 fi
 
 rm -Rf $TMP_DIR
@@ -95,16 +89,14 @@ let stime=`date +%s`-stime
 echo "... done in ${stime} seconds"
 
 
-if [ -z "$newnet" ]
-then
-  echo ""
-  echo "Configuring `cat $servicefile | wc -l` service hosts"
-  stime=`date +%s`
-  taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $servicefile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_SERVICE` $network ] \; broadcast input file [ $serviceyamlfile ] 2>&1 | grep -v Warning
+echo ""
+echo "Configuring `cat $servicefile | wc -l` service hosts"
+stime=`date +%s`
+taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $servicefile broadcast exec [ cat - \| /tmp/`basename $SCRIPT_SERVICE` $network ] \; broadcast input file [ $serviceyamlfile ] 2>&1 | grep -v Warning
 
-  let stime=`date +%s`-stime
-  echo "... done in ${stime} seconds"
-fi
+let stime=`date +%s`-stime
+echo "... done in ${stime} seconds"
+
 
 
 echo ""
@@ -131,9 +123,12 @@ echo "... done in ${stime} seconds"
 
 echo 'Creating nodefile'
 nodefile=${TMP_DIR}/nodefile
-$SCRIPT_GENNODES $networkyamlfile -f $hostyamlfile -e $exclfile > $nodefile
+addrfile=`tempfile`
+g5k-subnets -im -o $addrfile
+$SCRIPT_GENNODES $networkyamlfile -f $hostyamlfile -e $exclfile -a $addrfile > $nodefile
 
 rm $exclfile
+rm $addrfile
 
 if [ $? -ne 0 ]
 then
