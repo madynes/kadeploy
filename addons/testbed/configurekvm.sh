@@ -36,7 +36,7 @@ else
 fi
 
 network=`g5k-subnets -ps`
-if [ $? -ne 0 ]
+if [ $? -ne 0 ] || [ -z "$network" ]
 then
   echo 'Failed to get network'
   exit 1
