@@ -1220,15 +1220,23 @@ def ssh_tunnels_destroy()
 end
 =end
 
-def apt_cmd(session,shcmd,aptcmd,aptopts,params='')
+def http_proxy(hostname='')
+  if g5k? and hostname =~ /^[^\.]+\.([^\.]+)\.grid5000\.fr$/
+    "http://#{HTTP_PROXY_ADDR}.#{Regexp.last_match(1)}.grid5000.fr:#{HTTP_PROXY_PORT}"
+  else
+    "http://#{HTTP_PROXY_ADDR}:#{HTTP_PROXY_PORT}"
+  end
+end
+
+def apt_cmd(session,shcmd,aptcmd,aptopts,server=nil,params='')
 	aptproxy = nil
 	case $mode
 		when :KAVLAN, :VLANKVM
       if $tunnels
         aptproxy = 'Acquire::http::Proxy=\"http://localhost:3128\"'
       else
-        #aptproxy = "Acquire::http::Proxy=\\\"http://#{HTTP_PROXY_ADDR}:#{HTTP_PROXY_PORT}\\\""
-        aptproxy = ''
+        hostname = (server and server[:basename] ? server[:basename] : '')
+        aptproxy = "Acquire::http::Proxy=\\\"#{http_proxy(hostname)}\\\""
       end
 		when :KVM
 			aptproxy = ''
@@ -1267,16 +1275,16 @@ def apt_cmd(session,shcmd,aptcmd,aptopts,params='')
   sexec(session,"#{shcmd} #{aptcmd} #{aptopts} #{params}")
 end
 
-def apt_update(session)
-  apt_cmd(session,'apt-get','update',['q'])
+def apt_update(session,server=nil)
+  apt_cmd(session,'apt-get','update',['q'],server)
 end
 
-def apt_install(session,packages)
-  apt_cmd(session,'apt-get','install',['q','y','force-yes','allow-unauthenticated'],packages)
+def apt_install(session,packages,server=nil)
+  apt_cmd(session,'apt-get','install',['q','y','force-yes','allow-unauthenticated'],server,packages)
 end
 
-def apt_remove(session,packages)
-  apt_cmd(session,'apt-get','remove',['q','y','force-yes','purge'],packages)
+def apt_remove(session,packages,server=nil)
+  apt_cmd(session,'apt-get','remove',['q','y','force-yes','purge'],server,packages)
 end
 
 def get_open_port()
@@ -2458,10 +2466,10 @@ sshgw.ssh(servername,'root') do |session|
 	if $mode == :KAVLAN or $mode == :VLANKVM
     http_tunnel(server,session) do
       msg('Updating debian packages list',MSG_INFO)
-      apt_update(session)
+      apt_update(session,server)
 
       msg('Getting nodes IPv4/MAC addresses',MSG_INFO)
-      apt_install(session,'syslinux')
+      apt_install(session,'syslinux',server)
 
       nodes=[]
 	    if $mode == :KAVLAN
@@ -2488,7 +2496,7 @@ sshgw.ssh(servername,'root') do |session|
       end
 
       msg('Removing configuration related packages',MSG_INFO)
-      apt_remove(session,'syslinux')
+      apt_remove(session,'syslinux',server)
     end
   end
 end
@@ -2509,10 +2517,10 @@ select_server_type($kanodes,:dns).each do |server|
 
     http_tunnel(server,session) do
       msg('Updating debian packages list',MSG_INFO)
-      apt_update(session)
+      apt_update(session,server)
 
       msg('Installing DNS server',MSG_INFO)
-      apt_install(session,'bind9')
+      apt_install(session,'bind9',server)
 
 
       msg('Configuring DNS server',MSG_INFO)
@@ -2599,10 +2607,10 @@ select_server_type($kanodes,:dhcp).each do |server|
 
     http_tunnel(server,session) do
       msg('Updating debian packages list',MSG_INFO)
-      apt_update(session)
+      apt_update(session,server)
 
       msg('Installing DHCP server',MSG_INFO)
-      apt_install(session,'isc-dhcp-server')
+      apt_install(session,'isc-dhcp-server',server)
 
       msg('Gathering network informations',MSG_INFO)
       tmp = sexec(session,'hostname -i')[0]
@@ -2659,13 +2667,13 @@ sshgw.ssh(servername,'root') do |session|
 
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session)
+		apt_update(session,server)
 
 		msg('Installing mySQL server',MSG_INFO)
-		apt_install(session,'debconf-utils')
+		apt_install(session,'debconf-utils',server)
 		sexec(session,"echo 'mysql-server-#{CFG_MYSQL_VERSION} mysql-server/root_password password #{CFG_SQL_PASS_ROOT}' | debconf-set-selections")
 		sexec(session,"echo 'mysql-server-#{CFG_MYSQL_VERSION} mysql-server/root_password_again password #{CFG_SQL_PASS_ROOT}' | debconf-set-selections")
-		apt_install(session,'mysql-server')
+		apt_install(session,'mysql-server',server)
 
 		msg('Configuring mySQL server',MSG_INFO)
 		#sexec("cat #{CFG_MYSQL_CONF_FILE} | sed -e '/bind-address/d' > #{tmp}; mv -f #{tmp} #{CFG_MYSQL_CONF_FILE}")
@@ -2680,7 +2688,7 @@ sshgw.ssh(servername,'root') do |session|
 		sexec(session,"rm #{tmp}")
 
 		msg('Removing configuration related packages',MSG_INFO)
-		apt_remove(session,'debconf-utils')
+		apt_remove(session,'debconf-utils',server)
 	end
 end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
@@ -2697,10 +2705,10 @@ sshgw.ssh(servername,'root') do |session|
 
 	kadeploy_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session)
+		apt_update(session,server)
 
 		msg('Installing Kadeploy server/client',MSG_INFO)
-		apt_install(session,['kadeploy-server','kadeploy-client'])
+		apt_install(session,['kadeploy-server','kadeploy-client'],server)
 
 
 		msg('Creating Kadeploy directories',MSG_INFO)
@@ -2771,7 +2779,7 @@ sshgw.ssh(servername,'root') do |session|
 		if options[:update_file]
 			msg('Installing remote kadeploy files',MSG_INFO)
 			msg('Installing sshfs',MSG_INFO)
-			apt_install(session,'fuse-utils')
+			apt_install(session,'fuse-utils',server)
 
 			msg("Creating local permanent tunnel to #{}:22 on localhost:#{UPDATE_FORWARD_PORT}",MSG_INFO)
 			ssh_tunnel_create(session,22,$srchost,UPDATE_FORWARD_PORT)
@@ -2840,7 +2848,7 @@ sshgw.ssh(servername,'root') do |session|
 
 		# Ugly hack to be removed when the repository will be updated
 		msg('Installing ruby',MSG_INFO)
-		apt_install(session,'ruby')
+		apt_install(session,'ruby',server)
 
 
 		msg('Adding environments',MSG_INFO)
@@ -2874,28 +2882,28 @@ sshgw.ssh(servername,'root') do |session|
 
 	http_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session)
+		apt_update(session,server)
 
     case $deploysendmeth
     when :TFTP
       msg('Installing TFTP server',MSG_INFO)
-      apt_install(session,'debconf-utils')
+      apt_install(session,'debconf-utils',server)
       sexec(session,"rm -Rf #{CFG_TFTP_PATH}")
       sexec(session,"mkdir -p #{CFG_TFTP_PATH}")
       sexec(session,"echo 'tftpd-hpa tftpd-hpa/directory string #{CFG_TFTP_PATH}' | debconf-set-selections")
       sexec(session,"echo 'tftpd-hpa tftpd-hpa/username string #{CFG_KADEPLOY_USER}' | debconf-set-selections")
-      apt_install(session,'tftpd-hpa')
+      apt_install(session,'tftpd-hpa',server)
 
       msg('Configuring TFTP server',MSG_INFO)
       tempfile(cfg_tftp()) {|path| scp(servername,path,CFG_TFTP_CONF_FILE)}
       sexec(session,'service tftpd-hpa restart')
 
       msg('Removing configuration related packages',MSG_INFO)
-      apt_remove(session,['debconf-utils'])
+      apt_remove(session,['debconf-utils'],server)
     when :HTTP
       if HTTP_OVER_NFS
         msg('Installing NFS server',MSG_INFO)
-        apt_install(session,'nfs-server')
+        apt_install(session,'nfs-server',server)
         msg('Configuring NFS server',MSG_INFO)
         sexec(session,"rm -Rf #{cfg_pxe_path()}")
         sexec(session,"mkdir -p #{cfg_pxe_path()}")
@@ -2903,7 +2911,7 @@ sshgw.ssh(servername,'root') do |session|
         sexec(session,'exportfs -ar')
       else
         msg('Installing HTTP server',MSG_INFO)
-        apt_install(session,['apache2','apache2-mpm-worker'])
+        apt_install(session,['apache2','apache2-mpm-worker'],server)
 
         msg('Configuring HTTP server',MSG_INFO)
         sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
@@ -2915,7 +2923,7 @@ sshgw.ssh(servername,'root') do |session|
     end
 
     msg('Installing PXE bootfiles',MSG_INFO)
-    apt_install(session,'syslinux-common')
+    apt_install(session,'syslinux-common',server)
     CFG_PXE_BOOTFILES.each do |bootfile|
       tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
       msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
@@ -2961,9 +2969,9 @@ if $deploysendmeth == :HTTP
 
       http_tunnel(server,session) do
         msg('Updating debian packages list',MSG_INFO)
-        apt_update(session)
+        apt_update(session,server)
         msg('Installing HTTP server',MSG_INFO)
-        apt_install(session,['apache2','apache2-mpm-worker'])
+        apt_install(session,['apache2','apache2-mpm-worker'],server)
 
         sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
         sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
@@ -2979,7 +2987,7 @@ if $deploysendmeth == :HTTP
 
         if HTTP_OVER_NFS
           msg('Installing NFS client',MSG_INFO)
-          apt_install(session,'nfs-common')
+          apt_install(session,'nfs-common',server)
 
           sexec(session,"umount -f #{CFG_APACHE_SERVER_PATH}; true")
 
@@ -2999,7 +3007,7 @@ if $deploysendmeth == :HTTP
           sexec(session,"chmod -R 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
 
           msg('Installing PXE bootfiles',MSG_INFO)
-          apt_install(session,'syslinux-common')
+          apt_install(session,'syslinux-common',server)
           CFG_PXE_BOOTFILES.each do |bootfile|
             tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
             msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
@@ -3072,10 +3080,10 @@ sshgw.ssh(servername,'root') do |session|
 
 	kadeploy_tunnel(server,session) do
 		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session)
+		apt_update(session,server)
 
 		msg('Installing Kadeploy client',MSG_INFO)
-		apt_install(session,'kadeploy-client')
+		apt_install(session,'kadeploy-client',server)
 
 		msg('Configuring Kadeploy client',MSG_INFO)
 		tempfile(cfg_kadeploy_client()) do |path|
@@ -3086,7 +3094,7 @@ sshgw.ssh(servername,'root') do |session|
 
 	http_tunnel(server,session) do
 		msg('Installing additional packages',MSG_INFO)
-		apt_install(session,CFG_FRONTEND_PACKAGES)
+		apt_install(session,CFG_FRONTEND_PACKAGES,server)
 
 		msg("Creating frontend user '#{CFG_FRONTEND_USER}'",MSG_INFO)
 		sexec(session,"userdel --force --remove #{CFG_FRONTEND_USER}; true ;")
@@ -3114,7 +3122,7 @@ sshgw.ssh(servername,'root') do |session|
 
 		if options[:debpackages] and !options[:debpackages].empty?
 			msg("Installing additional packages '#{options[:debpackages].join(',')}'",MSG_INFO)
-			apt_install(session,options[:debpackages])
+			apt_install(session,options[:debpackages],server)
 		end
 	end
 
