@@ -399,6 +399,14 @@ class Workflow < Automata::TaskManager
     rescue MoveException
       error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE)
     end
+
+    if opts[:mode]
+      if not system("chmod #{opts[:mode]} #{localpath}") then
+        debug(0, "Unable to change the rights on #{localpath}")
+        return false
+      end
+    end
+
     remotepath.gsub!(remotepath,localpath) if !opts[:noaffect] and localpath
   end
 
@@ -525,7 +533,7 @@ class Workflow < Automata::TaskManager
           grab_file(
             gfm, pxefile, "pxe-#{context[:execution].true_user}--", 'pxe_file',
             FetchFileError::INVALID_PXE_FILE, :caching => false,
-            :cache => :kernels, :noaffect => true
+            :cache => :kernels, :noaffect => true, :mode => '744'
           )
         end
       end
