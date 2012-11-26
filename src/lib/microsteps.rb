@@ -1084,9 +1084,13 @@ class Microstep < Automata::QueueTask
       return parallel_exec("#{set_env()} && #{op[:command]}",{ :scattering => op[:scattering] })
     when :send
       debug(4,'Sending custom file')
+      dest = op[:destination].dup
+      deploy_context().each_pair do |key,val|
+        dest.gsub!(key,val)
+      end
       return parallel_sendfile(
         op[:file],
-        op[:destination],
+        dest,
         { :scattering => op[:scattering] }
       )
     else
@@ -1106,6 +1110,24 @@ class Microstep < Automata::QueueTask
     return path
   end
 
+  def deploy_context
+    {
+      'KADEPLOY_CLUSTER' => context[:cluster].name,
+      'KADEPLOY_ENV' => context[:execution].environment.name,
+      'KADEPLOY_ENV_KERNEL' => context[:execution].environment.kernel,
+      'KADEPLOY_ENV_INITRD' => context[:execution].environment.initrd,
+      'KADEPLOY_ENV_KERNEL_PARAMS' => get_kernel_params(),
+      'KADEPLOY_DEPLOY_PART' => get_deploy_part_str(),
+      'KADEPLOY_BLOCK_DEVICE' => get_block_device_str(),
+      'KADEPLOY_DEPLOY_PART_NUM' => get_deploy_part_num(),
+      'KADEPLOY_SWAP_PART_NUM' => context[:cluster].swap_part,
+      'KADEPLOY_PROD_PART_NUM' => context[:cluster].prod_part,
+      'KADEPLOY_TMP_PART_NUM' => context[:cluster].tmp_part,
+      'KADEPLOY_ENV_EXTRACTION_DIR' => context[:common].environment_extraction_dir,
+      'KADEPLOY_PREPOST_EXTRACTION_DIR' => context[:common].rambin_path
+    }
+  end
+
   # Create a string containing the environment variables for pre/post installs
   #
   # Arguments
@@ -1113,21 +1135,11 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the string containing the environment variables for pre/post installs
   def set_env
-    blockdev = get_block_device_str()
-
-    "KADEPLOY_CLUSTER=\"#{context[:cluster].name}\" "\
-    "KADEPLOY_ENV=\"#{context[:execution].environment.name}\" "\
-    "KADEPLOY_ENV_KERNEL=\"#{context[:execution].environment.kernel}\" "\
-    "KADEPLOY_ENV_INITRD=\"#{context[:execution].environment.initrd}\" "\
-    "KADEPLOY_ENV_KERNEL_PARAMS=\"#{get_kernel_params()}\" "\
-    "KADEPLOY_DEPLOY_PART=\"#{get_deploy_part_str()}\" "\
-    "KADEPLOY_BLOCK_DEVICE=\"#{blockdev}\" "\
-    "KADEPLOY_DEPLOY_PART_NUM=\"#{get_deploy_part_num()}\" "\
-    "KADEPLOY_SWAP_PART_NUM=\"#{context[:cluster].swap_part}\" "\
-    "KADEPLOY_PROD_PART_NUM=\"#{context[:cluster].prod_part}\" "\
-    "KADEPLOY_TMP_PART_NUM=\"#{context[:cluster].tmp_part}\" "\
-    "KADEPLOY_ENV_EXTRACTION_DIR=\"#{context[:common].environment_extraction_dir}\" "\
-    "KADEPLOY_PREPOST_EXTRACTION_DIR=\"#{context[:common].rambin_path}\""
+    ret = ''
+    deploy_env().each_pair do |key,val|
+      ret += "#{key.to_s}=\"#{val}\""
+    end
+    ret
   end
 
   # Perform a fdisk on the nodes
