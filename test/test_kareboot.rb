@@ -79,8 +79,8 @@ class TestKareboot  < Test::Unit::TestCase
         "DISPLAY messages\n"\
         "TIMEOUT 50\n"\
         "label bootlabel\n"\
-        "  KERNEL kernels/pxe-#{ENV['USER']}--#{File.basename(kernelfile)}\n"\
-        "  APPEND initrd=kernels/pxe-#{ENV['USER']}--#{File.basename(initrdfile)} root=/dev/sda3\n"
+        "  KERNEL KERNELS_DIR/FILES_PREFIX--#{File.basename(kernelfile)}\n"\
+        "  APPEND initrd=KERNELS_DIR/FILES_PREFIX--#{File.basename(initrdfile)} root=/dev/sda3\n"
       )
       pxeprofile.close
 
