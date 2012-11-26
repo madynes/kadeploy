@@ -708,12 +708,11 @@ class KadeployServer
           output.verbosel(0, "Reboot not performed since some pxe files cannot be grabbed")
           raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,{:rid => reboot_id})
         end
-=begin
+
         if not system("chmod +r #{local_pxe_file}") then
           output.verbosel(0, "Cannot add read rights on the pxe file")
           return 3
         end
-=end
       }
       gfm = nil
     end

@@ -73,9 +73,9 @@ module PXEOperations
       nodes_info.each { |node|
         msg_dup = msg.dup
 
-        msg_dup.gsub("KERNELS_DIR", @pxe_repository_kernels)
+        msg_dup.gsub!("KERNELS_DIR", kernel_path())
         msg_dup.gsub!("NODE_SINGULARITY", singularities[node['ip']]) if singularities
-        msg_dup.gsub("FILES_PREFIX", "pxe-#{username}--") if username
+        msg_dup.gsub!("FILES_PREFIX", "pxe-#{username}") if username
 
         file = node['dest']
         #prevent from overwriting some linked files
