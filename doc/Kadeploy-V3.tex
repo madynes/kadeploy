@@ -706,7 +706,7 @@ automata:
             post-ops:
               - action: send
                 file: my_custom_file
-                destination: /mnt/dest
+                destination: /
                 retries: 1
                 timeout: 10
                 scattering: chain
@@ -1373,6 +1373,8 @@ When you are executing a command or a script (via the \texttt{exec} action), you
 \item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
 \end{itemize}
 
+\texttt{Note}: This strings will also be substitued in your directory specification when you are using the \texttt{send} action.
+
 Here is an example of a file that contains custom operations:
 \begin{small}
 \begin{verbatim}
@@ -1395,7 +1397,7 @@ Here is an example of a file that contains custom operations:
         post-ops:
           - action: send
             file: my_custom_file
-            destination: /mnt/dest
+            destination: KADEPLOY_ENV_EXTRACTION_DIR
             retries: 1
             timeout: 10
             scattering: chain
