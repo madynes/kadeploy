@@ -907,7 +907,12 @@ class KadeployServer
         # Client disconnection fallback
         micros = []
         microthreads.each do |microthread|
-          micros << microthread[:micro]
+          micro = microthread[:micro]
+          until micro
+            sleep 0.2
+            micro = microthread[:micro]
+          end
+          micros << micro
         end
 
         finished = false
@@ -2416,7 +2421,12 @@ class KadeployServer
         # Client disconnection fallback
         micros = []
         microthreads.each do |microthread|
-          micros << microthread[:micro]
+          micro = microthread[:micro]
+          until micro
+            sleep 0.2
+            micro = microthread[:micro]
+          end
+          micros << micro
         end
 
         finished = false
