@@ -5,6 +5,15 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+Signal.trap("TERM") do
+  puts "TERM trapped, let's clean everything ..."
+  exit(1)
+end
+Signal.trap("INT") do
+  puts "SIGINT trapped, let's clean everything ..."
+  exit(1)
+end
+
 #Kadeploy libs
 require 'workflow'
 require 'debug'
@@ -2568,14 +2577,6 @@ rescue
   exit(1)
 end
 db = Database::DbFactory.create(config.common.db_kind)
-Signal.trap("TERM") do
-  puts "TERM trapped, let's clean everything ..."
-  exit(1)
-end
-Signal.trap("INT") do
-  puts "SIGINT trapped, let's clean everything ..."
-  exit(1)
-end
 if not db.connect(config.common.deploy_db_host,
                   config.common.deploy_db_login,
                   config.common.deploy_db_passwd,
