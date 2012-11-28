@@ -5,6 +5,11 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+Signal.trap("INT") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  exit(1)
+end
+
 #Kadeploy libs
 require 'config'
 require 'md5'
@@ -233,50 +238,50 @@ if (exec_specific_config != nil) then
   end
   
   tid_array = Array.new
-  Signal.trap("INT") do
-    puts "\nSIGINT trapped, let's clean everything ..."
-    exit(1)
-  end
 
   files_ok_nodes = Array.new
   files_ko_nodes = Array.new
   nodes_by_server.each_key { |server|
     tid_array << Thread.new {
-      #Connect to the server
-      distant = DRb.start_service()
-      uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
-      kadeploy_server = DRbObject.new(nil, uri)
+      begin
+        #Connect to the server
+        distant = DRb.start_service()
+        uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
+        kadeploy_server = DRbObject.new(nil, uri)
 
-      if exec_specific_config.get_version then
-        puts "#{server} server: Kadeploy version: #{kadeploy_server.get_version()}"
-      else
-        #Launch the listener on the client
-        if (exec_specific_config.multi_server) then
-          kadeploy_client = KadeployClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
+        if exec_specific_config.get_version then
+          puts "#{server} server: Kadeploy version: #{kadeploy_server.get_version()}"
         else
-          kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
-        end
-        local = DRb.start_service(nil, kadeploy_client)        
-        if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
-          content = Regexp.last_match
-          hostname = Socket.gethostname
-          client_host = String.new
-          if hostname.include?(client_host) then
-            #It' best to get the FQDN
-            client_host = hostname
+          #Launch the listener on the client
+          if (exec_specific_config.multi_server) then
+            kadeploy_client = KadeployClient.new(kadeploy_server, server, files_ok_nodes, files_ko_nodes)
           else
-            client_host = content[1]
+            kadeploy_client = KadeployClient.new(kadeploy_server, nil, files_ok_nodes, files_ko_nodes)
           end
-          client_port = content[2]
-          cloned_config = exec_specific_config.clone
-          cloned_config.node_array = nodes_by_server[server]
-          kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
-        else
-          puts "#{server} server: The URI #{local.uri} is not correct"
+          local = DRb.start_service(nil, kadeploy_client)        
+          if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
+            content = Regexp.last_match
+            hostname = Socket.gethostname
+            client_host = String.new
+            if hostname.include?(client_host) then
+              #It' best to get the FQDN
+              client_host = hostname
+            else
+              client_host = content[1]
+            end
+            client_port = content[2]
+            cloned_config = exec_specific_config.clone
+            cloned_config.node_array = nodes_by_server[server]
+            kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
+          else
+            puts "#{server} server: The URI #{local.uri} is not correct"
+          end
+          local.stop_service()
         end
-        local.stop_service()
+        distant.stop_service()
+      rescue DRb::DRbConnError
+        puts "Server disconnection (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
       end
-      distant.stop_service()
     }
   }
   tid_array.each { |tid|
