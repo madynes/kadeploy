@@ -222,7 +222,10 @@ class KadeployServer
       exec_specific_config = nil
       distant.stop_service()
       client = nil
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       return res
     end
   end
@@ -295,7 +298,10 @@ class KadeployServer
     return async_deploy_lock_wid(workflow_id) { |workflows|
       workflows.first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       true
     }
   end
@@ -313,7 +319,10 @@ class KadeployServer
       end
       workflows[0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       true
     }
   end
@@ -1028,7 +1037,10 @@ class KadeployServer
       @reboot_info_hash_lock.synchronize {
         kareboot_delete_reboot_info(ke.context[:rid])
       }
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       return nil, ke.errno
     end
     return rid, KarebootAsyncError::NO_ERROR
@@ -2547,7 +2559,10 @@ class KadeployServer
       @power_info_hash_lock.synchronize {
         kapower_delete_power_info(ke.context[:pid])
       }
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       return nil, ke.errno
     end
     return rid, KapowerAsyncError::NO_ERROR
