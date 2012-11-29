@@ -895,7 +895,7 @@ Here is a custom operation description:
   \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send} and \emph{exec})
   \item \yfield{file}{String} \small{(To be specified if the action is \emph{send})} The path to the file to be send
   \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination on the nodes
-  \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed
+  \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} before the script name to be able to use Kadeploy3 specific environment variables inside of it (example: \texttt{command: . /myscript.sh}).
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
   \item \yfieldd{scattering}{String}{'tree'} The scattering kind for this custom operation (expected values are \emph{tree} and \emph{chain})
