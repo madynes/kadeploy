@@ -529,14 +529,6 @@ module ConfigInformation
               'tarball_dir',String,'/tmp',Pathname
             )
           end
-          cp.parse('demolishing') do
-            conf.demolishing_env_threshold = cp.value(
-              'tag_threshold',Fixnum,0
-            )
-            conf.demolishing_env_auto_tag = cp.value(
-              'auto_tag',[TrueClass,FalseClass],false
-            )
-          end
           conf.max_preinstall_size = cp.value('max_preinstall_size',Fixnum,20)
           conf.max_postinstall_size = cp.value('max_postinstall_size',Fixnum,20)
         end
@@ -2506,7 +2498,7 @@ module ConfigInformation
       exec_specific.nodesetid = 0
       exec_specific.node_set = Nodes::NodeSet.new(exec_specific.nodesetid)
       exec_specific.node_array = Array.new
-      exec_specific.check_prod_env = false
+      exec_specific.check_demolishing = false
       exec_specific.true_user = USER
       exec_specific.user = nil
       exec_specific.load_env_kind = "db"
@@ -2563,8 +2555,8 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-c", "--check-prod-env", "Check if the production environment has been detroyed") {
-          exec_specific.check_prod_env = true
+        opt.on("-c", "--check-demolishing-tag", "Check if some nodes was deployed with an environment that have the demolishing tag") {
+          exec_specific.check_demolishing = true
         }
         opt.on("-d", "--debug-mode", "Activate the debug mode") {
           exec_specific.debug = true
@@ -2763,10 +2755,6 @@ module ConfigInformation
         return false
       end
       if not exec_specific.wait then
-        if exec_specific.check_prod_env then
-          error("-c/--check-prod-env cannot be used with --no-wait")
-          return false
-        end
         if (exec_specific.nodes_ok_file != "") || (exec_specific.nodes_ko_file != "") then
           error("-o/--output-ok-nodes and/or -n/--output-ko-nodes cannot be used with --no-wait")
           return false          
@@ -3050,8 +3038,6 @@ module ConfigInformation
     attr_accessor :purge_deployment_timer
     attr_accessor :rambin_path
     attr_accessor :mkfs_options
-    attr_accessor :demolishing_env_threshold
-    attr_accessor :demolishing_env_auto_tag
     attr_accessor :bt_tracker_ip
     attr_accessor :bt_download_timeout
     attr_accessor :almighty_env_users
@@ -3073,7 +3059,6 @@ module ConfigInformation
     def initialize
       @nodes_desc = Nodes::NodeSet.new
       #@kadeploy_disable_cache = false
-      #@demolishing_env_auto_tag = false
       #@log_to_file = ""
       #@async_end_of_deployment_hook = ""
       #@async_end_of_reboot_hook = ""
@@ -3137,7 +3122,6 @@ module ConfigInformation
           (@purge_deployment_timer == nil) ||
           (@rambin_path == nil) ||
           (@mkfs_options == nil) ||
-          (@demolishing_env_threshold == nil) ||
           (@almighty_env_users == nil)
          ) then
         puts "Some mandatory fields are missing in the common configuration file"

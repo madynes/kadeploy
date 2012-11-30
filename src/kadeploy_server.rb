@@ -699,8 +699,8 @@ class KadeployServer
     }
 
     if (exec_specific.reboot_kind == "env_recorded") && 
-        exec_specific.check_prod_env && 
-        exec_specific.node_set.check_demolishing_env(db, @config.common.demolishing_env_threshold) then
+        exec_specific.check_demolishing && 
+        exec_specific.node_set.check_demolishing_env(db) then
       output.verbosel(0, "Reboot not performed since some nodes have been deployed with a demolishing environment")
       raise KadeployError.new(KarebootAsyncError::DEMOLISHING_ENV,:rid => reboot_id, :status => 2)
     end
@@ -848,15 +848,12 @@ class KadeployServer
               [@config.common.ssh_port],
               []
             )
+            ret = KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES if not micro.nodes_ko.empty?
 
             if (exec_specific.reboot_kind == "env_recorded") then
               if (exec_specific.deploy_part == @config.cluster_specific[cluster].prod_part) then
                 micro.check_nodes("prod_env_booted")
                 set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
-                if (exec_specific.check_prod_env) then
-                  micro.nodes_ko.tag_demolishing_env(db) if @config.common.demolishing_env_auto_tag
-                  ret = KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES if not micro.nodes_ko.empty?
-                end
               else
                 set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
               end
