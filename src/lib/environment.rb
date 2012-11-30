@@ -196,7 +196,11 @@ module EnvironmentManagement
             end
           when "demolishing_env"
             if val =~ /\A\d+\Z/ then
-              @demolishing_env = val
+              if val.to_i != 0
+                @demolishing_env = -1
+              else
+                @demolishing_env = 0
+              end
             else
               Debug::distant_client_error("The environment demolishing_env must be a number", client)
               return false

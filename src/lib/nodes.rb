@@ -939,12 +939,13 @@ module Nodes
     # Output
     # * return true if at least one node has been deployed with a demolishing environment
     def check_demolishing_env(db, threshold)
+      return false if threshold <= 0
       args,nodelist = generic_where_nodelist()
       args << threshold
       res = db.run_query(
         "SELECT hostname FROM nodes \
          INNER JOIN environments ON nodes.env_id = environments.id \
-         WHERE demolishing_env > ? AND #{nodelist}",
+         WHERE #{nodelist} AND (demolishing_env > ? OR demolishing_env < 0)",
         *args
       )
       return (res.num_rows > 0)

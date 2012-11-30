@@ -531,7 +531,7 @@ module ConfigInformation
           end
           cp.parse('demolishing') do
             conf.demolishing_env_threshold = cp.value(
-              'tag_threshold',Fixnum,1000000
+              'tag_threshold',Fixnum,0
             )
             conf.demolishing_env_auto_tag = cp.value(
               'auto_tag',[TrueClass,FalseClass],false
