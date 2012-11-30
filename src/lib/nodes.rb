@@ -938,14 +938,12 @@ module Nodes
     # * threshold: specify the minimum number of failures to consider a envrionement as demolishing
     # Output
     # * return true if at least one node has been deployed with a demolishing environment
-    def check_demolishing_env(db, threshold)
-      return false if threshold <= 0
+    def check_demolishing_env(db)
       args,nodelist = generic_where_nodelist()
-      args << threshold
       res = db.run_query(
         "SELECT hostname FROM nodes \
          INNER JOIN environments ON nodes.env_id = environments.id \
-         WHERE #{nodelist} AND (demolishing_env > ? OR demolishing_env < 0)",
+         WHERE #{nodelist} AND demolishing_env != 0",
         *args
       )
       return (res.num_rows > 0)

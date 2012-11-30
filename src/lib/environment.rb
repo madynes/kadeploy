@@ -195,14 +195,14 @@ module EnvironmentManagement
               return false
             end
           when "demolishing_env"
-            if val =~ /\A\d+\Z/ then
-              if val.to_i != 0
-                @demolishing_env = -1
+            if val =~ /\A(true|false)\Z/ then
+              if val.downcase == 'true'
+                @demolishing_env = 1
               else
                 @demolishing_env = 0
               end
             else
-              Debug::distant_client_error("The environment demolishing_env must be a number", client)
+              Debug::distant_client_error("The environment demolishing_env must be a 'true' or 'false'", client)
               return false
             end
           else
@@ -454,7 +454,7 @@ module EnvironmentManagement
       out += "filesystem : #{@filesystem}\n" if (@filesystem != nil)
       out += "environment_kind : #{@environment_kind}\n"
       out += "visibility : #{@visibility}\n"
-      out += "demolishing_env : #{@demolishing_env}\n"
+      out += "demolishing_env : #{(@demolishing_env == 0 ? 'false' : 'true')}\n"
       Debug::distant_client_print(out, client)
     end
 

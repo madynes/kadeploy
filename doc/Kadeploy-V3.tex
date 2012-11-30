@@ -372,9 +372,6 @@ environments:
     extraction_dir: /mnt/dest
     tarball_dir: /tmp
     rambin_dir: /rambin
-  demolishing:
-    auto_tag: false
-    tag_threshold: 2
   max_postinstall_size: 10
   max_preinstall_size: 10
 pxe:
@@ -494,11 +491,6 @@ external:
     \item \yfieldd{extraction\_dir}{String}{/mnt/dest} extraction directory for the tarball in the deployment environment
     \item \yfieldd{tarball\_dir}{String}{/tmp} destination directory for the tarball download in the deployment environment. This is used when the tarballs are sent with Bittorrent.
     \item \yfieldd{rambin\_dir}{String}{/rambin} path of the ramdisk directory in the deployment environment
-  \end{itemize}
-  \item \ypath{/environments/demolishing}
-  \begin{itemize}
-    \item \yfieldd{auto\_tag}{Boolean}{false} specify if Kareboot must tag automatically an environment as demolishing after a failed reboot on the production environment
-    \item \yfieldd{tag\_threshold}{Integer}{1000000} maximum number of reboot failures (on the production environment) before considering that an environment is demolishing
   \end{itemize}
 
   \item \ypath{/pxe}
@@ -1420,7 +1412,7 @@ Contact: kadeploy3-users@lists.gforge.inria.fr
 
 General options:
   -b, --block-device BLOCKDEVICE Specify the block device to use
-  -c, --check-prod-env           Check if the production environment has been detroyed
+  -c, --check-demolishing-tag    Check if some nodes was deployed with an environment that have the demolishing tag
   -e, --env-name ENVNAME         Name of the recorded environment
   -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
   -k, --key [FILE]               Public key to copy in the root's authorized_keys, 
@@ -1476,11 +1468,11 @@ Here are some basic examples:
             --no-wait
 \end{verbatim}
 
-Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-prod-env} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the production environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed and a check is performed at the end of the reboot to ensure that the production environment is correctly deployed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the production environment has been destroyed and that it should be deployed again.
+Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-demolishing-tag} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the recorded environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the recorded environment has been destroyed and that it should be deployed again.
 
-An environment is considered \textit{demolishing} if the number of failures after a reboot on the production environment (when the \texttt{-c|--check-prod-env} optionis used with Kareboot), is higher than the threshold specify in the configuration file. In the Kaenv part you can find the way to reset the \textit{demolishing} counter of an environment by using an option of Kaenv.
+In the Kaenv part you can find the way to remove the \textit{demolishing} tag of an environment.
 
-Warning, if the \texttt{--no-wait} option is used, Kareboot won't wait the end of the reboot to exit. Thus, this option cannot be used with the \texttt{-c|--check-prod-env}, \texttt{-o, --output-ok-nodes} and \texttt{-n, --output-ko-nodes} options.
+Warning, if the \texttt{--no-wait} option is used, Kareboot won't wait the end of the reboot to exit. Thus, this option cannot be used with the \texttt{-o, --output-ok-nodes} and \texttt{-n, --output-ko-nodes} options.
 
 
 \subsection{Kaenv}\label{sec:kaenv}
@@ -1553,7 +1545,7 @@ This command deletes the version \textit{2} of the environment \textit{FreeBSD} 
 \begin{verbatim}
 > kaenv3 --remove-demolishing-tag FreeBSD --env-version 3
 \end{verbatim}
-This command resets the \textit{demolishing} counter of the version \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
+This command remove the \textit{demolishing} tag of the version \textit{3} of the environment \textit{FreeBSD}. If no version number is given, the latest version of the environment is considered.
 
 \paragraph{Use case 8 - update the tarball of an environment}
 \begin{verbatim}
@@ -1594,7 +1586,7 @@ fdisktype : 83
 filesystem : ext2
 environment_kind : xen
 visibility : shared
-demolishing_env : 0
+demolishing_env : false
 \end{verbatim}
 \end{small}
 
@@ -1620,7 +1612,7 @@ Explanation of the fields used in the environment description:
 \item shared: the environment can be used by everybody but it must explicitly use with the owner name ; furtermore, it won't be listed unless the owner name is specified ;
 \item public: the environment can be used by everybody and it is listed without specifing its owner name.
 \end{itemize}
-\item \texttt{demolishing\_env}: specify that the environment is demolishing (expected values are 0 if the environment is not demolishing, 10000 otherwise). SHOULD BE IMPROVED...
+\item \texttt{demolishing\_env}: specify that the environment is demolishing (true or false)
 \end{itemize}
 
 \subsection{Kaconsole}\label{sec:kaconsole}
