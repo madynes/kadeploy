@@ -880,7 +880,7 @@ module Nodes
       res = db.run_query(
         "SELECT hostname FROM nodes \
          INNER JOIN environments ON nodes.env_id = environments.id \
-         WHERE demolishing_env > ? AND #{nodelist}",
+         WHERE #{nodelist} AND demolishing_env > ?",
         *args
       )
       return (res.num_rows > 0)
