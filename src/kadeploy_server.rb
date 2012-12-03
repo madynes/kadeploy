@@ -5,6 +5,15 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+Signal.trap("TERM") do
+  puts "TERM trapped, let's clean everything ..."
+  exit(1)
+end
+Signal.trap("INT") do
+  puts "SIGINT trapped, let's clean everything ..."
+  exit(1)
+end
+
 #Kadeploy libs
 require 'workflow'
 require 'debug'
@@ -213,7 +222,10 @@ class KadeployServer
       exec_specific_config = nil
       distant.stop_service()
       client = nil
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       return res
     end
   end
@@ -286,7 +298,10 @@ class KadeployServer
     return async_deploy_lock_wid(workflow_id) { |workflows|
       workflows.first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       true
     }
   end
@@ -304,7 +319,10 @@ class KadeployServer
       end
       workflows[0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       true
     }
   end
@@ -1019,7 +1037,10 @@ class KadeployServer
       @reboot_info_hash_lock.synchronize {
         kareboot_delete_reboot_info(ke.context[:rid])
       }
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       return nil, ke.errno
     end
     return rid, KarebootAsyncError::NO_ERROR
@@ -2538,7 +2559,10 @@ class KadeployServer
       @power_info_hash_lock.synchronize {
         kapower_delete_power_info(ke.context[:pid])
       }
-      GC.start
+      begin
+        GC.start
+      rescue TypeError
+      end
       return nil, ke.errno
     end
     return rid, KapowerAsyncError::NO_ERROR
@@ -2578,14 +2602,6 @@ rescue
   exit(1)
 end
 db = Database::DbFactory.create(config.common.db_kind)
-Signal.trap("TERM") do
-  puts "TERM trapped, let's clean everything ..."
-  exit(1)
-end
-Signal.trap("INT") do
-  puts "SIGINT trapped, let's clean everything ..."
-  exit(1)
-end
 if not db.connect(config.common.deploy_db_host,
                   config.common.deploy_db_login,
                   config.common.deploy_db_passwd,
