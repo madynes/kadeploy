@@ -2389,6 +2389,11 @@ $clusters.values.collect! do |v|
   msg("  disk driver: #{v[:drivers][:disk]}",MSG_INFO)
 end
 
+msg("Creating SSH agent",MSG_INFO)
+agent=`ssh-agent`
+`#{agent}`
+`ssh-add #{$sshkeyfile} 1>/dev/null`
+
 Net::SSH.start(getgw(), ENV['USER'], :keys => $sshkeyfile) do |gwsession|
 sshgw = Net::SSH::Gateway.new(getgw(), ENV['USER'], :keys => $sshkeyfile)
 
@@ -2844,7 +2849,7 @@ sshgw.ssh(servername,'root') do |session|
 
 		sexec(session,'service kadeploy3d restart')
 
-    sleep 6
+    sleep 10
 
 		# Ugly hack to be removed when the repository will be updated
 		msg('Installing ruby',MSG_INFO)
@@ -3161,6 +3166,8 @@ end
 
 msg("Installation done",MSG_INFO)
 
+msg("Deleting SSH agent",MSG_INFO)
+`ssh-agent -k 1>/dev/null`
 
 msg("Frontend: #{CFG_FRONTEND_USER}@#{getnode($kanodes[:frontend][:basename])}")
 
