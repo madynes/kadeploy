@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Users VARS
+KADEPLOY_FILES=~/kadeployfiles.yml
+CONFIG_MIGRATION=~/kaconfig_migration
+KERNELS_DIR=~/kernels-kvm
+ENVS_DIR=~/envs-kvm
+
 TMP_DIR="${HOME}/.kabootstrap"
 
 SSH_KEY=~/.ssh/id_rsa
@@ -145,6 +151,13 @@ taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $hostf
 let stime=`date +%s`-stime
 echo "... done in ${stime} seconds"
 
+echo 'Checking every nodes'
+stime=`date +%s`
+taktuk $TAKTUK_OPTIONS -o default="$TAKTUK_OUTPUT" -c "$SSH_CONNECTOR" -f $allfile broadcast exec [ /bin/true ] 2>&1 | grep -v Warning
+
+let stime=`date +%s`-stime
+echo "... done in ${stime} seconds"
+
 echo ""
 echo "Cleaning temporary files"
 
@@ -156,4 +169,14 @@ echo "Services:"
 cat $serviceyamlfile | grep -v '\-\-\-' | grep -v 'newip:'
 echo ""
 
-echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile --no-tunnels"
+if [ -n "$KADEPLOY_FILES" ]
+then
+	OPT_KADEPLOY="-u $KADEPLOY_FILES"
+fi
+
+if [ -n "$CONFIG_MIGRATION" ]
+then
+	OPT_MIGRATION="-j $CONFIG_MIGRATION"
+fi
+
+echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile $OPT_KADEPLOY $OPT_MIGRATION --no-tunnels $KERNELS_DIR $ENVS_DIR"
