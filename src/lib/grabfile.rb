@@ -122,9 +122,9 @@ module Managers
                                (cache_size * 1024 * 1024) -  File.stat(client_file).size,
                                0.5, cache_pattern,
                                @output)
-            @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
+            @output.verbosel(3, "Caching the #{file_tag} file #{client_file}")
             if not system("cp #{client_file} #{local_file}") then
-              @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
+              @output.verbosel(0, "Unable to cache (#{client_file} to #{local_file})")
               return false
             else
               if not system("chmod 640 #{local_file}") then
@@ -229,9 +229,9 @@ module Managers
                              (cache_size * 1024 * 1024) -  File.stat(client_file).size,
                              0.5, cache_pattern,
                              @output)
-          @output.verbosel(3, "Do a local copy for the #{file_tag} file #{client_file}")
+          @output.verbosel(3, "Caching the #{file_tag} file #{client_file}")
           if not system("cp #{client_file} #{local_file}") then
-            @output.verbosel(0, "Unable to do the local copy (#{client_file} to #{local_file})")
+            @output.verbosel(0, "Unable to cache (#{client_file} to #{local_file})")
             return false
           else
             if not system("chmod 640 #{local_file}") then
