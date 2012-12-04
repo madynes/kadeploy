@@ -1189,16 +1189,10 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the keys have been successfully copied, false otherwise
   def ms_send_key_in_deploy_env(scattering_kind)
-    if (context[:execution].key != "") then
-      cmd = "cat - >>/root/.ssh/authorized_keys"
-      return parallel_exec(
-        cmd,
-        { :input_file => context[:execution].key, :scattering => scattering_kind}
-      )
-    else
-      debug(3, "No key has been specified")
-    end
-    return true
+    return parallel_exec(
+      "cat - >>/root/.ssh/authorized_keys",
+      { :input_file => context[:execution].key, :scattering => scattering_kind}
+    )
   end
 
   # Change the PXE configuration
@@ -1678,15 +1672,11 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the keys have been successfully copied, false otherwise
   def ms_send_key(scattering_kind)
-    if ((context[:execution].key != "") && ((context[:execution].environment.tarball["kind"] == "tgz") ||
-                                              (context[:execution].environment.tarball["kind"] == "tbz2"))) then
-      cmd = "cat - >>#{context[:common].environment_extraction_dir}/root/.ssh/authorized_keys"
-      return parallel_exec(
-        cmd,
-        {:input_file => context[:execution].key, :scattering => scattering_kind }
-      )
-    end
-    return true
+    return parallel_exec(
+      "cat - >>#{context[:common].environment_extraction_dir}/root/"\
+      ".ssh/authorized_keys",
+      {:input_file => context[:execution].key, :scattering => scattering_kind }
+    )
   end
 
   # Wait some nodes after a reboot
@@ -1802,12 +1792,16 @@ class Microstep < Automata::QueueTask
     when "pure_pxe"
       case context[:execution].environment.environment_kind
       when "linux"
-        return copy_kernel_initrd_to_pxe([context[:execution].environment.kernel,
-                                          context[:execution].environment.initrd])
+        return copy_kernel_initrd_to_pxe([
+          context[:execution].environment.kernel,
+          context[:execution].environment.initrd
+        ])
       when "xen"
-        return copy_kernel_initrd_to_pxe([context[:execution].environment.kernel,
-                                          context[:execution].environment.initrd,
-                                          context[:execution].environment.hypervisor])
+        return copy_kernel_initrd_to_pxe([
+          context[:execution].environment.kernel,
+          context[:execution].environment.initrd,
+          context[:execution].environment.hypervisor
+        ])
       when "other"
         failed_microstep("Only linux and xen environments can be booted with a pure PXE configuration")
         return false
@@ -1818,9 +1812,6 @@ class Microstep < Automata::QueueTask
         return install_grub_on_nodes("linux")
       when "xen"
         return install_grub_on_nodes("xen")
-      when "other"
-        #in this case, the bootloader must be installed by the user (dd partition)
-        return true
       end
     else
       failed_microstep("Invalid bootloader value: #{context[:common].bootloader}")

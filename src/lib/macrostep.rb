@@ -135,6 +135,13 @@ class Macrostep < Automata::TaskedTaskManager
     @tasks = steps()
     cexec = context[:execution]
 
+    if !cexec.key or cexec.key.empty?
+      delete_task(:send_key_in_deploy_env)
+      delete_task(:send_key)
+    else
+      delete_task(:send_key) unless ['tgz','tbz2'].include?(cexec.environment.tarball["kind"])
+    end
+
     delete_task(:create_partition_table) if cexec.disable_disk_partitioning
 
     # We do not format/mount/umount the deploy part for a dd.gz or dd.bz2 image
@@ -164,6 +171,10 @@ class Macrostep < Automata::TaskedTaskManager
     delete_task(:manage_user_post_install) \
       if cexec.environment.environment_kind == 'other' \
       or cexec.environment.postinstall.nil?
+
+    delete_task(:install_bootloader) \
+      if context[:common].bootloader == 'chainload_pxe' \
+      and context[:execution].environment.environment_kind == 'other'
 
     delete_task(:set_vlan) if cexec.vlan.nil?
   end
@@ -207,7 +218,7 @@ class Macrostep < Automata::TaskedTaskManager
 
   def timeout!(task)
     debug(1,
-      "Timeout in [#{task.name}] before the end of the step, "\
+      "Timeout in #{task.name} before the end of the step, "\
       "let's kill the instance",
       task.nsid
     )
