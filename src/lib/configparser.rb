@@ -313,7 +313,7 @@ module ConfigInformation
     end
 
     def unused(result = [],curval=nil,curpath=nil)
-      curval = @basehash unless curval
+      curval = @basehash if curval.nil?
       curpath = [] unless curpath
 
       if curval.is_a?(Hash)
