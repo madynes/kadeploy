@@ -279,8 +279,11 @@ if (exec_specific_config != nil) then
           local.stop_service()
         end
         distant.stop_service()
-      rescue DRb::DRbConnError
-        puts "Server disconnection (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
+      rescue DRb::DRbConnError => dce
+        puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
+        puts "---- Stack trace ----"
+        puts dce.backtrace
+        puts "---------------------"
       end
     }
   }
