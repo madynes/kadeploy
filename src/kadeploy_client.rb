@@ -237,14 +237,15 @@ if (exec_specific_config != nil) then
     end
   end
   
-  tid_array = Array.new
+  threads = []
 
   files_ok_nodes = Array.new
   files_ko_nodes = Array.new
   nodes_by_server.each_key { |server|
-    tid_array << Thread.new {
+    threads << Thread.new {
       begin
         #Connect to the server
+        Thread.current[:server] = exec_specific_config.servers[server]
         distant = DRb.start_service()
         uri = "druby://#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}"
         kadeploy_server = DRbObject.new(nil, uri)
@@ -279,14 +280,29 @@ if (exec_specific_config != nil) then
           local.stop_service()
         end
         distant.stop_service()
-      rescue DRb::DRbConnError
-        puts "Server disconnection (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
+      rescue DRb::DRbConnError => dce
+        puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
+        puts "---- Stack trace ----"
+        puts dce.backtrace
+        puts "---------------------"
       end
     }
   }
-  tid_array.each { |tid|
-    tid.join
-  }
+
+  threads.each do |thr|
+    begin
+      thr.join
+    rescue Exception => e
+      server = "(#{thr[:server][0]}:#{thr[:server][1]})" if thr and thr[:server]
+      puts "[ERROR] Server disconnection: an exception was raised #{server}"
+      puts "---- #{e.class.name} ----"
+      puts e.message
+      puts "---- Stack trace ----"
+      puts e.backtrace
+      puts "---------------------"
+      next
+    end
+  end
 
   #We merge the files
   if (exec_specific_config.nodes_ok_file != "") then
