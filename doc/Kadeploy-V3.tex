@@ -1196,7 +1196,7 @@ General options:
                                   each node in the PXE profile (the NODE_SINGULARITY pattern must
                                   be used in the PXE profile)
   -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
-                                   directory. Those files will be prefixed with "pxe-$username-" 
+                                   directory. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX--
       --env-version NUMBER         Number of version of the environment to deploy
       --server STRING              Specify the Kadeploy server to use
   -V, --verbose-level VALUE        Verbose level between 0 to 4
@@ -1283,7 +1283,7 @@ This kind of command can be used for debug purpose. It performs a deployment wit
             -w ~/pxe_profile -x "~/custom-kernel,~/custom-initrd" \
             --set-pxe-pattern ~/singularities
 \end{verbatim}
-In some specific case, you may want to use a specific PXE profile to boot your nodes. To do this, you have to provide a PXE profile. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server. So Kadeploy offers a feature to stage some files in an area where the files can be read by the TFTP server. This can be achieved with the \texttt{-x|--upload-pxe-files} option. You must know that such uploaded files will be copied in the \texttt{tftp\_images\_path}, and will be prefixed with \texttt{pxe-username-}.
+In some specific case, you may want to use a specific PXE profile to boot your nodes. To do this, you have to provide a PXE profile. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server. So Kadeploy offers a feature to stage some files in an area where the files can be read by the TFTP server. This can be achieved with the \texttt{-x|--upload-pxe-files} option. You must know that such uploaded files will be copied in the \texttt{tftp\_images\_path}. Those files will then be available in the \texttt{KERNELS\_DIR} directory with the prefix \texttt{FILES\_PREFIX--}.
 
 Here is an example of PXE profile that uses uploaded files:
 \begin{verbatim}
@@ -1294,11 +1294,11 @@ DISPLAY messages
 TIMEOUT 50
 
 label bootlabel
-        KERNEL KERNELS_DIR/FILES_PREFIX--custom-kernel
-        APPEND initrd=KERNELS_DIR/FILES_PREFIX--custom-initrd root=/dev/sda3 node_id=NODE_SINGULARITY
+        KERNEL KERNELS_DIR/FILES_PREFIX-custom-kernel
+        APPEND initrd=KERNELS_DIR/FILES_PREFIX-custom-initrd root=/dev/sda3 node_id=NODE_SINGULARITY
 \end{verbatim}
 
-In this example, \texttt{KERNELS\_DIR} will be replaced by the directory where the kernels are located inside of the TFTP directory; \texttt{FILES\_PREFIX} will be replaced by the prefix added to each files sent into the TFTP repository via the \texttt{-x|--upload-pxe-files} option (be careful not to forget to add \texttt{--} between this prefix and your filenames).
+In this example, \texttt{KERNELS\_DIR} will be replaced by the directory where the kernels are located inside of the TFTP directory; \texttt{FILES\_PREFIX--} will be replaced by the prefix added to each files sent into the TFTP repository via the \texttt{-x|--upload-pxe-files} option (be careful not to forget to add \texttt{--} between this prefix and your filenames).
 
 You can notice the \texttt{NODE\_SINGULARITY} pattern used in the PXE profile. Thanks to the \texttt{--set-pxe-pattern} option, you can also provide a file that defines a value in the PXE profile that depends on the node concerned. This file must define on each line a couple of value as follows : hostname,node singularity. In our example, the file \texttt{~/singularities} can contains something like:
 \begin{verbatim}
@@ -1432,7 +1432,7 @@ General options:
                                  each node in the PXE profile (the NODE_SINGULARITY pattern must
                                  be used in the PXE profile)
   -x, --upload-pxe-files FILES   Upload a list of files (file1,file2,file3) to the "tftp_images_path"
-                                 directory. Those files will be prefixed with "pxe-$username-" 
+                                 directory. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX--
       --env-version NUMBER       Specify the environment version
       --no-wait                  Do not wait the end of the reboot
       --server STRING            Specify the Kadeploy server to use
