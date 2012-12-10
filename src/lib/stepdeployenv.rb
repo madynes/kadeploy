@@ -36,14 +36,13 @@ require 'macrostep'
       [
         [ :switch_pxe, "prod_to_deploy_env", "" ],
         [ :set_vlan, "DEFAULT" ],
-        [ :create_kexec_repository ],
         [ :send_deployment_kernel, :tree ],
         [ :kexec,
           'linux',
-          @cluster_config.kexec_repository,
-          @cluster_config.deploy_kernel,
-          @cluster_config.deploy_initrd,
-          @cluster_config.deploy_kernel_args
+          context[:cluster].kexec_repository,
+          context[:cluster].deploy_kernel,
+          context[:cluster].deploy_initrd,
+          context[:cluster].deploy_kernel_args
         ],
         [ :wait_reboot, "kexec" ],
         [ :send_key_in_deploy_env, :tree ],

@@ -151,15 +151,16 @@ require 'ping'
     # Set information about a Taktuk command execution
     def nodes_updates(results)
       nodes_update(results[:output]) do |node,val|
-        node.last_cmd_stdout = val.join("\\n")
+        node.last_cmd_stdout = val.join("\\n") if node
       end
       nodes_update(results[:error]) do |node,val|
-        node.last_cmd_stderr = val.join("\\n")
+        node.last_cmd_stderr = val.join("\\n") if node
       end
       nodes_update(results[:status]) do |node,val|
-        node.last_cmd_exit_status = val[0]
+        node.last_cmd_exit_status = val[0] if node
       end
       nodes_update(results[:connector]) do |node,val|
+        next unless node
         val.each do |v|
           if !(v =~ /^Warning:.*$/)
             node.last_cmd_exit_status = "256"
