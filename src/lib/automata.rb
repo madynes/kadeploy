@@ -111,7 +111,7 @@ module Automata
     attr_reader :nodes, :nodes_done, :static_context
 
     TIMER_CKECK_PITCH = 0.5
-    QUEUE_CKECK_PITCH = 0.1
+    QUEUE_CKECK_PITCH = 0.3
 
     def initialize(nodeset,static_context = {})
       raise if nodeset.nil?
@@ -443,12 +443,11 @@ module Automata
       until (done?)
         begin
           sleep(QUEUE_CKECK_PITCH)
-          query = @queue.pop
+          clean_threads()
+          query = @queue.pop(true)
         rescue ThreadError
           retry unless done?
         end
-
-        clean_threads()
 
         # Don't do anything if the nodes was already treated
         clean_nodeset(query[:nodes])
