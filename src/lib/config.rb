@@ -1109,7 +1109,7 @@ module ConfigInformation
 
         cp.parse('kexec') do
           conf.kexec_repository = cp.value(
-            'repository',String,'/karepository',Pathname
+            'repository',String,'/dev/shm/kexec_repository',Pathname
           )
         end
 

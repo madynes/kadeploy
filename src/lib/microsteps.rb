@@ -1390,24 +1390,23 @@ class Microstep < Automata::QueueTask
   # * return false if the kexec execution failed
   def ms_kexec( systemkind, systemdir, kernelfile, initrdfile, kernelparams)
     if (systemkind == "linux") then
-      script = "#!/bin/bash\n"
-      script += shell_kexec(
+
+      tmpfile = Tempfile.new('kexec')
+      tmpfile.write(shell_kexec(
         kernelfile,
         initrdfile,
         kernelparams,
         systemdir
-      )
-
-      tmpfile = Tempfile.new('kexec')
-      tmpfile.write(script)
+      ))
       tmpfile.close
 
       ret = parallel_exec(
-        "file=`mktemp`;"\
-        "cat - >$file;"\
-        "chmod +x $file;"\
-        "nohup $file 1>/dev/null 2>/dev/null </dev/null &",
+        "/bin/bash -se",
         { :input_file => tmpfile.path, :scattering => :tree }
+      )
+
+      ret = ret && parallel_exec(
+        "nohup /bin/bash -c 'sleep 1 && nohup /sbin/kexec -e' 1>/dev/null 2>/dev/null </dev/null &"
       )
 
       tmpfile.unlink
@@ -1436,8 +1435,7 @@ class Microstep < Automata::QueueTask
       "--initrd=$initrd "\
       "--append=\"#{kernel_params}\" "\
     "&& sleep 1 "\
-    "&& echo \"u\" > /proc/sysrq-trigger "\
-    "&& nohup /sbin/kexec -e\n"
+    "&& echo \"u\" > /proc/sysrq-trigger"
   end
 
   # Get the shell command used to follow a symbolic link until reaching the real file
@@ -1466,16 +1464,6 @@ class Microstep < Automata::QueueTask
     ")"
   end
 
-  # Create kexec repository directory on current environment
-  #
-  # Arguments
-  # * scattering_kind: kind of taktuk scatter (tree, chain, kastafior)
-  # Output
-  # * return true if the kernel has been successfully sent
-  def ms_create_kexec_repository()
-    return parallel_exec("mkdir -p #{context[:cluster].kexec_repository}")
-  end
-
   # Send the deploy kernel files to an environment kexec repository
   #
   # Arguments
@@ -1483,12 +1471,12 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the kernel files have been sent successfully
   def ms_send_deployment_kernel(scattering_kind)
-    ret = true
-
     pxedir = File.join(
       context[:common].pxe.pxe_repository,
       context[:common].pxe.pxe_repository_kernels
     )
+
+    ret = parallel_exec("mkdir -p #{context[:cluster].kexec_repository}")
 
     ret = ret && parallel_sendfile(
       File.join(pxedir,context[:cluster].deploy_kernel),
