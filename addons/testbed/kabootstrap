@@ -75,33 +75,33 @@ CFG_KADEPLOY_SOFT_REBOOT = false
 
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
-  :retries => 2,
-  :timeout => 1200
+  :retries => 0,
+  :timeout => 200
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
-  :retries => 2,
-  :timeout => 900
+  :retries => 0,
+  :timeout => 200
 }
 CFG_KADEPLOY_MACROSTEP3 = [
   {
     :name => 'BootNewEnv|BootNewEnvKexec',
     :retries => 0,
-    :timeout => 1200
+    :timeout => 200
   },
   {
     :name => 'BootNewEnvHardReboot',
-    :retries => 2,
-    :timeout => 1200
+    :retries => 0,
+    :timeout => 200
   }
 ]
 
 CFG_KADEPLOY_PARTITION_SWAP_ID = 3
-CFG_KADEPLOY_PARTITION_SWAP_SIZE = '8M'
+CFG_KADEPLOY_PARTITION_SWAP_SIZE = '256M'
 CFG_KADEPLOY_PARTITION_PROD_ID = 1
-CFG_KADEPLOY_PARTITION_PROD_SIZE = '2M'
+CFG_KADEPLOY_PARTITION_PROD_SIZE = '4000M'
 CFG_KADEPLOY_PARTITION_DEPLOY_ID = 2
-CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '512M'
+CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '4000M'
 CFG_KADEPLOY_PARTITION_TMP_ID = 4
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
 
@@ -432,7 +432,7 @@ def cfg_kadeploy_deploy_kernel_args(cluster)
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 450
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 180
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
