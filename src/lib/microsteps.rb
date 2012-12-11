@@ -1036,7 +1036,7 @@ class Microstep < Automata::QueueTask
       failed_microstep("Error while sending the torrent file")
       return false
     end
-    if not parallel_exec("/usr/local/bin/bittorrent_detach /tmp/#{File.basename(torrent)}") then
+    if not parallel_exec(shell_detach("/usr/local/bin/bittorrent /tmp/#{File.basename(torrent)}")) then
       failed_microstep("Error while launching the bittorrent download")
       return false
     end
@@ -1399,9 +1399,7 @@ class Microstep < Automata::QueueTask
         { :input_file => tmpfile.path, :scattering => :tree }
       )
 
-      ret = ret && parallel_exec(
-        "nohup /bin/bash -c 'sleep 1 && nohup /sbin/kexec -e' 1>/dev/null 2>/dev/null </dev/null &"
-      )
+      ret = ret && parallel_exec(shell_detach('/sbin/kexec -e'))
 
       tmpfile.unlink
 
@@ -1410,6 +1408,16 @@ class Microstep < Automata::QueueTask
       debug(3, "   The Kexec optimization can only be used with a linux environment")
       return false
     end
+  end
+
+  # Get the shell command used to execute then detach a command
+  #
+  # Arguments
+  # * cmd: the command
+  # Output
+  # * return a string that describe the shell command to be executed
+  def shell_detach(cmd)
+    "nohup /bin/sh -c 'sleep 1; #{cmd}' 1>/dev/null 2>/dev/null </dev/null &"
   end
 
   # Get the shell command used to reboot the nodes with kexec
@@ -1493,7 +1501,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the reboot has been successfully performed, false otherwise
   def ms_reboot_from_deploy_env()
-    return parallel_exec("/usr/local/bin/reboot_detach", {},{}, context[:windows][:reboot])
+    return parallel_exec(shell_detach('/sbin/reboot -f'), {},{}, context[:windows][:reboot])
   end
 
   # Perform a power operation on the current set of nodes_ok
