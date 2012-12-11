@@ -53,8 +53,8 @@ require 'thread'
         tid = Thread.new do
           exec.run
           status,stdout,stderr = exec.wait
-          node.last_cmd_stdout = stdout.chomp.gsub(/\n/,"\\n")
-          node.last_cmd_stderr = stderr.chomp.gsub(/\n/,"\\n")
+          node.last_cmd_stdout = stdout.chomp
+          node.last_cmd_stderr = stderr.chomp
           node.last_cmd_exit_status = status.exitstatus.to_s
         end
         @threads.add(tid)
