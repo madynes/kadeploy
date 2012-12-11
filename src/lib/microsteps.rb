@@ -69,7 +69,7 @@ class Microstep < Automata::QueueTask
         debug(3,"Running #{@name.to_s}",false)
         ret = ret && send("ms_#{@name.to_s}".to_sym,*@params)
       end
-      debug(4, "Time in #{@name.to_s}: #{Time.now.to_i - start}s",false)
+      debug(4, " ~ Time in #{@name.to_s}: #{Time.now.to_i - start}s",false)
     end
 
     if ret

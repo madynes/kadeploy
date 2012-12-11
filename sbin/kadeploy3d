@@ -9,13 +9,13 @@
 PID=0
 Exit_handler_kill()
 {
-    ssh-agent -k
+    ssh-agent -k 1>/dev/null
     kill -9 $PID
 }
 
 Exit_handler_term()
 {
-    ssh-agent -k
+    ssh-agent -k 1>/dev/null
     kill -15 $PID
 }
 
@@ -34,8 +34,8 @@ source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
 
 # Launch an ssh agent (useful when deploying from production environment)
 tmp=`tempfile`
-ssh-agent > $tmp
-source $tmp
+ssh-agent 1> $tmp
+source $tmp 1>/dev/null
 ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
 rm $tmp
 
@@ -47,7 +47,7 @@ trap Exit_handler_kill KILL
 wait
 
 # Clean the ssh agent stuff
-ssh-agent -k
+ssh-agent -k 1>/dev/null
 rm -rf `dirname $SSH_AUTH_SOCK`
 
 exit 0
