@@ -1,3 +1,0 @@
-#!/bin/sh
-
-nohup /sbin/reboot -f &>/dev/null &
