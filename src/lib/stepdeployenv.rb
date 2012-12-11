@@ -34,7 +34,6 @@ require 'macrostep'
   class SetDeploymentEnvKexec < SetDeploymentEnv
     def steps()
       [
-        [ :switch_pxe, "prod_to_deploy_env", "" ],
         [ :set_vlan, "DEFAULT" ],
         [ :send_deployment_kernel, :tree ],
         [ :kexec,
