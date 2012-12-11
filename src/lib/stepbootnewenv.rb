@@ -60,9 +60,6 @@ require 'macrostep'
 
     def steps()
       [
-        [ :switch_pxe, "deploy_to_deployed_env" ],
-        [ :umount_deploy_part ],
-        [ :mount_deploy_part ],
         [ :kexec,
           context[:execution].environment.environment_kind,
           context[:common].environment_extraction_dir,
