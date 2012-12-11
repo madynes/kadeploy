@@ -52,19 +52,25 @@ require 'ping'
       nodes_init(:stdout => '', :stderr => 'Unreachable', :status => '256')
 
       res = nil
+      takbin = nil
+      takargs = nil
       do_taktuk do |tak|
         tak.broadcast_exec[command]
         tak.seq!.broadcast_input_file[opts[:input_file]] if opts[:input_file]
         res = tak.run!
-        @output.debug("#{tak.binary} #{tak.args.inspect}", @nodes)
+        takbin = tak.binary
+        takargs = tak.args
       end
 
+      ret = nil
       if res
         nodes_updates(res)
-        nodes_sort(expects)
+        ret = nodes_sort(expects)
       else
-        [[],@nodes.set.dup]
+        ret = [[],@nodes.set.dup]
       end
+      @output.debug("#{takbin} #{takargs.join(' ')}", @nodes)
+      ret
     end
 
     # Send a file with TakTuk
@@ -80,17 +86,23 @@ require 'ping'
       nodes_init(:stdout => '', :stderr => '', :status => '0')
 
       res = nil
+      takbin = nil
+      takargs = nil
       do_taktuk do |tak|
         res = tak.broadcast_put[src][dst].run!
-        @output.debug("#{tak.binary} #{tak.args.inspect}", @nodes)
+        takbin = tak.binary
+        takargs = tak.args
       end
 
+      ret = nil
       if res
         nodes_updates(res)
-        nodes_sort(expects)
+        ret = nodes_sort(expects)
       else
-        [[],@nodes.set.dup]
+        ret = [[],@nodes.set.dup]
       end
+      @output.debug("#{takbin} #{takargs.join(' ')}", @nodes)
+      ret
     end
 
 
@@ -151,10 +163,10 @@ require 'ping'
     # Set information about a Taktuk command execution
     def nodes_updates(results)
       nodes_update(results[:output]) do |node,val|
-        node.last_cmd_stdout = val.join("\\n") if node
+        node.last_cmd_stdout = val.join("\n") if node
       end
       nodes_update(results[:error]) do |node,val|
-        node.last_cmd_stderr = val.join("\\n") if node
+        node.last_cmd_stderr = val.join("\n") if node
       end
       nodes_update(results[:status]) do |node,val|
         node.last_cmd_exit_status = val[0] if node
