@@ -49,22 +49,28 @@ require 'ping'
     # Output
     # * returns an array that contains two arrays ([0] is the nodes OK and [1] is the nodes KO)
     def taktuk_exec(command,opts={},expects={})
-      nodes_init(:stdout => '', :stderr => 'Unreachable', :status => '256')
+      nodes_init(:stdout => '', :stderr => '', :status => '0')
 
       res = nil
+      takbin = nil
+      takargs = nil
       do_taktuk do |tak|
         tak.broadcast_exec[command]
         tak.seq!.broadcast_input_file[opts[:input_file]] if opts[:input_file]
         res = tak.run!
-        @output.debug("#{tak.binary} #{tak.args.inspect}", @nodes)
+        takbin = tak.binary
+        takargs = tak.args
       end
 
+      ret = nil
       if res
         nodes_updates(res)
-        nodes_sort(expects)
+        ret = nodes_sort(expects)
       else
-        [[],@nodes.set.dup]
+        ret = [[],@nodes.set.dup]
       end
+      @output.debug("#{takbin} #{takargs.join(' ')}", @nodes)
+      ret
     end
 
     # Send a file with TakTuk
@@ -80,17 +86,23 @@ require 'ping'
       nodes_init(:stdout => '', :stderr => '', :status => '0')
 
       res = nil
+      takbin = nil
+      takargs = nil
       do_taktuk do |tak|
         res = tak.broadcast_put[src][dst].run!
-        @output.debug("#{tak.binary} #{tak.args.inspect}", @nodes)
+        takbin = tak.binary
+        takargs = tak.args
       end
 
+      ret = nil
       if res
         nodes_updates(res)
-        nodes_sort(expects)
+        ret = nodes_sort(expects)
       else
-        [[],@nodes.set.dup]
+        ret = [[],@nodes.set.dup]
       end
+      @output.debug("#{takbin} #{takargs.join(' ')}", @nodes)
+      ret
     end
 
 
@@ -132,16 +144,16 @@ require 'ping'
     end
 
     # Set information about a Taktuk command execution
-    def nodes_update(result)
-      res = result.compact!([:line]).group_by { |v| v[:host] }
+    def nodes_update(result, fieldkey = :host, fieldval = :line)
+      res = result.compact!([fieldval]).group_by { |v| v[fieldkey] }
       res.each_pair do |host,values|
         node = node_get(host)
         ret = []
         values.each do |value|
-          if value[:line].is_a?(Array)
-            ret += value[:line]
+          if value[fieldval].is_a?(Array)
+            ret += value[fieldval]
           else
-            ret << value[:line]
+            ret << value[fieldval]
           end
         end
         yield(node,ret)
@@ -151,10 +163,10 @@ require 'ping'
     # Set information about a Taktuk command execution
     def nodes_updates(results)
       nodes_update(results[:output]) do |node,val|
-        node.last_cmd_stdout = val.join("\\n") if node
+        node.last_cmd_stdout = val.join("\n") if node
       end
       nodes_update(results[:error]) do |node,val|
-        node.last_cmd_stderr = val.join("\\n") if node
+        node.last_cmd_stderr = "#{val.join("\n")}\n" if node
       end
       nodes_update(results[:status]) do |node,val|
         node.last_cmd_exit_status = val[0] if node
@@ -164,8 +176,18 @@ require 'ping'
         val.each do |v|
           if !(v =~ /^Warning:.*$/)
             node.last_cmd_exit_status = "256"
-            node.last_cmd_stderr = "The node #{node.hostname} is unreachable"
-            break
+            node.last_cmd_stderr = '' unless node.last_cmd_stderr
+            node.last_cmd_stderr += "TAKTUK-ERROR-connector: #{v}\n"
+          end
+        end
+      end
+      nodes_update(results[:state],:peer) do |node,val|
+        next unless node
+        val.each do |v|
+          if TakTuk::StateStream.check?(:error,v)
+            node.last_cmd_exit_status = v
+            node.last_cmd_stderr = '' unless node.last_cmd_stderr
+            node.last_cmd_stderr += "TAKTUK-ERROR-state: #{TakTuk::StateStream::errmsg(v.to_i)}\n"
           end
         end
       end
