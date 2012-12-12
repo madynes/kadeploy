@@ -20,6 +20,7 @@ require 'macrostep'
         [ :send_environment, :chain ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
+        [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
       ]
@@ -32,6 +33,7 @@ require 'macrostep'
         [ :send_environment, :kastafior ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
+        [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
       ]
@@ -44,6 +46,7 @@ require 'macrostep'
         [ :send_environment, :tree ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
+        [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
       ]
@@ -57,6 +60,7 @@ require 'macrostep'
         [ :send_environment, :bittorrent ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
+        [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
       ]

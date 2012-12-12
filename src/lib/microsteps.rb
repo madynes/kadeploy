@@ -1416,6 +1416,46 @@ class Microstep < Automata::QueueTask
     end
   end
 
+  # Check the kernel files on the nodes
+  #
+  # Arguments
+  # * systemking: the kind of the system to boot ('linux', ...)
+  # * systemdir: the directory of the filesystem containing the system to boot
+  # * kernelfile: the (local to 'systemdir') path to the kernel image
+  # * initrdfile: the (local to 'systemdir') path to the initrd image
+  # * kernelparams: the commands given to the kernel when booting
+  # Output
+  # * return false if the kexec execution failed
+  def ms_check_kernel_files()
+    envkernel = context[:execution].environment.kernel
+    envinitrd = context[:execution].environment.initrd
+    envdir = context[:common].environment_extraction_dir
+
+    tmpfile = Tempfile.new('kernel_check')
+    tmpfile.write(
+      "kernel=#{shell_follow_symlink(envkernel,envdir)}\n"\
+      "initrd=#{shell_follow_symlink(envinitrd,envdir)}\n"\
+      "test -e \"$kernel\" || (echo \"Environment kernel file #{envkernel} not found in tarball (${kernel})\" 1>&2; false)\n"\
+      "test -e \"$initrd\" || (echo \"Environment initrd file #{envinitrd} not found in tarball (${initrd})\" 1>&2; false)\n"
+    )
+    tmpfile.close
+
+    return parallel_exec(
+      "/bin/bash -se",
+      { :input_file => tmpfile.path, :scattering => :tree }
+    )
+  end
+
+  # Get the shell command used to execute then detach a command
+  #
+  # Arguments
+  # * cmd: the command
+  # Output
+  # * return a string that describe the shell command to be executed
+  def shell_detach(cmd)
+    "nohup /bin/sh -c 'sleep 1; #{cmd}' 1>/dev/null 2>/dev/null </dev/null &"
+  end
+
   # Get the shell command used to reboot the nodes with kexec
   #
   # Arguments
