@@ -290,7 +290,7 @@ module TakTuk
 
     def valid?(value)
       TOKENS.each do |token|
-        return true if token =~ /^#{value}.*$/
+        return true if token =~ /^#{Regexp.escape(value)}.*$/
       end
       return false
     end

@@ -176,6 +176,8 @@ class Macrostep < Automata::TaskedTaskManager
       if context[:common].bootloader == 'chainload_pxe' \
       and context[:execution].environment.environment_kind == 'other'
 
+    delete_task(:check_kernel_files) if cexec.environment.environment_kind == 'other'
+
     delete_task(:set_vlan) if cexec.vlan.nil?
   end
 

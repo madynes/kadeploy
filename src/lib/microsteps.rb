@@ -1390,24 +1390,23 @@ class Microstep < Automata::QueueTask
   # * return false if the kexec execution failed
   def ms_kexec( systemkind, systemdir, kernelfile, initrdfile, kernelparams)
     if (systemkind == "linux") then
-      script = "#!/bin/bash\n"
-      script += shell_kexec(
+
+      tmpfile = Tempfile.new('kexec')
+      tmpfile.write(shell_kexec(
         kernelfile,
         initrdfile,
         kernelparams,
         systemdir
-      )
-
-      tmpfile = Tempfile.new('kexec')
-      tmpfile.write(script)
+      ))
       tmpfile.close
 
       ret = parallel_exec(
-        "file=`mktemp`;"\
-        "cat - >$file;"\
-        "chmod +x $file;"\
-        "nohup $file 1>/dev/null 2>/dev/null </dev/null &",
+        "/bin/bash -se",
         { :input_file => tmpfile.path, :scattering => :tree }
+      )
+
+      ret = ret && parallel_exec(
+        "nohup /bin/bash -c 'sleep 1 && nohup /sbin/kexec -e' 1>/dev/null 2>/dev/null </dev/null &"
       )
 
       tmpfile.unlink
@@ -1417,6 +1416,46 @@ class Microstep < Automata::QueueTask
       debug(3, "   The Kexec optimization can only be used with a linux environment")
       return false
     end
+  end
+
+  # Check the kernel files on the nodes
+  #
+  # Arguments
+  # * systemking: the kind of the system to boot ('linux', ...)
+  # * systemdir: the directory of the filesystem containing the system to boot
+  # * kernelfile: the (local to 'systemdir') path to the kernel image
+  # * initrdfile: the (local to 'systemdir') path to the initrd image
+  # * kernelparams: the commands given to the kernel when booting
+  # Output
+  # * return false if the kexec execution failed
+  def ms_check_kernel_files()
+    envkernel = context[:execution].environment.kernel
+    envinitrd = context[:execution].environment.initrd
+    envdir = context[:common].environment_extraction_dir
+
+    tmpfile = Tempfile.new('kernel_check')
+    tmpfile.write(
+      "kernel=#{shell_follow_symlink(envkernel,envdir)}\n"\
+      "initrd=#{shell_follow_symlink(envinitrd,envdir)}\n"\
+      "test -e \"$kernel\" || (echo \"Environment kernel file #{envkernel} not found in tarball (${kernel})\" 1>&2; false)\n"\
+      "test -e \"$initrd\" || (echo \"Environment initrd file #{envinitrd} not found in tarball (${initrd})\" 1>&2; false)\n"
+    )
+    tmpfile.close
+
+    return parallel_exec(
+      "/bin/bash -se",
+      { :input_file => tmpfile.path, :scattering => :tree }
+    )
+  end
+
+  # Get the shell command used to execute then detach a command
+  #
+  # Arguments
+  # * cmd: the command
+  # Output
+  # * return a string that describe the shell command to be executed
+  def shell_detach(cmd)
+    "nohup /bin/sh -c 'sleep 1; #{cmd}' 1>/dev/null 2>/dev/null </dev/null &"
   end
 
   # Get the shell command used to reboot the nodes with kexec
@@ -1436,8 +1475,7 @@ class Microstep < Automata::QueueTask
       "--initrd=$initrd "\
       "--append=\"#{kernel_params}\" "\
     "&& sleep 1 "\
-    "&& echo \"u\" > /proc/sysrq-trigger "\
-    "&& nohup /sbin/kexec -e\n"
+    "&& echo \"u\" > /proc/sysrq-trigger"
   end
 
   # Get the shell command used to follow a symbolic link until reaching the real file
@@ -1466,16 +1504,6 @@ class Microstep < Automata::QueueTask
     ")"
   end
 
-  # Create kexec repository directory on current environment
-  #
-  # Arguments
-  # * scattering_kind: kind of taktuk scatter (tree, chain, kastafior)
-  # Output
-  # * return true if the kernel has been successfully sent
-  def ms_create_kexec_repository()
-    return parallel_exec("mkdir -p #{context[:cluster].kexec_repository}")
-  end
-
   # Send the deploy kernel files to an environment kexec repository
   #
   # Arguments
@@ -1483,12 +1511,12 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the kernel files have been sent successfully
   def ms_send_deployment_kernel(scattering_kind)
-    ret = true
-
     pxedir = File.join(
       context[:common].pxe.pxe_repository,
       context[:common].pxe.pxe_repository_kernels
     )
+
+    ret = parallel_exec("mkdir -p #{context[:cluster].kexec_repository}")
 
     ret = ret && parallel_sendfile(
       File.join(pxedir,context[:cluster].deploy_kernel),

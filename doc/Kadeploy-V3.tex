@@ -674,7 +674,7 @@ postinstall:
 pxe: 
   headers: PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
 kexec:
-  repository: /karepository
+  repository: /dev/shm/kexec_repository
 hooks:
   use_ip_to_deploy: true
 automata: 
@@ -819,7 +819,7 @@ automata:
 
   \item \ypath{/kexec}
   \begin{itemize}
-    \item \yfieldd{repository}{String}{/karepository} the directory in the running system where deploy kernel files have to be copied for kexec purpose
+    \item \yfieldd{repository}{String}{/dev/shm/kexec\_repository} the directory in the running system where deploy kernel files have to be copied for kexec purpose
   \end{itemize}
 
   \item \ypath{/hooks}
