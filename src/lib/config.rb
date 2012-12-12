@@ -614,18 +614,14 @@ module ConfigInformation
             end
           end
         end
-=begin
-      if not @common.check_all_fields_filled() then
-        return false
-      end
-=end
+
       rescue ArgumentError => ae
-        puts "Error(#{configfile}) #{ae.message}"
+        $stderr.puts "Error(#{configfile}) #{ae.message}"
         return false
       end
 
       cp.unused().each do |path|
-        puts "Warning(#{configfile}) Unused field '#{path}'"
+        $stderr.puts "Warning(#{configfile}) Unused field '#{path}'"
       end
 
       return true
@@ -1122,12 +1118,6 @@ module ConfigInformation
             'use_ip_to_deploy',[TrueClass,FalseClass],false
           )
         end
-
-=begin
-        if @cluster_specific[cluster].check_all_fields_filled(cluster) == false
-          return false
-        end
-=end
 
       rescue ArgumentError => ae
         puts "Error(#{configfile}) #{ae.message}"
@@ -3069,68 +3059,6 @@ module ConfigInformation
       #@kastafior = "kastafior"
       #@pxe_repository_kernels = "kernels"
     end
-
-=begin
-    # Check if all the fields of the common configuration file are filled
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true if all the fields are filled, false otherwise
-    def check_all_fields_filled
-      err_msg =  " field is missing in the common configuration file"
-      self.instance_variables.each{|i|
-        a = eval i
-        puts "Warning: " + i + err_msg if (a == nil)
-      }
-
-      if (
-          (@verbose_level == nil) ||
-          (@pxe_kind == nil) ||
-          (@pxe_export == nil) ||
-          (@pxe_repository == nil) ||
-          (@pxe_repository_kernels_max_size == nil) ||
-          (@db_kind == nil) ||
-          (@deploy_db_host == nil) ||
-          (@deploy_db_name == nil) ||
-          (@deploy_db_login == nil) ||
-          (@deploy_db_passwd == nil) ||
-          (@rights_kind == nil) ||
-          (@nodes_desc == nil) ||
-          (@taktuk_connector == nil) ||
-          (@taktuk_tree_arity == nil) ||
-          (@taktuk_auto_propagate == nil) ||
-          (@tarball_dest_dir == nil) ||
-          (@kadeploy_server == nil) ||
-          (@kadeploy_server_port == nil) ||
-          (@max_preinstall_size == nil) ||
-          (@max_postinstall_size == nil) ||
-          (@kadeploy_tcp_buffer_size == nil) ||
-          (@kadeploy_cache_dir == nil) ||
-          (@kadeploy_cache_size == nil) ||
-          (@ssh_port == nil) ||
-          (@test_deploy_env_port == nil) ||
-          (@environment_extraction_dir == nil) ||
-          (@log_to_syslog == nil) ||
-          (@log_to_db == nil) ||
-          (@dbg_to_syslog == nil) ||
-          (@dbg_to_syslog_level == nil) ||
-          (@reboot_window == nil) ||
-          (@reboot_window_sleep_time == nil) ||
-          (@nodes_check_window == nil) ||
-          (@bootloader == nil) ||
-          (@purge_deployment_timer == nil) ||
-          (@rambin_path == nil) ||
-          (@mkfs_options == nil) ||
-          (@almighty_env_users == nil)
-         ) then
-        puts "Some mandatory fields are missing in the common configuration file"
-        return false
-      else
-        return true
-      end
-    end
-=end
   end
 
   
@@ -3312,29 +3240,6 @@ module ConfigInformation
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
 
-
-    # Check if all the fields of the common configuration file are filled
-    #
-    # Arguments
-    # * cluster: cluster name
-    # Output
-    # * return true if all the fields are filled, false otherwise
-    def check_all_fields_filled(cluster)
-      err_msg =  " field is missing in the specific configuration file #{cluster}"
-      self.instance_variables.each{|i|
-        a = eval i
-        puts "Warning: " + i + err_msg if (a == nil)
-      }
-      if ((@deploy_kernel == nil) || (@deploy_initrd == nil) || (@block_device == nil) || (@deploy_part == nil) || (@prod_part == nil) ||
-          (@tmp_part == nil) || (@workflow_steps == nil) || (@timeout_reboot_classical == nil) || (@timeout_reboot_kexec == nil) ||
-          (@pxe_header == nil) ||
-          (@cmd_console == nil) || (@partition_creation_kind == nil) || (@partition_file == nil)) then
-        puts "Some mandatory fields are missing in the specific configuration file for #{cluster}"
-        return false
-      else
-        return true
-      end
-    end
 
     # Get the list of the macro step instances associed to a macro step
     #
