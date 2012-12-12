@@ -156,8 +156,58 @@ module TakTuk
   end
 
   class StateStream < Stream
+    STATES = {
+      :error => {
+        3 => 'connection failed',
+        5 => 'connection lost',
+        7 => 'command failed',
+        9 => 'numbering update failed',
+        11 => 'pipe input failed',
+        14 => 'file reception failed',
+        16 => 'file send failed',
+        17 => 'invalid target',
+        18 => 'no target',
+        20 => 'invalid destination',
+        21 => 'destination not available anymore',
+      },
+      :progress => {
+        0 => 'taktuk is ready',
+        1 => 'taktuk is numbered',
+        4 => 'connection initialized',
+        6 => 'command started',
+        10 => 'pipe input started',
+        13 => 'file reception started',
+      },
+      :done => {
+        2 => 'taktuk terminated',
+        8 => 'command terminated',
+        12 => 'pipe input terminated',
+        15 => 'file reception terminated',
+        19 => 'message delivered',
+      }
+    }
+
     def initialize(template)
       super(:state,template)
+    end
+
+    # type can be :error, :progress or :done
+    def self.check?(type,state)
+      return nil unless STATES[type]
+      state = state.strip
+
+      begin
+        nb = Integer(state)
+        STATES[type].keys.include?(nb)
+      rescue
+        STATES[type].values.include?(state.downcase!)
+      end
+    end
+
+    def self.errmsg(nb)
+      STATES.each_value do |typeval|
+        return typeval[nb] if typeval[nb]
+      end
     end
   end
 
@@ -181,6 +231,7 @@ module TakTuk
 
   class Template
     SEPARATOR=':'
+    attr_reader :fields
 
     def initialize(fields)
       @fields = fields
@@ -188,6 +239,13 @@ module TakTuk
 
     def self.[](*fields)
       self.new(fields)
+    end
+
+    def add(template)
+      template.fields.each do |field|
+        @fields << field unless fields.include?(field)
+      end
+      self
     end
 
     def to_cmd
@@ -201,9 +259,14 @@ module TakTuk
       curpos = 0
       @fields.each do |field|
         len,tmp = string[curpos..-1].split(SEPARATOR,2)
+        leni = len.to_i
         raise ArgumentError.new('Command line output do not match the template') if tmp.nil?
-        ret[field] = tmp.slice!(0..(len.to_i-1))
-        curpos =+ len.length + len.to_i + 1
+        if leni <= 0
+          ret[field] = ''
+        else
+          ret[field] = tmp.slice!(0..(leni-1))
+        end
+        curpos += len.length + leni + 1
       end
       ret
     end
@@ -319,9 +382,9 @@ module TakTuk
         :error => ErrorStream.new(Template[:line]),
         :status => StatusStream.new(Template[:command,:line]),
         :connector => ConnectorStream.new(Template[:command,:line]),
+        :state => StateStream.new(Template[:command,:line,:peer]),
         :info => nil,
         :message => nil,
-        :state => nil,
         :taktuk => nil,
       }
 
