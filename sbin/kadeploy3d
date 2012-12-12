@@ -39,7 +39,12 @@ source $tmp 1>/dev/null
 ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
 rm $tmp
 
-ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" &
+if [ -n "$1" ] && [ -e "$1" ]
+then
+  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" 2>$1 &
+else
+  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" &
+fi
 PID=$!
 trap Exit_handler_term TERM
 trap Exit_handler_kill KILL

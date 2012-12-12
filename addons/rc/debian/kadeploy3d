@@ -20,7 +20,8 @@ PATH=/usr/sbin:/usr/bin:/sbin:/bin
 DESC="Kadeploy Server"
 NAME=kadeploy3d
 DAEMON=/usr/sbin/$NAME
-DAEMON_ARGS=""
+ERRFILE=`tempfile`
+DAEMON_ARGS="$ERRFILE"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
@@ -37,6 +38,8 @@ SCRIPTNAME=/etc/init.d/$NAME
 # Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
 . /lib/lsb/init-functions
 
+chown deploy:deploy $ERRFILE
+
 #
 # Function that starts the daemon/service
 #
@@ -47,12 +50,12 @@ do_start()
 	#   1 if daemon was already running
 	#   2 if daemon could not be started
         [ -e $PIDFILE ] && [ -e /proc/`cat $PIDFILE` ] && echo "Daemon already running" && return 1
-        start-stop-daemon --start --background --quiet --make-pidfile --pidfile $PIDFILE --exec $DAEMON --test > /dev/null || return 1
-        start-stop-daemon --start --background --quiet --make-pidfile --pidfile $PIDFILE --exec $DAEMON --chuid deploy || return 2
+        start-stop-daemon --start --background --quiet --make-pidfile --pidfile $PIDFILE --exec $DAEMON --test -- $DAEMON_ARGS > /dev/null || return 1
+        start-stop-daemon --start --background --quiet --make-pidfile --pidfile $PIDFILE --exec $DAEMON --chuid deploy -- $DAEMON_ARGS || return 2
 	# Add code here, if necessary, that waits for the process to be ready
 	# to handle requests from services started subsequently which depend
 	# on this one.  As a last resort, sleep for some time.
-	sleep 5; [ -e /proc/`cat $PIDFILE` ] || (echo ""; echo -n "Daemon not launched, probably a problem in the configuration" ; rm $PIDFILE ; return 2)
+	sleep 5; [ -e /proc/`cat $PIDFILE` ] || (rm $PIDFILE ;return 2)
 }
 
 #
@@ -83,31 +86,32 @@ do_stop()
 
 case "$1" in
   start)
-	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+	log_action_begin_msg "Starting $DESC"
 	do_start
 	case "$?" in
-		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+		0|1) log_action_end_msg 0 ;;
+		2) log_action_end_msg 1 ;;
 	esac
+	test -e $ERRFILE && cat $ERRFILE
 	;;
   stop)
-	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+	log_action_begin_msg "Stopping $DESC"
 	do_stop
 	case "$?" in
-		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
-		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+		0|1) log_action_end_msg 0 ;;
+		2) log_action_end_msg 1 ;;
 	esac
 	;;
   restart)
-	log_daemon_msg "Restarting $DESC" "$NAME"
+	log_action_begin_msg "Restarting $DESC"
 	do_stop
 	case "$?" in
 	  0|1)
 		do_start
 		case "$?" in
-			0) log_end_msg 0 ;;
-			1) log_end_msg 1 ;; # Old process is still running
-			*) log_end_msg 1 ;; # Failed to start
+			0) log_action_end_msg 0 ;;
+			1) log_action_end_msg 1 ;; # Old process is still running
+			*) log_action_end_msg 1 ;; # Failed to start
 		esac
 		;;
 	  *)
@@ -115,11 +119,13 @@ case "$1" in
 		log_end_msg 1
 		;;
 	esac
+	test -e $ERRFILE && cat $ERRFILE
 	;;
   *)
 	echo "Usage: $SCRIPTNAME {start|stop|restart}" >&2
 	exit 3
 	;;
 esac
+rm -f $ERRFILE
 
 :
