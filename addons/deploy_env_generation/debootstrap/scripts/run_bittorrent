@@ -1,7 +1,0 @@
-#!/bin/sh
-
-torrent=$1
-sleep 2
-cd /tmp
-echo "Run /usr/bin/btdownloadheadless $torrent"
-/usr/bin/ctorrent $torrent
