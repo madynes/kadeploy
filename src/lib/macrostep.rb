@@ -165,6 +165,8 @@ class Macrostep < Automata::TaskedTaskManager
       if cexec.environment.environment_kind == 'other' \
       or cexec.environment.postinstall.nil?
 
+    delete_task(:check_kernel_files) if cexec.environment.environment_kind == 'other'
+
     delete_task(:set_vlan) if cexec.vlan.nil?
   end
 
