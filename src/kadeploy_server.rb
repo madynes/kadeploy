@@ -264,6 +264,16 @@ class KadeployServer
     }
   end
 
+  def async_deploy_get_status(workflow_id)
+    ret = {}
+    async_deploy_lock_wid(workflow_id) do |workflows|
+      workflows.each do |workflow|
+        ret[workflow.context[:cluster].prefix] = workflow.status
+      end
+    end
+    ret
+  end
+
   # Get the results of a workflow (RPC: only for async execution)
   #
   # Arguments

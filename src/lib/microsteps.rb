@@ -81,6 +81,14 @@ class Microstep < Automata::QueueTask
     ret
   end
 
+  def status
+    {
+      :OK => @nodes_ok,
+      :KO => @nodes_ko,
+      :PROGRESS => @nodes.diff(@nodes_ok).diff(@nodes_ko),
+    }
+  end
+
   def kill
     # Be carefull to kill @runthread before killing @current_operation, in order to avoid the res condition: @runthread create the Operation object but do not set @current_operation because it was killed
     unless @runthread.nil?
@@ -974,7 +982,7 @@ class Microstep < Automata::QueueTask
     nodefile = Tempfile.new("kastafior-nodefile")
     nodefile.puts(Socket.gethostname())
 
-    @nodes.make_sorted_array_of_nodes.each do |node|
+    @nodes_ok.make_sorted_array_of_nodes.each do |node|
       nodefile.puts(get_nodeid(node))
     end
 
@@ -999,6 +1007,7 @@ class Microstep < Automata::QueueTask
       cmd = "#{context[:common].kastafior} -c \\\"#{context[:common].taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
     end
 
+    @nodes_ok.clean()
     status,out,err = nil
     command(cmd,
       :stdout_size => 1000,
@@ -1807,6 +1816,7 @@ class Microstep < Automata::QueueTask
                 :stderr => '',
                 :node_state => 'rebooted'
               )
+              @nodes_ok.push(node)
 
               debug(4,"#{node.hostname} is here after #{Time.now.tv_sec - start}s")
             end
@@ -1823,6 +1833,8 @@ class Microstep < Automata::QueueTask
       nodes_to_test = nil
     end
 
+    @nodes.diff(@nodes_ok).linked_copy(@nodes_ko)
+=begin
     res = [[],[]]
     @nodes.set.each do |node|
       if node.state == 'OK'
@@ -1832,6 +1844,7 @@ class Microstep < Automata::QueueTask
       end
     end
     classify_nodes(res)
+=end
 
     return (not @nodes_ok.empty?)
   end

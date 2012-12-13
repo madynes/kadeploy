@@ -4,6 +4,7 @@
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
+STATUS_UPDATE_DELAY = 2
 
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
@@ -32,7 +33,7 @@ class KadeployClient
   def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
     @kadeploy_server = kadeploy_server
     @site = site
-    @workflow_id = -1
+    @workflow_id = nil
     @files_ok_nodes = files_ok_nodes
     @files_ko_nodes = files_ko_nodes
   end
@@ -186,9 +187,45 @@ class KadeployClient
     file = "#{file}_#{@site}" if (@site != nil)
     File.delete(file) if File.exist?(file)
     file = File.new(file, "w")
-    file.write("#{@workflow_id}\n")
+    file.write("#{(@workflow_id ? @workflow_id : -1)}\n")
     file.close
   end
+end
+
+def display_status_cluster(stat,prefix='')
+  stat.each_pair do |macro,micros|
+    if micros.is_a?(Hash)
+      micros.each_pair do |micro,states|
+        states.each_pair do |state,nodes|
+          puts "#{prefix}  #{nodes.to_s_fold} (#{macro.to_s}-#{micro.to_s}:#{state.to_s})" unless nodes.empty?
+        end
+      end
+    elsif micros.is_a?(Nodes::NodeSet)
+      puts "#{prefix}  #{micros.to_s_fold} (#{macro.to_s})"
+    end
+  end
+end
+
+def display_status(stats)
+  puts '---'
+  puts 'Nodes status :'
+  if stats.size == 1
+    if stats[stats.keys[0]].empty?
+      puts '  Deployment did not start at the moment'
+    else
+      display_status_cluster(stats[stats.keys[0]])
+    end
+  else
+    stats.each_pair do |clname,stat|
+      puts "  [#{clname}]"
+      if stat.empty?
+        puts '    Deployment did not start at the moment'
+      else
+        display_status_cluster(stat,'  ')
+      end
+    end
+  end
+  puts '---'
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure
@@ -273,7 +310,24 @@ if (exec_specific_config != nil) then
             client_port = content[2]
             cloned_config = exec_specific_config.clone
             cloned_config.node_array = nodes_by_server[server]
+
+            status_thr = Thread.new do
+              last_status = Time.now
+              while true
+                gets
+                if Time.now - last_status > STATUS_UPDATE_DELAY
+                  stats = kadeploy_server.async_deploy_get_status(
+                    kadeploy_client.workflow_id
+                  )
+                  display_status(stats)
+                  last_status = Time.now
+                end
+              end
+            end
+
             kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
+            status_thr.kill
+            status_thr.join
           else
             puts "#{server} server: The URI #{local.uri} is not correct"
           end
