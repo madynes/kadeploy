@@ -150,6 +150,7 @@ class Microstep < Automata::QueueTask
       good_bad_array[1].each { |n|
         debug(4, "The node #{n.hostname} has been discarded of the current instance")
         set_node(n, :state => 'KO', :node_state => 'ko')
+        @nodes_ok.remove(n)
         @nodes_ko.push(n)
       }
     end
@@ -207,8 +208,11 @@ class Microstep < Automata::QueueTask
   # TODO: scattering kind
   def parallel_exec(cmd, opts={}, expects={}, window=nil)
     node_set = Nodes::NodeSet.new
-    @nodes.linked_copy(node_set)
-    @nodes_ok.clean()
+    if @nodes_ok.empty?
+      @nodes.linked_copy(node_set)
+    else
+      @nodes_ok.linked_copy(node_set)
+    end
 
     do_exec = lambda do |nodeset|
       res = nil
@@ -245,8 +249,11 @@ class Microstep < Automata::QueueTask
   # TODO: scattering kind
   def parallel_sendfile(src_file, dest_dir, opts={})
     nodeset = Nodes::NodeSet.new
-    @nodes.linked_copy(nodeset)
-    @nodes_ok.clean()
+    if @nodes_ok.empty?
+      @nodes.linked_copy(nodeset)
+    else
+      @nodes_ok.linked_copy(nodeset)
+    end
 
     res = nil
     parallel_op(
@@ -278,8 +285,11 @@ class Microstep < Automata::QueueTask
   # * return true if the power status has been reached at least on one node, false otherwise
   def parallel_get_power_status()
     node_set = Nodes::NodeSet.new
-    @nodes.linked_copy(node_set)
-    @nodes_ok.clean()
+    if @nodes_ok.empty?
+      @nodes.linked_copy(node_set)
+    else
+      @nodes_ok.linked_copy(node_set)
+    end
     debug(3, "A power status will be performed")
 
     res = nil
@@ -339,7 +349,6 @@ class Microstep < Automata::QueueTask
   # Output
   # * nothing
   def _escalation_cmd_wrapper(kind, level, node_set, initial_node_set)
-    @nodes_ok.clean()
     debug(3, "Performing a #{level} #{kind} on #{node_set.to_s_fold}")
 
     #First, we remove the nodes without command
@@ -512,7 +521,11 @@ class Microstep < Automata::QueueTask
   def escalation_cmd_wrapper(kind, level)
     node_set = Nodes::NodeSet.new(@nodes.id)
     initial_node_set = Nodes::NodeSet.new(@nodes.id)
-    @nodes.linked_copy(node_set)
+    if @nodes_ok.empty?
+      @nodes.linked_copy(node_set)
+    else
+      @nodes_ok.linked_copy(node_set)
+    end
     node_set.linked_copy(initial_node_set)
 
     bad_nodes = Nodes::NodeSet.new
@@ -927,8 +940,11 @@ class Microstep < Automata::QueueTask
   def send_tarball_and_uncompress_with_kastafior(tarball_file, tarball_kind, deploy_mount_point, deploy_part)
     if context[:cluster].use_ip_to_deploy then
       node_set = Nodes::NodeSet.new
-      @nodes.linked_copy(node_set)
-      @nodes_ok.clean()
+      if @nodes_ok.empty?
+        @nodes.linked_copy(node_set)
+      else
+        @nodes_ok.linked_copy(node_set)
+      end
       # Use a window not to flood ssh commands
       context[:windows][:reboot].launch_on_node_set(node_set) do |ns|
         res = nil
@@ -1630,7 +1646,7 @@ class Microstep < Automata::QueueTask
       ret = do_parted()
     end
 
-    ret = parallel_exec("partprobe #{context[:cluster].block_device}") if ret
+    ret = ret && parallel_exec("partprobe #{context[:cluster].block_device}")
 
     return ret
   end
@@ -2040,7 +2056,7 @@ class CustomMicrostep < Microstep
     @name = methname
     @params = args
 
-    @nodes_ok.clean
+    @nodes_ok.clean()
 
     run()
 
