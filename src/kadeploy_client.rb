@@ -4,6 +4,7 @@
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
+STATUS_UPDATE_DELAY = 2
 
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
@@ -32,7 +33,7 @@ class KadeployClient
   def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
     @kadeploy_server = kadeploy_server
     @site = site
-    @workflow_id = -1
+    @workflow_id = nil
     @files_ok_nodes = files_ok_nodes
     @files_ko_nodes = files_ko_nodes
   end
@@ -186,9 +187,52 @@ class KadeployClient
     file = "#{file}_#{@site}" if (@site != nil)
     File.delete(file) if File.exist?(file)
     file = File.new(file, "w")
-    file.write("#{@workflow_id}\n")
+    file.write("#{(@workflow_id ? @workflow_id : -1)}\n")
     file.close
   end
+end
+
+def display_status_cluster(stat,prefix='')
+  stat.each_pair do |macro,micros|
+    if micros.is_a?(Hash)
+      micros.each_pair do |micro,status|
+        if status.is_a?(Hash)
+          status[:nodes].each_pair do |state,nodes|
+            unless nodes.empty?
+              puts "#{prefix}  [#{macro.to_s}-#{micro.to_s}] ~#{status[:time]}s (#{state.to_s})"
+              puts "#{prefix}     #{nodes.to_s_fold}"
+            end
+          end
+        elsif status.is_a?(Nodes::NodeSet)
+          puts "#{prefix}  [#{macro.to_s}-#{micro.to_s}] #{status.to_s_fold}"
+        end
+      end
+    elsif micros.is_a?(Nodes::NodeSet)
+      puts "#{prefix}  [#{macro.to_s}] #{micros.to_s_fold}"
+    end
+  end
+end
+
+def display_status(stats,starttime,prefix='')
+  puts "#{prefix}---"
+  puts "#{prefix}Nodes status (#{Time.now.to_i - starttime}s):"
+  if stats.size == 1
+    if stats[stats.keys[0]].empty?
+      puts "#{prefix}  Deployment did not start at the moment"
+    else
+      display_status_cluster(stats[stats.keys[0]],prefix)
+    end
+  else
+    stats.each_pair do |clname,stat|
+      puts "#{prefix}  [#{clname}]"
+      if stat.empty?
+        puts "#{prefix}    Deployment did not start at the moment"
+      else
+        display_status_cluster(stat,"#{prefix}  ")
+      end
+    end
+  end
+  puts "#{prefix}---"
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure
@@ -241,6 +285,9 @@ if (exec_specific_config != nil) then
 
   files_ok_nodes = Array.new
   files_ko_nodes = Array.new
+
+  remoteobjects = []
+
   nodes_by_server.each_key { |server|
     threads << Thread.new {
       begin
@@ -261,6 +308,11 @@ if (exec_specific_config != nil) then
           end
           local = DRb.start_service(nil, kadeploy_client)        
           if /druby:\/\/([a-zA-Z]+[-\w.]*):(\d+)/ =~ local.uri
+            remoteobjects << {
+              :server => kadeploy_server,
+              :client => kadeploy_client,
+              :name => server,
+            }
             content = Regexp.last_match
             hostname = Socket.gethostname
             client_host = String.new
@@ -273,6 +325,8 @@ if (exec_specific_config != nil) then
             client_port = content[2]
             cloned_config = exec_specific_config.clone
             cloned_config.node_array = nodes_by_server[server]
+
+
             kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
           else
             puts "#{server} server: The URI #{local.uri} is not correct"
@@ -289,6 +343,26 @@ if (exec_specific_config != nil) then
     }
   }
 
+  starttime = Time.now.to_i
+
+  status_thr = Thread.new do
+    last_status = Time.now
+    while true
+      gets
+      if Time.now - last_status > STATUS_UPDATE_DELAY
+        prefix = (remoteobjects.size > 1)
+        remoteobjects.each do |obj|
+          display_status(
+            obj[:server].async_deploy_get_status(obj[:client].workflow_id),
+            starttime,
+            (prefix ? "[#{obj[:name]}] " : '')
+          )
+        end
+        last_status = Time.now
+      end
+    end
+  end
+
   threads.each do |thr|
     begin
       thr.join
@@ -303,6 +377,9 @@ if (exec_specific_config != nil) then
       next
     end
   end
+
+  status_thr.kill
+  status_thr.join
 
   #We merge the files
   if (exec_specific_config.nodes_ok_file != "") then
