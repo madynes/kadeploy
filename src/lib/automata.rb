@@ -46,6 +46,10 @@ module Automata
       raise 'Should be reimplemented'
     end
 
+    def cleaner()
+      raise 'Should be reimplemented'
+    end
+
     def context()
       raise 'Should be reimplemented'
     end
@@ -105,13 +109,18 @@ module Automata
       @nodes_ok = Nodes::NodeSet.new(@nodes.id)
       @nodes_ko = Nodes::NodeSet.new(@nodes.id)
     end
+
+    def cleaner
+      nil
+    end
   end
 
   class TaskManager
-    attr_reader :nodes, :nodes_done, :static_context
+    attr_reader :nodes, :nodes_done, :static_context, :cleaner
 
     TIMER_CKECK_PITCH = 0.5
-    QUEUE_CKECK_PITCH = 0.3
+    #QUEUE_CKECK_PITCH = 0.3
+    CLEAN_THREADS_PITCH = 5
 
     def initialize(nodeset,static_context = {})
       raise if nodeset.nil?
@@ -122,6 +131,7 @@ module Automata
       @nodes = nodeset #all nodes
       @nodes_done = Nodes::NodeSet.new(@nodes.id)
       @runthread = nil
+      @cleaner = nil
 
       load_tasks()
       load_config()
@@ -342,6 +352,7 @@ module Automata
         end
         @threads.delete(task) if @threads[task].empty?
       end
+      @cleaner.join
     end
 
     def run_task(task)
@@ -362,7 +373,10 @@ module Automata
       success = true
 
       if timeout and timeout > 0
-        sleep(TIMER_CKECK_PITCH) while ((Time.now - timestart) < timeout) and (thr.alive?)
+        while ((Time.now - timestart) < timeout) and (thr.alive?)
+          task.cleaner.join if task.cleaner and !task.cleaner.alive?
+          sleep(TIMER_CKECK_PITCH)
+        end
         if thr.alive?
           thr.kill!
           task.kill
@@ -437,17 +451,26 @@ module Automata
     def start()
       @nodes_done.clean()
       @runthread = Thread.current
+      # A thread is launched to clean and join threads that was unexpectedly closed
+      # That helps to raise exceptions from one imbricated element of the automata to the main thread
+      @cleaner = Thread.new do
+        until (done?)
+          sleep(CLEAN_THREADS_PITCH)
+          clean_threads()
+        end
+      end
       start!
       curtask = nil
 
       until (done?)
         begin
-          sleep(QUEUE_CKECK_PITCH)
-          clean_threads()
-          query = @queue.pop(true)
+          #sleep(QUEUE_CKECK_PITCH)
+          query = @queue.pop
         rescue ThreadError
           retry unless done?
         end
+
+        clean_threads()
 
         # Don't do anything if the nodes was already treated
         clean_nodeset(query[:nodes])
@@ -525,6 +548,11 @@ module Automata
       clean_threads()
       join_threads()
       @runthread = nil
+      if @cleaner.alive?
+        @cleaner.kill!
+        @cleaner.join
+      end
+      @cleaner = nil
 
       done!
       curtask
@@ -537,6 +565,12 @@ module Automata
         @runthread.kill! if @runthread.alive?
         @runthread.join
         @runthread = nil
+      end
+
+      unless @cleaner.nil?
+        @cleaner.kill! if @cleaner.alive?
+        @cleaner.join
+        @cleaner = nil
       end
 
       @threads.each_pair do |task,threads|
@@ -559,7 +593,7 @@ module Automata
     alias_method :__kill__, :kill
     include Task
 
-    attr_reader :name, :nodes, :nsid, :idx, :subidx, :nodes_brk, :nodes_ok, :nodes_ko, :mqueue, :mutex
+    attr_reader :name, :nodes, :nsid, :idx, :subidx, :nodes_brk, :nodes_ok, :nodes_ko, :mqueue, :mutex, :cleaner
 
     def initialize(name, idx, subidx, nodes, nsid, manager_queue, context = {}, config={}, params = [])
       @nsid = nsid
