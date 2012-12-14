@@ -439,7 +439,7 @@ external:
 
   \item \ypath{/verbosity}
   \begin{itemize}
-    \item \yfieldd{clients}{Integer}{3} number between 0 and 4 that specifies the default verbose level for the client. 0 means ``no verbose'' and 4 means ``full verbose''.
+    \item \yfieldd{clients}{Integer}{3} number between 0 and 5 that specifies the default verbose level for the client. 0 means ``no verbose'' and 5 means ``full verbose''.
     \item \yfieldd{logs}{Integer}{3} debug level of the output exported to Syslog.
   \end{itemize}
 
@@ -1199,7 +1199,7 @@ General options:
                                    directory. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX--
       --env-version NUMBER         Number of version of the environment to deploy
       --server STRING              Specify the Kadeploy server to use
-  -V, --verbose-level VALUE        Verbose level between 0 to 4
+  -V, --verbose-level VALUE        Verbose level between 0 to 5
 Advanced options:
       --write-workflow-id FILE     Write the workflow id in a file
       --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying" 
@@ -1233,10 +1233,10 @@ We present now several use cases.
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
-            --verbose-level 4 \
+            --verbose-level 5 \
             -k ~/.ssh/id_rsa.pub
 \end{verbatim}
-This command performs the deployment of the environment \textit{lenny-x64-nfs-1.0} on the node \textit{gdx-5.orsay.grid5000.fr} and copies the SSH public key \textit{~/.ssh/id\_rsa.pub} of the user in the deployed environment to allow a direct connection with the root account. Furthermore, the verbose level is set to 4, which means that you want the maximum verbose information.
+This command performs the deployment of the environment \textit{lenny-x64-nfs-1.0} on the node \textit{gdx-5.orsay.grid5000.fr} and copies the SSH public key \textit{~/.ssh/id\_rsa.pub} of the user in the deployed environment to allow a direct connection with the root account. Furthermore, the verbose level is set to 5, which means that you want the maximum verbose information.
 
 
 \paragraph{Use case 2 - basic usage - deployment of a range of nodes}
@@ -1270,7 +1270,7 @@ This command performs the deployment of the environment described by the file \t
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr \
             -e lenny-x64-nfs-1.0 \
-            --verbose-level 4 \
+            --verbose-level 5 \
             --breakpoint BroadcastEnvKastafior:manage_user_post_install \
             -d
 \end{verbatim}
@@ -1438,7 +1438,7 @@ General options:
       --env-version NUMBER       Specify the environment version
       --no-wait                  Do not wait the end of the reboot
       --server STRING            Specify the Kadeploy server to use
-  -V, --verbose-level VALUE      Verbose level between 0 to 4
+  -V, --verbose-level VALUE      Verbose level between 0 to 5
       --reboot-classical-timeout V Overload the default timeout for classical reboots
 \end{verbatim}
 \end{small}
@@ -1767,7 +1767,7 @@ General options:
   -v, --version                  Get the version
       --no-wait                  Do not wait the end of the power operation
       --server STRING            Specify the Kadeploy server to use
-  -V, --verbose-level VALUE      Verbose level between 0 to 4
+  -V, --verbose-level VALUE      Verbose level between 0 to 5
 \end{verbatim}
 \end{small}
 
