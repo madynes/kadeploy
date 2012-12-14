@@ -178,6 +178,16 @@ class Microstep < Automata::QueueTask
     end
   end
 
+  def check_nodes
+    unless @nodes_ko.empty?
+      ok_nsid = Nodes::NodeSet.newid(context)
+      ko_nsid = Nodes::NodeSet.newid(context)
+      context[:local][:parent].split!(@nsid,ok_nsid,@nodes_ok,ko_nsid,@nodes_ko)
+      raise_nodes(@nodes_ko,:KO,ko_nsid)
+      @nsid = ok_nsid
+    end
+  end
+
   def command(cmd,opts={},&block)
     raise '@current_operation should not be set' if @current_operation
     res = nil
@@ -1514,7 +1524,9 @@ class Microstep < Automata::QueueTask
       context[:common].pxe.pxe_repository_kernels
     )
 
+
     ret = parallel_exec("mkdir -p #{context[:cluster].kexec_repository}")
+    check_nodes()
 
     ret = ret && parallel_sendfile(
       File.join(pxedir,context[:cluster].deploy_kernel),
