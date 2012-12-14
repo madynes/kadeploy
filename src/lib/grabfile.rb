@@ -77,7 +77,7 @@ module Managers
             @output.verbosel(0, "Environment file cannot be moved")
             raise MoveException
           when "200"
-            @output.verbosel(4, "File #{client_file} fetched")
+            @output.verbosel(5, "File #{client_file} fetched")
           else
             @output.verbosel(0, "Cannot fetch the file at #{client_file}, http error #{resp}")
             return false
@@ -97,13 +97,13 @@ module Managers
             @output.verbosel(0, "Environment file cannot be moved")
             raise MoveException
           when "200"
-            @output.verbosel(4, "File #{client_file} fetched")
+            @output.verbosel(5, "File #{client_file} fetched")
             if not @config.exec_specific.environment.set_md5(file_tag, client_file, etag.gsub("\"",""), @db) then
               @output.verbosel(0, "Cannot update the md5 of #{client_file}")
               return false
             end
           when "304"
-            @output.verbosel(4, "File #{client_file} already in cache")
+            @output.verbosel(5, "File #{client_file} already in cache")
             if not system("touch -a #{local_file}") then
               @output.verbosel(0, "Unable to touch the local file")
               return false
@@ -217,7 +217,7 @@ module Managers
           @output.verbosel(0, "Environment file cannot be moved")
           raise MoveException
         when "200"
-          @output.verbosel(4, "File #{client_file} fetched")
+          @output.verbosel(5, "File #{client_file} fetched")
         else
           @output.verbosel(0, "Unable to grab the #{file_tag} file #{client_file}, http error #{resp}")
           return false

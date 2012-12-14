@@ -1709,8 +1709,8 @@ module ConfigInformation
         opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         } 
-        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
-          if d =~ /\A[0-4]\Z/ then
+        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
+          if d =~ /\A\d+\Z/ then
             exec_specific.verbose_level = d.to_i
           else
             error("Invalid verbose level")
@@ -2672,8 +2672,8 @@ module ConfigInformation
         opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         } 
-        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
-          if d =~ /\A[0-4]\Z/ then
+        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
+          if d =~ /\A\d+\Z/ then
             exec_specific.verbose_level = d.to_i
           else
             error("Invalid verbose level")
@@ -2713,7 +2713,7 @@ module ConfigInformation
         error("No node is chosen")
         return false
       end    
-      if (exec_specific.verbose_level != nil) && ((exec_specific.verbose_level > 4) || (exec_specific.verbose_level < 0)) then
+      if (exec_specific.verbose_level != nil) && ((exec_specific.verbose_level > 5) || (exec_specific.verbose_level < 0)) then
         error("Invalid verbose level")
         return false
       end
@@ -2936,8 +2936,8 @@ module ConfigInformation
         opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
           exec_specific.chosen_server = s
         } 
-        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 4") { |d|
-          if d =~ /\A[0-4]\Z/ then
+        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
+          if d =~ /\A\d+\Z/ then
             exec_specific.verbose_level = d.to_i
           else
             error("Invalid verbose level")
@@ -2970,7 +2970,7 @@ module ConfigInformation
         error("No node is chosen")
         return false
       end    
-      if (exec_specific.verbose_level != nil) && ((exec_specific.verbose_level > 4) || (exec_specific.verbose_level < 0)) then
+      if (exec_specific.verbose_level != nil) && ((exec_specific.verbose_level > 5) || (exec_specific.verbose_level < 0)) then
         error("Invalid verbose level")
         return false
       end

@@ -115,7 +115,7 @@ class Macrostep < Automata::TaskedTaskManager
     delete = lambda do |arr,index|
       if arr[index][0] == taskname
         arr.delete_at(index)
-        debug(4, " * Bypassing the step #{self.class.name}-#{taskname.to_s}",nsid)
+        debug(5, " * Bypassing the step #{self.class.name}-#{taskname.to_s}",nsid)
       end
     end
 
