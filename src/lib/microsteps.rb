@@ -755,7 +755,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the name of the deployment partition
   def get_block_device_str
-    if (context[:execution].deploy_part != "") then
+    if (context[:execution].block_device != "") then
       context[:execution].block_device
     else
       context[:cluster].block_device
