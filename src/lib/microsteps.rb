@@ -1767,6 +1767,7 @@ class Microstep < Automata::QueueTask
           || context[:cluster].timeout_reboot_classical
       end
     end
+    n = @nodes.length
     timeout = eval(timeout).to_i
 
     unless ports_up
