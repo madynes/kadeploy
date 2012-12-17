@@ -5,6 +5,8 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+DEPLOYMENT_STATUS_CHECK_PITCH=2
+
 Signal.trap("TERM") do
   puts "TERM trapped, let's clean everything ..."
   exit(1)
@@ -570,9 +572,21 @@ class KadeployServer
         end
 
         # Run workflows
-        threads = []
-        workflows.each { |workflow| threads << workflow.run! }
-        threads.each { |thread| thread.join }
+        threads = {}
+        workflows.each { |workflow| threads[workflow] = workflow.run! }
+        workflows.each { |workflow| sleep(0.2) until (workflow.cleaner) }
+        dones = []
+        until (dones.size >= workflows.size)
+          workflows.each do |workflow|
+            if !dones.include?(workflow) and workflow.done?
+              threads[workflow].join
+              dones << workflow
+            else
+              workflow.cleaner.join if workflow.cleaner and !workflow.cleaner.alive?
+            end
+          end
+          sleep(DEPLOYMENT_STATUS_CHECK_PITCH)
+        end
         workflows.each do |workflow|
           clname = workflow.context[:cluster].name
           client.print("")
