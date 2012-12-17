@@ -160,7 +160,7 @@ class Microstep < Automata::QueueTask
     end
     if not good_bad_array[1].empty? then
       good_bad_array[1].each { |n|
-        debug(4, "The node #{n.hostname} has been discarded of the current instance")
+        debug(5, "The node #{n.hostname} has been discarded of the current instance")
         set_node(n, :state => 'KO', :node_state => 'ko')
         @nodes_ok.remove(n)
         @nodes_ko.push(n)
@@ -1823,7 +1823,7 @@ class Microstep < Automata::QueueTask
               )
               @nodes_ok.push(node)
 
-              debug(4,"#{node.hostname} is here after #{Time.now.tv_sec - start}s")
+              debug(5,"#{node.hostname} is here after #{Time.now.tv_sec - start}s")
             end
           end
           @waitreboot_threads.add(thr)
