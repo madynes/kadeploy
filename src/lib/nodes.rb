@@ -525,7 +525,7 @@ module Nodes
     # Output
     # * nothing
     def push(node)
-      @set.push(node)
+      @set.push(node) unless @set.include?(node)
     end
 
     # Copy a node to the set
