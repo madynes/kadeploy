@@ -981,6 +981,8 @@ class Microstep < Automata::QueueTask
         failed_microstep("Cannot write the kastafior hostname file on server: #{e}")
         return false
       end
+    else
+      @nodes.linked_copy(@nodes_ok)
     end
 
     nodefile = Tempfile.new("kastafior-nodefile")
