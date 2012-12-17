@@ -41,7 +41,6 @@ module Automata
       raise 'Should be reimplemented'
     end
 
-
     def mqueue()
       raise 'Should be reimplemented'
     end
@@ -59,6 +58,10 @@ module Automata
     end
 
     def kill()
+      raise 'Should be reimplemented'
+    end
+
+    def status()
       raise 'Should be reimplemented'
     end
 
@@ -254,6 +257,14 @@ module Automata
           @config[taskname.to_sym] = opts
         end
       end
+    end
+
+    def status()
+      ret = {}
+      @threads.each_key{ |task| ret[task.name] = task.status }
+      ret[:OK] = @nodes_ok unless @nodes_ok.empty?
+      ret[:KO] = @nodes_ko unless @nodes_ko.empty?
+      ret
     end
 
     def load_tasks
@@ -591,6 +602,7 @@ module Automata
 
   class TaskedTaskManager < TaskManager
     alias_method :__kill__, :kill
+    alias_method :__status__, :status
     include Task
 
     attr_reader :name, :nodes, :nsid, :idx, :subidx, :nodes_brk, :nodes_ok, :nodes_ko, :mqueue, :mutex, :cleaner
@@ -689,6 +701,10 @@ module Automata
       __kill__()
       @nodes_ok.clean()
       @nodes.linked_copy(@nodes_ko)
+    end
+
+    def status()
+      __status__()
     end
   end
 end

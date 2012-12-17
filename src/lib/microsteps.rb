@@ -31,6 +31,7 @@ class Microstep < Automata::QueueTask
     @runthread = Thread.current
     @current_operation = nil
     @waitreboot_threads = ThreadGroup.new
+    @timestart = Time.now
   end
 
   def debug(level,msg,info=true,opts={})
@@ -55,7 +56,7 @@ class Microstep < Automata::QueueTask
     end
 
     if ret
-      start = Time.now.to_i
+      @timestart = Time.now.to_i
       if @name.to_s =~ /^custom_sub_.*$/
         debug(3,"Substitution operation #{@name.to_s.sub(/^custom_sub_/,'')}",false)
         ret = ret && send(:custom,*@params)
@@ -69,7 +70,7 @@ class Microstep < Automata::QueueTask
         debug(3,"Running #{@name.to_s}",false)
         ret = ret && send("ms_#{@name.to_s}".to_sym,*@params)
       end
-      debug(4, " ~ Time in #{@name.to_s}: #{Time.now.to_i - start}s",false)
+      debug(4, " ~ Time in #{@name.to_s}: #{Time.now.to_i - @timestart}s",false)
     end
 
     if ret
@@ -79,6 +80,17 @@ class Microstep < Automata::QueueTask
     end
 
     ret
+  end
+
+  def status
+    {
+      :nodes => {
+        :OK => @nodes_ok,
+        :KO => @nodes_ko,
+        :'**' => @nodes.diff(@nodes_ok).diff(@nodes_ko),
+      },
+      :time => (Time.now.to_i - @timestart),
+    }
   end
 
   def kill
@@ -974,7 +986,7 @@ class Microstep < Automata::QueueTask
     nodefile = Tempfile.new("kastafior-nodefile")
     nodefile.puts(Socket.gethostname())
 
-    @nodes.make_sorted_array_of_nodes.each do |node|
+    @nodes_ok.make_sorted_array_of_nodes.each do |node|
       nodefile.puts(get_nodeid(node))
     end
 
@@ -999,6 +1011,7 @@ class Microstep < Automata::QueueTask
       cmd = "#{context[:common].kastafior} -c \\\"#{context[:common].taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
     end
 
+    @nodes_ok.clean()
     status,out,err = nil
     command(cmd,
       :stdout_size => 1000,
@@ -1808,6 +1821,7 @@ class Microstep < Automata::QueueTask
                 :stderr => '',
                 :node_state => 'rebooted'
               )
+              @nodes_ok.push(node)
 
               debug(5,"#{node.hostname} is here after #{Time.now.tv_sec - start}s")
             end
@@ -1824,6 +1838,8 @@ class Microstep < Automata::QueueTask
       nodes_to_test = nil
     end
 
+    @nodes.diff(@nodes_ok).linked_copy(@nodes_ko)
+=begin
     res = [[],[]]
     @nodes.set.each do |node|
       if node.state == 'OK'
@@ -1833,6 +1849,7 @@ class Microstep < Automata::QueueTask
       end
     end
     classify_nodes(res)
+=end
 
     return (not @nodes_ok.empty?)
   end
