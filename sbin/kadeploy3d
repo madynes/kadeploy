@@ -39,9 +39,9 @@ source $tmp 1>/dev/null
 ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
 rm $tmp
 
-if [ -n "$1" ] && [ -e "$1" ]
+if [ -e `which logger` ]
 then
-  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" 2>$1 &
+  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" 2> >(logger -s -t "$(basename ${0})-error") &
 else
   ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" &
 fi
