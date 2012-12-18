@@ -20,8 +20,7 @@ PATH=/usr/sbin:/usr/bin:/sbin:/bin
 DESC="Kadeploy Server"
 NAME=kadeploy3d
 DAEMON=/usr/sbin/$NAME
-ERRFILE=`tempfile`
-DAEMON_ARGS="$ERRFILE"
+DAEMON_ARGS=
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
@@ -38,7 +37,6 @@ SCRIPTNAME=/etc/init.d/$NAME
 # Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
 . /lib/lsb/init-functions
 
-chown deploy:deploy $ERRFILE
 
 #
 # Function that starts the daemon/service
@@ -90,9 +88,8 @@ case "$1" in
 	do_start
 	case "$?" in
 		0|1) log_action_end_msg 0 ;;
-		2) log_action_end_msg 1 ;;
+		2) log_action_end_msg 1; log_daemon_msg "An error occured, probably a configuration issue, please check your syslog file." ;;
 	esac
-	test -e $ERRFILE && cat $ERRFILE
 	;;
   stop)
 	log_action_begin_msg "Stopping $DESC"
@@ -111,7 +108,7 @@ case "$1" in
 		case "$?" in
 			0) log_action_end_msg 0 ;;
 			1) log_action_end_msg 1 ;; # Old process is still running
-			*) log_action_end_msg 1 ;; # Failed to start
+			*) log_action_end_msg 1; log_daemon_msg "An error occured, probably a configuration issue, please check your syslog file." ;; # Failed to start
 		esac
 		;;
 	  *)
@@ -119,13 +116,11 @@ case "$1" in
 		log_end_msg 1
 		;;
 	esac
-	test -e $ERRFILE && cat $ERRFILE
 	;;
   *)
 	echo "Usage: $SCRIPTNAME {start|stop|restart}" >&2
 	exit 3
 	;;
 esac
-rm -f $ERRFILE
 
 :
