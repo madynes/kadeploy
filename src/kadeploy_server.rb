@@ -260,9 +260,9 @@ class KadeployServer
       res = FetchFileError::NO_ERROR
       workflows.each do |workflow|
         res = workflow.errno
-        break unless res == FetchFileError::NO_ERROR
+        break if res
       end
-      res
+      res || FetchFileError::NO_ERROR
     }
   end
 
