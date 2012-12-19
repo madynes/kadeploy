@@ -225,7 +225,7 @@ class KadeployServer
       distant.stop_service()
       client = nil
       begin
-        GC.start
+        GC.start if $gc
       rescue TypeError
       end
       return res
@@ -311,7 +311,7 @@ class KadeployServer
       workflows.first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
       begin
-        GC.start
+        GC.start if $gc
       rescue TypeError
       end
       true
@@ -332,7 +332,7 @@ class KadeployServer
       workflows[0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
       begin
-        GC.start
+        GC.start if $gc
       rescue TypeError
       end
       true
@@ -1054,7 +1054,7 @@ class KadeployServer
         kareboot_delete_reboot_info(ke.context[:rid])
       }
       begin
-        GC.start
+        GC.start if $gc
       rescue TypeError
       end
       return nil, ke.errno
@@ -2576,7 +2576,7 @@ class KadeployServer
         kapower_delete_power_info(ke.context[:pid])
       }
       begin
-        GC.start
+        GC.start if $gc
       rescue TypeError
       end
       return nil, ke.errno
@@ -2606,6 +2606,26 @@ class KadeployServer
   def kapower_delete_power_info(power_id)
     @power_info_hash.delete(power_id)
   end
+end
+
+$gc = true
+
+optparse = OptionParser.new($0) do |opts|
+	opts.on( '-h', '--help', 'Display this screen' ) do
+  		puts opts
+  		exit
+	end
+
+	opts.on( '-g', '--disable-gc-calls', 'Do not call ruby garbage collector manually' ) do
+  	$gc = false
+	end
+end
+
+begin
+  optparse.parse!
+rescue OptionParser::InvalidOption => e
+  $stderr.puts e.to_s
+  exit 1
 end
 
 # Disable reverse lookup to prevent lag in case of DNS failure
