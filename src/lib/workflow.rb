@@ -317,7 +317,7 @@ class Workflow < Automata::TaskManager
 
   def timeout!(task)
     debug(1,
-      "Timeout in [#{task.name}] before the end of the step, "\
+      "Timeout in #{task.name} before the end of the step, "\
       "let's kill the instance",
       task.nsid
     )
