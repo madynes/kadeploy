@@ -1200,7 +1200,7 @@ class Microstep < Automata::QueueTask
       return false
     end
     if not parallel_exec(
-      "fdisk #{context[:cluster].block_device}",
+      "fdisk #{get_block_device_str()}",
       { :input_file => temp.path, :scattering => :tree },
       { :status => expected_status}) then
       failed_microstep("Cannot perform the fdisk operation")
@@ -1661,7 +1661,7 @@ class Microstep < Automata::QueueTask
       ret = do_parted()
     end
 
-    ret = ret && parallel_exec("partprobe #{context[:cluster].block_device}")
+    ret = ret && parallel_exec("partprobe #{get_block_device_str()}")
 
     return ret
   end
@@ -1697,10 +1697,10 @@ class Microstep < Automata::QueueTask
     fstype = context[:execution].reformat_tmp_fstype
     if context[:common].mkfs_options.has_key?(fstype) then
       opts = context[:common].mkfs_options[fstype]
-      tmp_part = context[:cluster].block_device + context[:cluster].tmp_part
+      tmp_part = get_block_device_str() + context[:cluster].tmp_part
       return parallel_exec("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{opts} #{tmp_part}")
     else
-      tmp_part = context[:cluster].block_device + context[:cluster].tmp_part
+      tmp_part = get_block_device_str() + context[:cluster].tmp_part
       return parallel_exec("mkdir -p /tmp; umount #{tmp_part} 2>/dev/null; mkfs.#{fstype} #{tmp_part}")
     end
   end
@@ -1711,7 +1711,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the format has been successfully performed, false otherwise
   def ms_format_swap_part()
-    swap_part = context[:cluster].block_device + context[:cluster].swap_part
+    swap_part = get_block_device_str() + context[:cluster].swap_part
     return parallel_exec("mkswap #{swap_part}")
   end
 
@@ -1730,7 +1730,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the mount has been successfully performed, false otherwise
   def ms_mount_tmp_part()
-    tmp_part = context[:cluster].block_device + context[:cluster].tmp_part
+    tmp_part = get_block_device_str() + context[:cluster].tmp_part
     return parallel_exec("mount #{tmp_part} /tmp")
   end
 
