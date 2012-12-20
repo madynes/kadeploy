@@ -837,7 +837,9 @@ class KadeployServer
         micro = CustomMicrostep.new(set, context)
         Thread.current[:micro] = micro
         micros << micro
-        micro.debug(0,"Rebooting the nodes #{set.to_s_fold}",nil)
+        nodeset = Nodes::NodeSet.new
+        set.linked_copy(nodeset)
+        micro.debug(0,"Rebooting the nodes #{nodeset.to_s_fold}",nil)
         case exec_specific.reboot_kind
         when "env_recorded"
           #This should be the same case than a deployed env
@@ -862,7 +864,7 @@ class KadeployServer
           if (exec_specific.reboot_kind == "deploy_env") then
             micro.wait_reboot("classical","deploy",true,timeout)
             micro.send_key_in_deploy_env("tree")
-            set.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
+            nodeset.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
           else
             micro.wait_reboot(
               "classical",
@@ -877,9 +879,9 @@ class KadeployServer
             if (exec_specific.reboot_kind == "env_recorded") then
               if (exec_specific.deploy_part == @config.cluster_specific[cluster].prod_part) then
                 micro.check_nodes("prod_env_booted")
-                set.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
+                nodeset.set_deployment_state("prod_env", nil, db, exec_specific.true_user)
               else
-                set.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
+                nodeset.set_deployment_state("recorded_env", nil, db, exec_specific.true_user)
               end
             end
           end
@@ -894,7 +896,7 @@ class KadeployServer
             }
           end
         end
-        micro.debug(0,"Done rebooting the nodes #{set.to_s_fold}",nil)
+        micro.debug(0,"Done rebooting the nodes #{nodeset.to_s_fold}",nil)
         ret
       end
     end
