@@ -1168,7 +1168,7 @@ class Microstep < Automata::QueueTask
   def set_env
     ret = ''
     deploy_context().each_pair do |key,val|
-      ret += "#{key.to_s}=\"#{val}\""
+      ret += "#{key.to_s}=\"#{val}\" "
     end
     ret
   end
