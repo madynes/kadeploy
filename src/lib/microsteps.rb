@@ -1216,9 +1216,10 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the parted has been successfully performed, false otherwise
   def do_parted()
+    cmd = File.read(context[:cluster].partition_file).split("\n").join(' ')
     return parallel_exec(
-      "cat - > /rambin/parted_script && chmod +x /rambin/parted_script && /rambin/parted_script",
-      { :input_file => context[:cluster].partition_file, :scattering => :tree }
+      "parted -a optimal #{get_block_device_str()} --script #{cmd}",
+      { :scattering => :tree }
     )
   end
 
