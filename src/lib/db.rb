@@ -139,8 +139,9 @@ module Database
         @dbh = Mysql.real_connect(host, user, passwd, base)
         @dbh.reconnect = true
       rescue Mysql::Error => e
-        puts "Error code: #{e.errno}"
-        puts "Error message: #{e.error}"
+        $stderr.puts "MySQL error (code): #{e.errno}"
+        $stderr.puts "MySQL error (message): #{e.error}"
+        $stderr.puts e.backtrace
         ret = false
       end
       return ret
@@ -182,8 +183,9 @@ module Database
 
         st.close
       rescue Mysql::Error => e
-        puts "Error code: #{e.errno}"
-        puts "Error message: #{e.error}"
+        $stderr.puts "MySQL error (code): #{e.errno}"
+        $stderr.puts "MySQL error (message): #{e.error}"
+        $stderr.puts e.backtrace
       end
       return res
     end
