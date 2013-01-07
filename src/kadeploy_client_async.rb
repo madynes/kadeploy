@@ -64,6 +64,8 @@ if (exec_specific_config != nil) then
       puts "The environment does not exist"
     when KadeployAsyncError::NO_ENV_CHOSEN
       puts "You must choose an environment"
+    when KadeployAsyncError::CONFLICTING_OPTIONS
+      puts "Some options are conflicting"
     end
   end
 

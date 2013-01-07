@@ -134,6 +134,25 @@ class Workflow < Automata::TaskManager
     end
   end
 
+  def check_config()
+    cexec = context[:execution]
+    # Deploy on block device 
+    if cexec.block_device and !cexec.block_device.empty? \
+      and (!cexec.deploy_part or cexec.deploy_part.empty?)
+
+      # Without a dd image
+      unless ['ddgz','ddbz2'].include?(cexec.environment.tarball["kind"])
+        debug(0,"You can only deploy directly on block device when using a ddgz/ddbz2 environment")
+        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+      end
+      # Without specifying the partition to chainload on
+      if cexec.chainload_part.nil?
+        debug(0,"You must specify the partition to chainload on when deploying directly on block device")
+        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+      end
+    end
+  end
+
   def load_config()
     super()
     macrosteps = nil
@@ -159,6 +178,8 @@ class Workflow < Automata::TaskManager
       @config[macro.to_sym][:config][micro.to_sym] = {} unless @config[macro.to_sym][:config][micro.to_sym]
       @config[macro.to_sym][:config][micro.to_sym][:breakpoint] = true
     end
+
+    check_config()
   end
 
   def create_task(idx,subidx,nodes,nsid,context)
