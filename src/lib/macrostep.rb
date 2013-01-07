@@ -135,17 +135,33 @@ class Macrostep < Automata::TaskedTaskManager
     @tasks = steps()
     cexec = context[:execution]
 
+    # Deploy on block device
+    if cexec.block_device and !cexec.block_device.empty? \
+      and (!cexec.deploy_part or cexec.deploy_part.empty?)
+      delete_task(:create_partition_table)
+      delete_task(:format_deploy_part)
+      delete_task(:format_tmp_part)
+      delete_task(:format_swap_part)
+      delete_task(:mount_deploy_part)
+      delete_task(:umount_deploy_part)
+      delete_task(:manage_admin_post_install)
+      delete_task(:manage_user_post_install)
+      delete_task(:check_kernel_files)
+      delete_task(:send_key)
+      delete_task(:install_bootloader)
+    end
+
     if !cexec.key or cexec.key.empty?
       delete_task(:send_key_in_deploy_env)
       delete_task(:send_key)
     else
-      delete_task(:send_key) unless ['tgz','tbz2'].include?(cexec.environment.tarball["kind"])
+      delete_task(:send_key) if ['ddgz','ddbz2'].include?(cexec.environment.tarball["kind"])
     end
 
     delete_task(:create_partition_table) if cexec.disable_disk_partitioning
 
     # We do not format/mount/umount the deploy part for a dd.gz or dd.bz2 image
-    if cexec.environment.tarball['kind'] != 'tgz' and cexec.environment.tarball['kind'] != 'tbz2'
+    if ['ddgz','ddbz2'].include?(cexec.environment.tarball["kind"])
       delete_task(:format_deploy_part)
       delete_task(:mount_deploy_part)
       delete_task(:umount_deploy_part)

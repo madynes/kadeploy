@@ -42,6 +42,7 @@ class KadeployAsyncError
   LOAD_ENV_FROM_FILE_ERROR = 206
   LOAD_ENV_FROM_DB_ERROR = 207
   NO_ENV_CHOSEN = 208
+  CONFLICTING_OPTIONS = 209
 end
 
 class KarebootAsyncError

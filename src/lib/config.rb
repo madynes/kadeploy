@@ -115,8 +115,21 @@ module ConfigInformation
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
         if (allowed_to_deploy) then
-          b = (exec_specific_config.block_device != "") ? exec_specific_config.block_device : @cluster_specific[cluster].block_device
-          p = (exec_specific_config.deploy_part != "") ? exec_specific_config.deploy_part : @cluster_specific[cluster].deploy_part
+          b=nil
+          if exec_specific_config.block_device != ""
+            b = exec_specific_config.block_device
+          else
+            b = @cluster_specific[cluster].block_device
+          end
+          p=nil
+          if exec_specific_config.deploy_part.nil?
+            p = ''
+          elsif exec_specific_config.deploy_part != ""
+            p = exec_specific_config.deploy_part
+          else
+            p = @cluster_specific[cluster].deploy_part
+          end
+
           part = b + p
           allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
                                                                      exec_specific_config.true_user,
@@ -310,6 +323,7 @@ module ConfigInformation
       exec_specific.true_user = USER
       exec_specific.block_device = String.new
       exec_specific.deploy_part = String.new
+      exec_specific.chainload_part = nil
       exec_specific.verbose_level = nil
       exec_specific.debug = false
       exec_specific.script = String.new
@@ -1572,8 +1586,17 @@ module ConfigInformation
         opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
           if /\A[\w\/]+\Z/ =~ b then
             exec_specific.block_device = b
+            exec_specific.deploy_part = nil if exec_specific.deploy_part.empty?
           else
             error("Invalid block device")
+            return false
+          end
+        }
+        opt.on("-c", "--chainload-partition NUMBER", "Specify the number of the partition to chainload on") { |c|
+          if /\A\d+\Z/ =~ c then
+            exec_specific.chainload_part = c.to_i
+          else
+            error("Invalid chainload partition number")
             return false
           end
         }
@@ -1622,7 +1645,12 @@ module ConfigInformation
           exec_specific.nodes_ok_file = f
         }
         opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
+          if /\A\d+\Z/ =~ p then
             exec_specific.deploy_part = p
+          else
+            error("Invalid partition number")
+            return false
+          end
         }
         opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (ext[234] are allowed)") { |t|
           if not (/\A(ext2|ext3|ext4)\Z/ =~ t) then
