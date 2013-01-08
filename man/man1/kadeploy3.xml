@@ -55,6 +55,13 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>-c</option></term>
+	<term><option>--chainload-partition  <replaceable>NUMBER</replaceable></option></term>
+	<listitem>
+	  <para>Specify the number of the partition to chainload on.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-d</option></term>
 	<term><option>--debug-mode</option></term>
 	<listitem>
@@ -167,7 +174,7 @@
 	<term><option>-x</option></term>
 	<term><option>--upload-pxe-files <replaceable>FILE</replaceable></option></term>
 	<listitem>
-	  <para>Upload a list of files (file1,file2,file3) to the "tftp-images" directory. Those files will be prefixed with "pxe-$username-".</para>
+	  <para>Upload a list of files (file1,file2,file3) to the "tftp_images_path" directory. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX--</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -185,7 +192,7 @@
       <varlistentry>
 	<term><option>--verbose-level <replaceable>VALUE</replaceable></option></term>
 	<listitem>
-	  <para>Verbose level between 0 to 4.</para>
+	  <para>Verbose level between 0 to 5.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
