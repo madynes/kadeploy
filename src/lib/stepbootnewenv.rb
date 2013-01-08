@@ -22,15 +22,23 @@ require 'macrostep'
     # Output
     # * return the name of the deployment partition
     def get_deploy_part_str
-      if context[:execution].deploy_part != ""
-        if context[:execution].block_device != ""
-          return context[:execution].block_device + context[:execution].deploy_part
-        else
-          return context[:cluster].block_device + context[:execution].deploy_part
-        end
+      b=nil
+      if context[:execution].block_device != ""
+        b = context[:execution].block_device
       else
-        return context[:cluster].block_device + context[:cluster].deploy_part
+        b = context[:cluster].block_device
       end
+
+      p=nil
+      if context[:execution].deploy_part.nil?
+        p = ''
+      elsif context[:execution].deploy_part != ""
+        p = context[:execution].deploy_part
+      else
+        p = context[:cluster].deploy_part
+      end
+
+      b + p
     end
 
     # Get the kernel parameters

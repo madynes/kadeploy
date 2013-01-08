@@ -769,7 +769,9 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the name of the deployment partition
   def get_deploy_part_str
-    if (context[:execution].deploy_part != "") then
+    if context[:execution].deploy_part.nil?
+      get_block_device_str
+    elsif context[:execution].deploy_part != ""
       get_block_device_str + context[:execution].deploy_part
     else
       get_block_device_str + context[:cluster].deploy_part
@@ -783,7 +785,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the number of the deployment partition
   def get_deploy_part_num
-    if (context[:execution].deploy_part != "") then
+    if context[:execution].deploy_part != ""
       return context[:execution].deploy_part.to_i
     else
       return context[:cluster].deploy_part.to_i
@@ -1374,9 +1376,10 @@ class Microstep < Automata::QueueTask
             @output
           )
         when "chainload_pxe"
+          part = context[:execution].chainload_part || get_deploy_part_num()
           context[:common].pxe.set_pxe_for_chainload(
             nodes,
-            get_deploy_part_num(),
+            part,
             context[:cluster].pxe_header
           )
         end
@@ -1954,6 +1957,7 @@ class Microstep < Automata::QueueTask
       )
     end
     debug(3, "Broadcast time: #{Time.now.to_i - start}s") if res
+    res = res && parallel_exec('sync')
     return res
   end
 
