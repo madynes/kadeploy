@@ -182,6 +182,12 @@ class Macrostep < Automata::TaskedTaskManager
     delete_task(:manage_user_post_install) if cexec.environment.postinstall.nil?
 
     delete_task(:set_vlan) if cexec.vlan.nil?
+
+    if !cexec.deploy_part.nil? and cexec.deploy_part != ""
+      part = cexec.deploy_part.to_i
+      delete_task(:format_swap_part) if part == context[:cluster].swap_part.to_i
+      delete_task(:format_tmp_part) if part == context[:cluster].tmp_part.to_i
+    end
   end
 
   def create_task(idx,subidx,nodes,nsid,context)
