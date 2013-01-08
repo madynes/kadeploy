@@ -498,7 +498,7 @@ class KadeployServer
 
       begin
         workflow = Workflow.new(nodeset,context.dup)
-      rescue KadeployError
+      rescue KadeployError => ke
         @workflow_info_hash_lock.unlock
         raise KadeployError.new(ke.errno,{ :wid => workflow_id })
       end
@@ -606,6 +606,8 @@ class KadeployServer
         finished = true
       end
     rescue KadeployError => ke
+      msg = KadeployAsyncError.to_msg(ke.errno)
+      Debug::distant_client_error(msg + " (error ##{ke.errno})",client) if msg and !msg.empty?
       Debug::distant_client_error("Cannot run the deployment",client)
       kadeploy_sync_kill_workflow(ke.context[:wid])
     end
