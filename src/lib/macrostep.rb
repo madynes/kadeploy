@@ -142,13 +142,6 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:format_deploy_part)
       delete_task(:format_tmp_part)
       delete_task(:format_swap_part)
-      delete_task(:mount_deploy_part)
-      delete_task(:umount_deploy_part)
-      delete_task(:manage_admin_post_install)
-      delete_task(:manage_user_post_install)
-      delete_task(:check_kernel_files)
-      delete_task(:send_key)
-      delete_task(:install_bootloader)
     end
 
     # ddgz or ddbz2 image
@@ -173,7 +166,8 @@ class Macrostep < Automata::TaskedTaskManager
     delete_task(:format_tmp_part) unless cexec.reformat_tmp
 
     delete_task(:format_swap_part) \
-      if cexec.swap_part.nil? or cexec.swap_part == 'none'
+      if cexec.swap_part.nil? or cexec.swap_part == 'none' \
+      or cexec.environment.environment_kind != 'linux'
 
     delete_task(:install_bootloader) \
       if context[:common].bootloader == 'chainload_pxe' \
@@ -183,19 +177,9 @@ class Macrostep < Automata::TaskedTaskManager
       if cexec.environment.preinstall.nil? \
       and context[:cluster].admin_pre_install.nil?
 
-    delete_task(:manage_admin_post_install) \
-      if cexec.environment.environment_kind == 'other' \
-      or context[:cluster].admin_post_install.nil?
+    delete_task(:manage_admin_post_install) if context[:cluster].admin_post_install.nil?
 
-    delete_task(:manage_user_post_install) \
-      if cexec.environment.environment_kind == 'other' \
-      or cexec.environment.postinstall.nil?
-
-    delete_task(:install_bootloader) \
-      if context[:common].bootloader == 'chainload_pxe' \
-      and context[:execution].environment.environment_kind == 'other'
-
-    delete_task(:check_kernel_files) if cexec.environment.environment_kind == 'other'
+    delete_task(:manage_user_post_install) if cexec.environment.postinstall.nil?
 
     delete_task(:set_vlan) if cexec.vlan.nil?
   end
