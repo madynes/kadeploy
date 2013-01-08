@@ -170,7 +170,7 @@ class Macrostep < Automata::TaskedTaskManager
     delete_task(:format_tmp_part) unless cexec.reformat_tmp
 
     delete_task(:format_swap_part) \
-      if cexec.swap_part.nil? or cexec.swap_part == 'none'
+      if context[:cluster].swap_part.nil? or context[:cluster].swap_part == 'none'
 
     delete_task(:install_bootloader) \
       if context[:common].bootloader == 'chainload_pxe' \
