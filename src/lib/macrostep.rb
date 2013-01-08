@@ -166,7 +166,8 @@ class Macrostep < Automata::TaskedTaskManager
     delete_task(:format_tmp_part) unless cexec.reformat_tmp
 
     delete_task(:format_swap_part) \
-      if cexec.swap_part.nil? or cexec.swap_part == 'none' \
+      if context[:cluster].swap_part.nil? \
+      or context[:cluster].swap_part == 'none' \
       or cexec.environment.environment_kind != 'linux'
 
     delete_task(:install_bootloader) \
