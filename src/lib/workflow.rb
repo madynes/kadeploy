@@ -111,19 +111,29 @@ class Workflow < Automata::TaskManager
 
     # BootNewEnv step
     n = @nodes.length
+    setclassical = lambda do |inst,msg|
+      if inst[0] == 'BootNewEnvKexec'
+        inst[0] = 'BootNewEnvClassical'
+        # Should not be hardcoded
+        inst[1] = 0
+        inst[2] = eval("(#{context[:cluster].timeout_reboot_classical})+200").to_i
+        debug(0,msg)
+      end
+    end
     macrosteps[2].get_instances.each do |instance|
       # Kexec hack for non-linux envs
       if (context[:execution].environment.environment_kind != 'linux')
-        if instance[0] == 'BootNewEnvKexec'
-          instance[0] = 'BootNewEnvClassical'
-          # Should not be hardcoded
-          instance[1] = 2,
-          instance[2] = eval("(#{context[:cluster].timeout_reboot_classical})+200").to_i
-          debug(0,
-            "Using classical reboot instead of kexec one with this "\
-            "non-linux environment"
-          )
-        end
+        setclassical.call(
+          instance,
+          "Using classical reboot instead of kexec one with this "\
+          "non-linux environment"
+        )
+      elsif (['ddgz','ddbz2'].include?(context[:execution].environment.tarball["kind"]))
+        setclassical.call(
+          instance,
+          "Using classical reboot instead of kexec one with this "\
+          "ddgz/ddbz2 environment"
+        )
       end
 
       @tasks[2] << [ instance[0].to_sym ]
