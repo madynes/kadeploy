@@ -886,7 +886,7 @@ Here is a custom operation description:
   \item \yfield{name}{String} The name of the custom operation
   \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send} and \emph{exec})
   \item \yfield{file}{String} \small{(To be specified if the action is \emph{send})} The path to the file to be send (Kadeploy3 specific environment variables are substitued in the path)
-  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination on the nodes
+  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination directory on the nodes (the file name will remains the same)
   \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} before the script name to be able to use Kadeploy3 specific environment variables inside of it (example: \texttt{command: . /myscript.sh}).
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
@@ -1373,7 +1373,7 @@ When you are executing a command or a script (via the \texttt{exec} action), you
 \item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
 \end{itemize}
 
-\texttt{Note}: This strings will also be substitued in your directory specification when you are using the \texttt{send} action.
+\texttt{Note}: This variables will also be substitued in your \texttt{destination} directory specification when you are using the \texttt{send} action.
 
 Here is an example of a file that contains custom operations:
 \begin{small}
@@ -1397,7 +1397,7 @@ Here is an example of a file that contains custom operations:
         post-ops:
           - action: send
             file: my_custom_file
-            destination: KADEPLOY_ENV_EXTRACTION_DIR
+            destination: $KADEPLOY_ENV_EXTRACTION_DIR
             retries: 1
             timeout: 10
             scattering: chain
