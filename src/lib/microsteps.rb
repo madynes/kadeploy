@@ -1126,6 +1126,15 @@ class Microstep < Automata::QueueTask
         dest,
         { :scattering => op[:scattering] }
       )
+    when :run
+      debug(4,'Executing custom script')
+      return parallel_exec(
+        "#{set_env()} tmp=`mktemp` " \
+        "&& chmod 755 ${tmp} " \
+        "&& cat - > $tmp "\
+        "&& . ${tmp}",
+        { :input_file => op[:file], :scattering => op[:scattering] }
+      )
     else
       debug(0,"Invalid custom action '#{op[:action]}'")
       return false
