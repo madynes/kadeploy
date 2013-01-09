@@ -552,6 +552,20 @@ class Workflow < Automata::TaskManager
                 :retries => entry[:retries],
                 :scattering => entry[:scattering]
               }
+            elsif entry[:action] == :run
+              grab_file(
+                gfm, entry[:file], user_prefix, 'custom_file',
+                FetchFileError::INVALID_CUSTOM_FILE, :caching => false
+              )
+              target << {
+                :name => entry[:name],
+                :action => :run,
+                :file => entry[:file],
+                :timeout => entry[:timeout],
+                :retries => entry[:retries],
+                :destination => entry[:destination],
+                :scattering => entry[:scattering]
+              }
             else
               error(FetchFileError::INVALID_CUSTOM_FILE)
             end

@@ -1031,16 +1031,22 @@ module ConfigInformation
               unless info[:empty]
                 op = {
                   :name => "#{microname}-#{cp.value('name',String)}",
-                  :action => cp.value('action',String,nil,['exec','send'])
+                  :action => cp.value('action',String,nil,['exec','send','run'])
                 }
-                if op[:action] == 'exec'
+                case op[:action]
+                when 'exec'
                   op[:command] = cp.value('command',String)
                   op[:timeout] = cp.value('timeout',Fixnum,0)
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
-                else
+                when 'send'
                   op[:file] = cp.value('file',String)
                   op[:destination] = cp.value('destination',String)
+                  op[:timeout] = cp.value('timeout',Fixnum,0)
+                  op[:retries] = cp.value('retries',Fixnum,0)
+                  op[:scattering] = cp.value('scattering',String,:tree)
+                when 'run'
+                  op[:file] = cp.value('file',String)
                   op[:timeout] = cp.value('timeout',Fixnum,0)
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
@@ -1499,7 +1505,7 @@ module ConfigInformation
                 error("[#{file}] Operation #{operation}: 'action' field missing")
                 return false
               end
-              unless ['exec','send'].include?(op['action'])
+              unless ['exec','send','run'].include?(op['action'])
                 error("[#{file}] Invalid action '#{op['action']}'")
                 return false
               end
@@ -1520,7 +1526,8 @@ module ConfigInformation
                 return false
               end
 
-              if op['action'] == 'send'
+              case op['action']
+              when 'send'
                 unless op['file']
                   error("[#{file}] Operation #{operation}: 'file' field missing")
                   return false
@@ -1539,7 +1546,21 @@ module ConfigInformation
                   :scattering => scattering.to_sym,
                   :target => operation.to_sym
                 }
-              else
+              when 'run'
+                unless op['file']
+                  error("[#{file}] Operation #{operation}: 'file' field missing")
+                  return false
+                end
+                customops[macro.to_sym][micro.to_sym] << {
+                  :action => op['action'].to_sym,
+                  :name => "#{micro}-#{op['name']}",
+                  :file => op['file'],
+                  :timeout => timeout,
+                  :retries => retries,
+                  :scattering => scattering.to_sym,
+                  :target => operation.to_sym
+                }
+              when 'exec'
                 unless op['command']
                   error("[#{file}] Operation #{operation}: 'command' field missing")
                   return false
