@@ -1190,33 +1190,27 @@ class Microstep < Automata::QueueTask
   # * env: kind of environment on wich the fdisk operation is performed
   # Output
   # * return true if the fdisk has been successfully performed, false otherwise
-  def do_fdisk(env)
-    case env
-    when "prod_env"
-      expected_status = "256" #Strange thing, fdisk can not reload the partition table so it exits with 256
-    when "untrusted_env"
-      expected_status = "0"
-    else
-      failed_microstep("Invalid kind of deploy environment: #{env}")
-      return false
-    end
+  def do_fdisk()
     begin
       temp = Tempfile.new("fdisk_#{context[:cluster].name}")
     rescue StandardError
-      failed_microstep("Cannot create the tempfile fdisk_#{context[:cluster].name}")
+      failed_microstep("Cannot create the fdisk tempfile")
       return false
     end
-    if not command("cat #{context[:cluster].partition_file}|sed 's/PARTTYPE/#{context[:execution].environment.fdisk_type}/' > #{temp.path}") then
-      failed_microstep("Cannot generate the partition_file")
-      return false
-    end
-    if not parallel_exec(
+
+    map = File.read(context[:cluster].partition_file)
+    map.gsub!('PARTTYPE',context[:execution].environment.fdisk_type)
+    temp.write(map)
+    temp.close
+
+    unless parallel_exec(
       "fdisk #{get_block_device_str()}",
-      { :input_file => temp.path, :scattering => :tree },
-      { :status => expected_status}) then
+      { :input_file => temp.path, :scattering => :tree }
+    )
       failed_microstep("Cannot perform the fdisk operation")
       return false
     end
+
     temp.unlink
     return true
   end
@@ -1227,9 +1221,11 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the parted has been successfully performed, false otherwise
   def do_parted()
-    cmd = File.read(context[:cluster].partition_file).split("\n").join(' ')
+    map = File.read(context[:cluster].partition_file)
+    map.gsub!('PARTTYPE',context[:execution].environment.filesystem)
+    map.gsub!("\n",' ')
     return parallel_exec(
-      "parted -a optimal #{get_block_device_str()} --script #{cmd}",
+      "parted -a optimal #{get_block_device_str()} --script #{map}",
       { :scattering => :tree }
     )
   end
@@ -1664,12 +1660,12 @@ class Microstep < Automata::QueueTask
   # * env: kind of environment on wich the patition creation is performed (prod_env or untrusted_env)
   # Output
   # * return true if the operation has been successfully performed, false otherwise
-  def ms_create_partition_table(env)
+  def ms_create_partition_table()
     ret = true
 
     case context[:cluster].partition_creation_kind
     when "fdisk"
-      ret = do_fdisk(env)
+      ret = do_fdisk()
     when "parted"
       ret = do_parted()
     end
