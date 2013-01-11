@@ -301,18 +301,21 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_custom_operations
     `echo OK > #{@tmp[:localfile]}`
-    tmpfile = Tempfile.new('tmp')
-    opsfile = Tempfile.new('ops')
-    tmpfile.write('OK')
-    tmpfile.close
+    scriptfile = Tempfile.new('script')
+    scriptfile.write(
+      "#!/bin/bash\n"\
+      "echo OK > ${KADEPLOY_ENV_EXTRACTION_DIR}/TEST_RUN\n"
+    )
+    scriptfile.close
 
+    opsfile = Tempfile.new('ops')
     ops = {
       'SetDeploymentEnvUntrusted' => {
         'mount_deploy_part' => {
           'substitute' => [
             {
               'action' => 'exec',
-              'name' => 'test-mount',
+              'name' => 'test-exec',
               'command' => 'mount ${KADEPLOY_DEPLOY_PART} ${KADEPLOY_ENV_EXTRACTION_DIR}; partprobe ${KADEPLOY_BLOCK_DEVICE}',
             }
           ],
@@ -321,7 +324,7 @@ class TestKadeploy < Test::Unit::TestCase
               'action' => 'send',
               'name' => 'test-send',
               'file' => @tmp[:localfile],
-              'destination' => '/mnt/dest/TEST_POST',
+              'destination' => '/mnt/dest',
               'scattering' => 'tree',
             }
           ]
@@ -333,7 +336,14 @@ class TestKadeploy < Test::Unit::TestCase
             {
               'action' => 'exec',
               'name' => 'test-exec',
-              'command' => 'echo OK > ${KADEPLOY_ENV_EXTRACTION_DIR}/TEST_PRE',
+              'command' => 'echo OK > ${KADEPLOY_ENV_EXTRACTION_DIR}/TEST_EXEC',
+            }
+          ],
+          'post-ops' => [
+            {
+              'action' => 'run',
+              'name' => 'test-run',
+              'file' => scriptfile.path,
             }
           ],
         }
@@ -349,17 +359,19 @@ class TestKadeploy < Test::Unit::TestCase
       post = ''
       begin
         Net::SSH.start(@nodes.first,'root') do |ssh|
-          pre = ssh.exec!('cat /TEST_PRE').strip
-          post = ssh.exec!('cat /TEST_POST').strip
+          exec = ssh.exec!('cat /TEST_EXEC').strip
+          send = ssh.exec!("cat /#{File.basename(@tmp[:localfile])}").strip
+          run = ssh.exec!('cat /TEST_RUN').strip
         end
       rescue Net::SSH::AuthenticationFailed, SocketError
         assert(false,'Unable to contact nodes')
       end
-      assert(pre == 'OK','Custom pre-ops does not work properly')
-      assert(post == 'OK','Custom post-ops does not work properly')
+      assert(exec == 'OK','Custom exec action does not work properly')
+      assert(send == 'OK','Custom send action does not work properly')
+      assert(run == 'OK','Custom run action does not work properly')
     ensure
       `rm #{@tmp[:localfile]}`
-      tmpfile.unlink
+      scriptfile.unlink
       opsfile.unlink
     end
   end

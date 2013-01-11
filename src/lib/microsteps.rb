@@ -1117,14 +1117,23 @@ class Microstep < Automata::QueueTask
       return parallel_exec("#{set_env()} && #{op[:command]}",{ :scattering => op[:scattering] })
     when :send
       debug(4,'Sending custom file')
-      dest = op[:destination].dup
+      dest = File.join(op[:destination].dup,op[:filename].dup)
       deploy_context().each_pair do |key,val|
-        dest.gsub!(key,val.to_s)
+        dest.gsub!("$#{key}",val.to_s)
       end
       return parallel_sendfile(
         op[:file],
         dest,
         { :scattering => op[:scattering] }
+      )
+    when :run
+      debug(4,'Executing custom script')
+      return parallel_exec(
+        "#{set_env()} tmp=`mktemp` " \
+        "&& chmod 755 ${tmp} " \
+        "&& cat - > $tmp "\
+        "&& . ${tmp}",
+        { :input_file => op[:file], :scattering => op[:scattering] }
       )
     else
       debug(0,"Invalid custom action '#{op[:action]}'")

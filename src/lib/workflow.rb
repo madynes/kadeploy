@@ -517,6 +517,7 @@ class Workflow < Automata::TaskManager
             end
 
             if entry[:action] == :send
+              filename = File.basename(entry[:file].dup)
               grab_file(
                 gfm, entry[:file], user_prefix, 'custom_file',
                 FetchFileError::INVALID_CUSTOM_FILE, :caching => false
@@ -526,6 +527,7 @@ class Workflow < Automata::TaskManager
                 :action => :send,
                 :file => entry[:file],
                 :destination => entry[:destination],
+                :filename => filename,
                 :timeout => entry[:timeout],
                 :retries => entry[:retries],
                 :destination => entry[:destination],
@@ -538,6 +540,20 @@ class Workflow < Automata::TaskManager
                 :command => entry[:command],
                 :timeout => entry[:timeout],
                 :retries => entry[:retries],
+                :scattering => entry[:scattering]
+              }
+            elsif entry[:action] == :run
+              grab_file(
+                gfm, entry[:file], user_prefix, 'custom_file',
+                FetchFileError::INVALID_CUSTOM_FILE, :caching => false
+              )
+              target << {
+                :name => entry[:name],
+                :action => :run,
+                :file => entry[:file],
+                :timeout => entry[:timeout],
+                :retries => entry[:retries],
+                :destination => entry[:destination],
                 :scattering => entry[:scattering]
               }
             else

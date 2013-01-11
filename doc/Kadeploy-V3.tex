@@ -685,16 +685,14 @@ automata:
         microsteps:
           - name: reboot
             timeout: 10
-          - name: format_deploy_part
+          - name: create_partition_table
             substitute:
-              - action: send
-                file: partition_file
-                destination: /
-                timeout: 10
-                scattering: chain
-              - action: exec
-                command: cat /partition_file | fdisk
+              - action: run
+                name: my_partitioning
+                file: partitioning.sh
                 retries: 1
+                scattering: tree
+                timeout: 16
       - type: Untrusted
         timeout: 400
     BroadcastEnv: 
@@ -705,11 +703,16 @@ automata:
           - name: send_environment
             post-ops:
               - action: send
-                file: my_custom_file
-                destination: /
+                file: hostname
+                destination: \$KADEPLOY_ENV_EXTRACTION_DIR/etc/
                 retries: 1
-                timeout: 10
                 scattering: chain
+              - action: exec
+                command: mkdir -p \$KADEPLOY_ENV_EXTRACTION_DIR/mypath
+              - action: send
+                file: myfile
+                destination: \$KADEPLOY_ENV_EXTRACTION_DIR/mypath
+                timeout: 10
     BootNewEnv: 
       - type: Kexec
         timeout: 100
@@ -884,9 +887,9 @@ With custom operations you can send files or execute commands.
 Here is a custom operation description:
 \begin{itemize}
   \item \yfield{name}{String} The name of the custom operation
-  \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send} and \emph{exec})
-  \item \yfield{file}{String} \small{(To be specified if the action is \emph{send})} The path to the file to be send (Kadeploy3 specific environment variables are substitued in the path)
-  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination on the nodes
+  \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send}, \emph{run} and \emph{exec})
+  \item \yfield{file}{String} \small{(To be specified if the action is \emph{send} or \emph{run})} The path to the file to be send/executed (if the action is \emph{send} the file name will remains the same, if the action is \emph{run} this file need to contain a script)
+  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination directory on the nodes (Kadeploy3 specific environment variables are substitued in the path)
   \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} before the script name to be able to use Kadeploy3 specific environment variables inside of it (example: \texttt{command: . /myscript.sh}).
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
@@ -1356,7 +1359,7 @@ Here is a description of the YAML file:
   \item \ypath{/MicroStepName/MicroStepName/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see section \ref{sec:specific_config} for custom operation description)
 \end{itemize}
 
-When you are executing a command or a script (via the \texttt{exec} action), you can use the following environment variables :
+When you are executing a command or a script (via the \texttt{exec} or \texttt{run} action), you can use the following environment variables :
 \begin{itemize}
 \item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
 \item \texttt{KADEPLOY\_ENV} : environment deployed
@@ -1373,33 +1376,32 @@ When you are executing a command or a script (via the \texttt{exec} action), you
 \item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
 \end{itemize}
 
-\texttt{Note}: This strings will also be substitued in your directory specification when you are using the \texttt{send} action.
+\texttt{Note}: This variables will also be substitued in your \texttt{destination} directory specification when you are using the \texttt{send} action.
 
 Here is an example of a file that contains custom operations:
 \begin{small}
 \begin{verbatim}
     > cat ~/custom_ops.yml
     SetDeploymentEnvUntrusted:
-      format_deploy_part:
+      create_partition_table:
         substitute:
-          - action: send
-            name: send_partition_file
-            file: partition_file
-            destination: /
-            timeout: 10
-            scattering: chain
-          - action: exec
-            name: format_with_fdisk
-            command: "cat /partition_file | fdisk"
-            retries: 1
+          - action: run
+            name: my_partitioning
+            file: partitioning.sh
+            timeout: 16
+            scattering: tree
     BroadcastEnvKastafior:
       send_environment:
         post-ops:
+          - action: exec
+            command: echo 'net.ipv4.ip_forward = 1' >> $KADEPLOY_ENV_EXTRACTION_DIR/etc/sysctl.conf
+          - action: exec
+            command: mkdir -p $KADEPLOY_ENV_EXTRACTION_DIR/mypath
           - action: send
             file: my_custom_file
-            destination: KADEPLOY_ENV_EXTRACTION_DIR
+            destination: $KADEPLOY_ENV_EXTRACTION_DIR/mypath
             retries: 1
-            timeout: 10
+            timeout: 24
             scattering: chain
 \end{verbatim}
 \end{small}
@@ -2008,7 +2010,11 @@ Here is a sample of the configuration file setting:
 \subsection{Custom partitioning with Kadeploy3 client}
 You can use the Kadeploy3 client's option \emph{--set-custom-operations} (see \ref{sec:kadeploy_client}) to setup custom micro-step operations.
 
-The field to configure is the field \ypath{/SetDeploymentEnv/format\_deploy\_part/[substitute]}.
+The field to configure is the field \ypath{/SetDeploymentEnv/create\_partition\_table/[substitute]}.
+
+Be careful to use the same partitioning scheme than the one which is configured by default on the server in order for the deployment process to perform properly.
+
+If you want to change the partitioning scheme, you'll have to substitute the microsteps format\_deploy\_part, mount\_deploy\_part, umount\_deploy\_part, format\_swap\_part and format\_tmp\_part in order to mount and format the right partitions during the deployment.
 
 Here is a sample of the client command:
 \begin{verbatim}
@@ -2022,18 +2028,11 @@ Here is a sample of a the custom operations file:
 \begin{verbatim}
     > cat ~/custom_ops.yml
     SetDeploymentEnvUntrusted:
-      format_deploy_part:
+      create_partition_table:
         substitute:
-          - action: send
-            name: send_partition_file
-            file: partition_file
-            destination: /
-            timeout: 10
-            scattering: chain
-          - action: exec
-            name: format_with_fdisk
-            command: "cat /partition_file | fdisk"
-            retries: 1
+          - action: run
+            name: my_custom_partitioning
+            file: partitioning.sh
 \end{verbatim}
 \end{small}
 
