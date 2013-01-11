@@ -43,6 +43,31 @@ class KadeployAsyncError
   LOAD_ENV_FROM_DB_ERROR = 207
   NO_ENV_CHOSEN = 208
   CONFLICTING_OPTIONS = 209
+
+  def self.to_msg(errno)
+    case errno
+    when NODES_DISCARDED
+      "All the nodes have been discarded"
+    when NO_RIGHT_TO_DEPLOY
+      "Invalid options or invalid rights on nodes"
+    when UNKNOWN_NODE_IN_SINGULARITY_FILE
+      "Unknown node in singularity file"
+    when NODE_NOT_EXIST
+      "At least one node in your node list does not exist"
+    when VLAN_MGMT_DISABLED
+      "The VLAN management has been disabled on the site"
+    when LOAD_ENV_FROM_FILE_ERROR
+      "The environment cannot be loaded from the file you specified"
+    when LOAD_ENV_FROM_DB_ERROR
+      "The environment does not exist"
+    when NO_ENV_CHOSEN
+      "You must choose an environment"
+    when CONFLICTING_OPTIONS
+      "Some options are conflicting"
+    else
+      ""
+    end
+  end
 end
 
 class KarebootAsyncError
