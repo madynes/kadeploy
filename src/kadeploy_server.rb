@@ -608,7 +608,7 @@ class KadeployServer
     rescue KadeployError => ke
       msg = KadeployAsyncError.to_msg(ke.errno)
       Debug::distant_client_error(msg + " (error ##{ke.errno})",client) if msg and !msg.empty?
-      Debug::distant_client_error("Cannot run the deployment",client)
+      #Debug::distant_client_error("Cannot run the deployment",client)
       kadeploy_sync_kill_workflow(ke.context[:wid])
     end
     return true
