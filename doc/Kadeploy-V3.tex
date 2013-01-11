@@ -1178,6 +1178,7 @@ Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --env-file ENVFILE           File containing the environment description
   -b, --block-device BLOCKDEVICE   Specify the block device to use
+  -c, --chainload-partition NUMBER Specify the number of the partition to chainload on
   -d, --debug-mode                 Activate the debug mode
   -e, --env-name ENVNAME           Name of the recorded environment to deploy
   -f, --file MACHINELIST           Files containing list of nodes (- means stdin)
@@ -1405,6 +1406,16 @@ Here is an example of a file that contains custom operations:
             scattering: chain
 \end{verbatim}
 \end{small}
+
+\paragraph{Use case 11 - expert usage - deploying a dd image on a block device}
+\begin{verbatim}
+> kadeploy3 -m griffon-1.nancy.grid5000.fr \
+            -e ddgz_fulldisk_image \
+            -b /dev/sda \
+            -c 1
+\end{verbatim}
+
+For some specific purpose, you may want to deploy a dd image of an entire -partitioned- disk. To do this, you first have to create a ddgz image of the disk you want to deploy. Then you have to specify on which block device you want your image to be deployed with the \texttt{-b} option. You also need to tell on which partition the chainloaded reboot have to be performed with the \texttt{-c} option (typically a partition where a bootloader was installed).
 
 \subsection{Kareboot}
 Kareboot can be used by using the \texttt{kareboot3} command. The CLI looks like this:

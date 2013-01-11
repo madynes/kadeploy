@@ -129,7 +129,7 @@
 	<term><option>-V</option></term>
 	<term><option>--verbose-level <replaceable>VALUE</replaceable></option></term>
 	<listitem>
-	  <para>Verbose level between 0 to 4.</para>
+	  <para>Verbose level between 0 to 5.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
