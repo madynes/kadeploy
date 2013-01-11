@@ -918,6 +918,19 @@ Here is the list of the macro-step and their implementation:
     \item format\_deploy\_part
     \item mount\_deploy\_part
     \item format\_tmp\_part
+    \item format\_swap\_part
+    \end{itemize}
+  \item \texttt{SetDeploymentEnvKexec}
+    \begin{itemize}
+    \item send\_deployment\_kernel
+    \item kexec
+    \item wait\_reboot
+    \item send\_key\_in\_deploy\_env
+    \item create\_partition\_table
+    \item format\_deploy\_part
+    \item mount\_deploy\_part
+    \item format\_tmp\_part
+    \item format\_swap\_part
     \end{itemize}
   \item \texttt{SetDeploymentEnvUntrustedCustomPreInstall}
     \begin{itemize}
@@ -947,36 +960,36 @@ Here is the list of the macro-step and their implementation:
       \item send\_environment(``chain'')
       \item manage\_admin\_post\_install
       \item manage\_user\_post\_install
+      \item check\_kernel\_files
       \item send\_key
       \item install\_bootloader
-      \item switch\_pxe
       \end{itemize}
     \item \texttt{BroadcastEnvKastafior}
       \begin{itemize}
       \item send\_environment(``kastafior'')
       \item manage\_admin\_post\_install
       \item manage\_user\_post\_install
+      \item check\_kernel\_files
       \item send\_key
       \item install\_bootloader
-      \item switch\_pxe
       \end{itemize}
     \item \texttt{BroadcastEnvTree}
       \begin{itemize}
       \item send\_environment(``tree'')
       \item manage\_admin\_post\_install
       \item manage\_user\_post\_install
+      \item check\_kernel\_files
       \item send\_key
       \item install\_bootloader
-      \item switch\_pxe
       \end{itemize}
     \item \texttt{BroadcastEnvBittorrent}
       \begin{itemize}
       \item send\_environment(``bittorrent'')
       \item manage\_admin\_post\_install
       \item manage\_user\_post\_install
+      \item check\_kernel\_files
       \item send\_key
       \item install\_bootloader
-      \item switch\_pxe
       \end{itemize}
     \item \texttt{BroadcastEnvDummy}
   \end{itemize}
@@ -984,17 +997,22 @@ Here is the list of the macro-step and their implementation:
   \begin{itemize}
     \item \texttt{BootNewEnvClassical}
       \begin{itemize}
+      \item switch\_pxe
       \item umount\_deploy\_part
       \item reboot\_from\_deploy\_env
       \item wait\_reboot
       \end{itemize}
     \item \texttt{BootNewEnvKexec}
       \begin{itemize}
-      \item reboot(``kexec'')
+      \item switch\_pxe
+      \item umount\_deploy\_part
+      \item mount\_deploy\_part
+      \item kexec
       \item wait\_reboot
       \end{itemize}
     \item \texttt{BootNewEnvHardReboot}
       \begin{itemize}
+      \item switch\_pxe
       \item reboot(``hard'')
       \item wait\_reboot
       \end{itemize}
