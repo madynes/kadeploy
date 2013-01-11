@@ -1,0 +1,8 @@
+Change-Id: Id9eff92e063dfaa0eb66aaf19ad30e92ebf54c05
+Code-Review+2: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Verified+1: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-by: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-at: Fri, 11 Jan 2013 17:30:30 +0100
+Reviewed-on: http://localhost:8081/651
+Project: kadeploy3
+Branch: refs/heads/3.1.6
