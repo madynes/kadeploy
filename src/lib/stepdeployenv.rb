@@ -71,7 +71,6 @@ require 'macrostep'
     def steps()
       [
         [ :check_nodes, "prod_env_booted" ],
-        [ :create_partition_table ],
         [ :format_deploy_part ],
         [ :mount_deploy_part ],
         [ :format_tmp_part ],
