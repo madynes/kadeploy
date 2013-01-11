@@ -1166,7 +1166,10 @@ class Microstep < Automata::QueueTask
       'KADEPLOY_PROD_PART_NUM' => context[:cluster].prod_part,
       'KADEPLOY_TMP_PART_NUM' => context[:cluster].tmp_part,
       'KADEPLOY_ENV_EXTRACTION_DIR' => context[:common].environment_extraction_dir,
-      'KADEPLOY_PREPOST_EXTRACTION_DIR' => context[:common].rambin_path
+      'KADEPLOY_TMP_DIR' => '/tmp',
+      'KADEPLOY_OS_KIND' => context[:execution].environment.environment_kind,
+      'KADEPLOY_PART_TYPE' => context[:execution].environment.fdisk_type,
+      'KADEPLOY_FS_TYPE' => context[:execution].environment.filesystem
     }
   end
 

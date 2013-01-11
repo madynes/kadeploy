@@ -1392,7 +1392,10 @@ When you are executing a command or a script (via the \texttt{exec} or \texttt{r
 \item \texttt{KADEPLOY\_PROD\_PART\_NUM} : the production partition number
 \item \texttt{KADEPLOY\_TMP\_PART\_NUM} : the tmp partition number
 \item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
-\item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
+\item \texttt{KADEPLOY\_TMP\_DIR} : a temporary directory (to be used for your scripts)
+\item \texttt{KADEPLOY\_OS\_KIND} : the kind of operating system being deployed (the value of the \emph{environment\_kind} field of the environment description)
+\item \texttt{KADEPLOY\_PART\_TYPE} : the MSDOS partition type of the deployment partition (the value of the \emph{fdisk\_type} field of the environment description)
+\item \texttt{KADEPLOY\_FS\_TYPE} : the filesystem format of the deployment partition (the value of the \emph{filesystem} field of the environment description)
 \end{itemize}
 
 \texttt{Note}: This variables will also be substitued in your \texttt{destination} directory specification when you are using the \texttt{send} action.
@@ -1983,6 +1986,10 @@ When writing a script for an admin pre-install, an admin post-install and a user
 \item \texttt{KADEPLOY\_TMP\_PART\_NUM} : the tmp partition number
 \item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
 \item \texttt{KADEPLOY\_PREPOST\_EXTRACTION\_DIR} : path where the pre/post tarball are extracted
+\item \texttt{KADEPLOY\_TMP\_DIR} : a temporary directory (to be used for your scripts)
+\item \texttt{KADEPLOY\_OS\_KIND} : the kind of operating system being deployed (the value of the \emph{environment\_kind} field of the environment description)
+\item \texttt{KADEPLOY\_PART\_TYPE} : the MSDOS partition type of the deployment partition (the value of the \emph{fdisk\_type} field of the environment description)
+\item \texttt{KADEPLOY\_FS\_TYPE} : the filesystem format of the deployment partition (the value of the \emph{filesystem} field of the environment description)
 \end{itemize}
 
 \section{Build a custom pre-install}\label{sec:custom-preinstall}
