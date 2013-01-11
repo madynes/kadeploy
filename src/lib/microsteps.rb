@@ -1184,6 +1184,13 @@ class Microstep < Automata::QueueTask
     ret
   end
 
+  def set_parttype(map,val,empty)
+    map.gsub!(/PARTTYPE#{get_deploy_part_num()}(\D)/,"#{val}\\1")
+    map.gsub!(/PARTTYPE\d+/,empty)
+    map.gsub!('PARTTYPE',val)
+    map
+  end
+
   # Perform a fdisk on the nodes
   #
   # Arguments
@@ -1199,7 +1206,7 @@ class Microstep < Automata::QueueTask
     end
 
     map = File.read(context[:cluster].partition_file)
-    map.gsub!('PARTTYPE',context[:execution].environment.fdisk_type)
+    map = set_parttype(map,context[:execution].environment.fdisk_type,'0')
     temp.write(map)
     temp.close
 
@@ -1222,8 +1229,8 @@ class Microstep < Automata::QueueTask
   # * return true if the parted has been successfully performed, false otherwise
   def do_parted()
     map = File.read(context[:cluster].partition_file)
-    map.gsub!('PARTTYPE',context[:execution].environment.filesystem)
     map.gsub!("\n",' ')
+    map = set_parttype(map, context[:execution].environment.filesystem, '')
     return parallel_exec(
       "parted -a optimal #{get_block_device_str()} --script #{map}",
       { :scattering => :tree }
