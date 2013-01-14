@@ -1,0 +1,61 @@
+#!/bin/bash -e
+
+
+### Install grub on the deployment partition ###
+grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR --force \
+  $KADEPLOY_DEPLOY_PART
+grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR --force \
+  --recheck $KADEPLOY_DEPLOY_PART
+
+
+### Generation of the menu file grub.cfg ###
+MENUFILE=/boot/grub/grub.cfg
+
+## Guess the Grub's disk number from the name of the block device ##
+# Get the last character of the block device name ("/dev/sdb" -> 'b')
+grubdisk=${KADEPLOY_BLOCK_DEVICE#${KADEPLOY_BLOCK_DEVICE%?}}
+# Get a number based on this value, numbering starts at 'a'
+let grubdisk=$(printf "%d" "'$grubdisk")-$(printf "%d" "'a") || test $grubdisk -eq 0
+# Get the Grub's disk identifier (so "/dev/sdb" -> "hd1")
+grubdisk="hd${grubdisk}"
+
+## Generate the options considering on the operating system ##
+case $KADEPLOY_OS_KIND in
+  "linux")
+    opts="  linux $KADEPLOY_ENV_KERNEL $KADEPLOY_ENV_KERNEL_PARAMS root=$KADEPLOY_DEPLOY_PART ro"$'\n'
+    [ -n "$KADEPLOY_ENV_INITRD" ] && opts+="  initrd $KADEPLOY_ENV_INITRD"$'\n'
+    ;;
+
+  "xen")
+    opts="  multiboot $KADEPLOY_ENV_HYPERVISOR $KADEPLOY_ENV_HYPERVISOR_PARAMS"$'\n'
+    opts+="  module $KADEPLOY_ENV_KERNEL $KADEPLOY_ENV_KERNEL_PARAMS root=$KADEPLOY_DEPLOY_PART ro"$'\n'
+    [ -n "$KADEPLOY_ENV_INITRD" ] && opts+="  module $KADEPLOY_ENV_INITRD"$'\n'
+    ;;
+
+  "bsd")
+    opts="  insmod ufs1"$'\n'
+    opts+="  insmod ufs2"$'\n'
+    opts+="  insmod zfs"$'\n'
+    opts+="  chainloader +1"$'\n'
+    ;;
+
+  "windows")
+    opts="  insmod fat"$'\n'
+    opts+="  insmod ntfs"$'\n'
+    opts+="  ntldr /bootmgr"$'\n'
+    ;;
+  *)
+    echo "Unknown operating system '${KADEPLOY_OS_KIND}'" 1>&2
+    exit 1
+esac
+
+## Write the menu file ##
+IFS=''
+cat <<EOF > $KADEPLOY_ENV_EXTRACTION_DIR/$MENUFILE
+set default=1
+set timeout=0
+
+menuentry "${KADEPLOY_OS_KIND}" {
+  set root=(${grubdisk},${KADEPLOY_DEPLOY_PART_NUM})
+${opts}}
+EOF

@@ -1,0 +1,77 @@
+#!/bin/bash -e
+
+
+### Install grub on the deployment partition ###
+grub-install --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR $KADEPLOY_DEPLOY_PART
+grub-install --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR --recheck \
+  $KADEPLOY_DEPLOY_PART
+
+
+### Generation of the menu file grub.cfg ###
+MENUFILE=/boot/grub/menu.lst
+
+## Guess the Grub's disk number from the name of the block device ##
+# Get the last character of the block device name ("/dev/sdb" -> 'b')
+grubdisknum=${KADEPLOY_BLOCK_DEVICE#${KADEPLOY_BLOCK_DEVICE%?}}
+# Get a number based on this value, numbering starts at 'a'
+let grubdisknum=$(printf "%d" "'$grubdisknum" )-$(printf "%d" "'a") || grubdisknum=0
+# Get the Grub's disk identifier (so "/dev/sdb" -> "hd1")
+grubdisk="hd${grubdisknum}"
+
+## Get grub partition number ##
+let grubpart=${KADEPLOY_DEPLOY_PART_NUM}-1
+
+## Generate the options considering on the operating system ##
+case $KADEPLOY_OS_KIND in
+  "linux")
+    opts="  kernel $KADEPLOY_ENV_KERNEL $KADEPLOY_ENV_KERNEL_PARAMS"$'\n'
+    [ -n "$KADEPLOY_ENV_INITRD" ] && \
+      opts+="  initrd $KADEPLOY_ENV_INITRD"$'\n'
+    ;;
+
+  "xen")
+    opts="  kernel $KADEPLOY_ENV_HYPERVISOR $KADEPLOY_ENV_HYPERVISOR_PARAMS"$'\n'
+    opts+="  module $KADEPLOY_ENV_KERNEL $KADEPLOY_ENV_KERNEL_PARAMS"$'\n'
+    [ -n "$KADEPLOY_ENV_INITRD" ] && \
+      opts+="  module $KADEPLOY_ENV_INITRD"$'\n'
+    ;;
+
+  "bsd")
+    opts=''
+    if [ $grubdisknum -ne 0 ]
+    then
+      opts+="map (hd0) (hd${grubdisknum})"$'\n'
+      opts+="map (hd${grubdisknum}) (hd0)"$'\n'
+    fi
+    opts+="rootnoverify (hd0,${grubpart})"$'\n'
+    opts+="makeactive"$'\n'
+    opts+="chainloader +1"$'\n'
+    ;;
+
+  "windows")
+    opts=''
+    if [ $grubdisknum -ne 0 ]
+    then
+      opts+="map (hd0) (hd${grubdisknum})"$'\n'
+      opts+="map (hd${grubdisknum}) (hd0)"$'\n'
+    fi
+    opts+="rootnoverify (hd0,${grubpart})"$'\n'
+    opts+="makeactive"$'\n'
+    opts+="chainloader +1"$'\n'
+    ;;
+  *)
+    echo "Unknown operating system '${KADEPLOY_OS_KIND}'" 1>&2
+    exit 1
+    ;;
+esac
+
+## Write the menu file ##
+IFS=''
+cat <<EOF > $KADEPLOY_ENV_EXTRACTION_DIR/$MENUFILE
+default 0
+
+title ${KADEPLOY_OS_KIND}
+root (${grubdisk},${grubpart})
+$opts
+EOF
+

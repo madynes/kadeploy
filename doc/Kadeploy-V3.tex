@@ -399,8 +399,6 @@ external:
   bittorrent: 
     tracker_ip: 10.0.0.4
     download_timeout: 1800
-  grub:
-    version: 2
   mkfs:
   - fstype: ext2
     args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
@@ -527,11 +525,6 @@ external:
     \item \yfieldd{download\_timeout}{Integer}{nil} timeout for the Bittorrent file download
   \end{itemize}
 
-  \item \ypath{/external/grub}
-  \begin{itemize}
-    \item \yfieldd{version}{Integer}{2} the version of grub to be installed on the partition of the deployed environment
-  \end{itemize}
-
   \item \ypath{/external/[mkfs]} Options for mkfs. The options for several FS can be defined here.
   \begin{itemize}
     \item \yfieldd{fstype}{String}{nil} the filesystem type
@@ -558,6 +551,8 @@ clusters:
 - name: graphene
   prefix: gra
   conf_file: cluster_conf-graphene.yml
+  scripts:
+    bootloader: install_grub2
   partition_file: cluster_partition-graphene
   nodes: 
     - name: graphene-1.nancy.grid5000.fr # Full version
@@ -585,6 +580,11 @@ clusters:
     \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
     \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
     \item \yfield{partition\_file}{String} the partition file for this cluster (see section \ref{sec:partfiles})
+  \end{itemize}
+
+  \item \ypath{/clusters/scripts}
+  \begin{itemize}
+    \item \yfield{bootloader}{String} A script that install a bootloader on the deployment partition. This script can use Kadeploy3 environment variables (see \ref{sec:envvars}).
   \end{itemize}
 
   \item \ypath{/clusters/[nodes]}
