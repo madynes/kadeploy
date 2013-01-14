@@ -1905,6 +1905,9 @@ class Microstep < Automata::QueueTask
         return install_grub_on_nodes("linux")
       when "xen"
         return install_grub_on_nodes("xen")
+      else
+        failed_microstep("Only linux and xen environments can be booted with chainload PXE configuration")
+        return false
       end
     else
       failed_microstep("Invalid bootloader value: #{context[:common].bootloader}")

@@ -146,6 +146,7 @@ class Workflow < Automata::TaskManager
 
   def check_config()
     cexec = context[:execution]
+
     # Deploy on block device 
     if cexec.block_device and !cexec.block_device.empty? \
       and (!cexec.deploy_part or cexec.deploy_part.empty?)
@@ -160,6 +161,20 @@ class Workflow < Automata::TaskManager
         debug(0,"You must specify the partition to chainload on when deploying directly on block device")
         error(KadeployAsyncError::CONFLICTING_OPTIONS)
       end
+    end
+
+    if ['ddgz','ddbz2'].include?(cexec.environment.tarball["kind"])
+      if context[:common].bootloader == 'pure_pxe'
+        debug(0,"DD image based environments cannot be booted with a pure PXE configuration")
+        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+      end
+    else
+      if context[:common].bootloader == 'chainload_pxe' \
+      and !['linux','xen'].include?(cexec.environment.environment_kind)
+        debug(0,"Only linux and xen environments can be booted with a pure chainload configuration")
+        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+      end
+
     end
   end
 
