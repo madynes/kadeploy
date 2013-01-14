@@ -1040,13 +1040,18 @@ module ConfigInformation
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
                 when 'send'
-                  op[:file] = cp.value('file',String)
+                  op[:file] = cp.value(
+                    'file',String,nil,{ :type => 'file', :readable => true }
+                  )
                   op[:destination] = cp.value('destination',String)
                   op[:timeout] = cp.value('timeout',Fixnum,0)
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
                 when 'run'
-                  op[:file] = cp.value('file',String)
+                  op[:file] = cp.value(
+                    'file',String,nil,{ :type => 'file', :readable => true }
+                  )
+                  op[:params] = cp.value('params',String,'')
                   op[:timeout] = cp.value('timeout',Fixnum,0)
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
@@ -1551,10 +1556,12 @@ module ConfigInformation
                   error("[#{file}] Operation #{operation}: 'file' field missing")
                   return false
                 end
+                op['params'] = '' unless op['params']
                 customops[macro.to_sym][micro.to_sym] << {
                   :action => op['action'].to_sym,
                   :name => "#{micro}-#{op['name']}",
                   :file => op['file'],
+                  :params => op['params'],
                   :timeout => timeout,
                   :retries => retries,
                   :scattering => scattering.to_sym,

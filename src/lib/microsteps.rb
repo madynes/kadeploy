@@ -1132,7 +1132,7 @@ class Microstep < Automata::QueueTask
         "#{set_env()} tmp=`mktemp` " \
         "&& chmod 755 ${tmp} " \
         "&& cat - > $tmp "\
-        "&& . ${tmp}",
+        "&& . ${tmp} #{op[:params]}",
         { :input_file => op[:file], :scattering => op[:scattering] }
       )
     else

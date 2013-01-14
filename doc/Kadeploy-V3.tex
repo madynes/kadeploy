@@ -890,6 +890,7 @@ Here is a custom operation description:
   \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send}, \emph{run} and \emph{exec})
   \item \yfield{file}{String} \small{(To be specified if the action is \emph{send} or \emph{run})} The path to the file to be send/executed (if the action is \emph{send} the file name will remains the same, if the action is \emph{run} this file need to contain a script)
   \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination directory on the nodes (Kadeploy3 specific environment variables are substitued in the path)
+  \item \yfield{params}{String}{''} \small{(To be specified if the action is \emph{run})} The parameters of the script.
   \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} before the script name to be able to use Kadeploy3 specific environment variables inside of it (example: \texttt{command: . /myscript.sh}).
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
