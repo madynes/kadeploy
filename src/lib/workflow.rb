@@ -561,9 +561,9 @@ class Workflow < Automata::TaskManager
                 :name => entry[:name],
                 :action => :run,
                 :file => entry[:file],
+                :params => entry[:params],
                 :timeout => entry[:timeout],
                 :retries => entry[:retries],
-                :destination => entry[:destination],
                 :scattering => entry[:scattering]
               }
             else
