@@ -2024,35 +2024,8 @@ If you choose to mount more than one partition in the pre-install, remember to u
 
 
 \section{Do a custom partitioning}\label{sec:custom-partitioning}
-To perform a custom partitioning, you can use a substitute custom operation. There is two ways to setup this kind of operation: in the cluster-specific configuration file (Administrator) or using the Kadeploy3 client (User).
+To perform a custom partitioning, you can use a substitute custom operation.
 
-\subsection{Custom partitioning with cluster-specific configuration}\
-The setting to modify in the cluster-specific configuration file (see section \ref{sec:specific_config}) is \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/format\_deploy\_part/[substitute]}.
-
-Here is a sample of the configuration file setting:
-\begin{small}
-\begin{verbatim}
-    ...
-    automata:
-      macrosteps:
-        SetDeploymentEnv:
-          - type: Untrusted
-            timeout: 200
-            microsteps:
-              - name: format_deploy_part
-                substitute:
-                  - action: send
-                    file: partition_file
-                    destination: /
-                    timeout: 10
-                    scattering: chain
-                  - action: exec
-                    command: cat /partition_file | fdisk
-                    retries: 1
-\end{verbatim}
-\end{small}
-
-\subsection{Custom partitioning with Kadeploy3 client}
 You can use the Kadeploy3 client's option \emph{--set-custom-operations} (see \ref{sec:kadeploy_client}) to setup custom micro-step operations.
 
 The field to configure is the field \ypath{/SetDeploymentEnv/create\_partition\_table/[substitute]}.
@@ -2080,6 +2053,9 @@ Here is a sample of a the custom operations file:
             file: partitioning.sh
 \end{verbatim}
 \end{small}
+
+Note: It is also possible for administrators to add systematic custom operations in the deployment process in order to perform a custom partitioning: the setting to modify in the cluster-specific configuration file (see section \ref{sec:specific_config}) is \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/format\_deploy\_part/[substitute]}. The custom operations to add will look the same as the ones created in the \emph{custom\_ops.yml} script.
+
 
 
 \end{document}
