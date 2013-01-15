@@ -399,8 +399,6 @@ external:
   bittorrent: 
     tracker_ip: 10.0.0.4
     download_timeout: 1800
-  grub:
-    version: 2
   mkfs:
   - fstype: ext2
     args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
@@ -527,11 +525,6 @@ external:
     \item \yfieldd{download\_timeout}{Integer}{nil} timeout for the Bittorrent file download
   \end{itemize}
 
-  \item \ypath{/external/grub}
-  \begin{itemize}
-    \item \yfieldd{version}{Integer}{2} the version of grub to be installed on the partition of the deployed environment
-  \end{itemize}
-
   \item \ypath{/external/[mkfs]} Options for mkfs. The options for several FS can be defined here.
   \begin{itemize}
     \item \yfieldd{fstype}{String}{nil} the filesystem type
@@ -558,6 +551,8 @@ clusters:
 - name: graphene
   prefix: gra
   conf_file: cluster_conf-graphene.yml
+  scripts:
+    bootloader: install_grub2
   partition_file: cluster_partition-graphene
   nodes: 
     - name: graphene-1.nancy.grid5000.fr # Full version
@@ -571,6 +566,8 @@ clusters:
 - name: griffon
   conf_file: cluster_conf-griffon.yml
   partition_file: cluster_partition-griffon
+  scripts:
+    bootloader: install_grub
   nodes: 
     - name: griffon-[1-92].nancy.grid5000.fr # Digest version
       address: 10.0.65.[1-92]
@@ -585,6 +582,11 @@ clusters:
     \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
     \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
     \item \yfield{partition\_file}{String} the partition file for this cluster (see section \ref{sec:partfiles})
+  \end{itemize}
+
+  \item \ypath{/clusters/scripts}
+  \begin{itemize}
+    \item \yfield{bootloader}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/clusters/[nodes]}
@@ -1046,6 +1048,14 @@ A partition map must be provided for each cluster.
 If you specify \texttt{fdisk} for the \ypath{/partitioning/kind} field in the cluster-specific configuration file, the partition map file must be a fdisk map. In this case, concerning the type of the deployment partition (MSDOS partition type), you must use the value \texttt{PARTTYPE} instead of a real value. Thus, this value will be modified on the fly according to the kind of environment deployed (field \texttt{fdisktype} of the environment description). You can also use the values \texttt{PARTTYPE}$N$ (for sample, \texttt{PARTTYPE3}), where $N$ is a partition number: during the deployment process, if you are deploying on the partition number $X$, \texttt{PARTTYPE}$X$ will be substitued by the partition type and every \texttt{PARTTYPE}$Y$ where $Y \neq X$ by \emph{0} (empty partition).
 
 If you specify \texttt{parted} for the \ypath{/partitioning/kind} field in the cluster-specific configuration file, you must provide a file containing a parted map. In this case, concerning the kind of the deployment partition, you must use the value \texttt{PARTTYPE} instead of a real value. Thus, this value will be modified on the fly according to the kind of filesystem deployed (field \texttt{filesystem} of the environment description). You can also use the values \texttt{PARTTYPE}$N$ (for sample, \texttt{PARTTYPE3}), where $N$ is a partition number: during the deployment process, if you are deploying on the partition number $X$, \texttt{PARTTYPE}$X$ will be substitued by the filesystem kind and every \texttt{PARTTYPE}$Y$ where $Y \neq X$ by an empty string.
+\section{Bootloader install script}\label{sec:bootscript}
+A script that installs a bootloader on the nodes must be provided for each cluster.
+
+You can use the Kadeploy3 environment variables in your script (see section \ref{sec:env_vars}). The tools you can use in your script are the ones that are installed in your deployment environment (see section \ref{sec:deployenv}).
+
+Be careful to install the bootloader on the deployment partition (Kadeploy3 environment variable \texttt{KADEPLOY\_DEPLOY\_PART}) in order for kadeploy to be able to chainload on it.
+
+Samples of scripts are provided in the distribution (in the directory \texttt{scripts/bootloader/}).
 
 
 
@@ -1090,7 +1100,7 @@ The COMMAND can should be:
 \end{itemize}
 
 
-\section{Deployment environment}
+\section{Deployment environment}\label{sec:deployenv}
 There are three ways to set a deployment environment: using the production environment, using a dedicated environment, using an NFSRoot environment.
 
 \subsection{Configuration of the production environment}

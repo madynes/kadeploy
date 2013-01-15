@@ -799,115 +799,14 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the kernel parameters
   def get_kernel_params
-    kernel_params = String.new
     #We first check if the kernel parameters are defined in the environment
-    if (context[:execution].environment.kernel_params != nil) then
-      kernel_params = context[:execution].environment.kernel_params
+    if !context[:execution].environment.kernel_params.nil?
+      context[:execution].environment.kernel_params
     #Otherwise we eventually check in the cluster specific configuration
-    elsif (context[:cluster].kernel_params != nil) then
-      kernel_params = context[:cluster].kernel_params
+    elsif !context[:cluster].kernel_params.nil?
+      context[:cluster].kernel_params
     else
-      kernel_params = ""
-    end
-    return kernel_params
-  end
-
-  # Install Grub-legacy on the deployment partition
-  #
-  # Arguments
-  # * kind of OS (linux, xen)
-  # Output
-  # * return true if the installation of Grub-legacy has been successfully performed, false otherwise
-  def install_grub1_on_nodes(kind)
-    root = get_deploy_part_str()
-    grubpart = "hd0,#{get_deploy_part_num() - 1}"
-    path = context[:common].environment_extraction_dir
-    line1 = line2 = line3 = ""
-    kernel_params = get_kernel_params()
-    case kind
-    when "linux"
-      line1 = "#{context[:execution].environment.kernel}"
-      line1 += " #{kernel_params}" if kernel_params != ""
-      if (context[:execution].environment.initrd == nil) then
-        line2 = "none"
-      else
-        line2 = "#{context[:execution].environment.initrd}"
-      end
-    when "xen"
-      line1 = "#{context[:execution].environment.hypervisor}"
-      
-      line1 += " #{context[:execution].environment.hypervisor_params}" if context[:execution].environment.hypervisor_params != nil
-      line2 = "#{context[:execution].environment.kernel}"
-      line2 += " #{kernel_params}" if kernel_params != ""
-      if (context[:execution].environment.initrd == nil) then
-        line3 = "none"
-      else
-        line3 = "#{context[:execution].environment.initrd}"
-      end
-    else
-      failed_microstep("Invalid os kind #{kind}")
-      return false
-    end
-    return parallel_exec(
-      "(/usr/local/bin/install_grub "\
-      "#{kind} #{root} \"#{grubpart}\" #{path} "\
-      "\"#{line1}\" \"#{line2}\" \"#{line3}\")"
-    )
-  end
-
-  # Install Grub 2 on the deployment partition
-  #
-  # Arguments
-  # * kind of OS (linux, xen)
-  # Output
-  # * return true if the installation of Grub 2 has been successfully performed, false otherwise
-  def install_grub2_on_nodes(kind)
-    root = get_deploy_part_str()
-    grubpart = "hd0,#{get_deploy_part_num()}"
-    path = context[:common].environment_extraction_dir
-    line1 = line2 = line3 = ""
-    kernel_params = get_kernel_params()
-    case kind
-    when "linux"
-      line1 = "#{context[:execution].environment.kernel}"
-      line1 += " #{kernel_params}" if kernel_params != ""
-      if (context[:execution].environment.initrd == nil) then
-        line2 = "none"
-      else
-        line2 = "#{context[:execution].environment.initrd}"
-      end
-    when "xen"
-      line1 = "#{context[:execution].environment.hypervisor}"
-      line1 += " #{context[:execution].environment.hypervisor_params}" if context[:execution].environment.hypervisor_params != nil
-      line2 = "#{context[:execution].environment.kernel}"
-      line2 += " #{kernel_params}" if kernel_params != ""
-      if (context[:execution].environment.initrd == nil) then
-        line3 = "none"
-      else
-        line3 = "#{context[:execution].environment.initrd}"
-      end
-    else
-      failed_microstep("Invalid os kind #{kind}")
-      return false
-    end
-    return parallel_exec(
-      "(/usr/local/bin/install_grub2 "\
-      "#{kind} #{root} \"#{grubpart}\" #{path} "\
-      "\"#{line1}\" \"#{line2}\" \"#{line3}\")",
-      {},
-      {:status => ["0"]}
-    )
-  end
-
-  def install_grub_on_nodes(kind)
-    case context[:common].grub
-    when "grub1"
-      return install_grub1_on_nodes(kind)
-    when "grub2"
-      return install_grub2_on_nodes(kind)
-    else
-      failed_microstep("#{context[:common].grub} is not a valid Grub choice")
-      return false
+      ''
     end
   end
 
@@ -1906,12 +1805,10 @@ class Microstep < Automata::QueueTask
         return false
       end
     when "chainload_pxe"
-      case context[:execution].environment.environment_kind
-      when "linux"
-        return install_grub_on_nodes("linux")
-      when "xen"
-        return install_grub_on_nodes("xen")
-      end
+      return parallel_exec(
+        run_script(),
+        { :input_file => context[:cluster].bootloader_script }
+      )
     else
       failed_microstep("Invalid bootloader value: #{context[:common].bootloader}")
       return false
