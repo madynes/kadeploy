@@ -65,6 +65,8 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0444,root,root) /usr/local/man/man1/kapower3.1
 %doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/bootloader/install_grub
 %doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/bootloader/install_grub2
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/partitioning/parted-sample
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/partitioning/fdisk-sample
 
 %files server
 %defattr(-,deploy,deploy,-)

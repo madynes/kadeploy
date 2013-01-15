@@ -1,0 +1,32 @@
+#!/bin/bash -e
+
+function do_fdisk()
+{
+  unset map
+
+  for cmd in "$@"
+  do
+    map+="$cmd"$'\n'
+  done
+  map+="w"
+
+  IFS=''
+  echo $map | /sbin/fdisk $KADEPLOY_BLOCK_DEVICE
+  unset IFS
+}
+
+# Set the MSDOS-partitioning partition type of the deployment partition
+PARTTYPE[$KADEPLOY_DEPLOY_PART_NUM]=\
+"t ${KADEPLOY_DEPLOY_PART_NUM} ${KADEPLOY_PART_TYPE}"
+
+# Execution of several fdisk commands for debug purpose
+# (identification of the line which is failing)
+do_fdisk d 1 d 2 d 3 d 4
+do_fdisk n p 1 '' +4G t 82
+do_fdisk n p 2 '' +6G ${PARTTYPE[2]}
+do_fdisk n p 3 '' +6G ${PARTTYPE[3]}
+do_fdisk n e '' ''
+do_fdisk n '' '' ${PARTTYPE[5]}
+do_fdisk a $KADEPLOY_DEPLOY_PART_NUM
+
+/sbin/partprobe $KADEPLOY_BLOCK_DEVICE

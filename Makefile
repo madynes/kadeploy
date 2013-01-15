@@ -81,6 +81,8 @@ install_man:
 install_scripts:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub2 $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/partitioning/parted-sample $(DESTDIR)/usr/local/kadeploy3/scripts/partitioning
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/partitioning/fdisk-sample $(DESTDIR)/usr/local/kadeploy3/scripts/partitioning
 
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
@@ -91,6 +93,7 @@ tree_server:
 	@mkdir -p $(DESTDIR)/etc/kadeploy3/keys
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
+	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts/partitioning
 
 tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3
