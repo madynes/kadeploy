@@ -1096,6 +1096,21 @@ There are three ways to set a deployment environment: using the production envir
 \subsection{Configuration of the production environment}
 TODO
 \subsection{Creation of the dedicated environment}
+\subsubsection{Debian: Debirf based method (recommended)}
+This methods consists in creating a kernel/initrd that contains all the tools required to perform a deployment. The \emph{debirf} software (\url{http://cmrg.fifthhorseman.net/wiki/debirf}) is to ease the creation of the deployment environment. To use these method, go to the \texttt{addons/deploy\_env\_generation/debirf} directory and execute with root rights:
+\begin{small}
+\begin{verbatim}
+> make all
+\end{verbatim}
+\end{small}
+
+The \texttt{kadeploy-deploy-kernel/debirf.conf} configuration file can be tuned if you want to add or remove some packages in the filesystem. To do this, you can modify the \texttt{INCLUDE} and \texttt{INCLUDE} values.
+
+You can also add custom debirf modules in the \texttt{kadeploy-deploy-kernel/modules/} directory. You can find a module sample named \texttt{blacklist\_sample} in this directory. Please refer to debirf documentation for further information.
+
+Once you've executed the make command, you can find the kernel/initrd files of the deployment environment in the directory \texttt{kadeploy-deploy-kernel/}.
+
+\subsubsection{Debian: Debootstrap based method}
 This methods consists in creating a kernel/initrd that contains all the tools required to perform a deployment. Two scripts are provided to ease the creation of the deployment environment. To use these scripts, go to the \texttt{addons/deploy\_env\_generation/debootstrap} directory and execute with root rights:
 \begin{small}
 \begin{verbatim}
@@ -1118,6 +1133,16 @@ The size of the uncompressed initrd depends on what you have to put in your depl
 Depending on the kernel version you choose, the script will fetch the vanilla kernel corresponding to this version. Once a kernel has been fetched, it won't be fetched again in another run. Thus, you have to delete the kernel file if you want to fetch it again. At the opposite, if you do not want to use the sources of the vanilla kernel but your own sources, you can put your own kernel (tar.bz2 compressed) in the current directory. The only requirement is to name the file with the following pattern: linux-\textit{version}.tar.bz2. Then, at the kernel version prompt, just enter the \textit{version} value.
 
 After the execution of \texttt{make\_kernel.sh}, a directory prefixed with \texttt{built-} will be created. This directory contains the kernel and the initrd files, prefixed with \texttt{deploy-}.
+
+\subsubsection{Centos: Kadeploy provided scripts}
+This methods consists in creating a kernel/initrd that contains all the tools required to perform a deployment. A custom ruby script can be used to ease the creation of the deployment environment. To use these method, go to the \texttt{addons/deploy\_env\_generation/centirf} directory and execute with root rights:
+\begin{small}
+\begin{verbatim}
+> make all
+\end{verbatim}
+\end{small}
+
+Once you've executed the make command, you can find the kernel/initrd files of the deployment environment in the directory \texttt{centirf/}.
 
 \subsection{Creation of the NFSRoot environment}
 TODO
