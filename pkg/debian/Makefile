@@ -53,9 +53,10 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/clusters.yml $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_conf*.yml $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd.yml $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_partition-* $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub2 $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/parted-sample $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/fdisk-sample $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 
 install_conf_common:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DEB_ROOT_COMMON)$(SUFFIX)/etc/kadeploy3$(SUFFIX)/load_kadeploy_env
@@ -118,6 +119,8 @@ endif
 install_scripts:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/bootloader
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub2 $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/bootloader
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/partitioning/parted-sample $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/partitioning
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/partitioning/fdisk-sample $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/partitioning
 
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)$(SUFFIX)/usr/bin
@@ -132,6 +135,7 @@ tree_server:
 	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)/keys
 	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts
 	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/bootloader
+	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/partitioning
 
 tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)

@@ -41,9 +41,10 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/clusters.yml $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_conf*.yml $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd.yml $(DESTDIR)/etc/kadeploy3
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_partition-* $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub2 $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/parted-sample $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/fdisk-sample $(DESTDIR)/etc/kadeploy3
 
 install_conf_common:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
@@ -83,6 +84,8 @@ install_man:
 install_scripts:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub2 $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/partitioning/parted-sample $(DESTDIR)/usr/local/kadeploy3/scripts/partitioning
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/partitioning/fdisk-sample $(DESTDIR)/usr/local/kadeploy3/scripts/partitioning
 
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
@@ -93,6 +96,7 @@ tree_server:
 	@mkdir -p $(DESTDIR)/etc/kadeploy3/keys
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
+	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts/partitioning
 
 tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3
