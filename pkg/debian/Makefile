@@ -29,6 +29,7 @@ ADDONS=$(KADEPLOY_ROOT)/addons
 DB=$(KADEPLOY_ROOT)/db
 TEST=$(KADEPLOY_ROOT)/test
 MAN=$(KADEPLOY_ROOT)/man
+SCRIPTS=$(KADEPLOY_ROOT)/scripts
 
 SUFFIX = ""
 ifeq ($(DEV),)
@@ -53,6 +54,8 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_conf*.yml $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd.yml $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_partition-* $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub2 $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 
 install_conf_common:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DEB_ROOT_COMMON)$(SUFFIX)/etc/kadeploy3$(SUFFIX)/load_kadeploy_env
@@ -112,6 +115,10 @@ ifeq (${DEV},)
 	@(cd $(MAN); sh generate.sh $(PWD)/$(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/man)
 endif
 
+install_scripts:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/bootloader
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub2 $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/bootloader
+
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)$(SUFFIX)/usr/bin
 	@mkdir -p $(DEB_ROOT_CLIENT)$(SUFFIX)/usr/sbin
@@ -123,6 +130,8 @@ tree_server:
 	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/etc/init.d
 	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)
 	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/etc/kadeploy3$(SUFFIX)/keys
+	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts
+	@mkdir -p $(DEB_ROOT_SERVER)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)/scripts/bootloader
 
 tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)$(SUFFIX)/usr/local/kadeploy3$(SUFFIX)
@@ -146,7 +155,7 @@ endif
 	@sh set_control.sh kadeploy-client-control.in kadeploy-client $(SUFFIX) > $(DEB_ROOT_CLIENT)$(SUFFIX)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_CLIENT)$(SUFFIX) kadeploy-client$(SUFFIX)-$(VERSION).deb
 
-package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version
+package_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version install_scripts
 ifeq (${DEV},)
 else
 	@cp -r ${DEB_ROOT_SERVER}/* ${DEB_ROOT_SERVER}$(SUFFIX)

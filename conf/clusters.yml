@@ -8,3 +8,5 @@ clusters:
   - address: 172.16.160.3
     name: vm-002
   partition_file: ./cluster_partition-g5kdev-cluster
+  scripts:
+    bootloader: ./install_grub2

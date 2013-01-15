@@ -10,6 +10,7 @@ ADDONS=$(KADEPLOY_ROOT)/addons
 TEST=$(KADEPLOY_ROOT)/test
 PKG=$(KADEPLOY_ROOT)/pkg
 MAN=$(KADEPLOY_ROOT)/man
+SCRIPTS=$(KADEPLOY_ROOT)/scripts
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
 RELEASE_VERSION:=$(shell cat release_version)
@@ -41,6 +42,8 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_conf*.yml $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd.yml $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_partition-* $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub $(DESTDIR)/etc/kadeploy3
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub2 $(DESTDIR)/etc/kadeploy3
 
 install_conf_common:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
@@ -77,6 +80,10 @@ install_version:
 install_man:
 	@(cd $(MAN); sh generate.sh $(DESTDIR)/usr/local/man)
 
+install_scripts:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub2 $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
+
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
 	@mkdir -p $(DESTDIR)/
@@ -84,6 +91,8 @@ tree_server:
 	@mkdir -p $(DESTDIR)/usr/sbin
 	@mkdir -p $(DESTDIR)/etc/init.d
 	@mkdir -p $(DESTDIR)/etc/kadeploy3/keys
+	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts
+	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
 
 tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3
@@ -99,7 +108,7 @@ install_common: tree_common install_conf_common install_src install_test install
 
 install_client: tree_client install_conf_client install_bin
 
-install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version
+install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version install_scripts
 
 install_all: install_common install_client install_server
 
