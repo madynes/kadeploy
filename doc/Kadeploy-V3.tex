@@ -541,7 +541,7 @@ external:
 \section{Clusters file}
 This file describes the list of all the clusters, the location of their specific setting files and their nodes. All the nodes of the clusters that aim to be deployed must be declared in this file. It must be defined in the  \texttt{/etc/kadeploy3/clusters.yml} file.
 
-Warning, a cluster-specific configuration file and a partition file must be defined for each cluster define in this file.
+Warning, a cluster-specific configuration file and some partitioning/bootloader\_install scripts must be defined for each cluster define in this file.
 
 \subsection{Example of a clusters file\\}
 \begin{small}
@@ -553,7 +553,7 @@ clusters:
   conf_file: cluster_conf-graphene.yml
   scripts:
     bootloader: install_grub2
-  partition_file: cluster_partition-graphene
+    partitioning: partitioning-graphene
   nodes: 
     - name: graphene-1.nancy.grid5000.fr # Full version
       address: 10.0.66.1
@@ -565,9 +565,9 @@ clusters:
       address: 10.0.66.4
 - name: griffon
   conf_file: cluster_conf-griffon.yml
-  partition_file: cluster_partition-griffon
   scripts:
     bootloader: install_grub
+    partitioning: partitioning-griffon
   nodes: 
     - name: griffon-[1-92].nancy.grid5000.fr # Digest version
       address: 10.0.65.[1-92]
@@ -581,12 +581,12 @@ clusters:
     \item \yfield{name}{String} the name of the cluster
     \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
     \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
-    \item \yfield{partition\_file}{String} the partition file for this cluster (see section \ref{sec:partfiles})
   \end{itemize}
 
   \item \ypath{/clusters/scripts}
   \begin{itemize}
     \item \yfield{bootloader}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
+    \item \yfield{partitioning}{String} A script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/clusters/[nodes]}
@@ -604,7 +604,6 @@ To define the specific configuration of a cluster, you must create a specific fi
 --- 
 partitioning: 
   block_device: /dev/sda
-  kind: fdisk
   partitions:
     swap: 1
     prod: 2
@@ -733,7 +732,6 @@ automata:
   \item \ypath{/partitioning}
   \begin{itemize}
     \item \yfield{block\_device}{String}block device of the disk used on the nodes
-    \item \yfield{kind}{String} tool used to create the partition table (expected values are \texttt{fdisk} or \texttt{parted})
     \item \yfieldd{disable\_swap}{Boolean}{false} disable the swap partition on the disk
   \end{itemize}
 
@@ -1042,12 +1040,6 @@ You can remark two things :
 \end{itemize}
 For a given command on a given cluster, if you specify some group of nodes (with \texttt{GROUP\_SHORT} or \texttt{GROUP\_FQDN} patterns), you will also be able to specify, for some nodes of the cluster, a command that does not imply a group of nodes. To do this, you must specify these commands in the specific commands configuration files.
 
-\section{Partition map files}\label{sec:partfiles}
-A partition map must be provided for each cluster. 
-
-If you specify \texttt{fdisk} for the \ypath{/partitioning/kind} field in the cluster-specific configuration file, the partition map file must be a fdisk map. In this case, concerning the type of the deployment partition (MSDOS partition type), you must use the value \texttt{PARTTYPE} instead of a real value. Thus, this value will be modified on the fly according to the kind of environment deployed (field \texttt{fdisktype} of the environment description). You can also use the values \texttt{PARTTYPE}$N$ (for sample, \texttt{PARTTYPE3}), where $N$ is a partition number: during the deployment process, if you are deploying on the partition number $X$, \texttt{PARTTYPE}$X$ will be substitued by the partition type and every \texttt{PARTTYPE}$Y$ where $Y \neq X$ by \emph{0} (empty partition).
-
-If you specify \texttt{parted} for the \ypath{/partitioning/kind} field in the cluster-specific configuration file, you must provide a file containing a parted map. In this case, concerning the kind of the deployment partition, you must use the value \texttt{PARTTYPE} instead of a real value. Thus, this value will be modified on the fly according to the kind of filesystem deployed (field \texttt{filesystem} of the environment description). You can also use the values \texttt{PARTTYPE}$N$ (for sample, \texttt{PARTTYPE3}), where $N$ is a partition number: during the deployment process, if you are deploying on the partition number $X$, \texttt{PARTTYPE}$X$ will be substitued by the filesystem kind and every \texttt{PARTTYPE}$Y$ where $Y \neq X$ by an empty string.
 \section{Bootloader install script}\label{sec:bootscript}
 A script that installs a bootloader on the nodes must be provided for each cluster.
 
@@ -1057,7 +1049,16 @@ Be careful to install the bootloader on the deployment partition (Kadeploy3 envi
 
 Samples of scripts are provided in the distribution (in the directory \texttt{scripts/bootloader/}).
 
+\section{Partitioning script}\label{sec:partscript}
+A partitioning script must be provided for each cluster.
 
+You can use the Kadeploy3 environment variables in your script (see section \ref{sec:env_vars}). The tools you can use in your script are the ones that are installed in your deployment environment (see section \ref{sec:deployenv}).
+
+Be careful to write the partition type on MSDOS partitions, some bootloaders will fail to boot unless this information is written in the partition table.
+
+You should also use the \emph{/sbin/partprobe} at the end of your script to inform the OS (deployment environment) of partition table changes.
+
+Samples of scripts are provided in the distribution (in the directory \texttt{scripts/partitioning/}).
 
 \section{Specific commands configuration files}
 In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd.yml} in the configuration directory.
