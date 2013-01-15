@@ -63,6 +63,8 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0444,root,root) /usr/local/man/man1/kanodes3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kaconsole3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kapower3.1
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/bootloader/install_grub
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/bootloader/install_grub2
 
 %files server
 %defattr(-,deploy,deploy,-)
