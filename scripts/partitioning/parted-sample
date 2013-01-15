@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+parted --script -a optimal /dev/sda mklabel msdos
+parted --script -a optimal /dev/sda u GB mkpart primary linux-swap 0% 4
+[ $KADEPLOY_DEPLOY_PART_NUM -eq 2 ] && fstype=$KADEPLOY_FS_TYPE 
+parted --script -a optimal /dev/sda u GB mkpart primary $fstype 4 10
+unset fstype
+[ $KADEPLOY_DEPLOY_PART_NUM -eq 3 ] && fstype=$KADEPLOY_FS_TYPE 
+parted --script -a optimal /dev/sda u GB mkpart primary $fstype 10 16
+unset fstype
+parted --script -a optimal /dev/sda u GB mkpart extended 16 100%
+[ $KADEPLOY_DEPLOY_PART_NUM -eq 5 ] && fstype=$KADEPLOY_FS_TYPE 
+parted --script -a optimal /dev/sda u GB mkpart logical $fstype 16 100%
+unset fstype
+
+parted --script -a optimal /dev/sda align-check optimal 1
+parted --script -a optimal /dev/sda align-check optimal 2
+parted --script -a optimal /dev/sda align-check optimal 3
+parted --script -a optimal /dev/sda align-check optimal 4
+
+partprobe $KADEPLOY_BLOCK_DEVICE
