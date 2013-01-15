@@ -1163,6 +1163,8 @@ class Microstep < Automata::QueueTask
       'KADEPLOY_ENV_KERNEL' => context[:execution].environment.kernel,
       'KADEPLOY_ENV_INITRD' => context[:execution].environment.initrd,
       'KADEPLOY_ENV_KERNEL_PARAMS' => get_kernel_params(),
+      'KADEPLOY_ENV_HYPERVISOR' => context[:execution].environment.hypervisor,
+      'KADEPLOY_ENV_HYPERVISOR_PARAMS' => context[:execution].environment.hypervisor_params,
       'KADEPLOY_DEPLOY_PART' => get_deploy_part_str(),
       'KADEPLOY_BLOCK_DEVICE' => get_block_device_str(),
       'KADEPLOY_DEPLOY_PART_NUM' => get_deploy_part_num(),

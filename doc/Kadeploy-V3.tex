@@ -889,8 +889,8 @@ Here is a custom operation description:
   \item \yfield{name}{String} The name of the custom operation
   \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send}, \emph{run} and \emph{exec})
   \item \yfield{file}{String} \small{(To be specified if the action is \emph{send} or \emph{run})} The path to the file to be send/executed (if the action is \emph{send} the file name will remains the same, if the action is \emph{run} this file need to contain a script)
-  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination directory on the nodes (Kadeploy3 specific environment variables are substitued in the path)
-  \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} before the script name to be able to use Kadeploy3 specific environment variables inside of it (example: \texttt{command: . /myscript.sh}).
+  \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination directory on the nodes (Kadeploy3 environment variables are substitued in the path)
+  \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} before the script name to be able to use Kadeploy3 environment variables inside of it (example: \texttt{command: . /myscript.sh}).
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
   \item \yfieldd{scattering}{String}{'tree'} The scattering kind for this custom operation (expected values are \emph{tree} and \emph{chain})
@@ -1378,25 +1378,7 @@ Here is a description of the YAML file:
   \item \ypath{/MicroStepName/MicroStepName/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see section \ref{sec:specific_config} for custom operation description)
 \end{itemize}
 
-When you are executing a command or a script (via the \texttt{exec} or \texttt{run} action), you can use the following environment variables :
-\begin{itemize}
-\item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
-\item \texttt{KADEPLOY\_ENV} : environment deployed
-\item \texttt{KADEPLOY\_ENV\_KERNEL} : the path to the kernel file inside the deployed environment directory
-\item \texttt{KADEPLOY\_ENV\_INITRD} : the path to the initrd file inside the deployed environment directory
-\item \texttt{KADEPLOY\_ENV\_KERNEL\_PARAMS} : the deployed environment kernel parameters
-\item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
-\item \texttt{KADEPLOY\_BLOCK\_DEVICE} : the block device used in deployment
-\item \texttt{KADEPLOY\_DEPLOY\_PART\_NUM} : the deployment parition number
-\item \texttt{KADEPLOY\_SWAP\_PART\_NUM} : the swap partition number
-\item \texttt{KADEPLOY\_PROD\_PART\_NUM} : the production partition number
-\item \texttt{KADEPLOY\_TMP\_PART\_NUM} : the tmp partition number
-\item \texttt{KADEPLOY\_ENV\_EXTRACTION\_DIR} : path where the environment tarball is extracted
-\item \texttt{KADEPLOY\_TMP\_DIR} : a temporary directory (to be used for your scripts)
-\item \texttt{KADEPLOY\_OS\_KIND} : the kind of operating system being deployed (the value of the \emph{environment\_kind} field of the environment description)
-\item \texttt{KADEPLOY\_PART\_TYPE} : the MSDOS partition type of the deployment partition (the value of the \emph{fdisk\_type} field of the environment description)
-\item \texttt{KADEPLOY\_FS\_TYPE} : the filesystem format of the deployment partition (the value of the \emph{filesystem} field of the environment description)
-\end{itemize}
+When you are executing a command or a script (via the \texttt{exec} or \texttt{run} action), you can use the Kadeploy3 environment variables (see section \ref{sec:env_vars}).
 
 \texttt{Note}: This variables will also be substitued in your \texttt{destination} directory specification when you are using the \texttt{send} action.
 
@@ -1970,14 +1952,16 @@ Here are two examples:
 
 If everything went right, the output of \texttt{kaenv2to3} shows the description in the new format. You can redirect this output to a file and use this file as an input for \texttt{kaenv}.
 
-\section{Environment variables in the pre- and post-install context}
-When writing a script for an admin pre-install, an admin post-install and a user post-install, you can use the following environment variables :
+\section{Kadeploy3 Environment variables}\label{sec:env_vars}
+When writing a script for an admin pre-install, an admin/user post-install or some custom operations, you can use the following environment variables :
 \begin{itemize}
 \item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
 \item \texttt{KADEPLOY\_ENV} : environment deployed
 \item \texttt{KADEPLOY\_ENV\_KERNEL} : the path to the kernel file inside the deployed environment directory
 \item \texttt{KADEPLOY\_ENV\_INITRD} : the path to the initrd file inside the deployed environment directory
 \item \texttt{KADEPLOY\_ENV\_KERNEL\_PARAMS} : the deployed environment kernel parameters
+\item \texttt{KADEPLOY\_ENV\_HYPERVISOR} : the path to the hypervisor's kernel file inside the deployed environment directory (usefull when deploying a Xen environment for sample)
+\item \texttt{KADEPLOY\_ENV\_HYPERVISOR\_PARAMS} : the deployed environment hypervisor parameters
 \item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
 \item \texttt{KADEPLOY\_BLOCK\_DEVICE} : the block device used in deployment
 \item \texttt{KADEPLOY\_DEPLOY\_PART\_NUM} : the deployment parition number
