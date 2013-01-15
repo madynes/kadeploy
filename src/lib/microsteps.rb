@@ -1109,6 +1109,13 @@ class Microstep < Automata::QueueTask
     return true
   end
 
+  def run_script()
+    "tmp=`mktemp` " \
+    "&& chmod 755 ${tmp} " \
+    "&& cat - > $tmp "\
+    "&& #{set_env()} ${tmp}"
+  end
+
   # Run a custom method
   def custom(op)
     case op[:action]
@@ -1129,10 +1136,7 @@ class Microstep < Automata::QueueTask
     when :run
       debug(4,'Executing custom script')
       return parallel_exec(
-        "#{set_env()} tmp=`mktemp` " \
-        "&& chmod 755 ${tmp} " \
-        "&& cat - > $tmp "\
-        "&& . ${tmp}",
+        run_script(),
         { :input_file => op[:file], :scattering => op[:scattering] }
       )
     else
