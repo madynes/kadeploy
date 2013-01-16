@@ -1613,7 +1613,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-c", "--chainload-partition NUMBER", "Specify the number of the partition to chainload on") { |c|
+        opt.on("-c", "--chainload-partition NUMBER", "Specify the number of the partition to chainload on (use 0 to chainload on the MBR)") { |c|
           if /\A\d+\Z/ =~ c then
             exec_specific.chainload_part = c.to_i
           else

@@ -58,7 +58,7 @@
 	<term><option>-c</option></term>
 	<term><option>--chainload-partition  <replaceable>NUMBER</replaceable></option></term>
 	<listitem>
-	  <para>Specify the number of the partition to chainload on.</para>
+	  <para>Specify the number of the partition to chainload on (use 0 to chainload on the MBR).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
