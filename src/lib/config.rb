@@ -150,18 +150,28 @@ module ConfigInformation
               @common.almighty_env_users,
               exec_specific_config.true_user,
               client,
-              false
+              false,
+              exec_specific_config.load_env_file
             ) == false
         ) then
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
         end
       when "db"
-        if (exec_specific_config.environment.load_from_db(exec_specific_config.load_env_desc,
-                                                          exec_specific_config.env_version,
-                                                          exec_specific_config.user,
-                                                          exec_specific_config.true_user,
-                                                          db,
-                                                          client) == false) then
+        private_envs = exec_specific_config.user.nil? \
+          || exec_specific_config.user == exec_specific_config.true_user
+        unless exec_specific_config.environment.load_from_db(
+          db,
+          exec_specific_config.load_env_desc,
+          exec_specific_config.env_version,
+          exec_specific_config.user || exec_specific_config.true_user,
+          private_envs,
+          exec_specific_config.user.nil?
+        )
+          client.print(
+            "The environment #{exec_specific_config.load_env_desc} cannot be loaded. "\
+            "Maybe the version number does not exist "\
+            "or it belongs to another user"
+          )
           return KadeployAsyncError::LOAD_ENV_FROM_DB_ERROR
         end
       else
@@ -219,12 +229,21 @@ module ConfigInformation
       end
 
       if (exec_specific_config.reboot_kind == "env_recorded") then   
-        if (exec_specific_config.environment.load_from_db(exec_specific_config.env_arg,
-                                                          exec_specific_config.env_version,
-                                                          exec_specific_config.user,
-                                                          exec_specific_config.true_user,
-                                                          db,
-                                                          client) == false) then
+        private_envs = exec_specific_config.user.nil? \
+          || exec_specific_config.user == exec_specific_config.true_user
+        unless exec_specific_config.environment.load_from_db(
+          db,
+          exec_specific_config.env_arg,
+          exec_specific_config.env_version,
+          exec_specific_config.user || exec_specific_config.true_user,
+          private_envs,
+          exec_specific_config.user.nil?
+        )
+          client.print(
+            "The environment #{exec_specific_config.env_arg} cannot be loaded. "\
+            "Maybe the version number does not exist "\
+            "or it belongs to another user"
+          )
           return KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
         end
       end
@@ -234,15 +253,25 @@ module ConfigInformation
     def check_kaenv_config(exec_specific_config, db, client)
       #Environment load
       if exec_specific_config.operation == "add"
-        if (
-          exec_specific_config.environment.load_from_file(
-            exec_specific_config.env_desc,
-            @common.almighty_env_users,
-            exec_specific_config.true_user,
-            client,
-            true
-          ) == false
-        ) then
+        # almighty users can add environments for other users
+        user = nil
+        if exec_specific_config.user \
+        and @common.almighty_env_users.include?(
+          exec_specific_config.true_user
+        )
+          user = exec_specific_config.user
+        else
+          user = exec_specific_config.true_user
+        end
+
+        unless (exec_specific_config.environment.load_from_file(
+          exec_specific_config.load_env_desc,
+          @common.almighty_env_users,
+          user,
+          client,
+          true,
+          exec_specific_config.load_env_file
+        ))
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
         end
       end
@@ -318,6 +347,7 @@ module ConfigInformation
       exec_specific.node_array = Array.new
       exec_specific.load_env_kind = String.new
       exec_specific.load_env_desc = String.new
+      exec_specific.load_env_file = String.new
       exec_specific.env_version = nil #By default we load the latest version
       exec_specific.user = nil
       exec_specific.true_user = USER
@@ -1398,7 +1428,16 @@ module ConfigInformation
         return false
       end
 
-      ret = IO::read(file)
+      begin
+        ret = YAML.load_file(file)
+      rescue ArgumentError
+        error("Invalid YAML file '#{file}'")
+        ret = nil
+      rescue Errno::ENOENT
+        error("File not found '#{file}'")
+        ret = nil
+      end
+
       tmpfile.unlink if tmpfile
       return ret
     end
@@ -1604,6 +1643,7 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
           if tmp = load_envfile(f)
+            exec_specific.load_env_file = f
             exec_specific.load_env_desc = tmp
             exec_specific.load_env_kind = "file"
           else
@@ -1949,7 +1989,7 @@ module ConfigInformation
       exec_specific.true_user = USER #By default, we use the current user
       exec_specific.visibility_tag = String.new
       exec_specific.show_all_version = false
-      exec_specific.version = String.new
+      exec_specific.version = nil
       exec_specific.files_to_move = Array.new
       exec_specific.get_version = false
       exec_specific.chosen_server = String.new
@@ -1980,7 +2020,8 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
           if tmp = load_envfile(f)
-            exec_specific.env_desc = tmp
+            exec_specific.load_env_desc = tmp
+            exec_specific.load_env_file = f
             exec_specific.operation = "add"
           else
             return false
@@ -2048,7 +2089,7 @@ module ConfigInformation
           exec_specific.env_name = n
           exec_specific.operation = "set-visibility-tag"
         }
-        opt.on("--update-tarball-md5 ENVNAME", "Update the MD5 of the environment tarball") { |n|
+        opt.on("--update-image-md5 ENVNAME", "Update the MD5 of the environment image") { |n|
           exec_specific.env_name = n
           exec_specific.operation = "update-tarball-md5"
         }
@@ -2086,7 +2127,7 @@ module ConfigInformation
       return true if exec_specific.get_version
       case exec_specific.operation 
       when "add"
-        if (exec_specific.env_desc == "") then
+        if (exec_specific.load_env_desc == "") then
           error("You must choose a file that contains the environment description")
           return false
         end
