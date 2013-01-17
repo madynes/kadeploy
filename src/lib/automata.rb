@@ -465,10 +465,11 @@ module Automata
       # A thread is launched to clean and join threads that was unexpectedly closed
       # That helps to raise exceptions from one imbricated element of the automata to the main thread
       @cleaner = Thread.new do
-        until (done?)
+        while !done? and @runthread.alive?
           sleep(CLEAN_THREADS_PITCH)
           clean_threads()
         end
+        @runthread.join unless @runthread.alive?
       end
       start!
       curtask = nil
