@@ -414,7 +414,7 @@ class Workflow < Automata::TaskManager
         )
       end
 
-      if opts[:maxsize]
+      if res and opts[:maxsize]
         if (File.size(localpath) / 1024**2) > opts[:maxsize]
           debug(0,
             "The #{filetag} file #{remotepath} is too big "\
