@@ -6,14 +6,62 @@
 #Ruby libs
 require 'tempfile'
 require 'pathname'
+require 'yaml'
 
 #Kadeploy libs
 require 'db'
 require 'md5'
 require 'http'
 require 'debug'
+require 'configparser'
 
 module EnvironmentManagement
+  OS_KIND = [
+    'linux',
+    'xen',
+    'other',
+  ]
+  IMAGE_KIND = [
+    'tar',
+    'dd',
+  ]
+  IMAGE_COMPRESSION = [
+    'gzip',
+    'bzip2',
+  ]
+
+  def self.image_type_short(kind,compression)
+    case kind
+    when 'tar'
+      case compression
+      when 'gzip'
+        'tgz'
+      when 'bzip2'
+        'tbz2'
+      end
+    when 'dd'
+      case compression
+      when 'gzip'
+        'ddgz'
+      when 'bzip2'
+        'ddbz2'
+      end
+    end
+  end
+
+  def self.image_type_long(type)
+    case type
+    when 'tgz'
+      [ 'tar', 'gzip' ]
+    when 'tbz2'
+      [ 'tar', 'bzip2' ]
+    when 'ddgz'
+      [ 'dd', 'gzip' ]
+    when 'ddbz2'
+      [ 'dd', 'bzip2' ]
+    end
+  end
+
   class Environment
     attr_reader :id
     attr_reader :name
@@ -35,6 +83,33 @@ module EnvironmentManagement
     attr_reader :visibility
     attr_reader :demolishing_env
 
+    def error(client,msg)
+      Debug::distant_client_error(msg,client)
+    end
+
+    def check_os_values()
+      mandatory = []
+      type = EnvironmentManagement.image_type_long(@tarball['kind'])
+      case type[0]
+      when 'tar'
+        case @environment_kind
+        when 'xen'
+          mandatory << :@hypervisor
+        end
+        mandatory << :@kernel
+        mandatory << :@filesystem
+      when 'dd'
+      end
+
+      mandatory.each do |name|
+        val = self.instance_variable_get(name)
+        if val.nil? or val.empty?
+          return [false,"The field '#{name.to_s[1..-1]}' is mandatory for OS #{@environment_kind} with the '#{type[0]}' image kind"]
+        end
+      end
+      return [true,'']
+    end
+
     # Load an environment file
     #
     # Arguments
@@ -45,194 +120,103 @@ module EnvironmentManagement
     # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(description, almighty_env_users, user, client, record_in_db)
-      @preinstall = nil
-      @postinstall = nil
-      @environment_kind = nil
-      @demolishing_env = "0"
-      @author = "no author"
-      @description = "no description"
-      @kernel = nil
-      @kernel_params = nil
-      @initrd = nil
-      @hypervisor = nil
-      @hypervisor_params = nil
-      @fdisk_type = nil
-      @filesystem = nil
-      @visibility = "shared"
+    def load_from_file(description, almighty_env_users, user, client, record_in_db, filename=nil)
       @user = user
-      @version = 0
       @id = -1
-      description.split("\n").each { |line|
-        if /\A(\w+)\ :\ (.+)\Z/ =~ line then
-          content = Regexp.last_match
-          attr = content[1]
-          val = content[2]
-          case attr
-          when "name"
-            @name = val
-          when "version"
-            if val =~ /\A\d+\Z/ then
-              @version = val
-            else
-              Debug::distant_client_error("The environment version must be a number", client)
+
+      filemd5 = Proc.new do |file|
+        ret = nil
+        if file =~ /^http[s]?:\/\//
+          ret = ''
+        else
+          if record_in_db
+            ret = client.get_file_md5(file)
+            if ret == 0
+              error(client,"The tarball file #{file} cannot be read")
               return false
             end
-          when "description"
-            @description = val
-          when "author"
-            @author = val
-          when "tarball"
-            #filename|tgz
-            if val =~ /\A.+\|(tgz|tbz2|ddgz|ddbz2)\Z/ then
-              @tarball = Hash.new
-              tmp = val.split("|")
-              @tarball["file"] = tmp[0]
-              @tarball["kind"] = tmp[1]
-              if @tarball["file"] =~ /^http[s]?:\/\// then
-                Debug::distant_client_print("#{@tarball["file"]} is an HTTP file, let's bypass the md5sum", client)
-                @tarball["md5"] = ""
-              else
-                if (record_in_db) then
-                  md5 = client.get_file_md5(@tarball["file"])
-                  if (md5 != 0) then
-                    @tarball["md5"] = md5
-                  else
-                    Debug::distant_client_error("The tarball file #{@tarball["file"]} cannot be read", client)
-                    return false
-                  end
-                end
-              end
-            else
-              Debug::distant_client_error("The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2", client)
-              return false
-            end
-          when "preinstall"
-            if val =~ /\A.+\|(tgz|tbz2)\|.+\Z/ then
-              entry = val.split("|")
-              @preinstall = Hash.new
-              @preinstall["file"] = entry[0]
-              @preinstall["kind"] = entry[1]
-              @preinstall["script"] = entry[2]
-              if @preinstall["file"] =~ /^http[s]?:\/\// then
-                Debug::distant_client_print("#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum", client)
-                @preinstall["md5"] = ""
-              else
-                if (record_in_db) then
-                  md5 = client.get_file_md5(@preinstall["file"])
-                  if (md5 != 0) then
-                    @preinstall["md5"] = md5
-                  else
-                    Debug::distant_client_error("The pre-install file #{@preinstall["file"]} cannot be read", client)
-                    return false
-                  end
-                end
-              end
-            else
-              Debug::distant_client_error("The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2", client)
-              return false
-            end
-          when "postinstall"
-            #filename|tgz|script,filename|tgz|script...
-            if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
-              @postinstall = Array.new
-              val.split(",").each { |tmp|
-                tmp2 = tmp.split("|")
-                entry = Hash.new
-                entry["file"] = tmp2[0]
-                entry["kind"] = tmp2[1]
-                entry["script"] = tmp2[2]
-                if entry["file"] =~ /^http[s]?:\/\// then
-                  Debug::distant_client_print("#{entry["file"]} is an HTTP file, let's bypass the md5sum", client)
-                  entry["md5"] = ""
-                else
-                  if (record_in_db) then
-                    md5 = client.get_file_md5(entry["file"])
-                    if (md5 != 0) then
-                      entry["md5"] = md5
-                    else
-                      Debug::distant_client_error("The post-install file #{entry["file"]} cannot be read", client)
-                      return false
-                    end
-                  end
-                end
-                @postinstall.push(entry)
-              }
-            else
-              Debug::distant_client_error("The environment postinstall must be described like filename1|kind1|script1,filename2|kind2|script2,...  where kind is tgz or tbz2", client)
-              return false
-            end
-          when "kernel"
-            @kernel = val
-          when "kernel_params"
-            @kernel_params = val
-          when "initrd"
-            @initrd = val
-          when "hypervisor"
-            @hypervisor = val
-          when "hypervisor_params"
-            @hypervisor_params = val
-          when "fdisktype"
-            @fdisk_type = val
-          when "filesystem"
-            @filesystem = val
-          when "environment_kind"
-            if val =~ /\A(linux|xen|other)\Z/ then
-              @environment_kind = val
-            else
-              Debug::distant_client_error("The environment kind must be linux, xen or other", client)
-              return false
-            end
-          when "visibility"
-            if val =~ /\A(private|shared|public)\Z/ then
-              @visibility = val
-              if (@visibility == "public") && (not almighty_env_users.include?(@user)) then
-                Debug::distant_client_error("Only the environment administrators can set the \"public\" tag", client)
-                return false
-              end
-            else
-              Debug::distant_client_error("The environment visibility must be private, shared or public", client)
-              return false
-            end
-          when "demolishing_env"
-            if val =~ /\A(true|false)\Z/ then
-              if val.downcase == 'true'
-                @demolishing_env = 1
-              else
-                @demolishing_env = 0
-              end
-            else
-              Debug::distant_client_error("The environment demolishing_env must be a 'true' or 'false'", client)
-              return false
-            end
-          else
-            Debug::distant_client_error("#{attr} is an invalid attribute", client)
-            return false
           end
         end
-      }
-      case @environment_kind
-      when "linux"
-        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
-          Debug::distant_client_error("The name, tarball, kernel, fdisktype, filesystem, and environment_kind fields are mandatory", client)
-          return false
-        end
-      when "xen"
-        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) || (@hypervisor == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
-          Debug::distant_client_error("The name, tarball, kernel, hypervisor, fdisktype, filesystem, and environment_kind fields are mandatory", client)
-          return false
-        end
-      when "other"
-        if ((@name == nil) || (@tarball == nil) ||(@fdisk_type == nil)) then
-          Debug::distant_client_error("The name, tarball, fdisktype, and environment_kind fields are mandatory", client)
-          return false
-        end        
-      when nil
-        Debug::distant_client_error("The environment_kind field is mandatory", client)
-        return false       
       end
 
-      return true
+      begin
+        cp = ConfigInformation::ConfigParser.new(description)
+        @name = cp.value('name',String)
+        @version = cp.value('version',Fixnum,1)
+        @description = cp.value('description',String,'')
+        @author = cp.value('author',String,'')
+        @visibility = cp.value('visibility',String,'shared',['public','private','shared'])
+        if @visibility == 'public' and !almighty_env_users.include?(@user)
+          error(client,'Only the environment administrators can set the "public" tag')
+          return false
+        end
+        @demolishing_env = (
+          cp.value('destructive',[TrueClass,FalseClass],false) ? 1 : 0
+        )
+        @environment_kind = cp.value('os_kind',String,nil,OS_KIND)
+
+        cp.parse('image',true) do
+          file = cp.value('file',String)
+          @tarball = {
+            'kind' => EnvironmentManagement.image_type_short(
+              cp.value('kind',String,nil,IMAGE_KIND),
+              cp.value('compression',String,nil,IMAGE_COMPRESSION)
+            ),
+            'file' => file,
+            'md5' => filemd5.call(file)
+          }
+        end
+
+        cp.parse('preinstall') do |info|
+          unless info[:empty]
+            file = cp.value('archive',String)
+            @preinstall = {
+              'file' => file,
+              'kind' => EnvironmentManagement.image_type_short(
+                'tar',
+                cp.value('compression',String,nil,IMAGE_COMPRESSION)
+              ),
+              'md5' => filemd5.call(file),
+              'script' => cp.value('script',String,'none'),
+            }
+          end
+        end
+
+        @postinstall = []
+        cp.parse('postinstalls',false,Array) do |info|
+          unless info[:empty]
+            file = cp.value('archive',String)
+            @postinstall << {
+              'kind' => EnvironmentManagement.image_type_short(
+                'tar',
+                cp.value('compression',String,nil,IMAGE_COMPRESSION)
+              ),
+              'file' => file,
+              'md5' => filemd5.call(file),
+              'script' => cp.value('script',String,'none'),
+            }
+          end
+        end
+
+        cp.parse('boot') do
+          @kernel = cp.value('kernel',String,'',Pathname)
+          @initrd = cp.value('initrd',String,'',Pathname)
+          @kernel_params = cp.value('kernel_params',String,'')
+          @hypervisor = cp.value('hypervisor',String,'',Pathname)
+          @hypervisor_params = cp.value('hypervisor_params',String,'')
+        end
+
+        @filesystem = cp.value('filesystem',String,'')
+        @fdisk_type = cp.value('partition_type',Fixnum,0).to_s(16)
+
+      rescue ArgumentError => ae
+        error(client,"Error(#{(filename ? filename : 'env_desc')}) #{ae.message}")
+        return false
+      end
+
+      ret = check_os_values()
+      error(client,ret[1]) unless ret[0]
+      return ret[0]
     end
 
     # Load an environment from a database
