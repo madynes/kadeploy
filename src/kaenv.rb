@@ -86,11 +86,11 @@ if exec_specific_config != nil then
     puts "The URI #{local.uri} is not correct"
     exit(1)
   end
-  
-  kadeploy_server.run("kaenv", exec_specific_config, client_host, client_port)
+
+  ret = kadeploy_server.run("kaenv", exec_specific_config, client_host, client_port)
   local.stop_service()
   distant.stop_service()
-  exit(0)
+  exit(ret)
 else
   exit(1)
 end

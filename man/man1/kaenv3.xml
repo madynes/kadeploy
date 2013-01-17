@@ -133,9 +133,9 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--update-tarball-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--update-image-md5 <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
-	  <para>Update the MD5 of the environment tarball.</para>
+	  <para>Update the MD5 of the environment image.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
