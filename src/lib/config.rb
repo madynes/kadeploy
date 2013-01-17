@@ -150,7 +150,8 @@ module ConfigInformation
               @common.almighty_env_users,
               exec_specific_config.true_user,
               client,
-              false
+              false,
+              exec_specific_config.load_env_file
             ) == false
         ) then
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
@@ -236,11 +237,12 @@ module ConfigInformation
       if exec_specific_config.operation == "add"
         if (
           exec_specific_config.environment.load_from_file(
-            exec_specific_config.env_desc,
+            exec_specific_config.load_env_desc,
             @common.almighty_env_users,
             exec_specific_config.true_user,
             client,
-            true
+            true,
+            exec_specific_config.load_env_file
           ) == false
         ) then
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
@@ -318,6 +320,7 @@ module ConfigInformation
       exec_specific.node_array = Array.new
       exec_specific.load_env_kind = String.new
       exec_specific.load_env_desc = String.new
+      exec_specific.load_env_file = String.new
       exec_specific.env_version = nil #By default we load the latest version
       exec_specific.user = nil
       exec_specific.true_user = USER
@@ -1394,7 +1397,16 @@ module ConfigInformation
         return false
       end
 
-      ret = IO::read(file)
+      begin
+        ret = YAML.load_file(file)
+      rescue ArgumentError
+        error("Invalid YAML file '#{file}'")
+        ret = nil
+      rescue Errno::ENOENT
+        error("File not found '#{file}'")
+        ret = nil
+      end
+
       tmpfile.unlink if tmpfile
       return ret
     end
@@ -1598,6 +1610,7 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
           if tmp = load_envfile(f)
+            exec_specific.load_env_file = f
             exec_specific.load_env_desc = tmp
             exec_specific.load_env_kind = "file"
           else
@@ -1974,7 +1987,8 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
           if tmp = load_envfile(f)
-            exec_specific.env_desc = tmp
+            exec_specific.load_env_desc = tmp
+            exec_specific.load_env_file = f
             exec_specific.operation = "add"
           else
             return false
@@ -2080,7 +2094,7 @@ module ConfigInformation
       return true if exec_specific.get_version
       case exec_specific.operation 
       when "add"
-        if (exec_specific.env_desc == "") then
+        if (exec_specific.load_env_desc == "") then
           error("You must choose a file that contains the environment description")
           return false
         end
