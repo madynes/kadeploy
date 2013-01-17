@@ -1,0 +1,670 @@
+#!/usr/bin/ruby
+
+require 'yaml'
+require 'fileutils'
+require 'optparse'
+require 'pp'
+
+# Default values and constants
+
+USER=`id -u -n`.strip
+GROUP=`id -g -n`.strip
+
+ENVS_PATH = `pwd`.strip
+BACKUP_DIR = 'envs.bak'
+
+# For description purpose
+class Boolean
+end
+
+# Hack to enable nested Hashes merging
+class Hash
+  def merge!(hash)
+    return unless hash.is_a?(Hash)
+    hash.each_pair do |k,v|
+      if self[k]
+        if v.is_a?(Hash)
+          self[k].merge!(v)
+        elsif v.is_a?(Array)
+          # Keep array's order
+          v.each_index do |i|
+            self[k][i] = v[i] unless v[i].nil?
+          end
+        else
+          self[k] = v
+        end
+      else
+        self[k] = v
+      end
+    end
+  end
+
+  def merge(hash)
+    ret = self.dup
+    return ret unless hash.is_a?(Hash)
+    hash.each_pair do |k,v|
+      if ret[k]
+        if v.is_a?(Hash)
+          ret[k] = ret[k].merge(v)
+        elsif v.is_a?(Array)
+          # Keep array's order
+          v.each_index do |i|
+            ret[k][i] = v[i] unless v[i].nil?
+          end
+        else
+          ret[k] = v
+        end
+      else
+        ret[k] = v
+      end
+    end
+    ret
+  end
+end
+
+# Strings class improvements to test the content of a String
+class String
+  BOOLEAN_VALUES_TRUE=['true','yes']
+  BOOLEAN_VALUES_FALSE=['false','no','none']
+
+  def integer?
+    true if Integer(self) rescue false
+  end
+
+  def float?
+    true if Float(self) rescue false
+  end
+
+  def boolean?
+    BOOLEAN_VALUES_TRUE.include?(self.downcase) or BOOLEAN_VALUES_FALSE.include?(self.downcase)
+  end
+
+  def to_b
+    if BOOLEAN_VALUES_TRUE.include?(self.downcase)
+      true
+    elsif BOOLEAN_VALUES_FALSE.include?(self.downcase)
+      false
+    else
+      nil
+    end
+  end
+end
+
+# Description of a configuration resource and the way to migrate it
+class ConfigValue
+  attr_reader :oldname, :type, :default, :migmethod
+  attr_accessor :newname
+
+  def initialize(oldname, type, default = nil, migmeth = nil, listmeth = nil)
+    @oldname = oldname
+    @type = type
+    @default = default
+    @migmeth = migmeth
+    @listmeth = listmeth
+  end
+
+  def value(content)
+    ret = nil
+    if content
+      if @listmeth
+        ret = []
+        begin
+          list = @listmeth.call(content)
+        rescue Exception
+          raise ArgumentError.new(ConfigValue.errmsg("Unable to split as a list"))
+        end
+        list.each do |elem|
+          if @migmeth
+            begin
+              ret << @migmeth.call(elem)
+            rescue Exception
+              raise ArgumentError.new(errmsg("Unable to apply migration method"))
+            end
+          else
+            ret << elem
+          end
+        end
+      else
+        if @migmeth
+          begin
+            ret = @migmeth.call(content)
+          rescue Exception
+            raise ArgumentError.new(errmsg("Unable to apply migration method"))
+          end
+        else
+          ret = content
+        end
+      end
+    else
+      ret = @default
+    end
+
+    cast(ret)
+  end
+
+  def cast(value, type=nil)
+    # Cast to the specified type
+    type = @type if type.nil?
+    ret = nil
+    if value.is_a?(Array)
+      ret = value
+      value.collect! { |val| cast(val) }
+    elsif value
+      begin
+        if type == Fixnum
+          ret = Integer(value)
+        elsif type == Float
+          ret = Float(value)
+        elsif type == Boolean
+          ret = value.to_b
+        elsif type.is_a?(Array)
+          type.each do |t|
+            begin
+              ret = cast(value,t)
+              break
+            rescue ArgumentError
+            end
+          end
+        else
+          ret = value
+        end
+      rescue Exception
+        raise ArgumentError.new(errmsg(
+          "Unable to cast value '#{value}' to #{type.name}"
+        ))
+      end
+    end
+    ret
+  end
+
+  def ConfigValue.[](name,type,default=nil,migmeth=nil,listmeth=nil)
+    ConfigValue.new(name,type,default,migmeth,listmeth)
+  end
+
+  def errmsg(msg)
+    "migration error [field: #{@oldname}], #{msg}"
+  end
+end
+
+class ConfigIter
+  attr_reader :value
+
+  def initialize(hash)
+    @value = hash
+  end
+
+  def ConfigIter.[](hash)
+    ConfigIter.new(hash)
+  end
+end
+
+class ConfigDrop < ConfigValue
+  def ConfigDrop.[](name)
+    ConfigDrop.new(name,FalseClass)
+  end
+end
+
+# Allow to cache associations between old key names and new ConfigValues
+class ConfigWrapper
+  def initialize()
+    @newconf = {}
+  end
+
+  def add(path, config)
+    config.newname = path
+    if config.oldname.is_a?(Array)
+      config.oldname.each do |oldname|
+        @newconf[oldname] = [] unless @newconf[oldname]
+        @newconf[oldname] << config
+      end
+    else
+      @newconf[config.oldname] = [] unless @newconf[config.oldname]
+      @newconf[config.oldname] << config
+    end
+  end
+
+  def parse(curval, curpath=[])
+    if curval.is_a?(Hash)
+      curval.each_pair do |k,v|
+        curpath.push(k)
+        parse(v,curpath)
+        curpath.pop
+      end
+    elsif curval.is_a?(Array)
+      curval.each_index do |i|
+        curpath.push(i)
+        parse(curval[i],curpath)
+        curpath.pop
+      end
+    elsif curval.is_a?(ConfigIter)
+      curpath.push(ConfigIter)
+      parse(curval.value,curpath)
+      curpath.pop
+    elsif curval.is_a?(ConfigValue)
+      add(curpath.dup,curval)
+    end
+  end
+
+  def path2hash(path, value)
+    ret = nil
+    if path.empty?
+      ret = value
+    else
+      path.reverse_each do |cur|
+        next if cur == ConfigIter
+        if ret.nil?
+          if cur.is_a?(Fixnum)
+            ret = []
+          else
+            ret = {}
+          end
+          ret[cur] = value
+        else
+          tmp = ret
+          if cur.is_a?(Fixnum)
+            ret = []
+          else
+            ret = {}
+          end
+          ret[cur] = tmp
+        end
+      end
+    end
+    ret
+  end
+
+  def migrate(oldname, value)
+    ret = nil
+    unless @newconf[oldname].nil?
+      begin
+        path = nil
+        @newconf[oldname].each do |confval|
+          break if confval.is_a?(ConfigDrop)
+          path = confval.newname[0..-2] unless path
+          break if value.nil?
+          newval = confval.value(value)
+          if newval.is_a?(Array)
+            ret = [] unless ret
+            newval.each_index do |i|
+              ret[i] = {} unless ret[i]
+              ret[i][confval.newname.last] = newval[i] unless newval[i].nil?
+            end
+          else
+            ret = {} unless ret
+            ret[confval.newname.last] = newval unless newval.nil?
+          end
+        end
+        #puts "#{oldname}: #{path.pretty_inspect}"
+        ret = path2hash(path,ret) if !ret.nil? and ret.size > 0
+      rescue ArgumentError => ae
+        raise ae if $error
+      end
+    else
+      raise ArgumentError.new(
+        "No rules to migrate the '#{oldname}' field"
+      ) if $error
+    end
+    ret
+  end
+end
+
+ENV_DESC = {
+  'name' => ConfigValue['name', String],
+  'version' => ConfigValue['version', Fixnum, 0],
+  'description' => ConfigValue['description', String, ''],
+  'author' => ConfigValue['author', String, ''],
+  'visibility' => ConfigValue['visibility', String, 'shared'],
+  'destructive' => ConfigValue['demolishing_env', Boolean, false],
+  'os' => ConfigValue['environment_kind', String],
+  'image' => {
+    'file' => ConfigValue[
+      'tarball',
+      String,
+      nil,
+      lambda { |old| old.split('|')[0] }
+    ],
+    'kind' => ConfigValue[
+      'tarball',
+      String,
+      nil,
+      lambda { |old| (old.split('|')[1] =~ /^dd/ ? 'dd' : 'tar') }
+    ],
+    'compression' => ConfigValue[
+      'tarball',
+      String,
+      nil,
+      lambda { |old| (old.split('|')[1] =~ /gz$/ ? 'gzip' : 'bzip2') }
+    ],
+  },
+  'preinstall' => {
+    'archive' => ConfigValue[
+      'preinstall',
+      String,
+      nil,
+      lambda { |old| old.split('|')[0] }
+    ],
+    'compression' => ConfigValue[
+      'preinstall',
+      String,
+      nil,
+      lambda { |old| (old.split('|')[1] =~ /gz$/ ? 'gzip' : 'bzip2') }
+    ],
+    'script' => ConfigValue[
+      'preinstall',
+      String,
+      nil,
+      lambda { |old| old.split('|')[2]  }
+    ],
+  },
+  'postinstalls' => ConfigIter[
+    'archive' => ConfigValue[
+      'postinstall',
+      String,
+      nil,
+      lambda { |old| old.split('|')[0] },
+      lambda { |old| old.split(',') }
+    ],
+    'compression' => ConfigValue[
+      'postinstall',
+      String,
+      nil,
+      lambda { |old| (old.split('|')[1] =~ /gz$/ ? 'gzip' : 'bzip2') },
+      lambda { |old| old.split(',') }
+    ],
+    'script' => ConfigValue[
+      'postinstall',
+      String,
+      nil,
+      lambda { |old| old.split('|')[2]  },
+      lambda { |old| old.split(',') }
+    ],
+  ],
+  'boot' => {
+    'kernel' => ConfigValue['kernel', String, ''],
+    'initrd' => ConfigValue['initrd', String, ''],
+    'kernel_params' => ConfigValue['kernel_params', String, ''],
+    'hypervisor' => ConfigValue['hypervisor', String, ''],
+    'hypervisor_params' => ConfigValue['hypervisor_params', String, ''],
+  },
+  'filesystem' => ConfigValue['filesystem', String, ''],
+  'partition_type' => ConfigValue['fdisktype', Fixnum, 0],
+}
+
+ENV_SORT = [
+  'name',
+  'version',
+  'description',
+  'author',
+  'visibility',
+  'destructive',
+  'os',
+  'image',
+  'preinstall',
+  'postinstalls',
+  'boot',
+  'filesystem',
+  'partition_type',
+]
+
+# Options parsing
+
+$backuppath   = nil
+$user         = USER
+$group        = GROUP
+$setrights      = false
+
+$backupfiles = []
+$backup = false
+$confirm = true
+$save = true
+$debug = false
+$error = true
+
+USAGE = "Usage: #{$0} [options]"
+
+optparse = OptionParser.new(USAGE) do |opts|
+	opts.on( '-h', '--help', 'Display this screen' ) do
+  		puts opts
+  		exit
+	end
+
+	opts.on( '-b', '--backup', "Move current configuration files into the backup directory [default: disabled]") do
+  	$backup = false
+	end
+
+	opts.on( '-B', '--backup-dir <PATH>', "Specify the path to the directory where kadeploy current environment files should be saved [default: '#{ENVS_PATH}/#{BACKUP_DIR}']") do |b|
+  	$backuppath = b
+	end
+
+	opts.on( '-u', '--user <USERNAME>', "Specify the user that owns the configuration files [default: '#{USER}]'") do |u|
+  	$user = u
+	end
+
+	opts.on( '-g', '--group <GROUPNAME>', "Specify the group of the configuration files [default: '#{GROUP}']") do |g|
+  	$group = g
+	end
+
+	opts.on( '-d', '--dry-run', "Do not write or modify any files [default: disabled]") do
+  	$save = false
+	end
+
+	opts.on( '-r', '--rights', "Set the USER/GROUP rights on generated files [default: disabled]") do
+  	$setrights = true
+	end
+
+	opts.on( '-y', '--no-confirmation-dialog', "Disable the confirmation dialog [default: enabled]") do
+  	$confirm = false
+	end
+
+	opts.on( '-E', '--no-errors', "Do not display errors [default: disabled]") do
+  	$error = false
+	end
+
+	opts.on( '', '--debug', "Print debug of the migration [default: disabled]") do
+  	$debug = true
+	end
+end
+
+begin
+  optparse.parse!
+rescue OptionParser::InvalidOption => e
+  $stderr.puts e.to_s
+  exit 1
+end
+
+
+
+# Signal handler
+trap('INT') do
+  abort_migration()
+end
+
+
+
+# Script methods
+def abort_migration()
+  $stderr.puts "\nMigration aborted."
+  exit 1
+end
+
+def save_config_file(file, content_hash, options = {:sort=>false})
+  unless content_hash.empty?
+    if options[:sort]
+      # Ugly hack to enable yaml output sorting since the :SortKeys option do
+      # not work anymore and since OrderedHashes are only available in ruby 1.9
+      max = options[:sort].size
+      yaml = YAML::quick_emit(content_hash) do |out|
+        out.map(content_hash.taguri(), content_hash.to_yaml_style()) do |map|
+          content_hash.keys.sort do |x,y|
+            tmpx = options[:sort].index(x)
+            tmpy = options[:sort].index(y)
+            tmpx,tmpy = [x.to_s,y.to_s] if !tmpx and !tmpy
+            (tmpx || max+1) <=> (tmpy || max+2)
+          end.each{ |k| map.add(k, content_hash[k]) }
+          #content_hash.sort_by { |k,v| k }.each{ |t| map.add(t[0],t[1]) }
+          #content_hash.keys.sort.each { |k| map.add(k, content_hash[k]) }
+        end
+      end
+    else
+      yaml = content_hash.to_yaml
+    end
+    if $save
+      File.open(file,'w+') { |f| f.puts(yaml) }
+      FileUtils.chown($user,$group,file) if $setrights
+    else
+      puts "\n=== #{file} ==="
+      puts yaml
+      puts '==='
+    end
+  end
+end
+
+def migrate_file(file, options = {:content=>true,:errmsg=>true})
+  config = nil
+  if File.exists?(file)
+    if options[:content]
+      content = File.read(file).split("\n")
+    else
+      content = nil
+    end
+
+    yield(content)
+
+    $backupfiles << file if $backup
+  else
+    $stderr.puts "### file not found '#{file}', ignored" if options[:errmsg]
+  end
+  config
+end
+
+def migrate_content(content, conftree = nil, options = {:wrap=>true,:custom=>false})
+  config = {}
+  if content
+    cw = nil
+    if options[:wrap]
+      cw = ConfigWrapper.new()
+      cw.parse(conftree)
+    end
+
+    content.each do |line|
+      key,val = parse_key_val(line)
+      next if key.nil?
+      puts "\tmigration of '#{key}' -> '#{val}':" if $debug
+      key,val = yield(key,val) if options[:custom]
+      if key and options[:wrap]
+        tmp = cw.migrate(key,val)
+      else
+        tmp = { key => val }
+      end
+      puts "\t#{tmp.pretty_inspect}" if $debug
+      config.merge!(tmp) unless key.nil?
+    end
+
+    prepare = Proc.new do |var|
+      if var.is_a?(Array)
+        var.compact!
+        #var.sort! { |x,y| (x.is_a?(String) or y.is_a?(String) ? x <=> y : 1) }
+        var.each do |val|
+          prepare.call(val)
+        end
+      elsif var.is_a?(Hash)
+        var.each_value do |val|
+          prepare.call(val)
+        end
+      end
+    end
+
+    prepare.call(config)
+  end
+
+  config
+end
+
+def parse_key_val(line)
+  key,val = nil
+  if line =~ /^\s*([^\s#]+)\s*:\s*(.*)\s*$/
+    key = Regexp.last_match(1)
+    val = Regexp.last_match(2)
+=begin
+    if val.integer?
+      val = val.to_i
+    elsif val.float?
+      val = val.to_f
+    elsif val.boolean?
+      val = val.to_b
+    end
+=end
+  end
+  [key,val]
+end
+
+
+# Treatment
+if ARGV.empty?
+  $stderr.puts 'No files given'
+  abort_migration()
+end
+
+$backuppath = File.join(ENVS_PATH,BACKUP_DIR) unless $backuppath
+
+# Confirmation dialog
+if $confirm
+  puts "\nMigration settings"
+  puts "  Environments files      : #{ARGV.join(', ')}"
+  puts "  Backup directory        : #{$backuppath}"
+  puts "  Dry run                 : #{!$save}"
+  puts "  Debug mode              : #{$debug}"
+  puts "  Enable errors           : #{$error}"
+  puts "  Set rights to files     : #{$setrights}"
+  puts "  Move files to backup dir: #{$backup}"
+  puts "  User                    : #{$user}"
+  puts "  Group                   : #{$group}"
+  print "\nAre this settings ok [y/N]? "
+
+  abort_migration() unless $stdin.gets.chomp.downcase == 'y'
+end
+
+# Migration
+puts "\nStarting migration"
+
+FileUtils.mkdir_p($backuppath) if $backup
+
+begin
+
+ARGV.each do |curfile|
+  migrate_file(curfile) do |content|
+    env = migrate_content(
+      content,
+      ENV_DESC,
+      :wrap => true
+    )
+    basename = nil
+    if File.basename(curfile).include?('.')
+      basename = File.basename(curfile,".#{curfile.split('.').last}")
+    else
+      basename = File.basename(curfile)
+    end
+    save_config_file(
+      File.join(File.dirname(curfile),"#{basename}.yml"),
+      env,
+      :sort=>ENV_SORT
+    )
+    puts "  migration of '#{curfile}' ok"
+  end
+end
+
+# Backup of old files
+if $save and $backup and !$backupfiles.empty?
+  puts "  Moving old files to backup directory"
+  $backupfiles.each do |file|
+    FileUtils.mv(file,$backuppath)
+    puts "  #{file} ok"
+  end
+end
+
+puts "Migration done."
+
+rescue ArgumentError => ae
+  $stderr.puts "Error: #{ae.message}"
+  exit 1
+end
