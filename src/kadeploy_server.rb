@@ -1729,7 +1729,7 @@ class KadeployServer
     where = ''
     if (user == "*") then #we show the environments of all the users
       if (exec_specific.show_all_version == false) then
-        if (exec_specific.version != "") then
+        if exec_specific.version then
           where = "version = ? \
                    AND visibility <> 'private' \
                    GROUP BY name"
@@ -1750,7 +1750,7 @@ class KadeployServer
       #If the user wants to print the environments of another user, private environments are not shown
       mask_private_env = exec_specific.true_user != user
       if (exec_specific.show_all_version == false) then
-        if (exec_specific.version != "") then
+        if exec_specific.version then
           if mask_private_env then
             where = "user = ? \
                      AND version = ? \
@@ -1808,7 +1808,7 @@ class KadeployServer
     if (res.num_rows > 0) then
       env.short_view_header(client)
       res.each_hash { |row|
-        env.load_from_hash(row)
+        env.load_from_dbhash(row)
         env.short_view(client)
       }
     else
@@ -1826,69 +1826,35 @@ class KadeployServer
   # * nothing
   def kaenv_add_environment(exec_specific, client, db)
     if (env = exec_specific.environment)
-      args = []
-      args << env.name
-      args << env.version
-      args << env.user
-      res = db.run_query(
-        "SELECT * FROM environments WHERE name = ? AND version = ? AND user = ?",
-        env.name, env.version, env.user
-      )
-      if (res.num_rows != 0) then
-        Debug::distant_client_print("An environment with the name #{env.name} and the version #{env.version} has already been recorded for the user #{env.user}", client)
-        return(1)
-      end
-      if (env.visibility == "public") then
-        res = db.run_query(
-          "SELECT * FROM environments WHERE name = ? AND version = ? AND visibility='public'",
-          env.name, env.version
+      if (envs = exec_specific.environment.save_to_db(db)) == true
+        Debug::distant_client_print(
+          "The environment #{env.name} version #{env.version} of #{env.user} "\
+          "has been added",
+          client
         )
-        if (res.num_rows != 0) then
-          Debug::distant_client_print("A public environment with the name #{env.name} and the version #{env.version} has already been recorded", client)
-          return(1)
+        return 0
+      else
+        if envs and !envs.empty?
+          env = envs[0]
+          if env.visibility == 'public'
+            Debug::distant_client_print(
+              "A public environment with the name #{env.name} "\
+              "and the version #{env.version} has already been recorded",
+              client
+            )
+          else
+            Debug::distant_client_print(
+              "An environment with the name #{env.name} "\
+              "and the version #{env.version} has already been recorded "\
+              "for the user #{env.user}",
+              client
+            )
+          end
+        else
+          Debug::distant_client_print("Environment cannot be add",client)
         end
+        return 1
       end
-      db.run_query(
-        "INSERT INTO environments (\
-           name, \
-           version, \
-           description, \
-           author, \
-           tarball, \
-           preinstall, \
-           postinstall, \
-           kernel, \
-           kernel_params, \
-           initrd, \
-           hypervisor, \
-           hypervisor_params, \
-           fdisk_type, \
-           filesystem, \
-           user, \
-           environment_kind, \
-           visibility, \
-           demolishing_env) \
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-         env.name,
-         env.version,
-         env.description,
-         env.author,
-         env.flatten_tarball_with_md5(),
-         env.flatten_pre_install_with_md5() || '',
-         env.flatten_post_install_with_md5() || '',
-         env.kernel,
-         env.kernel_params || '',
-         env.initrd,
-         env.hypervisor || '',
-         env.hypervisor_params || '',
-         env.fdisk_type,
-         env.filesystem,
-         env.user,
-         env.environment_kind,
-         env.visibility,
-         env.demolishing_env
-      )
-      return(0)
     end
   end
 
@@ -1901,20 +1867,34 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_delete_environment(exec_specific, client, db)
-    if (exec_specific.version != "") then
-      version = exec_specific.version
+    # almighty users can delete environments of other users
+    user = nil
+    if exec_specific.user \
+    and @config.common.almighty_env_users.include?(exec_specific.true_user)
+      user = exec_specific.user
     else
-      version = _get_max_version(db, exec_specific.env_name, exec_specific.true_user, exec_specific.true_user)
+      user = exec_specific.true_user
     end
-    res = db.run_query(
-      "DELETE FROM environments WHERE name = ? AND version = ? AND user = ?",
-      exec_specific.env_name, version, exec_specific.true_user
+
+    ret = EnvironmentManagement::Environment.del_from_db(
+      db,
+      exec_specific.env_name,
+      exec_specific.version,
+      user,
+      true
     )
-    if (res.affected_rows == 0) then
+
+    if ret
+      Debug::distant_client_print(
+        "The environment #{ret.name} version #{ret.version} of #{ret.user} "\
+        "has been deleted",
+        client
+      )
+      return 0
+    else
       Debug::distant_client_print("No environment has been deleted", client)
-      return(1)
+      return 1
     end
-    return(0)
   end
 
   # Print the environment designed by exec_specific.env_name and that belongs to the user specified in exec_specific.user
@@ -1926,118 +1906,94 @@ class KadeployServer
   # Output
   # * print the specified environment that belongs to the specified user
   def kaenv_print_environment(exec_specific, client, db)
-    env = EnvironmentManagement::Environment.new
-    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
-    #If the user wants to print the environments of another user, private environments are not shown
-    mask_private_env = exec_specific.true_user != user
+    version = (exec_specific.show_all_version ? true : exec_specific.version)
+    user = exec_specific.user || exec_specific.true_user
+    private_envs = exec_specific.user.nil? \
+      || exec_specific.user == exec_specific.true_user
 
-    args = []
-
-    query = "SELECT * FROM environments WHERE name = ? AND user = ?"
-    query += " AND visibility <> 'private'" if mask_private_env
-    args << exec_specific.env_name
-    args << user
-
-    if (exec_specific.show_all_version == false) then
-      if (exec_specific.version != "") then
-        version = exec_specific.version
-      else
-        version = _get_max_version(db, exec_specific.env_name, user, exec_specific.true_user)
-      end
-
-      query += " AND version = ?"
-      args << version
-    else
-      query += " ORDER BY version"
-    end
-
-    res = db.run_query(query,*args)
-
-    if (res.num_rows > 0) then
-      res.each_hash { |row|
-        Debug::distant_client_print("###", client)
-        env.load_from_hash(row)
-        env.full_view(client)
-      }
-    else
-      Debug::distant_client_print("The environment does not exist", client)
-    end
-  end
-
-  # Get the highest version of an environment
-  #
-  # Arguments
-  # * db: database handler
-  # * env_name: environment name
-  # * user: owner of the environment
-  # Output
-  # * return the highest version number or -1 if no environment is found
-  def _get_max_version(db, env_name, user, true_user)
-    #If the user wants to print the environments of another user, private environments are not shown
-    query = "SELECT MAX(version) FROM environments WHERE user = ? AND name = ?"
-    query += " AND visibility <> 'private'" if (user != true_user)
-
-    res = db.run_query(query,user,env_name)
-
-    if (res.num_rows > 0) then
-      return res.to_array[0][0]
-    else
-      return -1
-    end
-  end
-
-  def _allowed_to_update_env?(env_user, true_user, client)
-    if ((env_user != true_user) && (not @config.common.almighty_env_users.include?(true_user))) then
-      Debug::distant_client_error("You are only allowed to modify your owned environments", client)
-      return false
-    else
-      return true
-    end
-  end
-
-  # Update the md5sum of the tarball
-  # Sub function of update_preinstall_md5
-  #
-  # * db: database handler
-  # * env_name: environment name
-  # * env_version: environment version
-  # * env_user: environment user
-  # * true_user: true user
-  # * client: DRb handler of the Kadeploy client
-  # Output
-  # * nothing
-  def _update_tarball_md5(db, env_name, env_version, env_user, true_user, client)
-    if (env_version != "") then
-      version = env_version
-    else
-      version = _get_max_version(db, env_name, env_user, true_user)
-    end
-
-    res = db.run_query(
-      "SELECT * FROM environments WHERE name = ? AND user = ? AND version = ?",
-      env_name, env_user, version
+    envs = EnvironmentManagement::Environment.get_from_db(
+      db,
+      exec_specific.env_name,
+      version,
+      user,
+      private_envs,
+      exec_specific.user.nil?
     )
-    
-    if (res.num_rows > 0) then
-      res.each_hash  { |row|
-        env = EnvironmentManagement::Environment.new
-        env.load_from_hash(row)
-        md5 = client.get_file_md5(env.tarball["file"])
-        if (md5 != 0) then
-          tarball = "#{env.tarball["file"]}|#{env.tarball["kind"]}|#{md5}"         
-          res = db.run_query(
-            "UPDATE environments SET tarball = ? WHERE name = ? AND user = ? AND version = ?",
-            tarball, env_name, env_user, version
-          )
-          if (res.affected_rows == 0) then
-            Debug::distant_client_print("No update has been performed", client)
-          end
-        else
-          Debug::distant_client_error("The md5 of the file #{env.tarball["file"]} cannot be obtained", client)
-        end
-      }
+
+    if envs and !envs.empty?
+      envs.each do |env|
+        env.full_view(client)
+      end
     else
-      Debug::distant_client_error("The environment specified does not exist", client)
+      Debug::distant_client_error(
+        "The environment #{exec_specific.env_name} cannot be loaded. "\
+        "Maybe the version number does not exist "\
+        "or it belongs to another user",
+        client
+      )
+    end
+  end
+
+
+  def _update_file_md5(exec_specific, client, db, type)
+    # almighty users can delete environments of other users
+    user = nil
+    if exec_specific.user \
+    and @config.common.almighty_env_users.include?(exec_specific.true_user)
+      user = exec_specific.user
+    else
+      user = exec_specific.true_user
+    end
+
+    envs = EnvironmentManagement::Environment.get_from_db(
+      db,
+      exec_specific.env_name,
+      exec_specific.version,
+      user,
+      true,
+      false
+    )
+
+    env = nil
+    if envs and !envs.empty?
+      env = envs[0]
+    else
+      Debug::distant_client_error(
+        "The environment #{exec_specific.env_name} cannot be loaded. "\
+        "Maybe the version number does not exist "\
+        "or it belongs to another user",
+        client
+      )
+      return 1
+    end
+
+    value = yield(env)
+
+    if value.nil?
+      Debug::distant_client_print("No environment has been updated", client)
+      return 1
+    end
+
+    ret = EnvironmentManagement::Environment.update_to_db(
+      db,
+      exec_specific.env_name,
+      exec_specific.version,
+      user,
+      true,
+      {type => value},
+      env
+    )
+
+    if ret
+      Debug::distant_client_print(
+        "The environment #{env.name} version #{env.version} of #{env.user} "\
+        "has been updated",
+        client
+      )
+      return 0
+    else
+      Debug::distant_client_print("No environment has been updated", client)
+      return 1
     end
   end
 
@@ -2049,55 +2005,31 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_update_tarball_md5(exec_specific, client, db)
-    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
-    _update_tarball_md5(db, exec_specific.env_name, exec_specific.version, user, exec_specific.true_user, client) if _allowed_to_update_env?(user, exec_specific.true_user, client)
-  end
+    _update_file_md5(exec_specific, client, db, 'tarball') do |env|
+      ret = nil
+      if env.tarball
+        tar = env.tarball.dup
+        md5 = client.get_file_md5(tar['file'])
 
-  # Update the md5sum of the preinstall
-  # Sub function of update_preinstall_md5
-  #
-  # * db: database handler
-  # * env_name: environment name
-  # * env_version: environment version
-  # * env_user: environment use
-  # * true_user: true user
-  # * client: DRb handler of the Kadeploy client
-  # Output
-  # * nothing
-  def _update_preinstall_md5(db, env_name, env_version, env_user, true_user, client)
-    if (env_version != "") then
-      version = env_version
-    else
-      version = _get_max_version(db, env_name, env_user, true_user)
-    end
-    res = db.run_query(
-      "SELECT * FROM environments WHERE name = ? AND user = ? AND version = ?",
-      env_name, env_user, version
-    )
-    if (res.num_rows > 0) then
-      res.each_hash  { |row|
-        env = EnvironmentManagement::Environment.new
-        env.load_from_hash(row)
-        if (env.preinstall != nil) then
-          md5 = client.get_file_md5(env.preinstall["file"])
-          if (md5 != 0) then
-            tarball = "#{env.preinstall["file"]}|#{env.preinstall["kind"]}|#{md5}|#{env.preinstall["script"]}"
-            res = db.run_query(
-              "UPDATE environments SET preinstall = ? WHERE name = ? AND user = ? AND version = ?",
-              tarball, env_name, env_user, version
-            )
-            if (res.affected_rows == 0) then
-              Debug::distant_client_print("No update has been performed", client)
-            end
-          else
-            Debug::distant_client_error("The md5 of the file #{env.preinstall["file"]} cannot be obtained", client)
-          end
+        if tar['md5'] == 0
+          Debug::distant_client_error(
+            "The md5 of the file #{tar['file']} cannot be obtained",
+            client
+          )
+          ret = nil
+        elsif tar['md5'] and tar['md5'] == md5
+          client.print("The md5 of the file #{tar['file']} already is up to date")
+          ret = nil
         else
-          Debug::distant_client_print("No preinstall to update", client)
+          client.print("The md5 of the file #{tar['file']} will be updated")
+          tar['md5'] = md5
+          ret = EnvironmentManagement::Environment.flatten_image(tar,true)
         end
-      }
-    else
-      Debug::distant_client_error("The environment specified does not exist", client)
+      else
+        Debug::distant_client_print("No image to update", client)
+        ret = nil
+      end
+      ret
     end
   end
 
@@ -2109,63 +2041,31 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_update_preinstall_md5(exec_specific, client, db)
-    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
-    _update_preinstall_md5(db, exec_specific.env_name, exec_specific.version, user, exec_specific.true_user, client) if _allowed_to_update_env?(user, exec_specific.true_user, client)
-  end
+    _update_file_md5(exec_specific, client, db, 'preinstall') do |env|
+      ret = nil
+      if env.preinstall
+        pre = env.preinstall.dup
+        md5 = client.get_file_md5(pre['file'])
 
-  # Update the md5sum of the postinstall files
-  # Sub function of update_postinstalls_md5
-  #
-  # * db: database handler
-  # * env_name: environment name
-  # * env_version: environment version
-  # * env_user: environment user
-  # * true_user: true user
-  # * client: DRb handler of the Kadeploy client
-  # Output
-  # * nothing
-  def _update_postinstall_md5(db, env_name, env_version, env_user, true_user, client)
-    if (env_version != "") then
-      version = env_version
-    else
-      version = _get_max_version(db, env_name, env_user, true_user)
-    end
-    res = db.run_query(
-      "SELECT * FROM environments WHERE name = ? AND user = ? AND version = ?",
-      env_name, env_user, version
-    )
-    if (res.num_rows > 0) then
-      res.each_hash  { |row|
-        env = EnvironmentManagement::Environment.new
-        env.load_from_hash(row)
-        if (env.postinstall != nil) then
-          postinstall_array = Array.new
-          all_is_ok = true
-          env.postinstall.each { |p|
-            md5 = client.get_file_md5(p["file"])
-            if (md5 != 0) then
-              postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{md5}|#{p["script"]}")
-            else
-              all_is_ok = false
-              Debug::distant_client_error("The md5 of the file #{p["file"]} cannot be obtained", client)
-              break
-            end
-          }
-          if all_is_ok
-            res = db.run_query(
-              "UPDATE environments SET postinstall = ? WHERE name = ? AND user = ?  AND version = ?",
-              postinstall_array.join(","), env_name, env_user, version
-            )
-            if (res.affected_rows == 0) then
-              Debug::distant_client_print("No update has been performed", client)
-            end
-          end
+        if pre['md5'] == 0
+          Debug::distant_client_error(
+            "The md5 of the file #{pre['file']} cannot be obtained",
+            client
+          )
+          ret = nil
+        elsif pre['md5'] and pre['md5'] == md5
+          client.print("The md5 of the file #{pre['file']} already is up to date")
+          ret = nil
         else
-          Debug::distant_client_print("No postinstall to update", client)
+          client.print("The md5 of the file #{pre['file']} will be updated")
+          pre['md5'] = md5
+          ret = EnvironmentManagement::Environment.flatten_preinstall(pre,true)
         end
-      }
-    else
-      Debug::distant_client_error("The environment specified does not exist", client)      
+      else
+        Debug::distant_client_print("No preinstall to update", client)
+        ret = nil
+      end
+      ret
     end
   end
 
@@ -2177,8 +2077,35 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_update_postinstall_md5(exec_specific, client, db)
-    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
-    _update_postinstall_md5(db, exec_specific.env_name, exec_specific.version, user, exec_specific.true_user, client) if _allowed_to_update_env?(user, exec_specific.true_user, client)
+    _update_file_md5(exec_specific, client, db, 'postinstall') do |env|
+      ret = nil
+      if env.postinstall and !env.postinstall.empty?
+        posts = env.postinstall.dup
+        posts.each do |post|
+          md5 = client.get_file_md5(post['file'])
+
+          if md5 == 0
+            Debug::distant_client_error(
+              "The md5 of the file #{post['file']} cannot be obtained",
+              client
+            )
+            ret = nil
+            break
+          elsif post['md5'] and post['md5'] == md5
+            client.print("The md5 of the file #{post['file']} already is up to date")
+          else
+            client.print("The md5 of the file #{post['file']} will be updated")
+            post['md5'] = md5
+            ret = true
+          end
+        end
+        ret = EnvironmentManagement::Environment.flatten_postinstall(posts,true) if ret
+      else
+        Debug::distant_client_print("No postinstall to update", client)
+        ret = nil
+      end
+      ret
+    end
   end
 
   # Remove the demolishing tag on an environment
@@ -2190,22 +2117,34 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_remove_demolishing_tag(exec_specific, client, db)
-    #if no version number is given, we only remove the demolishing tag on the last version
-    if (exec_specific.version != "") then
-      version = exec_specific.version
+    # almighty users can delete environments of other users
+    user = nil
+    if exec_specific.user \
+    and @config.common.almighty_env_users.include?(exec_specific.true_user)
+      user = exec_specific.user
     else
-      version = _get_max_version(db, exec_specific.env_name, exec_specific.true_user, exec_specific.true_user)
+      user = exec_specific.true_user
     end
-    res = db.run_query(
-      "UPDATE environments SET demolishing_env = 0 \
-       WHERE name = ? AND user = ? AND version = ?",
+
+    ret = EnvironmentManagement::Environment.update_to_db(
+      db,
       exec_specific.env_name,
-      exec_specific.true_user,
-      version
+      exec_specific.version,
+      user,
+      true,
+      {'demolishing_env' => 0}
     )
-        
-    if (res.affected_rows == 0) then
-      Debug::distant_client_print("No update has been performed", client)
+
+    if ret
+      Debug::distant_client_print(
+        "The environment #{ret.name} version #{ret.version} of #{ret.user} "\
+        "has been updated",
+        client
+      )
+      return 0
+    else
+      Debug::distant_client_print("No environment has been updated", client)
+      return 1
     end
   end
 
@@ -2218,20 +2157,46 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_set_visibility_tag(exec_specific, client, db)
-    user = exec_specific.user ? exec_specific.user : exec_specific.true_user
-    if (exec_specific.visibility_tag == "public") && (not @config.common.almighty_env_users.include?(exec_specific.true_user)) then
-      Debug::distant_client_print("Only the environment administrators can set the \"public\" tag", client)
-    else
-      res = db.run_query(
-        "UPDATE environments SET visibility = ? WHERE name = ? AND user = ? AND version = ?",
-        exec_specific.visibility_tag,
-        exec_specific.env_name,
-        user,
-        exec_specific.version
-      )
-      if (res.affected_rows == 0) then
-        Debug::distant_client_print("No update has been performed", client)
+    # almighty users can delete environments of other users
+    user = nil
+
+    if @config.common.almighty_env_users.include?(exec_specific.true_user)
+      if exec_specific.user \
+        user = exec_specific.user
+      else
+        user = exec_specific.true_user
       end
+    else
+      if exec_specific.visibility_tag == "public"
+        Debug::distant_client_print(
+          'Only the environment administrators can set the "public" tag',
+          client
+        )
+        return 1
+      else
+        user = exec_specific.true_user
+      end
+    end
+
+    ret = EnvironmentManagement::Environment.update_to_db(
+      db,
+      exec_specific.env_name,
+      exec_specific.version,
+      user,
+      true,
+      {'visibility' => exec_specific.visibility_tag}
+    )
+
+    if ret
+      Debug::distant_client_print(
+        "The environment #{ret.name} version #{ret.version} of #{ret.user} "\
+        "has been updated",
+        client
+      )
+      return 0
+    else
+      Debug::distant_client_print("No environment has been updated", client)
+      return 1
     end
   end
 
@@ -2244,6 +2209,7 @@ class KadeployServer
   # Output
   # * nothing
   def kaenv_move_files(exec_specific, client, db)
+    #TODO: update
     if (not @config.common.almighty_env_users.include?(exec_specific.true_user)) then
       Debug::distant_client_print("Only the environment administrators can move the files in the environments", client)
     else
