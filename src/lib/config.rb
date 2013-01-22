@@ -612,10 +612,6 @@ module ConfigInformation
             end
           end
 
-          cp.parse('grub') do
-            conf.grub = "grub#{cp.value('version',Fixnum,2,(1..2))}"
-          end
-
           cp.parse('kastafior') do
             conf.kastafior = cp.value('binary',String,'kastafior')
           end
@@ -731,9 +727,15 @@ module ConfigInformation
           conf = @cluster_specific[clname]
           conf.name = clname
 
-          conf.partition_file = cp.value(
-            'partition_file',String,nil,{ :type => 'file', :readable => true }
-          )
+          cp.parse('scripts',true) do
+            conf.bootloader_script = cp.value(
+              'bootloader',String,nil,{ :type => 'file', :readable => true }
+            )
+            conf.partitioning_script = cp.value(
+              'partitioning',String,nil,{ :type => 'file', :readable => true }
+            )
+          end
+
           clfile = cp.value(
             'conf_file',String,nil,{ :type => 'file', :readable => true }
           )
@@ -821,9 +823,6 @@ module ConfigInformation
 
         cp.parse('partitioning',true) do
           conf.block_device = cp.value('block_device',String,nil,Pathname)
-          conf.partition_creation_kind = cp.value(
-            'kind',String,nil,['fdisk','parted']
-          )
           cp.parse('partitions',true) do
             conf.swap_part = cp.value('swap',Fixnum,1).to_s
             conf.prod_part = cp.value('prod',Fixnum).to_s
@@ -3093,7 +3092,6 @@ module ConfigInformation
     attr_accessor :async_end_of_power_hook
     attr_accessor :vlan_hostname_suffix
     attr_accessor :set_vlan_cmd
-    attr_accessor :grub
     attr_accessor :kastafior
 
     # Constructor of CommonConfig
@@ -3111,7 +3109,6 @@ module ConfigInformation
       #@async_end_of_power_hook = ""
       #@vlan_hostname_suffix = ""
       #@set_vlan_cmd = ""
-      #@grub = "grub2"
       #@kastafior = "kastafior"
       #@pxe_repository_kernels = "kernels"
     end
@@ -3144,8 +3141,8 @@ module ConfigInformation
     attr_accessor :cmd_very_hard_power_on
     attr_accessor :cmd_power_status
     attr_accessor :group_of_nodes #Hashtable (key is a command name)
-    attr_accessor :partition_creation_kind
-    attr_accessor :partition_file
+    attr_accessor :partitioning_script
+    attr_accessor :bootloader_script
     attr_accessor :prefix
     attr_accessor :drivers
     attr_accessor :pxe_header
@@ -3195,8 +3192,8 @@ module ConfigInformation
       @nfsroot_params = nil
       @admin_pre_install = nil
       @admin_post_install = nil
-      @partition_creation_kind = nil
-      @partition_file = nil
+      @partitioning_script = nil
+      @bootloader_script = nil
       @prefix = nil
       @use_ip_to_deploy = false
     end
@@ -3242,8 +3239,8 @@ module ConfigInformation
       dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
-      dest.partition_creation_kind = @partition_creation_kind.clone
-      dest.partition_file = @partition_file.clone
+      dest.partitioning_script = @partitioning_script.clone
+      dest.bootloader_script = @bootloader_script.clone
       dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
@@ -3290,8 +3287,8 @@ module ConfigInformation
       dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
       dest.admin_pre_install = @admin_pre_install.clone if (@admin_pre_install != nil)
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
-      dest.partition_creation_kind = @partition_creation_kind.clone
-      dest.partition_file = @partition_file.clone
+      dest.partitioning_script = @partitioning_script.clone
+      dest.bootloader_script = @bootloader_script.clone
       dest.prefix = @prefix.dup
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end

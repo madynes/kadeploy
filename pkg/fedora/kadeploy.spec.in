@@ -63,15 +63,22 @@ rm -rf $RPM_BUILD_ROOT
 %doc %attr(0444,root,root) /usr/local/man/man1/kanodes3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kaconsole3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kapower3.1
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/bootloader/install_grub
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/bootloader/install_grub2
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/partitioning/parted-sample
+%doc %attr(0444,root,root) /usr/local/kadeploy3/scripts/partitioning/fdisk-sample
 
 %files server
 %defattr(-,deploy,deploy,-)
 /etc/init.d/kadeploy3d
 %config(noreplace) /etc/kadeploy3/clusters.yml
 %config(noreplace) /etc/kadeploy3/cluster_conf-g5kdev-cluster.yml
-%config(noreplace) /etc/kadeploy3/cluster_partition-g5kdev-cluster
 %config(noreplace) /etc/kadeploy3/cmd.yml
 %config(noreplace) /etc/kadeploy3/server_conf.yml
+%config(noreplace) /etc/kadeploy3/install_grub
+%config(noreplace) /etc/kadeploy3/install_grub2
+%config(noreplace) /etc/kadeploy3/parted-sample
+%config(noreplace) /etc/kadeploy3/fdisk-sample
 /etc/kadeploy3/version
 /etc/kadeploy3/keys/id_deploy
 /etc/kadeploy3/keys/id_deploy.pub
