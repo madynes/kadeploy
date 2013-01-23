@@ -90,11 +90,14 @@ CFG_KADEPLOY_MACROSTEP3 = [
     :timeout => 200
   },
   {
-    :name => 'BootNewEnvHardReboot',
+    :name => 'BootNewEnv|BootNewEnvHardReboot',
     :retries => 0,
     :timeout => 200
   }
 ]
+
+CFG_KADEPLOY_PARTITIONING_SCRIPT = 'parted-sample'
+CFG_KADEPLOY_BOOTLOADER_SCRIPT = 'install_grub2'
 
 CFG_KADEPLOY_PARTITION_SWAP_ID = 3
 CFG_KADEPLOY_PARTITION_SWAP_SIZE = '256M'
@@ -125,41 +128,104 @@ CFG_KADEPLOY_PREINSTALLS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'preinstalls')
 
 def cfg_environment_desc(env)
   postinstall = ''
-  if env[:postinstall]
-    postinstall = "postinstall : #{File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))}|#{env[:postinstall][:filetype]}|#{env[:postinstall][:args]}\n"
-  end
+  if $version >= 7
+    desc = env[:desc].dup
+    if env[:postinstall]
+      postinstall = {
+        'archive' => File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file])),
+        'compression' => env[:postinstall][:filetype],
+        'script' => env[:postinstall][:args],
+      }
+      desc['postinstalls'] = [ postinstall ]
+    end
 
-  "###\n"\
-  "name : #{env[:name]}\n"\
-  "#{env[:desc]}\n"\
-  "tarball : #{File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))}|tgz\n"\
-  + postinstall
+    desc['name'] = env[:name]
+    desc['image']['file'] = File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))
+
+    desc.to_yaml
+  else
+    if env[:postinstall]
+      postinstall = "postinstall : #{File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))}|#{env[:postinstall][:filetype]}|#{env[:postinstall][:args]}\n"
+    end
+
+    "###\n"\
+    "name : #{env[:name]}\n"\
+    "#{env[:desc]}\n"\
+    "tarball : #{File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))}|tgz\n"\
+    + postinstall
+  end
 end
 
-CFG_KADEPLOY_CLIENT_CONF_FILE = File.join(CFG_KADEPLOY_CONF_PATH,'client_conf')
+def cfg_kadeploy_client_filename()
+  if $version >= 5
+    File.join(CFG_KADEPLOY_CONF_PATH,'client_conf.yml')
+  else
+    File.join(CFG_KADEPLOY_CONF_PATH,'client_conf')
+  end
+end
+
 def cfg_kadeploy_client()
-  "default = kadeploy\n"\
-  "kadeploy = #{$services[:kadeploy][:fqdn]}:#{CFG_KADEPLOY_PORT}\n"
+  if $version >= 5
+    {
+      'default' => 'kadeploy',
+      'servers' => [
+        {
+          'name' => 'kadeploy',
+          'hostname' => $services[:kadeploy][:fqdn],
+          'port' => CFG_KADEPLOY_PORT,
+        },
+      ],
+    }.to_yaml
+  else
+    "default = kadeploy\n"\
+    "kadeploy = #{$services[:kadeploy][:fqdn]}:#{CFG_KADEPLOY_PORT}\n"
+  end
 end
 
 
 def cfg_kadeploy_macrostep(macrostep)
-  ret = ''
+  ret = nil
+  if $version >= 5
+    ret = []
+  else
+    ret = ''
+  end
+
   if macrostep.is_a?(Array)
     tmp = []
     macrostep.each do |step|
-      tmp << cfg_kadeploy_macrostep(step)
-      ret = tmp.join(',')
+      if $version >= 5
+        tmp << cfg_kadeploy_macrostep(step)
+        ret = tmp.join(',')
+      else
+        ret += cfg_kadeploy_macrostep(step)
+      end
     end
   elsif macrostep.is_a?(Hash)
-    ret = "#{macrostep[:name]}:#{macrostep[:retries]}:#{macrostep[:timeout]}"
+    if $version >= 5
+      tmp = macrostep[:name].split('|')
+      ret << {
+        'type' => tmp[1].gsub(tmp[0],''),
+        'timeout' => macrostep[:timeout],
+        'retries' => macrostep[:retries],
+      }
+    else
+      ret = "#{macrostep[:name]}:#{macrostep[:retries]}:#{macrostep[:timeout]}"
+    end
   elsif macrostep.is_a?(String)
     ret = macrostep
   end
   ret
 end
 
-CFG_KADEPLOY_CONF_CONF_FILE = File.join(CFG_KADEPLOY_CONF_PATH,'conf')
+def cfg_kadeploy_conf_filename()
+  if $version >= 5
+    File.join(CFG_KADEPLOY_CONF_PATH,'server_conf.yml')
+  else
+    File.join(CFG_KADEPLOY_CONF_PATH,'conf')
+  end
+end
+
 def cfg_kadeploy_conf()
   pxe_kind = nil
 	case $deploysendmeth
@@ -174,68 +240,201 @@ def cfg_kadeploy_conf()
       pxe_export = '/'
   end
 
-  "verbose_level = #{CFG_KADEPLOY_VERBOSE}\n"\
-  "pxe_kind = #{pxe_kind}\n"\
-  "pxe_repository = #{cfg_pxe_path()}\n"\
-  "pxe_repository_kernels = kernels\n"\
-  "pxe_repository_kernels_max_size = 600\n"\
-  "pxe_export = #{pxe_export}\n"\
-  "db_kind = mysql\n"\
-  "deploy_db_host = #{$services[:sql][:fqdn]}\n"\
-  "deploy_db_name = #{CFG_SQL_DB}\n"\
-  "deploy_db_login = #{CFG_SQL_USER}\n"\
-  "deploy_db_passwd = #{CFG_SQL_PASS_USER}\n"\
-  "rights_kind = db\n"\
-  "taktuk_connector = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
-  "taktuk_tree_arity = 0\n"\
-  "taktuk_auto_propagate = true\n"\
-  "tarball_dest_dir = /tmp\n"\
-  "environment_extraction_dir = /mnt/dest\n"\
-  "kadeploy_server = #{$services[:kadeploy][:fqdn]}\n"\
-  "kadeploy_server_port = #{CFG_KADEPLOY_PORT}\n"\
-  "kadeploy_tcp_buffer_size = 8192\n"\
-  "kadeploy_cache_dir = #{CFG_KADEPLOY_CACHE_PATH}\n"\
-  "kadeploy_cache_size = 8000\n"\
-  "ssh_port = 22\n"\
-  "rsh_port = 514\n"\
-  "test_deploy_env_port = #{CFG_KADEPLOY_PORT}\n"\
-  "use_rsh_to_deploy = false\n"\
-  "log_to_file = #{CFG_KADEPLOY_LOGFILE}\n"\
-  "log_to_syslog = true\n"\
-  "log_to_db = true\n"\
-  "dbg_to_syslog = true\n"\
-  "dbg_to_syslog_level = 3\n"\
-  "reboot_window = 100\n"\
-  "reboot_window_sleep_time = 15\n"\
-  "nodes_check_window = 200\n"\
-  "bootloader = chainload_pxe\n"\
-  "purge_deployment_timer = 900\n"\
-  "rambin_path = /rambin\n"\
-  "mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index\n"\
-  "demolishing_env_threshold = 2\n"\
-  "demolishing_env_auto_tag = false\n"\
-  "almighty_env_users = root,oar,deploy\n"\
-  "max_preinstall_size = 10\n"\
-  "max_postinstall_size = 10\n"\
-  "vlan_hostname_suffix = -kavlan-VLAN_ID\n"
-  #"async_end_of_deployment_hook = \n"\
-  #"set_vlan_cmd = \n"
-  # >>> TODO: add Bitorrent support in bootstrap
-  #"bt_tracker_ip = \n"\
+  if $version >= 5
+    {
+      'database' => {
+        'kind' => 'mysql',
+        'name' => CFG_SQL_DB,
+        'host' => $services[:sql][:fqdn],
+        'login' => CFG_SQL_USER,
+        'passwd' => CFG_SQL_PASS_USER,
+      },
+      'rights' => {
+        'kind' => 'db',
+        'purge_deployment_timer' => 900,
+        'almighty_users' => 'root,oar,deploy',
+      },
+      'logs' => {
+        'syslog' => true,
+        'database' => true,
+        'debug' => true,
+        'file' => CFG_KADEPLOY_LOGFILE,
+      },
+      'verbosity' => {
+        'logs' => CFG_KADEPLOY_VERBOSE,
+        'clients' => CFG_KADEPLOY_VERBOSE,
+      },
+      'cache' => {
+        'size' => 8000,
+        'directory' => CFG_KADEPLOY_CACHE_PATH,
+        'disabled' => false,
+      },
+      'network' => {
+        'tcp_buffer_size' => 8192,
+        'server_hostname' => $services[:kadeploy][:fqdn],
+        'vlan' => {
+          'hostname_suffix' => '-kavlan-VLAN_ID',
+        },
+        'ports' => {
+          'test_deploy_env' => CFG_KADEPLOY_PORT,
+          'ssh' => 22,
+          'kadeploy_server' => CFG_KADEPLOY_PORT,
+        },
+      },
+      'windows' => {
+        'reboot' => {
+          'sleep_time' => 15,
+          'size' => 100,
+        },
+        'check' => {
+          'size' => 200,
+        },
+      },
+      'environments' => {
+        'max_postinstall_size' => 10,
+        'max_preinstall_size' => 10,
+        'deployment' => {
+          'rambin_dir' => '/rambin',
+          'extraction_dir' => '/mnt/dest',
+          'tarball_dir' => '/tmp',
+        },
+      },
+      'pxe' => {
+        'kind' => pxe_kind,
+        'export' => pxe_export,
+        'repository' => cfg_pxe_path(),
+        'bootloader' => 'chainload_pxe',
+        'kernels' => {
+          'directory' => 'kernels',
+          'max_size' => 600,
+        },
+      },
+      'external' => {
+        'mkfs' => [
+          {
+            'fstype' => 'ext2',
+            'args' => '-b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+          },
+          {
+            'fstype' => 'ext3',
+            'args' => '-b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+          },
+        ],
+        'taktuk' => {
+          'auto_propagate' => false,
+          'tree_arity' => 0,
+          'connector' => "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root"
+        },
+      },
+    }.to_yaml
+  else
+    "verbose_level = #{CFG_KADEPLOY_VERBOSE}\n"\
+    "pxe_kind = #{pxe_kind}\n"\
+    "pxe_repository = #{cfg_pxe_path()}\n"\
+    "pxe_repository_kernels = kernels\n"\
+    "pxe_repository_kernels_max_size = 600\n"\
+    "pxe_export = #{pxe_export}\n"\
+    "db_kind = mysql\n"\
+    "deploy_db_host = #{$services[:sql][:fqdn]}\n"\
+    "deploy_db_name = #{CFG_SQL_DB}\n"\
+    "deploy_db_login = #{CFG_SQL_USER}\n"\
+    "deploy_db_passwd = #{CFG_SQL_PASS_USER}\n"\
+    "rights_kind = db\n"\
+    "taktuk_connector = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
+    "taktuk_tree_arity = 0\n"\
+    "taktuk_auto_propagate = true\n"\
+    "tarball_dest_dir = /tmp\n"\
+    "environment_extraction_dir = /mnt/dest\n"\
+    "kadeploy_server = #{$services[:kadeploy][:fqdn]}\n"\
+    "kadeploy_server_port = #{CFG_KADEPLOY_PORT}\n"\
+    "kadeploy_tcp_buffer_size = 8192\n"\
+    "kadeploy_cache_dir = #{CFG_KADEPLOY_CACHE_PATH}\n"\
+    "kadeploy_cache_size = 8000\n"\
+    "ssh_port = 22\n"\
+    "rsh_port = 514\n"\
+    "test_deploy_env_port = #{CFG_KADEPLOY_PORT}\n"\
+    "use_rsh_to_deploy = false\n"\
+    "log_to_file = #{CFG_KADEPLOY_LOGFILE}\n"\
+    "log_to_syslog = true\n"\
+    "log_to_db = true\n"\
+    "dbg_to_syslog = true\n"\
+    "dbg_to_syslog_level = 3\n"\
+    "reboot_window = 100\n"\
+    "reboot_window_sleep_time = 15\n"\
+    "nodes_check_window = 200\n"\
+    "bootloader = chainload_pxe\n"\
+    "purge_deployment_timer = 900\n"\
+    "rambin_path = /rambin\n"\
+    "mkfs_options = ext2@-b 4096 -O sparse_super,filetype,resize_inode,dir_index|ext3@-b 4096 -O sparse_super,filetype,resize_inode,dir_index\n"\
+    "demolishing_env_threshold = 2\n"\
+    "demolishing_env_auto_tag = false\n"\
+    "almighty_env_users = root,oar,deploy\n"\
+    "max_preinstall_size = 10\n"\
+    "max_postinstall_size = 10\n"\
+    "vlan_hostname_suffix = -kavlan-VLAN_ID\n"
+    #"async_end_of_deployment_hook = \n"\
+    #"set_vlan_cmd = \n"
+    # >>> TODO: add Bitorrent support in bootstrap
+    #"bt_tracker_ip = \n"\
+  end
 end
 
-CFG_KADEPLOY_CMD_CONF_FILE = File.join(CFG_KADEPLOY_CONF_PATH,'cmd')
+
+def cfg_kadeploy_cmd_filename()
+  if $version >= 5
+    File.join(CFG_KADEPLOY_CONF_PATH,'cmd.yml')
+  else
+    File.join(CFG_KADEPLOY_CONF_PATH,'cmd')
+  end
+end
+
 def cfg_kadeploy_cmd()
   "\n"
 end
 
-CFG_KADEPLOY_CLUSTERS_CONF_FILE = File.join(CFG_KADEPLOY_CONF_PATH,'clusters')
-def cfg_kadeploy_clusters()
-  cfg = ''
-  $clusters.values.each do |cluster|
-    cfg += "#{cluster[:name]}\n"
+def cfg_kadeploy_clusters_filename()
+  if $version >= 5
+    File.join(CFG_KADEPLOY_CONF_PATH,'clusters.yml')
+  else
+    File.join(CFG_KADEPLOY_CONF_PATH,'clusters')
   end
-  cfg
+end
+
+def cfg_kadeploy_clusters()
+  if $version >= 5
+    cfg = { 'clusters' => [] }
+    $clusters.values.each do |cluster|
+      tmp = {
+        'name' => cluster[:name],
+        'conf_file' => cfg_kadeploy_specific_conf_filename(cluster[:name]),
+        'nodes' => []
+      }
+      cluster[:nodes].each do |node|
+        tmp['nodes'] << {
+          'name' => node[:fqdn],
+          'address' => node[:ipv4],
+        }
+      end
+
+        tmp['scripts'] = {}
+
+      tmp['scripts']['partitioning'] = CFG_KADEPLOY_PARTITIONING_SCRIPT
+      tmp['scripts']['bootloader'] = CFG_KADEPLOY_BOOTLOADER_SCRIPT
+        tmp['partition_file'] = cfg_kadeploy_partition_filename(cluster[:name])
+      unless $version >= 7
+        tmp['partition_file'] = cfg_kadeploy_partition_filename(cluster[:name])
+      end
+
+      cfg['clusters'] << tmp
+    end
+    cfg.to_yaml
+  else
+    cfg = ''
+    $clusters.values.each do |cluster|
+      cfg += "#{cluster[:name]}\n"
+    end
+    cfg
+  end
 end
 
 CFG_KADEPLOY_NODES_CONF_FILE = File.join(CFG_KADEPLOY_CONF_PATH,'nodes')
@@ -248,6 +447,10 @@ def cfg_kadeploy_nodes()
 end
 
 CFG_KADEPLOY_PARTITION_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'partition_file_')
+def cfg_kadeploy_partition_filename(cluster)
+  CFG_KADEPLOY_PARTITION_CONF_FILE_PREFIX+cluster
+end
+
 def cfg_kadeploy_partition_file(cluster)
   # delete partitions
   "d\n1\nd\n2\nd\n3\nd\n4\n"\
@@ -432,46 +635,158 @@ def cfg_kadeploy_deploy_kernel_args(cluster)
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
+def cfg_kadeploy_specific_conf_filename(cluster)
+  if $version >= 5
+    CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster+'.yml'
+  else
+    CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster
+  end
+end
 CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 180
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
-  "deploy_kernel = #{File.basename(cluster[:kernel][:vmlinuz])}\n"\
-  "deploy_initrd = #{File.basename(cluster[:kernel][:initrd])}\n"\
-  "deploy_kernel_args = #{cfg_kadeploy_deploy_kernel_args(cluster)}\n"\
-  "kexec_repository = /tmp/kaexec\n"\
-  "block_device = #{cfg_kadeploy_disk_device()}\n"\
-  "prod_part = #{CFG_KADEPLOY_PARTITION_PROD_ID}\n"\
-  "deploy_part = #{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\n"\
-  "tmp_part = #{CFG_KADEPLOY_PARTITION_TMP_ID}\n"\
-  "swap_part = #{CFG_KADEPLOY_PARTITION_SWAP_ID}\n"\
-  + # Kareboot
-  "timeout_reboot_classical = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
-  "timeout_reboot_kexec = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
-  "cmd_soft_reboot = #{cfg_kadeploy_soft_reboot_cmd()}\n"\
-  "cmd_hard_reboot = #{cfg_kadeploy_hard_reboot_cmd()}\n"\
-  "cmd_very_hard_reboot = /bin/false\n"\
-  + # Kapower
-  "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
-  "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
-  "cmd_hard_power_off = #{cfg_kadeploy_power_off_cmd()}\n"\
-  "cmd_power_status = #{cfg_kadeploy_power_status_cmd()}\n"\
-  + # Kaconsole
-  "cmd_console = #{cfg_kadeploy_console_cmd()}\n"\
-  "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8\n"\
-  + # >>> TODO: UPDATE
-  "partition_creation_kind = fdisk\n"\
-  "pxe_header = #{CFG_PXE_HEADER.gsub("\n",'\n')}\n"\
-  "use_ip_to_deploy = true\n"\
-  + #Automata description
-  "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1)}\n"\
-  "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP2)}\n"\
-  "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP3)}\n"\
-  + (postinstallpath ? "admin_post_install = #{postinstallpath}|tgz|none\n" : '')
-  #"nfsroot_kernel = \n"\
-  #"nfsroot_params = \n"\
-  #cmd_very_hard_power_off = /usr/sbin/pdumix -n HOSTNAME_FQDN -d
-  #cmd_soft_power_on = /usr/sbin/pdumix -n HOSTNAME_FQDN -u
+  if $version >= 5
+    cfg = {
+      'partitioning' => {
+        'block_device' => cfg_kadeploy_disk_device(),
+        'partitions' => {
+          'deploy' => CFG_KADEPLOY_PARTITION_DEPLOY_ID,
+          'prod' => CFG_KADEPLOY_PARTITION_PROD_ID,
+          'swap' => CFG_KADEPLOY_PARTITION_SWAP_ID,
+          'tmp' => CFG_KADEPLOY_PARTITION_TMP_ID,
+        },
+        'disable_swap' => false,
+      },
+      'timeouts' => {
+        'reboot' => CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT,
+        'kexec' => CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT,
+      },
+      'remoteops' => {
+        'console' => [
+          {
+            'name' => 'soft',
+            'cmd' => cfg_kadeploy_console_cmd(),
+          },
+        ],
+        'power_status' => [
+          {
+            'name' => 'soft',
+            'cmd' => cfg_kadeploy_power_status_cmd(),
+          },
+        ],
+        'power_on' => [
+          {
+            'name' => 'hard',
+            'cmd' => cfg_kadeploy_power_on_cmd(),
+          },
+        ],
+        'power_off' => [
+          {
+            'name' => 'soft',
+            'cmd' => "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"",
+          },
+          {
+            'name' => 'hard',
+            'cmd' => cfg_kadeploy_power_off_cmd(),
+          },
+        ],
+        'reboot' => [
+          {
+            'name' => 'soft',
+            'cmd' => cfg_kadeploy_soft_reboot_cmd(),
+          },
+          {
+            'name' => 'hard',
+            'cmd' => cfg_kadeploy_hard_reboot_cmd(),
+          },
+        ],
+      },
+      'kernels' => {
+        'deploy' => {
+          'vmlinuz' => File.basename(cluster[:kernel][:vmlinuz]),
+          'initrd' => File.basename(cluster[:kernel][:initrd]),
+          'params' => cfg_kadeploy_deploy_kernel_args(cluster),
+        },
+        'user' => {
+          'kernel_params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+        },
+      },
+      'kexec' => {
+        'repository' => '/dev/shm/kexec_repository',
+      },
+      'pxe' => {
+        'headers' => CFG_PXE_HEADER.gsub("\n",'\n'),
+      },
+      'automata' => {
+        'SetDeploymentEnv' => cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1),
+        'BroadcastEnv' => cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP2),
+        'BootNewEnv' => cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP3),
+      },
+      'hooks' => {
+        'use_ip_to_deploy' => true,
+      }
+    }
+
+    if postinstallpath and !postinstallpath.empty?
+      cfg['postinstall'] = {
+        'files' => [
+          {
+            'file' => postinstallpath,
+            'format' => 'tgz',
+            'script' => 'none',
+          }
+        ],
+      }
+    end
+
+    if $version >= 7
+      cfg['partitioning']['script'] = CFG_KADEPLOY_PARTITIONING_SCRIPT
+      cfg['bootloader'] = {}
+      cfg['bootloader']['script'] = CFG_KADEPLOY_BOOTLOADER_SCRIPT
+    else
+      cfg['partitioning']['kind'] = 'fdisk'
+    end
+
+    cfg.to_yaml
+  else
+    "deploy_kernel = #{File.basename(cluster[:kernel][:vmlinuz])}\n"\
+    "deploy_initrd = #{File.basename(cluster[:kernel][:initrd])}\n"\
+    "deploy_kernel_args = #{cfg_kadeploy_deploy_kernel_args(cluster)}\n"\
+    "kexec_repository = /dev/shm/kexec_repository\n"\
+    "block_device = #{cfg_kadeploy_disk_device()}\n"\
+    "prod_part = #{CFG_KADEPLOY_PARTITION_PROD_ID}\n"\
+    "deploy_part = #{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\n"\
+    "tmp_part = #{CFG_KADEPLOY_PARTITION_TMP_ID}\n"\
+    "swap_part = #{CFG_KADEPLOY_PARTITION_SWAP_ID}\n"\
+    + # Kareboot
+    "timeout_reboot_classical = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
+    "timeout_reboot_kexec = #{CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT}\n"\
+    "cmd_soft_reboot = #{cfg_kadeploy_soft_reboot_cmd()}\n"\
+    "cmd_hard_reboot = #{cfg_kadeploy_hard_reboot_cmd()}\n"\
+    "cmd_very_hard_reboot = /bin/false\n"\
+    + # Kapower
+    "cmd_hard_power_on = #{cfg_kadeploy_power_on_cmd()}\n"\
+    "cmd_soft_power_off = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} root@HOSTNAME_FQDN \"nohup /sbin/halt &>/dev/null &\"\n"\
+    "cmd_hard_power_off = #{cfg_kadeploy_power_off_cmd()}\n"\
+    "cmd_power_status = #{cfg_kadeploy_power_status_cmd()}\n"\
+    + # Kaconsole
+    "cmd_console = #{cfg_kadeploy_console_cmd()}\n"\
+    "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8\n"\
+    + # >>> TODO: UPDATE
+    "partition_creation_kind = fdisk\n"\
+    "pxe_header = #{CFG_PXE_HEADER.gsub("\n",'\n')}\n"\
+    "use_ip_to_deploy = true\n"\
+    + #Automata description
+    "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1)}\n"\
+    "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP2)}\n"\
+    "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP3)}\n"\
+    + (postinstallpath ? "admin_post_install = #{postinstallpath}|tgz|none\n" : '')
+    #"nfsroot_kernel = \n"\
+    #"nfsroot_params = \n"\
+    #cmd_very_hard_power_off = /usr/sbin/pdumix -n HOSTNAME_FQDN -d
+    #cmd_soft_power_on = /usr/sbin/pdumix -n HOSTNAME_FQDN -u
+  end
 end
 
 # kastafior default config
@@ -982,6 +1297,7 @@ $gateway = nil
 $deploysendmeth = :HTTP
 $configs = {}
 $tunnels = true
+$version = 7
 
 options = {}
 
@@ -1520,6 +1836,7 @@ options[:daemon_config] = nil
 options[:network_config] = nil
 options[:dns_forward] = nil
 options[:dns_config] = nil
+options[:upload] = []
 
 $debug				        = false
 $netiface 						= NET_ADMIN_IFACE
@@ -1560,7 +1877,11 @@ optparse = OptionParser.new(USAGE) do |opts|
 		$mode = :VLANKVM
 	end
 
-	opts.on( '-v', '--vlan ID', 'Set the VLAN ID (be careful to disable kavlan DHCP manually)' ) do |k|
+	opts.on( '-v', '--version VERSION', 'Bootstrap a Kadeploy version 3.1.VERSION' ) do |v|
+		$version = v.to_i
+	end
+
+	opts.on( '', '--vlan ID', 'Set the VLAN ID (be careful to disable kavlan DHCP manually)' ) do |k|
 		$kavlan_id = k
 	end
 
@@ -1606,6 +1927,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '-j', '--kascript <scriptfile>', 'Run a script after configuring kadeploy daemon and before running it (sample: config file migration script, ...)' ) do |j|
   	options[:kascript] = j
+	end
+
+	opts.on( '-z', '--upload-conf <file>', 'Upload files in the Kadeploy3 configuration directory' ) do |f|
+  	options[:upload] << f
 	end
 
 	opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes should be used as daemon in a YAML file with fields "host" and "newip" given for each services' ) do |d|
@@ -1836,21 +2161,36 @@ envfiles.each do |env|
 	$kaenvs[env] = {}
 	$kaenvs[env][:dscfile] = File.join(CFG_KADEPLOY_ENVS_DESC_PATH,File.basename(env))
 	tmp = File.new(File.join(ARGV[1],env)).read
-	tmp.each do |line|
-		if line =~ /^\s*name\s*:\s*([^ ]+)\s*$/
-			$kaenvs[env][:name] = Regexp.last_match(1).strip
-		elsif line =~ /^\s*tarball\s*:\s*([^ |]+)\|\S+\s*$/
-			$kaenvs[env][:tarball] = Regexp.last_match(1).strip
-		elsif line =~ /^\s*postinstall\s*:\s*([^ |]+)\|([^ |]+)\|(.*)$/
-			$kaenvs[env][:postinstall] = {}
-			$kaenvs[env][:postinstall][:file] = Regexp.last_match(1).strip
-			$kaenvs[env][:postinstall][:filetype] = Regexp.last_match(2).strip
-			$kaenvs[env][:postinstall][:args] = Regexp.last_match(3).strip
-		elsif line.strip != '###' and !line.strip.empty?
-			$kaenvs[env][:desc] = [] unless $kaenvs[env][:desc]
-			$kaenvs[env][:desc] << line
-		end
-	end
+
+  if $version >= 7
+    desc = YAML.load(tmp)
+    $kaenvs[env][:name] = desc['name']
+    $kaenvs[env][:tarball] = desc['image']['file']
+    if desc[:postinstalls] and !desc[:postinstalls].empty?
+      $kaenvs[env][:postinstall] = {}
+      $kaenvs[env][:postinstall][:file] = desc[:postinstalls].first['archive']
+      $kaenvs[env][:postinstall][:filetype] = 'gzip'
+      $kaenvs[env][:postinstall][:args] = desc[:postinstalls].first['script']
+    end
+    $kaenvs[env][:desc] = desc
+  else
+    tmp.each do |line|
+      if line =~ /^\s*name\s*:\s*([^ ]+)\s*$/
+        $kaenvs[env][:name] = Regexp.last_match(1).strip
+      elsif line =~ /^\s*tarball\s*:\s*([^ |]+)\|\S+\s*$/
+        $kaenvs[env][:tarball] = Regexp.last_match(1).strip
+      elsif line =~ /^\s*postinstall\s*:\s*([^ |]+)\|([^ |]+)\|(.*)$/
+        $kaenvs[env][:postinstall] = {}
+        $kaenvs[env][:postinstall][:file] = Regexp.last_match(1).strip
+        $kaenvs[env][:postinstall][:filetype] = Regexp.last_match(2).strip
+        $kaenvs[env][:postinstall][:args] = Regexp.last_match(3).strip
+      elsif line.strip != '###' and !line.strip.empty?
+        $kaenvs[env][:desc] = [] unless $kaenvs[env][:desc]
+        $kaenvs[env][:desc] << line
+      end
+    end
+  end
+
 	msg("#{$kaenvs[env][:name]}:",MSG_INFO)
 	if $kaenvs[env][:tarball] and File.exist?($kaenvs[env][:tarball])
 		msg("  tarball: #{$kaenvs[env][:tarball]}",MSG_INFO)
@@ -2809,18 +3149,20 @@ sshgw.ssh(servername,'root') do |session|
 
 		msg('Configuring Kadeploy server',MSG_INFO)
     sexec(session,"mkdir -p /root/.ssh; grep \"$(cat #{CFG_KADEPLOY_SSHKEY_DEFAULT}.pub)\" /root/.ssh/authorized_keys || cat #{CFG_KADEPLOY_SSHKEY_DEFAULT}.pub >> /root/.ssh/authorized_keys")
-		tempfile(cfg_kadeploy_conf()) {|path| scp(servername,path,CFG_KADEPLOY_CONF_CONF_FILE)}
-		tempfile(cfg_kadeploy_cmd()) {|path| scp(servername,path,CFG_KADEPLOY_CMD_CONF_FILE)}
-		tempfile(cfg_kadeploy_clusters()) {|path| scp(servername,path,CFG_KADEPLOY_CLUSTERS_CONF_FILE)}
-		tempfile(cfg_kadeploy_nodes()) {|path| scp(servername,path,CFG_KADEPLOY_NODES_CONF_FILE)}
+		tempfile(cfg_kadeploy_conf()) {|path| scp(servername,path,cfg_kadeploy_conf_filename())}
+		tempfile(cfg_kadeploy_cmd()) {|path| scp(servername,path,cfg_kadeploy_cmd_filename())}
+		tempfile(cfg_kadeploy_clusters()) {|path| scp(servername,path,cfg_kadeploy_clusters_filename())}
+		tempfile(cfg_kadeploy_nodes()) {|path| scp(servername,path,CFG_KADEPLOY_NODES_CONF_FILE)} unless $version >= 5
 		$clusters.values.each do |cluster|
-			filepath = CFG_KADEPLOY_PARTITION_CONF_FILE_PREFIX+cluster[:name]
-			tempfile(cfg_kadeploy_partition_file(cluster)) do |path|
-				scp(servername,path,filepath)
-			end
-			sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{filepath}")
+      unless $version >= 7
+        filepath = cfg_kadeploy_partition_filename(cluster[:name])
+        tempfile(cfg_kadeploy_partition_file(cluster)) do |path|
+          scp(servername,path,filepath)
+        end
+        sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{filepath}")
+      end
 
-			filepath = CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster[:name]
+			filepath = cfg_kadeploy_specific_conf_filename(cluster[:name])
 			tempfile(cfg_kadeploy_specific_conf(cluster)) do |path|
 				scp(servername,path,filepath)
 			end
@@ -2829,9 +3171,15 @@ sshgw.ssh(servername,'root') do |session|
 
 		msg('Configuring Kadeploy client',MSG_INFO)
 		tempfile(cfg_kadeploy_client()) do |path|
-			scp(servername,path,CFG_KADEPLOY_CLIENT_CONF_FILE)
+			scp(servername,path,cfg_kadeploy_client_filename())
 		end
-		sexec(session,"chmod +r #{CFG_KADEPLOY_CLIENT_CONF_FILE}")
+		sexec(session,"chmod +r #{cfg_kadeploy_client_filename()}")
+
+    if options[:upload] and !options[:upload].empty?
+      options[:upload].each do |file|
+        scp(servername,file,CFG_KADEPLOY_CONF_PATH)
+      end
+    end
 
     if options[:kascript]
       msg("Executing kascript '#{options[:kascript]}'",MSG_INFO)
@@ -2841,6 +3189,9 @@ sshgw.ssh(servername,'root') do |session|
       sexec(session,filepath)
       sexec(session,"rm -f #{filepath}")
     end
+
+	  sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_CONF_PATH}")
+
 
 		sexec(session,'service kadeploy3d restart')
 
@@ -3087,9 +3438,9 @@ sshgw.ssh(servername,'root') do |session|
 
 		msg('Configuring Kadeploy client',MSG_INFO)
 		tempfile(cfg_kadeploy_client()) do |path|
-			scp(servername,path,CFG_KADEPLOY_CLIENT_CONF_FILE)
+			scp(servername,path,cfg_kadeploy_client_filename())
 		end
-		sexec(session,"chmod +r #{CFG_KADEPLOY_CLIENT_CONF_FILE}")
+		sexec(session,"chmod +r #{cfg_kadeploy_client_filename()}")
 	end
 
 	http_tunnel(server,session) do
