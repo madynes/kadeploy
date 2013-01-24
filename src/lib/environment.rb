@@ -84,6 +84,7 @@ module EnvironmentManagement
     attr_reader :description
     attr_reader :author
     attr_accessor :tarball
+    attr_accessor :image
     attr_accessor :preinstall
     attr_accessor :postinstall
     attr_reader :kernel
@@ -104,8 +105,7 @@ module EnvironmentManagement
 
     def check_os_values()
       mandatory = []
-      type = EnvironmentManagement.image_type_long(@tarball['kind'])
-      case type[0]
+      case @image[:kind]
       when 'tar'
         case @environment_kind
         when 'xen'
@@ -149,7 +149,7 @@ module EnvironmentManagement
           if setmd5
             ret = client.get_file_md5(f)
             if ret == 0
-              error(client,"The tarball file #{f} cannot be read")
+              error(client,"The image file #{f} cannot be read")
               return false
             end
           end
@@ -175,13 +175,21 @@ module EnvironmentManagement
 
         cp.parse('image',true) do
           file = cp.value('file',String)
+          kind = cp.value('kind',String,nil,IMAGE_KIND)
+          compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
+          md5 = filemd5.call(file)
+          shortkind = EnvironmentManagement.image_type_short(kind,compress)
           @tarball = {
-            'kind' => EnvironmentManagement.image_type_short(
-              cp.value('kind',String,nil,IMAGE_KIND),
-              cp.value('compression',String,nil,IMAGE_COMPRESSION)
-            ),
+            'kind' => shortkind,
             'file' => file,
-            'md5' => filemd5.call(file)
+            'md5' => md5,
+          }
+          @image = {
+            :file => file,
+            :kind => kind,
+            :compression => compress,
+            :shortkind => shortkind,
+            :md5 => md5,
           }
         end
 
@@ -385,6 +393,7 @@ module EnvironmentManagement
       @demolishing_env = env.demolishing_env
       @environment_kind = env.environment_kind
       @tarball = env.tarball
+      @image = env.image
       @preinstall = env.preinstall
       @postinstall = env.postinstall
       @kernel = env.kernel
@@ -424,6 +433,13 @@ module EnvironmentManagement
       @demolishing_env = hash['demolishing_env']
       @environment_kind = hash['environment_kind']
       @tarball = self.class.expand_image(hash['tarball'],true)
+      tmp = EnvironmentManagement.image_type_long(@tarball['kind'])
+      @image = {
+        :file => @tarball['file'],
+        :kind => tmp[0],
+        :compression => tmp[1],
+        :md5 => @tarball['md5'],
+      }
       @preinstall = self.class.expand_preinstall(hash['preinstall'],true)
       @postinstall = self.class.expand_postinstall(hash['postinstall'],true)
       @kernel = hash['kernel']
@@ -486,30 +502,6 @@ module EnvironmentManagement
       end
     end
 
-    # Check the MD5 digest of the files
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * returns true if the digest is OK, false otherwise
-    def check_md5_digest
-      val = @tarball.split("|")
-      tarball_file = val[0]
-      tarball_md5 = val[2]
-      if (MD5::get_md5_sum(tarball_file) != tarball_md5) then
-        return false
-      end
-      @postinstall.split(",").each { |entry|
-        val = entry.split("|")
-        postinstall_file = val[0]
-        postinstall_md5 = val[2]
-        if (MD5::get_md5_sum(postinstall_file) != postinstall_md5) then
-          return false
-        end       
-      }
-      return true
-    end
-
     # Print the header
     #
     # Arguments
@@ -544,9 +536,9 @@ module EnvironmentManagement
       ret['os'] = @environment_kind
 
       ret['image'] = {}
-      ret['image']['kind'],ret['image']['compression'] =
-        EnvironmentManagement.image_type_long(@tarball['kind'])
-      ret['image']['file'] = @tarball['file']
+      ret['image']['file'] = @image[:file]
+      ret['image']['kind'] = @image[:kind]
+      ret['image']['compression'] = @image[:compression]
 
       unless @preinstall.nil?
         ret['preinstall'] = {}
