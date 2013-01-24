@@ -949,22 +949,6 @@ module Nodes
       return (res.num_rows > 0)
     end
 
-    # Tag some environments as demolishing
-    #
-    # Arguments
-    # * db: database handler
-    # Output
-    # * return nothing
-    def tag_demolishing_env(db)
-      if not empty? then
-        args,nodelist = generic_where_nodelist()
-        res = db.run_query("SELECT DISTINCT(env_id) FROM nodes WHERE #{nodelist}", *args)
-        res.each_array do |row|
-          db.run_query("UPDATE environments SET demolishing_env=demolishing_env+1 WHERE id=?", row[0])
-        end
-      end
-    end
-
     def generic_where_nodelist(field='hostname', sep=' OR ')
       ret = []
       @set.each do |node|
