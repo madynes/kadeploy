@@ -1231,6 +1231,8 @@ def cfg_sql()
   "  `environment_kind` varchar(10) NOT NULL,\n"\
   "  `visibility` varchar(8) NOT NULL,\n"\
   "  `demolishing_env` int(8) NOT NULL default '0',\n"\
+  "  `multipart` boolean NOT NULL default FALSE,\n"\
+  "  `options` text NULL default NULL,\n"\
   "  PRIMARY KEY  (`id`)\n"\
   ") ENGINE=MyISAM  DEFAULT CHARSET=utf8;\n"\
   + # table log
