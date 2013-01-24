@@ -148,6 +148,7 @@ class Macrostep < Automata::TaskedTaskManager
     # ddgz or ddbz2 image
     if cexec.environment.image[:kind] == 'dd'
       delete_task(:format_deploy_part)
+      # if not mountable
       delete_task(:mount_deploy_part)
       delete_task(:umount_deploy_part)
       delete_task(:manage_admin_post_install)
@@ -156,6 +157,29 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:send_key)
       delete_task(:install_bootloader)
     end
+
+    # FSA image
+    if cexec.environment.image[:kind] == 'fsa'
+      delete_task(:format_deploy_part)
+      # if not mountable
+      delete_task(:mount_deploy_part)
+      delete_task(:umount_deploy_part)
+      delete_task(:manage_admin_post_install)
+      delete_task(:manage_user_post_install)
+      delete_task(:check_kernel_files)
+      delete_task(:send_key)
+      delete_task(:install_bootloader)
+    end
+
+    # Multi-partitioned environment
+    if cexec.environment.multipart
+      delete_task(:format_deploy_part)
+      delete_task(:format_tmp_part)
+      delete_task(:format_swap_part)
+    end
+
+    delete_task(:decompress_environment) \
+      unless cexec.environment.image[:kind] == 'fsa'
 
     if !cexec.key or cexec.key.empty?
       delete_task(:send_key_in_deploy_env)
