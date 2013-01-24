@@ -24,6 +24,7 @@ module EnvironmentManagement
   IMAGE_KIND = [
     'tar',
     'dd',
+    'fsa',
   ]
   IMAGE_COMPRESSION = [
     'gzip',
@@ -46,6 +47,8 @@ module EnvironmentManagement
       when 'bzip2'
         'ddbz2'
       end
+    when 'fsa'
+      "fsa#{compression}"
     end
   end
 
@@ -59,6 +62,8 @@ module EnvironmentManagement
       [ 'dd', 'gzip' ]
     when 'ddbz2'
       [ 'dd', 'bzip2' ]
+    when /^fsa(\d+)$/
+      [ 'fsa', $1 ]
     end
   end
 
@@ -75,8 +80,10 @@ module EnvironmentManagement
       'preinstall',
       'postinstalls',
       'boot',
+      'multipart',
       'filesystem',
       'partition_type',
+      'options',
     ]
     attr_reader :id
     attr_reader :name
@@ -98,6 +105,8 @@ module EnvironmentManagement
     attr_reader :environment_kind
     attr_reader :visibility
     attr_reader :demolishing_env
+    attr_reader :multipart
+    attr_reader :options
 
     def debug(client,msg)
       Debug::distant_client_print(msg,client)
@@ -172,15 +181,18 @@ module EnvironmentManagement
           error(client,'Only the environment administrators can set the "public" tag')
           return false
         end
-        @demolishing_env = (
-          cp.value('destructive',[TrueClass,FalseClass],false) ? 1 : 0
-        )
+        @demolishing_env = cp.value('destructive',[TrueClass,FalseClass],false)
         @environment_kind = cp.value('os',String,nil,OS_KIND)
 
         cp.parse('image',true) do
           file = cp.value('file',String)
           kind = cp.value('kind',String,nil,IMAGE_KIND)
-          compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
+          compress = nil
+          if kind == 'fsa'
+            compress = cp.value('compression',Fixnum,0,Array(0..9)).to_s
+          else
+            compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
+          end
           md5 = filemd5.call(file)
           shortkind = EnvironmentManagement.image_type_short(kind,compress)
           @tarball = {
@@ -227,16 +239,64 @@ module EnvironmentManagement
           end
         end
 
+        @filesystem = cp.value('filesystem',String,'')
+        @fdisk_type = cp.value('partition_type',Fixnum,0).to_s(16) #numeric or hexa
+        @multipart = cp.value('multipart',[TrueClass,FalseClass],false)
+        @options = {}
+        cp.parse('options',@multipart) do |info|
+          unless info[:empty]
+            @options['partitions'] = []
+            cp.parse('partitions',true,Array) do |info|
+              unless info[:empty]
+                tmp = {
+                  'id' => cp.value('id',Fixnum),
+                  'device' => cp.value('device',String),
+                }
+                # Check if 'id' already defined for another partition
+                unless @options['partitions'].select{ |part|
+                  part['id'] == tmp['id']
+                }.empty?
+                  raise ArgumentError.new(
+                    "Partition id ##{tmp['id']} is already defined "\
+                    "[field: #{info[:path]}]"
+                  )
+                end
+
+                # Check if 'device' already defined for another partition
+                unless @options['partitions'].select{ |part|
+                  part['device'] == tmp['device']
+                }.empty?
+                  raise ArgumentError.new(
+                    "Partition device '#{tmp['device']}' is already defined "\
+                    "[field: #{info[:path]}]"
+                  )
+                end
+                @options['partitions'] << tmp
+              end
+            end
+            if !@multipart and @options['partitions'].size > 1
+              debug(client,
+                "Warning(#{(filename ? filename : 'env_desc')}) "\
+                "Multiple partitions defined with non-multipart "\
+                "environment, by default, the partition #0 will be installed "\
+                "on the deployment partition"
+              )
+            end
+          end
+        end
+
         cp.parse('boot') do
           @kernel = cp.value('kernel',String,'',Pathname)
           @initrd = cp.value('initrd',String,'',Pathname)
           @kernel_params = cp.value('kernel_params',String,'')
           @hypervisor = cp.value('hypervisor',String,'',Pathname)
           @hypervisor_params = cp.value('hypervisor_params',String,'')
+          if @multipart
+            @options['block_device'] = cp.value('block_device',String)
+            @options['deploy_part'] = cp.value('partition',Fixnum).to_s
+          end
         end
 
-        @filesystem = cp.value('filesystem',String,'')
-        @fdisk_type = cp.value('partition_type',Fixnum,0).to_s(16) #numeric or hexa
 
       rescue ArgumentError => ae
         debug(client,"Error(#{(filename ? filename : 'env_desc')}) #{ae.message}")
@@ -411,6 +471,8 @@ module EnvironmentManagement
       @hypervisor_params = env.hypervisor_params
       @fdisk_type = env.fdisk_type
       @filesystem = env.filesystem
+      @multipart = env.multipart
+      @options = env.options
       self
     end
 
@@ -438,7 +500,7 @@ module EnvironmentManagement
       @description = hash['description']
       @author = hash['author']
       @visibility = hash['visibility']
-      @demolishing_env = hash['demolishing_env']
+      @demolishing_env = (hash['demolishing_env'] == 0 ? false : true)
       @environment_kind = hash['environment_kind']
       @tarball = self.class.expand_image(hash['tarball'],true)
       tmp = EnvironmentManagement.image_type_long(@tarball['kind'])
@@ -458,6 +520,8 @@ module EnvironmentManagement
       @hypervisor_params = hash['hypervisor_params']
       @fdisk_type = hash['fdisk_type']
       @filesystem = hash['filesystem']
+      @multipart = (hash['multipart'] == 0 ? false : true)
+      @options = (hash['options'].empty? ? {} : YAML.load(hash['options']))
       self
     end
 
@@ -485,8 +549,10 @@ module EnvironmentManagement
              user, \
              environment_kind, \
              visibility, \
-             demolishing_env) \
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+             demolishing_env, \
+             multipart, \
+             options) \
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
            @name,
            @version,
            @description,
@@ -504,7 +570,9 @@ module EnvironmentManagement
            @user,
            @environment_kind,
            @visibility,
-           @demolishing_env
+           (@demolishing_env ? 1 : 0),
+           (@multipart ? 1 : 0),
+           (@options.empty? ? '' : @options.to_yaml)
         )
 
         true
@@ -541,7 +609,7 @@ module EnvironmentManagement
       ret['description'] = @description if !@description.nil? and !@description.empty?
       ret['author'] = @author if !@author.nil? and !@author.empty?
       ret['visibility'] = @visibility
-      ret['destructive'] = (@demolishing_env == 0 ? false : true)
+      ret['destructive'] = @demolishing_env
       ret['os'] = @environment_kind
 
       ret['image'] = {}
@@ -578,10 +646,16 @@ module EnvironmentManagement
         if !@hypervisor.nil? and !@hypervisor.empty?
       tmp['hypervisor_params'] = @hypervisor_params \
         if !@hypervisor_params.nil? and !@hypervisor_params.empty?
+      tmp['block_device'] = @options['block_device'] \
+        if !@options['block_device'].nil? and !@options['block_device'].empty?
+      tmp['partition'] = @options['deploy_part'].to_i \
+        if !@options['partition'].nil? and !@options['partition'].empty?
       ret['boot'] = tmp unless tmp.empty?
 
       ret['filesystem'] = @filesystem if !@filesystem.nil? and !@filesystem.empty?
       ret['partition_type'] = @fdisk_type.to_i(16)
+      ret['multipart'] = @multipart
+      ret['options'] = @options unless @options.empty?
 
       ret
     end
