@@ -24,6 +24,7 @@ module EnvironmentManagement
   IMAGE_KIND = [
     'tar',
     'dd',
+    'fsa',
   ]
   IMAGE_COMPRESSION = [
     'gzip',
@@ -46,6 +47,8 @@ module EnvironmentManagement
       when 'bzip2'
         'ddbz2'
       end
+    when 'fsa'
+      "fsa#{compression}"
     end
   end
 
@@ -59,6 +62,8 @@ module EnvironmentManagement
       [ 'dd', 'gzip' ]
     when 'ddbz2'
       [ 'dd', 'bzip2' ]
+    when /^fsa(\d+)$/
+      [ 'fsa', $1 ]
     end
   end
 
@@ -176,7 +181,12 @@ module EnvironmentManagement
         cp.parse('image',true) do
           file = cp.value('file',String)
           kind = cp.value('kind',String,nil,IMAGE_KIND)
-          compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
+          compress = nil
+          if kind == 'fsa'
+            compress = cp.value('compression',Fixnum,nil,Array(1..9)).to_s
+          else
+            compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
+          end
           md5 = filemd5.call(file)
           shortkind = EnvironmentManagement.image_type_short(kind,compress)
           @tarball = {
