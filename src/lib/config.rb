@@ -111,36 +111,6 @@ module ConfigInformation
         end
       end
 
-      #Rights check
-      allowed_to_deploy = true
-      #The rights must be checked for each cluster if the node_list contains nodes from several clusters
-      exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
-        if (allowed_to_deploy) then
-          b=nil
-          if exec_specific_config.block_device != ""
-            b = exec_specific_config.block_device
-          else
-            b = @cluster_specific[cluster].block_device
-          end
-          p=nil
-          if exec_specific_config.deploy_part.nil?
-            p = ''
-          elsif exec_specific_config.deploy_part != ""
-            p = exec_specific_config.deploy_part
-          else
-            p = @cluster_specific[cluster].deploy_part
-          end
-
-          part = b + p
-          allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
-                                                                     exec_specific_config.true_user,
-                                                                     client, set, db, part).granted?
-        end
-      }
-      if (not allowed_to_deploy) then
-        Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
-        return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
-      end
 
       #Environment load
       case exec_specific_config.load_env_kind
@@ -178,6 +148,60 @@ module ConfigInformation
       else
         Debug::distant_client_error("You must choose an environment", client)
         return KadeployAsyncError::NO_ENV_CHOSEN
+      end
+
+      # Multi-partitioned archives hack
+      if exec_specific_config.environment.multipart
+        exec_specific_config.block_device =
+          exec_specific_config.environment.options['block_device']
+        exec_specific_config.deploy_part =
+          exec_specific_config.environment.options['deploy_part']
+      end
+
+      #Rights check
+      allowed_to_deploy = true
+      #The rights must be checked for each cluster if the node_list contains nodes from several clusters
+      exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
+        b=nil
+        if exec_specific_config.block_device != ""
+          b = exec_specific_config.block_device
+        else
+          b = @cluster_specific[cluster].block_device
+        end
+        p=nil
+        if exec_specific_config.deploy_part.nil?
+          p = ''
+        elsif exec_specific_config.deploy_part != ""
+          p = exec_specific_config.deploy_part
+        else
+          p = @cluster_specific[cluster].deploy_part
+        end
+
+        part = b + p
+        unless CheckRights::CheckRightsFactory.create(
+          @common.rights_kind, exec_specific_config.true_user,
+          client, set, db, part
+        ).granted?
+          Debug::distant_client_error(
+            "You do not have the right to deploy on all the nodes", client
+          )
+          return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
+        end
+      }
+
+      # Check rights on multipart environement
+      if exec_specific_config.environment.multipart
+        exec_specific_config.environment.options['partitions'].each do |part|
+          unless CheckRights::CheckRightsFactory.create(
+            @common.rights_kind, exec_specific_config.true_user, client,
+            exec_specific_config.node_set, db, part['device']
+          ).granted?
+            Debug::distant_client_error(
+              "You do not have the right to deploy on all the nodes", client
+            )
+            return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
+          end
+        end
       end
 
       return KadeployAsyncError::NO_ERROR

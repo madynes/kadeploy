@@ -18,6 +18,7 @@ require 'macrostep'
     def steps()
       [
         [ :send_environment, :chain ],
+        [ :decompress_environment, :tree ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
         [ :check_kernel_files ],
@@ -31,6 +32,8 @@ require 'macrostep'
     def steps()
       [
         [ :send_environment, :kastafior ],
+        [ :decompress_environment, :tree ],
+        #[ :mount_deploy_part ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
         [ :check_kernel_files ],
@@ -44,6 +47,7 @@ require 'macrostep'
     def steps()
       [
         [ :send_environment, :tree ],
+        [ :decompress_environment, :tree ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
         [ :check_kernel_files ],
@@ -58,6 +62,7 @@ require 'macrostep'
       [
         [ :mount_tmp_part ], #we need /tmp to store the tarball
         [ :send_environment, :bittorrent ],
+        [ :decompress_environment, :tree ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
         [ :check_kernel_files ],

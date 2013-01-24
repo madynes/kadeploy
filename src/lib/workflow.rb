@@ -98,7 +98,6 @@ class Workflow < Automata::TaskManager
       debug(0,"A specific presinstall will be used with this environment")
     end
 
-
     # SetDeploymentEnv step
     macrosteps[0].get_instances.each do |instance|
       @tasks[0] << [ instance[0].to_sym ]
@@ -128,11 +127,18 @@ class Workflow < Automata::TaskManager
           "Using classical reboot instead of kexec one with this "\
           "non-linux environment"
         )
+      # TODO: only if fs is not supported
       elsif context[:execution].environment.image[:kind] == 'dd'
         setclassical.call(
           instance,
           "Using classical reboot instead of kexec one with this "\
-          "ddgz/ddbz2 environment"
+          "dd environment"
+        )
+      elsif context[:execution].environment.image[:kind] == 'fsa'
+        setclassical.call(
+          instance,
+          "Using classical reboot instead of kexec one with this "\
+          "FSA environment"
         )
       end
 
@@ -146,7 +152,7 @@ class Workflow < Automata::TaskManager
 
   def check_config()
     cexec = context[:execution]
-    # Deploy on block device 
+    # Deploy on block device
     if cexec.block_device and !cexec.block_device.empty? \
       and (!cexec.deploy_part or cexec.deploy_part.empty?)
 
@@ -161,6 +167,18 @@ class Workflow < Automata::TaskManager
         error(KadeployAsyncError::CONFLICTING_OPTIONS)
       end
     end
+
+=begin
+    # Deploy FSA images
+    if cexec.environment.image[:kind] == 'fsa'
+      # Since no bootloader is installed with FSA, we do not allow to install
+      # FSA archives unless the boot method is a GRUB PXE boot
+      if !context[:common].pxe[:local].is_a?(NetBoot::GrubPXE) and cexec.pxe_profile_msg.empty?
+        debug(0,"FSA archives can only be booted if GRUB is used to boot on the hard disk or you define a custom PXE boot method")
+        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+      end
+    end
+=end
   end
 
   def load_config()
