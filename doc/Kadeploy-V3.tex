@@ -1785,12 +1785,13 @@ Explanation of the fields used in the environment description:
     \item \texttt{public}: the environment can be used by everybody and it is listed without specifing its owner name.
   \end{itemize}
   \item \yfieldd{destructive}{Boolean}{false} specify that the environment is destructive
+  \item \yfieldd{multipart}{Boolean}{false} specify that the environment is multi-partitioned. Be careful, with multi-partitioned environment, specific options have to be set (\texttt{(Multi-partitioned)} tagged ones).
   \item \yfield{os}{String} kind of environment (expected values are \texttt{linux}, \texttt{xen} or \texttt{other}).
   \item \ypath{/image} the disk image of the environment
   \begin{itemize}
     \item \yfield{file}{String} the path to the disk image of the environment (can be local path or URL)
-    \item \yfield{kind}{String} specify the kind of image (expected values are \texttt{tar} (a tarball archive of the environment) or \texttt{dd} (a dd image of the environment))
-    \item \yfield{compression}{String} the compression of the disk image file (expected values are \texttt{gzip} or \texttt{bzip2})
+    \item \yfield{kind}{String} specify the kind of image (expected values are \texttt{tar} (a tarball archive of the environment), \texttt{dd} (a dd image of the environment) or \texttt{fsa} (a fsarchiver image of the environment, see section \ref{sec:fsa}))
+    \item \yfield{compression}{String/Integer} the compression of the disk image file (expected values are Strings \texttt{gzip} or \texttt{bzip2} and Integer \texttt{[0..9]} for FSA image)
   \end{itemize}
   \item \ypath{/preinstall} a pre-installation script that will be executed before the environment is sent and installed (useless unless the kind of image is \texttt{tar})
   \begin{itemize}
@@ -1804,16 +1805,24 @@ Explanation of the fields used in the environment description:
     \item \yfield{compression}{String} the compression of the archive (expected values are \texttt{gzip} or \texttt{bzip2})
     \item \yfieldd{script}{String}{none} the script to execute. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. pre-install.
   \end{itemize}
-  \item \ypath{/boot} information about the system that will be installed (useless unless the kind of image is \texttt{tar})
+  \item \ypath{/boot} information about the system that will be installed (useless if the kind of image is \texttt{dd})
   \begin{itemize}
     \item \yfieldd{kernel}{String}{''} path of the kernel in the tarball.
     \item \yfieldd{kernel\_params}{String}{''} set of parameters that must be applied to the kernel for a correct boot
     \item \yfieldd{initrd}{String}{''} path of the initrd in the tarball.
     \item \yfieldd{hypervisor}{String}{''} path of the hypervisor in the tarball. This fields is only required for the Xen based environments
     \item \yfieldd{hypervisor\_params}{String}{''} set of parameters that must be applied to the hypervisor for a correct boot. This fields is only required for the Xen based environments
+    \item \yfield{block\_device}{String} \texttt{(Multi-partitioned)} specify the block\_device that contains the partition to boot
+    \item \yfield{partition}{Integer} \texttt{(Multi-partitioned)} specify the partition that contains the system to be booted
   \end{itemize}
-  \item \yfieldd{partition\_type}{Integer}{0} the MS-DOS partition type, you can specify hexadecimal values using the prefix \texttt{0x}. For example, \texttt{0x83} or \texttt{131} for Linux, \texttt{0xa5} for FreeBSD, ... (useless unless the kind of image is \texttt{tar})
+  \item \yfieldd{partition\_type}{Integer}{0} the MS-DOS partition type, you can specify hexadecimal values using the prefix \texttt{0x}. For example, \texttt{0x83} or \texttt{131} for Linux, \texttt{0xa5} for FreeBSD, ...
   \item \yfieldd{filesystem}{String}{''} type of filesystem wished on the deployment partition. It must be known by the mkfs command (useless unless the kind of image is \texttt{tar})
+  \item \ypath{/options} Extra options
+  \item \ypath{/options/[partitions]} \texttt{(Multi-partitioned)} Information about the dispatching of the partitions included inside the image file on the partitions of the hard disk.
+  \begin{itemize}
+    \item \yfield{id}{Integer} \texttt{(Multi-partitioned)} the ID of the partition in the multi-partitioned image file
+    \item \yfield{device}{String} \texttt{(Multi-partitioned)} the physical partition (for example: \texttt{/dev/sda3}) where the partition \texttt{\#id} of the multi-partitioned image file has to be saved
+  \end{itemize}
 \end{itemize}
 
 \subsection{Kaconsole}\label{sec:kaconsole}
@@ -2168,5 +2177,54 @@ Here is a example of a the custom operations file:
 Note: It is also possible for administrators to add systematic custom operations in the deployment process in order to perform a custom partitioning: the setting to modify in the cluster-specific configuration file (see section \ref{sec:specific_config}) is \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/format\_deploy\_part/[substitute]}. The custom operations to add will look the same as the ones created in the \emph{custom\_ops.yml} script.
 
 
+\section{Fsarchiver environements}\label{sec:fsa}
+Fsarchiver allow to save several partition in one single file. It supports a bunch of different filesystems, it's also possible to specify the compression algorithm used to compress the archive.
+
+A documentation about creating fsarchiver images is available on the project's website (\url{http://www.fsarchiver.org/}).
+
+\texttt{Note:} Be careful to clean the system that will be booted in the image from node-specific files (for example, \texttt{udev} files on Linux systems).
+
+Once the image is generated, it's possible to install it with Kadeploy3. In the environment file (see section \ref{sec:env_desc}), the type of the image file (field \ypath{/kind}) have to be set to \texttt{fsa}. If several partitions are saved in the fsarchiver image, the field \ypath{/multipart} need to be set to \texttt{true}, it's also necessary to specify where each partitions should be installed on the node (field \ypath{/options/[partitions]}) and the partition where the system to boot is locates (fields \ypath{/boot/block\_device} and \ypath{/boot/partition}).
+
+\texttt{Note:} The ID number of each partition (field \ypath{/options/[partitions]/id}) is affected depending on the order the partitions was saved in the fsarchiver file when it was generated.
+
+Here is an example of an fsa environment description:
+\begin{small}
+\begin{verbatim}
+---
+name: debian-min
+version: 1
+description: https://www.grid5000.fr/mediawiki/index.php/Squeeze-x64-base-1.0
+author: John Smith
+visibility: shared
+destructive: true
+multipart: true
+os: linux
+image:
+  kind: fsa
+  compression: 3
+  file: /grid5000/debian-multipart.fsa
+boot:
+  kernel: /vmlinuz
+  initrd: /initrd.img
+  block_device: /dev/sda
+  partition: 2
+filesystem: ext3
+partition_type: 0x83
+options:
+  partitions:
+  - id: 0
+    device: /dev/sda1
+  - id: 1
+    device: /dev/sda2
+  - id: 2
+    device: /dev/sda3
+\end{verbatim}
+\end{small}
+
+% To deploy a system installed on a non-supported filesystem, please refer to the section \ref{sec:unsupported_fs}.
+
+%\section{Boot non-supported systems}
+% Create a GRUB PXE disk, boot with custom PXE ...
 
 \end{document}
