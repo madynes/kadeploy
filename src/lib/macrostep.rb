@@ -157,6 +157,21 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:install_bootloader)
     end
 
+    # fsa image
+    if cexec.environment.image[:kind] == 'fsa'
+      delete_task(:format_deploy_part)
+      delete_task(:mount_deploy_part)
+      delete_task(:umount_deploy_part)
+      delete_task(:manage_admin_post_install)
+      delete_task(:manage_user_post_install)
+      delete_task(:check_kernel_files)
+      delete_task(:send_key)
+      delete_task(:install_bootloader)
+    end
+
+    delete_task(:decompress_environment) \
+      unless cexec.environment.image[:kind] == 'fsa'
+
     if !cexec.key or cexec.key.empty?
       delete_task(:send_key_in_deploy_env)
       delete_task(:send_key)

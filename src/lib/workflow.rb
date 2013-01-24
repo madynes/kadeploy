@@ -132,7 +132,13 @@ class Workflow < Automata::TaskManager
         setclassical.call(
           instance,
           "Using classical reboot instead of kexec one with this "\
-          "ddgz/ddbz2 environment"
+          "dd environment"
+        )
+      elsif context[:execution].environment.image[:kind] == 'fsa'
+        setclassical.call(
+          instance,
+          "Using classical reboot instead of kexec one with this "\
+          "fsa environment"
         )
       end
 
