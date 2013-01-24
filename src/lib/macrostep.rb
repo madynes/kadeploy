@@ -145,7 +145,7 @@ class Macrostep < Automata::TaskedTaskManager
     end
 
     # ddgz or ddbz2 image
-    if ['ddgz','ddbz2'].include?(cexec.environment.tarball["kind"])
+    if cexec.environment.image[:kind] == 'dd'
       delete_task(:format_deploy_part)
       delete_task(:mount_deploy_part)
       delete_task(:umount_deploy_part)

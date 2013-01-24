@@ -128,7 +128,7 @@ class Workflow < Automata::TaskManager
           "Using classical reboot instead of kexec one with this "\
           "non-linux environment"
         )
-      elsif (['ddgz','ddbz2'].include?(context[:execution].environment.tarball["kind"]))
+      elsif context[:execution].environment.image[:kind] == 'dd'
         setclassical.call(
           instance,
           "Using classical reboot instead of kexec one with this "\
@@ -151,8 +151,8 @@ class Workflow < Automata::TaskManager
       and (!cexec.deploy_part or cexec.deploy_part.empty?)
 
       # Without a dd image
-      unless ['ddgz','ddbz2'].include?(cexec.environment.tarball["kind"])
-        debug(0,"You can only deploy directly on block device when using a ddgz/ddbz2 environment")
+      unless cexec.environment.image[:kind] == 'dd'
+        debug(0,"You can only deploy directly on block device when using a dd image")
         error(KadeployAsyncError::CONFLICTING_OPTIONS)
       end
       # Without specifying the partition to chainload on
@@ -451,12 +451,12 @@ class Workflow < Automata::TaskManager
       context[:client], context[:database]
     )
 
-    # Env tarball
-    file = context[:execution].environment.tarball
+    # Env image
+    file = context[:execution].environment.image
     grab_file(
-      gfm, file['file'], env_prefix, 'tarball',
+      gfm, file[:file], env_prefix, 'image',
       FetchFileError::INVALID_ENVIRONMENT_TARBALL,
-      :md5 => file['md5'], :caching => true
+      :md5 => file[:md5], :caching => true
     )
 
     # SSH key file

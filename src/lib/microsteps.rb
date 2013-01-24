@@ -701,7 +701,7 @@ class Microstep < Automata::QueueTask
       files.push(f.sub(/\A\//,'')) if (f != nil)
     }
     must_extract = false
-    archive = context[:execution].environment.tarball["file"]
+    archive = context[:execution].environment.image[:file]
     dest_dir = File.join(context[:common].pxe_repository, context[:common].pxe_repository_kernels)
     files.each { |file|
       if not (File.exist?(File.join(dest_dir, context[:execution].prefix_in_cache + File.basename(file)))) then
@@ -723,7 +723,7 @@ class Microstep < Automata::QueueTask
       }
       tmpdir = get_tmpdir()
       if not extract_files_from_archive(archive,
-                                        context[:execution].environment.tarball["kind"],
+                                        context[:execution].environment.image[:shortkind],
                                         files_in_archive,
                                         tmpdir) then
         failed_microstep("Cannot extract the files from the archive")
@@ -1786,31 +1786,31 @@ class Microstep < Automata::QueueTask
     case scattering_kind
     when :bittorrent
       res = send_tarball_and_uncompress_with_bittorrent(
-        context[:execution].environment.tarball["file"],
-        context[:execution].environment.tarball["kind"],
+        context[:execution].environment.image[:file],
+        context[:execution].environment.image[:shortkind],
         context[:common].environment_extraction_dir,
         get_deploy_part_str()
       )
     when :chain
       res = send_tarball_and_uncompress_with_taktuk(
         :chain,
-        context[:execution].environment.tarball["file"],
-        context[:execution].environment.tarball["kind"],
+        context[:execution].environment.image[:file],
+        context[:execution].environment.image[:shortkind],
         context[:common].environment_extraction_dir,
         get_deploy_part_str()
       )
     when :tree
       res = send_tarball_and_uncompress_with_taktuk(
         :tree,
-        context[:execution].environment.tarball["file"],
-        context[:execution].environment.tarball["kind"],
+        context[:execution].environment.image[:file],
+        context[:execution].environment.image[:shortkind],
         context[:common].environment_extraction_dir,
         get_deploy_part_str()
       )
     when :kastafior
       res = send_tarball_and_uncompress_with_kastafior(
-       context[:execution].environment.tarball["file"],
-       context[:execution].environment.tarball["kind"],
+       context[:execution].environment.image[:file],
+       context[:execution].environment.image[:shortkind],
        context[:common].environment_extraction_dir,
        get_deploy_part_str()
       )
