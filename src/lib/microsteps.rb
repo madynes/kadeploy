@@ -830,6 +830,8 @@ class Microstep < Automata::QueueTask
       cmd = "gzip -cd > #{deploy_part}"
     when "ddbz2"
       cmd = "bzip2 -cd > #{deploy_part}"
+    when /^fsa\d+$/
+      cmd = "cat - > #{fsarchive()}"
     else
       failed_microstep("The #{tarball_kind} archive kind is not supported")
       return false
@@ -903,6 +905,8 @@ class Microstep < Automata::QueueTask
       cmd = "gzip -cd > #{deploy_part}"
     when "ddbz2"
       cmd = "bzip2 -cd > #{deploy_part}"
+    when /^fsa\d+$/
+      cmd = "cat - > #{fsarchive()}"
     else
       failed_microstep("The #{tarball_kind} archive kind is not supported")
       return false
@@ -993,6 +997,8 @@ class Microstep < Automata::QueueTask
       cmd = "gzip -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
     when "ddbz2"
       cmd = "bzip2 -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
+    when /^fsa\d+$/
+      cmd = "cat - > #{fsarchive()}"
     else
       failed_microstep("The #{tarball_kind} archive kind is not supported")
       return false
@@ -1090,6 +1096,10 @@ class Microstep < Automata::QueueTask
       ret += "#{key.to_s}=\"#{val}\" "
     end
     ret
+  end
+
+  def fsarchive()
+    File.join(context[:common].rambin_path,'_FSARCHIVE.fsa')
   end
 
   public
@@ -1818,6 +1828,37 @@ class Microstep < Automata::QueueTask
     debug(3, "Broadcast time: #{Time.now.to_i - start}s") if res
     res = res && parallel_exec('sync')
     return res
+  end
+
+  # Uncompress the user environment on the nodes
+  #
+  # Arguments
+  # * scattering_kind: kind of taktuk scatter (tree, chain)
+  # Output
+  # * return true if the admin preinstall has been successfully uncompressed, false otherwise
+  def ms_decompress_environment(scattering_kind)
+    unless context[:execution].environment.image[:kind] == 'fsa'
+      failed_microstep("Only fsa images need to be decompressed separatly")
+      return false
+    end
+
+    nbcpu = "$(grep -c '^processor' /proc/cpuinfo)"
+
+    comp = (
+     context[:execution].environment.image[:compression].to_i > 0 \
+      ? "-z #{context[:execution].environment.image[:compression]}" \
+      : ''
+    )
+
+    fsmap = ''
+    context[:execution].environment.image[:partitions].each do |part|
+      fsmap += "id=#{part[:id].to_s},dest=#{part[:device]} "
+    end
+
+    return parallel_exec(
+      "fsarchiver -j #{nbcpu} #{comp} restfs #{fsarchive()} #{fsmap}",
+      { :scattering => scattering_kind }
+    )
   end
 
 
