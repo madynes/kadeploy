@@ -757,15 +757,6 @@ module ConfigInformation
           conf = @cluster_specific[clname]
           conf.name = clname
 
-          cp.parse('scripts',true) do
-            conf.bootloader_script = cp.value(
-              'bootloader',String,nil,{ :type => 'file', :readable => true }
-            )
-            conf.partitioning_script = cp.value(
-              'partitioning',String,nil,{ :type => 'file', :readable => true }
-            )
-          end
-
           clfile = cp.value(
             'conf_file',String,nil,{ :type => 'file', :readable => true }
           )
@@ -861,6 +852,15 @@ module ConfigInformation
           end
           conf.swap_part = 'none' if cp.value(
             'disable_swap',[TrueClass,FalseClass],false
+          )
+          conf.partitioning_script = cp.value(
+            'script',String,nil,{ :type => 'file', :readable => true }
+          )
+        end
+
+        cp.parse('bootloader',true) do
+          conf.bootloader_script = cp.value(
+            'script',String,nil,{ :type => 'file', :readable => true }
           )
         end
 

@@ -551,9 +551,6 @@ clusters:
 - name: graphene
   prefix: gra
   conf_file: cluster_conf-graphene.yml
-  scripts:
-    bootloader: install_grub2
-    partitioning: partitioning-graphene
   nodes: 
     - name: graphene-1.nancy.grid5000.fr # Full version
       address: 10.0.66.1
@@ -565,9 +562,6 @@ clusters:
       address: 10.0.66.4
 - name: griffon
   conf_file: cluster_conf-griffon.yml
-  scripts:
-    bootloader: install_grub
-    partitioning: partitioning-griffon
   nodes: 
     - name: griffon-[1-92].nancy.grid5000.fr # Digest version
       address: 10.0.65.[1-92]
@@ -581,12 +575,6 @@ clusters:
     \item \yfield{name}{String} the name of the cluster
     \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
     \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
-  \end{itemize}
-
-  \item \ypath{/clusters/scripts}
-  \begin{itemize}
-    \item \yfield{bootloader}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
-    \item \yfield{partitioning}{String} A script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/clusters/[nodes]}
@@ -609,6 +597,9 @@ partitioning:
     prod: 2
     deploy: 3
     tmp: 5
+  script: partitioning-griffon
+bootloader:
+  script: install_grub2
 timeouts: 
   reboot: 200 + 150 * Math.log(n)
   kexec: 60
@@ -733,6 +724,7 @@ automata:
   \begin{itemize}
     \item \yfield{block\_device}{String}block device of the disk used on the nodes
     \item \yfieldd{disable\_swap}{Boolean}{false} disable the swap partition on the disk
+    \item \yfield{script}{String} A script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/partitioning/partitions}
@@ -741,6 +733,11 @@ automata:
     \item \yfield{prod}{Integer} number of the production partition on the disk
     \item \yfield{deploy}{Integer} number of the deployment partition on the disk
     \item \yfield{tmp}{Integer} number of the tmp partition on the disk
+  \end{itemize}
+
+  \item \ypath{/bootloader}
+  \begin{itemize}
+    \item \yfield{script}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/timeouts}
