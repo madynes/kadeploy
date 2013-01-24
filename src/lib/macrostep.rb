@@ -212,6 +212,7 @@ class Macrostep < Automata::TaskedTaskManager
   def break!(task,nodeset)
     debug(2,"*** Breakpoint on #{task.name.to_s} reached for #{nodeset.to_s_fold}",task.nsid)
     debug(1,"Step #{self.class.name} breakpointed",task.nsid)
+    log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
   end
 
   def success!(task,nodeset)
@@ -219,6 +220,7 @@ class Macrostep < Automata::TaskedTaskManager
       "End of step #{self.class.name} after #{Time.now.to_i - @start_time}s",
       task.nsid
     )
+    log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
   end
 
   def fail!(task,nodeset)
@@ -228,6 +230,7 @@ class Macrostep < Automata::TaskedTaskManager
       "after #{Time.now.to_i - @start_time}s",
       task.nsid
     )
+    log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
   end
 
   def timeout!(task)
@@ -264,7 +267,6 @@ class Macrostep < Automata::TaskedTaskManager
   end
 
   def done!()
-    log("step#{idx+1}_duration", context[:local][:duration], nodes)
     @start_time = nil
   end
 end
