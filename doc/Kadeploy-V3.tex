@@ -237,7 +237,7 @@ Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} bu
 
 The file \texttt{load\_kadeploy\_env} in the configuration directory contains the \texttt{KADEPLOY\_INSTALL\_DIR} variable. You should probably fill this variable with the Kadeploy installation directory you used. This directory can be anywhere in the filesystem.
 
-\paragraph{Description format: YAML\\}
+\paragraph{Description format: YAML\\}\label{sec:yamlconf}
 In Kadeploy configuration settings are given using the YAML markup language. You should be aware that, in this language, indentation is very important. Also, in the YAML language, fields are typed, the value \texttt{"16"} is not equivalent to the value \texttt{16}.
 
 \paragraph{YAML types\\}
@@ -551,9 +551,6 @@ clusters:
 - name: graphene
   prefix: gra
   conf_file: cluster_conf-graphene.yml
-  scripts:
-    bootloader: install_grub2
-    partitioning: partitioning-graphene
   nodes: 
     - name: graphene-1.nancy.grid5000.fr # Full version
       address: 10.0.66.1
@@ -565,9 +562,6 @@ clusters:
       address: 10.0.66.4
 - name: griffon
   conf_file: cluster_conf-griffon.yml
-  scripts:
-    bootloader: install_grub
-    partitioning: partitioning-griffon
   nodes: 
     - name: griffon-[1-92].nancy.grid5000.fr # Digest version
       address: 10.0.65.[1-92]
@@ -581,12 +575,6 @@ clusters:
     \item \yfield{name}{String} the name of the cluster
     \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
     \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
-  \end{itemize}
-
-  \item \ypath{/clusters/scripts}
-  \begin{itemize}
-    \item \yfield{bootloader}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
-    \item \yfield{partitioning}{String} A script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/clusters/[nodes]}
@@ -609,6 +597,9 @@ partitioning:
     prod: 2
     deploy: 3
     tmp: 5
+  script: partitioning-griffon
+bootloader:
+  script: install_grub2
 timeouts: 
   reboot: 200 + 150 * Math.log(n)
   kexec: 60
@@ -733,6 +724,7 @@ automata:
   \begin{itemize}
     \item \yfield{block\_device}{String}block device of the disk used on the nodes
     \item \yfieldd{disable\_swap}{Boolean}{false} disable the swap partition on the disk
+    \item \yfield{script}{String} A script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/partitioning/partitions}
@@ -741,6 +733,11 @@ automata:
     \item \yfield{prod}{Integer} number of the production partition on the disk
     \item \yfield{deploy}{Integer} number of the deployment partition on the disk
     \item \yfield{tmp}{Integer} number of the tmp partition on the disk
+  \end{itemize}
+
+  \item \ypath{/bootloader}
+  \begin{itemize}
+    \item \yfield{script}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/timeouts}
@@ -1552,7 +1549,7 @@ General options:
 Advanced options:
       --remove-demolishing-tag ENVNAME  Remove demolishing tag on an environment
       --set-visibility-tag ENVNAME      Set the visibility tag on an environment
-      --update-tarball-md5 ENVNAME      Update the MD5 of the environment tarball
+      --update-image-md5 ENVNAME      Update the MD5 of the environment image
       --update-preinstall-md5 ENVNAME   Update the MD5 of the environment preinstall
       --update-postinstalls-md5 ENVNAME Update the MD5 of the environment postinstalls
       --move-files                      Move the files of the environment (for administrators only)
@@ -1621,53 +1618,98 @@ This command does the same thing than the precedent one but it concerns the post
 This command allows to define the environment \textit{sidx64-base} version 3 as a private environment. Note that the environment version is required and only the almighty environment users are allowed to define an environment as public.
 
 \subsubsection{Environment description}\label{sec:env_desc}
-Each line of an environment description must follow the pattern: \texttt{key : value} (note that the spaces around the \texttt{:} are mandatory.
+The description of an environment is made with a YAML file (see section \ref{sec:yamlconf}).
+
 Here is an example of an environment description:
 \begin{small}
 \begin{verbatim}
-name : xen
-version : 1
-description : https://www.grid5000.fr/index.php/Etch-x64-xen-1.0
-author : John Smith
-tarball : /grid5000/etch-x64-xen-1.0.tgz|tgz
-preinstall : /home/john/test/pre_install.tgz|tgz|launch.sh
-postinstall : /home/john/test/post_install.tgz|tgz|traitement.sh
-kernel : /boot/vmlinuz-2.6.18-6-xen-amd64
-kernel_params : console=tty0 console=ttyS1,38400n8
-initrd : /boot/initrd.img-2.6.18-6-xen-amd64
-hypervisor : /boot/xen-3.0.3-1-amd64.gz
-hypervisor_params : dom0_mem=1000000
-fdisktype : 83
-filesystem : ext2
-environment_kind : xen
-visibility : shared
-demolishing_env : false
+---
+name: debian-xen
+version: 3
+description: https://www.grid5000.fr/index.php/Etch-x64-xen-1.0
+author: John Smith
+visibility: shared
+image:
+  file: /grid5000/debian-x64-xen-1.0.tgz
+  kind: tar
+  compression: gzip
+preinstall:
+  archive: /home/john/test/pre_install.tgz
+  compression: gzip
+  script: launch.sh
+postinstalls:
+- archive: /home/john/test/post_install1.tgz
+  compression: gzip
+  script: traitement.sh
+- archive: /home/john/test/post_install2.tgz
+  compression: gzip
+  script: start.sh
+boot:
+  kernel: /boot/vmlinuz-2.6.18-6-xen-amd64
+  kernel_params: console=tty0 console=ttyS1,38400n8
+  initrd: /boot/initrd.img-2.6.18-6-xen-amd64
+  hypervisor: /boot/xen-3.0.3-1-amd64.gz
+  hypervisor_params: dom0_mem=1000000
+partition_type: 0x83
+filesystem: ext2
+\end{verbatim}
+\end{small}
+
+Another (shorter) example:
+\begin{small}
+\begin{verbatim}
+---
+name: freebsd
+version: 1
+image:
+  file: /grid5000/freebsd.ddgz
+  kind: dd
+  compression: gzip
 \end{verbatim}
 \end{small}
 
 Explanation of the fields used in the environment description:
 \begin{itemize}
-\item \texttt{name}: name of the environment. The spaces are allowed in the name but remember to use some quotes around it when you use Kadeploy or Kaenv.
-\item \texttt{version}: version of the environment.
-\item \texttt{author}: author of the environment.
-\item \texttt{tarball}: disk image of the environment. The syntax is: \texttt{file|kind}. The allowed kinds are \texttt{tgz}, \texttt{tbz2}, \texttt{ddgz} and \texttt{ddbz2}.
-\item \texttt{preinstall (opt)}: pre-install file. The syntax is: \texttt{file|kind|script [params]}. The allowed kinds of files are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
-\item \texttt{postinstall}: post-install files. The syntax is: \texttt{file1|kind|script1 [params],file2|kind|script2 [params], ...}. The allowed kinds of files for post-installs are \texttt{tgz} and \texttt{tbz2}. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched.
-\item \texttt{kernel}: path of the kernel in the tarball.
-\item \texttt{kernel\_params}: set of parameters that must be applied to the kernel for a correct boot.
-\item \texttt{initrd}: path of the initrd in the tarball.
-\item \texttt{hypervisor (opt)}: path of the hypervisor in the tarball. This fields is only required for the Xen based environments.
-\item \texttt{hypervisor\_params (opt)}: set of parameters that must be applied to the hypervisor for a correct boot. This fields is only required for the Xen based environments.
-\item \texttt{fdisktype}: partition type in hexadecimal (\texttt{83} for Linux, \texttt{a4} for FreeBSD, ...). This is used as an input for fdisk.
-\item \texttt{filesystem}: type of filesystem wished on the deployment partition. It must be known by the mkfs command.
-\item \texttt{environment\_kind}: kind of environment. Expected values are linux, xen or other.
-\item \texttt{visibility}: define the visibility level of an environment. Three levels are available:
-\begin{itemize}
-\item private: only the owner of the environment can see and use it ;
-\item shared: the environment can be used by everybody but it must explicitly use with the owner name ; furtermore, it won't be listed unless the owner name is specified ;
-\item public: the environment can be used by everybody and it is listed without specifing its owner name.
-\end{itemize}
-\item \texttt{demolishing\_env}: specify that the environment is demolishing (true or false)
+  \item \yfield{name}{String} name of the environment. The spaces are allowed in the name but remember to use some quotes around it when you use Kadeploy or Kaenv.
+  \item \yfieldd{version}{Integer}{1} the version of the environment
+  \item \yfieldd{description}{String}{''} the description of the environment
+  \item \yfieldd{author}{String}{''} the author of the environment
+  \item \yfieldd{visibility}{String}{'private'} define the visibility level of an environment. Three levels are available:
+  \begin{itemize}
+    \item \texttt{private}: only the owner of the environment can see and use it ;
+    \item \texttt{shared}: the environment can be used by everybody but it must explicitly use with the owner name ; furtermore, it won't be listed unless the owner name is specified ;
+    \item \texttt{public}: the environment can be used by everybody and it is listed without specifing its owner name.
+  \end{itemize}
+  \item \yfieldd{destructive}{Boolean}{false} specify that the environment is destructive
+  \item \yfield{os}{String} kind of environment (expected values are \texttt{linux}, \texttt{xen} or \texttt{other}).
+  \item \ypath{/image} the disk image of the environment
+  \begin{itemize}
+    \item \yfield{file}{String} the path to the disk image of the environment (can be local path or URL)
+    \item \yfield{kind}{String} specify the kind of image (expected values are \texttt{tar} (a tarball archive of the environment) or \texttt{dd} (a dd image of the environment))
+    \item \yfield{compression}{String} the compression of the disk image file (expected values are \texttt{gzip} or \texttt{bzip2})
+  \end{itemize}
+  \item \ypath{/preinstall} a pre-installation script that will be executed before the environment is sent and installed (useless unless the kind of image is \texttt{tar})
+  \begin{itemize}
+    \item \yfield{archive}{String} the path to the archive that contains the scripts (can be local path or URL)
+    \item \yfield{compression}{String} the compression of archive (expected values are \texttt{gzip} or \texttt{bzip2})
+    \item \yfieldd{script}{String}{none} the script to execute. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
+  \end{itemize}
+  \item \ypath{/[postinstalls]} some post-installation script that will be executed after the environment is sent and installed (useless unless the kind of image is \texttt{tar})
+  \begin{itemize}
+    \item \yfield{archive}{String} the path to the archive that contains the scripts (can be local path or URL)
+    \item \yfield{compression}{String} the compression of the archive (expected values are \texttt{gzip} or \texttt{bzip2})
+    \item \yfieldd{script}{String}{none} the script to execute. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. pre-install.
+  \end{itemize}
+  \item \ypath{/boot} information about the system that will be installed (useless unless the kind of image is \texttt{tar})
+  \begin{itemize}
+    \item \yfieldd{kernel}{String}{''} path of the kernel in the tarball.
+    \item \yfieldd{kernel\_params}{String}{''} set of parameters that must be applied to the kernel for a correct boot
+    \item \yfieldd{initrd}{String}{''} path of the initrd in the tarball.
+    \item \yfieldd{hypervisor}{String}{''} path of the hypervisor in the tarball. This fields is only required for the Xen based environments
+    \item \yfieldd{hypervisor\_params}{String}{''} set of parameters that must be applied to the hypervisor for a correct boot. This fields is only required for the Xen based environments
+  \end{itemize}
+  \item \yfieldd{partition\_type}{Integer}{0} the MS-DOS partition type, you can specify hexadecimal values using the prefix \texttt{0x}. For sample, \texttt{0x83} or \texttt{131} for Linux, \texttt{0xa5} for FreeBSD, ... (useless unless the kind of image is \texttt{tar})
+  \item \yfieldd{filesystem}{String}{''} type of filesystem wished on the deployment partition. It must be known by the mkfs command (useless unless the kind of image is \texttt{tar})
 \end{itemize}
 
 \subsection{Kaconsole}\label{sec:kaconsole}
@@ -1941,53 +1983,6 @@ Kadeploy has the same feature, so please refer to the use case about \textit{spe
 \subsubsection{Other environments}
 On an \emph{Other} environment, you eventually have to update your bootloader in order to boot on the new kernel.
 
-\section{Migrate your Kadeploy 2.1.x environment}
-Migrating your environments from Kadeploy 2.1.x is quite easy. Please refer to the~\ref{sec:env_desc} part to get the full information about the environment description with Kadeploy 3.
-
-\subsubsection{Differences}
-The fields used in the previous descriptions are similar. This following fields are exactly the same: \texttt{name}, \texttt{version}, \texttt{description}, \texttt{author}, \texttt{fdisktype}, and \texttt{filesystem}. You just have to replace the \texttt{=} character with \texttt{:} for these fields.
-Then, the old \texttt{filebase} and \texttt{filesite} have been modified and renamed in \texttt{tarball} and \texttt{postinstall}.
-
-Kadeploy 3 considers three kinds of environments: \textit{linux}, \textit{xen}, and \textit{other}. The environment kind must be specified with the field \texttt{environment\_kind}.
-\begin{itemize}
-\item If you choose the \textit{linux} kind, you can fill the new \texttt{kernel} field by using the old \texttt{kernelpath} field. This is the same thing with the new \texttt{initrd} field where you can use the old \texttt{initrdpath}. The new \texttt{kernel\_params} field can be filled with the old \texttt{kernelparam}.
-\item If you choose the \textit{xen}, you must use the fields of a \textit{linux} environment and the new \texttt{hypervisor} and \texttt{hypervisor\_params}. You do not have to specify anymore the use of mboot.c32, this is automatically handled by Kadeploy 3.
-\item If you choose the \textit{other} kind (typically for OS like FreeBSD), you can fill the \texttt{kernel}, \texttt{kernel\_params} and \texttt{initrd} with any value.
-\end{itemize}
-
-The field \texttt{part} has been added to allow the users to specify a default deployment partition for their environment. The expected value must be an existing block device like \texttt{/dev/sda3}.
-
-\subsubsection{Automatic translation}
-A small script named \texttt{env\_migrate} has been written to ease the translation of the old Kadeploy environment. The CLI looks like this:
-
-\begin{small}
-\begin{verbatim}
-> kaenv2to3 -h
-Usage: kaenv2to3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-
-General options:
-  -e, --env-name NAME          Environment name
-  -f, --env-file FILE          Environment file
-  -k, --env-kind KIND          Environment kind (linux|xen|other)
-\end{verbatim}
-\end{small}
-
-To use \texttt{kaenv2to3}, you have to choose the kind of environment you wish to migrate and you have to choose the environment. The choice can be made in two ways:
-\begin{itemize}
-\item choosing the environment from its name in the old version of Kadeploy (like it can be seen with the kaenvironments output) ;
-\item choosing the environment from a file that contains the description in the old format.
-\end{itemize}
-
-Here are two examples:
-\begin{small}
-\begin{verbatim}
-> kaenv2to3 -e envname_in_kaenvironments_db -k linux
-> kaenv2to3 -f envfile_in_2_1_x_format.dsc -k xen
-\end{verbatim}
-\end{small}
-
-If everything went right, the output of \texttt{kaenv2to3} shows the description in the new format. You can redirect this output to a file and use this file as an input for \texttt{kaenv}.
 
 \section{Kadeploy3 Environment variables}\label{sec:env_vars}
 When writing a script for an admin pre-install, an admin/user post-install or some custom operations, you can use the following environment variables :

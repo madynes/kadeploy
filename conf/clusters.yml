@@ -7,6 +7,3 @@ clusters:
     name: vm-001
   - address: 172.16.160.3
     name: vm-002
-  scripts:
-    bootloader: ./install_grub2
-    partitioning: ./parted-sample

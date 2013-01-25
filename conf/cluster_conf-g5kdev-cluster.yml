@@ -8,6 +8,9 @@ partitioning:
     swap: 1
   disable_swap: false
   block_device: /dev/hda
+  script: ./parted-sample
+bootloader:
+  script: ./install_grub2
 timeouts: 
   reboot: 120
   kexec: 60
