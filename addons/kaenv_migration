@@ -636,8 +636,12 @@ ARGV.each do |curfile|
     env = migrate_content(
       content,
       ENV_DESC,
-      :wrap => true
-    )
+      :wrap => true,
+      :custom => true
+    ) do |key,val|
+      val = val.to_s.to_i(16) if key == 'fdisktype'
+      [key,val]
+    end
     basename = nil
     if File.basename(curfile).include?('.')
       basename = File.basename(curfile,".#{curfile.split('.').last}")
