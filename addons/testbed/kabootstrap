@@ -24,6 +24,9 @@ SSH_OPTIONS			= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o 
 HTTP_PROXY_ADDR   = 'proxy'
 HTTP_PROXY_PORT   = 3128
 DEB_REPOSITORY   	= 'http://apt.grid5000.fr/kadeploy'
+GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
+DEPENDANCIES      = ['libmysql-ruby1.8','ruby1.8']
+BUILD_DEPENDANCIES = ['git','make','docbook2x']
 
 if g5k?
   G5K_API       	= 'https://api.grid5000.fr/2.0'
@@ -62,7 +65,7 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 # Update path for devel
 UPDATE_PATH_CHECK = {
   'src' => 'kadeploy_server.rb',
-  'lib' => 'managers.rb',
+  'lib' => 'environment.rb',
 }
 UPDATE_FORWARD_PORT = 2222
 UPDATE_DIR_VAR = 'WORKINGDIR'
@@ -96,13 +99,13 @@ CFG_KADEPLOY_MACROSTEP3 = [
   }
 ]
 
-CFG_KADEPLOY_PARTITION_SWAP_ID = 3
+CFG_KADEPLOY_PARTITION_SWAP_ID = 1
 CFG_KADEPLOY_PARTITION_SWAP_SIZE = '256M'
-CFG_KADEPLOY_PARTITION_PROD_ID = 1
+CFG_KADEPLOY_PARTITION_PROD_ID = 2
 CFG_KADEPLOY_PARTITION_PROD_SIZE = '4000M'
-CFG_KADEPLOY_PARTITION_DEPLOY_ID = 2
+CFG_KADEPLOY_PARTITION_DEPLOY_ID = 3
 CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '4000M'
-CFG_KADEPLOY_PARTITION_TMP_ID = 4
+CFG_KADEPLOY_PARTITION_TMP_ID = 5
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
 
 CFG_KADEPLOY_PORT = 25300
@@ -1596,6 +1599,10 @@ def apt_install(session,packages,server=nil)
   apt_cmd(session,'apt-get','install',['q','y','force-yes','allow-unauthenticated'],server,packages)
 end
 
+def apt_build_dep(session,packages,server=nil)
+  apt_cmd(session,'apt-get','build-dep',['q','y','force-yes','allow-unauthenticated'],server,packages)
+end
+
 def apt_remove(session,packages,server=nil)
   apt_cmd(session,'apt-get','remove',['q','y','force-yes','purge'],server,packages)
 end
@@ -1940,6 +1947,10 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '', '--no-tunnels', 'Disable SSH tunnels (VLAN connections should be routed)' ) do
   	$tunnels = false
+	end
+
+	opts.on( '', '--git [<commit>]', 'Install a git snapshot of Kadeploy3 (default: master).' ) do |c|
+  	options[:git] = c || :master
 	end
 
 	opts.on( '', '--debug', 'Verbose display of every instruction sent' ) do
@@ -3044,8 +3055,54 @@ sshgw.ssh(servername,'root') do |session|
 		msg('Updating debian packages list',MSG_INFO)
 		apt_update(session,server)
 
-		msg('Installing Kadeploy server/client',MSG_INFO)
-		apt_install(session,['kadeploy-server','kadeploy-client'],server)
+    if options[:git]
+		  msg('Cleaning previous Kadeploy install',MSG_INFO)
+      sexec(session,"dpkg --force-all -r kadeploy-common kadeploy-server kadeploy-client")
+
+		  msg('Installing Kadeploy dependancies',MSG_INFO)
+		  #apt_build_dep(session,['kadeploy-server','kadeploy-client'],server)
+		  apt_install(session,DEPENDANCIES,server)
+
+		  msg('Installing scm and build packages',MSG_INFO)
+      apt_install(session,BUILD_DEPENDANCIES,server)
+
+		  msg('Create a temporary directory',MSG_INFO)
+      tmpdir = sexec(session,'mktemp -d')
+
+		  msg("Cloning Kadeploy git repository",MSG_INFO)
+      sexec(session,
+        "https_proxy=http://localhost:3128 GIT_SSL_NO_VERIFY=1 "\
+        "git clone #{GIT_REPOSITORY} #{tmpdir}"
+      )
+
+      unless options[:git] == :master
+		    msg("Checkout git revision #{options[:git].to_s}",MSG_INFO)
+        sexec(session,
+          "https_proxy=http://localhost:3128 "\
+          "cd #{tmpdir} && git checkout #{options[:git].to_s}"
+        )
+      end
+
+		  msg("Creating the #{CFG_KADEPLOY_USER} user",MSG_INFO)
+      sexec(session, "userdel --force --remove #{CFG_KADEPLOY_USER}; true")
+      sexec(session, "useradd --user-group #{CFG_KADEPLOY_USER}")
+
+		  msg("Building Kadeploy packages",MSG_INFO)
+      sexec(session,"cd #{tmpdir} && make deb")
+
+		  msg('Installing Kadeploy server/client',MSG_INFO)
+      sexec(session,"dpkg --force-all -i #{tmpdir}/*.deb")
+
+		  msg('Remove the temporary directory',MSG_INFO)
+      sexec(session,"rm -Rf #{tmpdir}")
+
+      msg('Remove scm and build packages',MSG_INFO)
+		  apt_remove(session,BUILD_DEPENDANCIES)
+    else
+      msg('Installing Kadeploy server/client',MSG_INFO)
+		  apt_install(session,['kadeploy-server','kadeploy-client'],server)
+    end
+
 
 
 		msg('Creating Kadeploy directories',MSG_INFO)
