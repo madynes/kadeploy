@@ -1,0 +1,48 @@
+== New in 3.1.6 ==
+* CLI modifications:
+  - The CLI display has been modified to look clearer
+  - Get the status of the deploying nodes by pressing the <ENTER> key
+  - Use variables in custom PXE profiles [see doc sec/4.2.2, Use Case 6]
+  - Create custom microsteps before, after or instead of an existing one
+    [see doc sec/4.2.2, Use Case 10]
+  - Deploy directly on a block device with a DD image of the entire disk
+    [see doc sec/4.2.2, Use Case 11]
+  - The demolishing_env field of environments descriptions is now a boolean
+    [see doc sec/4.2.4, Environment description]
+  - A lot of variables are now exported by Kadeploy when running scripts
+    [see doc sec/4.5]
+
+* New automata to handle deployments workflow:
+  - Specify timeouts and retries on automata's microsteps [see doc sec/2.3.2]
+  - Improved deployment process for DD images
+  - Create custom microsteps before, after or instead of an existing one
+    [see doc sec/2.3.2, Custom operations]
+  - Kexec is now available at the first reboot (SetDeploymentEnv macro-step)
+    [see doc sec/2.3.2, The automata macro-steps]
+
+* Parallel commands execution:
+  - New TakTuk wrapper
+  - Execution of system commands
+  - Improvement of performances
+  - Better gathering of commands statuses and outputs
+
+* Some other minor changes:
+  - RC scripts are now saving launch time errors in the syslog
+  - Doc: Creation of (new) deployment environments [see doc sec/2.6.2]
+  - Doc: Do a custom partitioning [see doc sec/4.7]
+  - Unit test suite
+  - A lot of bug fixes
+
+!! Changes in configuration files !!
+* Cluster specific configuration [doc sec/2.3]
+  - The fields concerning the demolishing settings (threshold value, ...)
+    have been removed, this functionality is no more supported
+  - The fields 'retries' of each macro step description do now have the right
+    behavior, it specifies the number of retries instead of the number of tries
+* Clusters configuration file [doc sec/2.2]
+  - For display purposes, a prefix can be associated to each cluster
+* Changes in the partitioning maps [doc sec/2.4]
+  - You can now specify parted maps (instead of parted scripts)
+  - In your maps you can use several PARTTYPE<N> instead of a single one
+* Pre/post install files:
+  - Kadeploy exports more variables when running scripts [see doc sec/4.5]
