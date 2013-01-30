@@ -1,0 +1,50 @@
+New in 3.1.6:
+* CLI modifications:
+  - The CLI display has been modified to look clearer
+  - Create custom microsteps before, after or instead of an existing one [see doc#]
+  - Get the status of the nodes involved in a deployment by pressing the <ENTER>
+    key
+  - Use custom PXE files with built-in prefixes [see doc#]
+
+* New automata to handle deployments workflow:
+  - Specify timeouts and retries on automata's microsteps [see doc#]
+  - Create custom microsteps before, after or instead of an existing one
+    (a custom microstep is a sequence of actions, the available actions are:
+    send a file, run a script, execute a command) [see doc#]
+  - Improved deployment process for DD images
+
+* Deploy directly on a block device with a DD image of the entire disk [see doc#]
+
+* Kexec is now available at the first reboot (SetDeploymentEnv step) [see doc#]
+
+* A lot of variables are now exported by Kadeploy when its running scripts [see doc#]
+
+* RC scripts was rewritten to save the errors at launch time in the syslog
+
+* New TakTuk wrapper:
+  - Improvement of performances
+  - Better gathering of commands statuses and outputs
+
+* Changes in the cluster specific configuration files:
+  - The fields concerning the demolishing environment configuration
+    (threshold value, ...) have been removed, this functionality is no more
+    supported
+  - The fields "retries" of each macro step description do now have the right
+    meaning: it specify the number of retries instead of the number of tries
+    [see doc#]
+
+* Changes in the clusters configuration file:
+  - A prefix can be associated to each cluster, it will be use for display
+    purposes [see doc#]
+
+* Changes in the partitioning maps:
+  - You can now specify parted maps (instead of parted scripts)
+  - In your maps you can use several PARTTYPE<N> instead of a single one [see doc#]
+
+* Documentation:
+  - Creation of deployment environment [see doc#]
+  - Use case: custom partitioning [see doc#]
+  - Use case: ... [see doc#]
+
+* Test unit suite
+* A lot of bug fixes
