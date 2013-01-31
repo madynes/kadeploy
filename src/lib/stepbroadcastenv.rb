@@ -68,12 +68,11 @@ require 'macrostep'
   end
 
   class BroadcastEnvDummy < BroadcastEnv
-    def start()
-      true
-    end
-
     def steps()
-      []
+      [
+        [ :dummy ],
+        [ :dummy ],
+      ]
     end
   end
 #end

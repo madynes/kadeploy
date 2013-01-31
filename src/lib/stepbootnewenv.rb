@@ -116,12 +116,11 @@ require 'macrostep'
   end
 
   class BootNewEnvDummy < BootNewEnv
-    def start()
-      true
-    end
-
     def steps()
-      []
+      [
+        [ :dummy ],
+        [ :dummy ],
+      ]
     end
   end
 #end

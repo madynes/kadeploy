@@ -1094,6 +1094,10 @@ class Microstep < Automata::QueueTask
 
   public
 
+  def ms_dummy()
+    sleep((200+rand(800)) / 1000.0)
+    true
+  end
 
   # Send the SSH key in the deployment environment
   #

@@ -96,12 +96,11 @@ require 'macrostep'
   end
 
   class SetDeploymentEnvDummy < SetDeploymentEnv
-    def start()
-      true
-    end
-
     def steps()
-      []
+      [
+        [ :dummy ],
+        [ :dummy ],
+      ]
     end
   end
 #end
