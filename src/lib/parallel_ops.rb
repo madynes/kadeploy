@@ -37,7 +37,7 @@ require 'ping'
     end
 
     def kill
-      @taktuk.kill unless @taktuk.nil?
+      @taktuk.kill! unless @taktuk.nil?
     end
 
     # Exec a command with TakTuk

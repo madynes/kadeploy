@@ -389,7 +389,7 @@ module Automata
           sleep(TIMER_CKECK_PITCH)
         end
         if thr.alive?
-          thr.kill!
+          thr.kill
           task.kill
           success = false
           timeout!(task)
@@ -561,7 +561,7 @@ module Automata
       join_threads()
       @runthread = nil
       if @cleaner.alive?
-        @cleaner.kill!
+        @cleaner.kill
         @cleaner.join
       end
       @cleaner = nil
@@ -572,29 +572,31 @@ module Automata
 
     def kill()
       clean_threads()
+      @queue.clear()
 
       unless @runthread.nil?
-        @runthread.kill! if @runthread.alive?
+        @runthread.kill if @runthread.alive?
         @runthread.join
         @runthread = nil
       end
 
       unless @cleaner.nil?
-        @cleaner.kill! if @cleaner.alive?
+        @cleaner.kill if @cleaner.alive?
         @cleaner.join
         @cleaner = nil
       end
 
       @threads.each_pair do |task,threads|
+        task.kill
         threads.each_pair do |key,thread|
-          thread.kill!
+          thread.kill
           thread.join
         end
-        task.kill
       end
 
       @threads = {}
       @nodes_done.clean()
+      @queue.clear()
       @nodes.linked_copy(@nodes_done)
 
       kill!
