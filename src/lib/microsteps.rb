@@ -28,7 +28,7 @@ class Microstep < Automata::QueueTask
   def initialize(name, idx, subidx, nodes, nsid, manager_queue, output, context = {}, params = [])
     @output = output
     super(name, idx, subidx, nodes, nsid, manager_queue, context, params)
-    @runthread = Thread.current
+    @runthread = nil
     @current_operation = nil
     @waitreboot_threads = ThreadGroup.new
     @timestart = Time.now
@@ -44,6 +44,7 @@ class Microstep < Automata::QueueTask
   end
 
   def run()
+    @runthread = Thread.current
     ret = true
 
     @nodes.set.each do |node|

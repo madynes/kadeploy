@@ -239,9 +239,9 @@ class KadeployServer
   # Output
   # * return true if the workflow has reached the end, false if not, and nil if the workflow does not exist
   def async_deploy_ended?(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflows|
+    return async_deploy_lock_wid(workflow_id) { |info|
       res = true
-      workflows.each do |workflow|
+      info[:workflows].each do |workflow|
         res = res && workflow.done?
         break unless res
       end
@@ -256,9 +256,9 @@ class KadeployServer
   # Output
   # * return true if the workflow encountered and error, false if not, and nil if the workflow does not exist
   def async_deploy_file_error?(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflows|
+    return async_deploy_lock_wid(workflow_id) { |info|
       res = FetchFileError::NO_ERROR
-      workflows.each do |workflow|
+      info[:workflows].each do |workflow|
         res = workflow.errno
         break if res
       end
@@ -268,8 +268,8 @@ class KadeployServer
 
   def async_deploy_get_status(workflow_id)
     ret = {}
-    async_deploy_lock_wid(workflow_id) do |workflows|
-      workflows.each do |workflow|
+    async_deploy_lock_wid(workflow_id) do |info|
+      info[:workflows].each do |workflow|
         ret[workflow.context[:cluster].prefix] = workflow.status
       end
     end
@@ -286,8 +286,8 @@ class KadeployServer
     nodes_ok = Nodes::NodeSet.new
     nodes_ko = Nodes::NodeSet.new
 
-    async_deploy_lock_wid(workflow_id) do |workflows|
-      workflows.each do |workflow|
+    async_deploy_lock_wid(workflow_id) do |info|
+      info[:workflows].each do |workflow|
         nodes_ok.add(workflow.nodes_ok)
         nodes_ok.add(workflow.nodes_brk)
         nodes_ko.add(workflow.nodes_ko)
@@ -307,8 +307,8 @@ class KadeployServer
   # Output
   # * return true if the deployment has been freed and nil if workflow id does no exist
   def async_deploy_free(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflows|
-      workflows.first.context[:database].disconnect
+    return async_deploy_lock_wid(workflow_id) { |info|
+      info[:workflows].first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
       begin
         GC.start
@@ -325,11 +325,11 @@ class KadeployServer
   # Output
   # * return true if the deployment has been killed and nil if workflow id does no exist
   def async_deploy_kill(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |workflows|
-      workflows.each do |workflow|
+    return async_deploy_lock_wid(workflow_id) { |info|
+      info[:workflows].each do |workflow|
         workflow.kill()
       end
-      workflows[0].context[:db].disconnect
+      info[:workflows][0].context[:db].disconnect
       kadeploy_delete_workflow_info(workflow_id)
       begin
         GC.start
@@ -476,6 +476,7 @@ class KadeployServer
       + Time.now.to_s \
       + exec_specific.node_set.to_s
     )
+    kadeploy_create_workflow_info(workflow_id)
     context[:deploy_id] = workflow_id
 
     workflows = []
@@ -624,12 +625,22 @@ class KadeployServer
     # id == -1 means that the workflow has not been launched yet
     @workflow_info_hash_lock.synchronize {
       if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
-        @workflow_info_hash[workflow_id].each do |workflow|
+        @workflow_info_hash[workflow_id][:runthread].kill! \
+          @workflow_info_hash[workflow_id][:runthread].alive?
+        @workflow_info_hash[workflow_id][:runthread].join
+
+        @workflow_info_hash[workflow_id][:workflows].each do |workflow|
           workflow.kill()
         end
         kadeploy_delete_workflow_info(workflow_id)
       end
     }
+  end
+
+  def kadeploy_create_workflow_info(workflow_id)
+    @workflow_info_hash[workflow_id] = {}
+    @workflow_info_hash[workflow_id][:runthread] = Thread.current
+    @workflow_info_hash[workflow_id][:workflows] = []
   end
 
   # Record a Managers::WorkflowManager pointer
@@ -640,8 +651,7 @@ class KadeployServer
   # Output
   # * nothing
   def kadeploy_add_workflow_info(workflow_ptr, workflow_id)
-    @workflow_info_hash[workflow_id] = [] unless @workflow_info_hash[workflow_id]
-    @workflow_info_hash[workflow_id] << workflow_ptr
+    @workflow_info_hash[workflow_id][:workflows] << workflow_ptr
   end
 
   # Delete the information of a workflow
@@ -689,8 +699,8 @@ class KadeployServer
   def async_deploy_lock_wid(workflow_id)
     @workflow_info_hash_lock.lock
     if @workflow_info_hash.has_key?(workflow_id) then
-      workflow = @workflow_info_hash[workflow_id]
-      ret = yield(workflow)
+      info = @workflow_info_hash[workflow_id]
+      ret = yield(info)
     else
       ret = nil
     end

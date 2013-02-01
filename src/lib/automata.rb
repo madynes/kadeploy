@@ -572,6 +572,7 @@ module Automata
 
     def kill()
       clean_threads()
+      @queue.clear()
 
       unless @runthread.nil?
         @runthread.kill! if @runthread.alive?
@@ -586,15 +587,16 @@ module Automata
       end
 
       @threads.each_pair do |task,threads|
+        task.kill
         threads.each_pair do |key,thread|
           thread.kill!
           thread.join
         end
-        task.kill
       end
 
       @threads = {}
       @nodes_done.clean()
+      @queue.clear()
       @nodes.linked_copy(@nodes_done)
 
       kill!
