@@ -413,6 +413,7 @@ def cfg_kadeploy_clusters()
         'nodes' => []
       }
       cluster[:nodes].each do |node|
+        next unless node[:type] == :NODE
         tmp['nodes'] << {
           'name' => node[:fqdn],
           'address' => node[:ipv4],
@@ -452,14 +453,16 @@ end
 def cfg_kadeploy_partition_file(cluster)
   # delete partitions
   "d\n1\nd\n2\nd\n3\nd\n4\n"\
+  + # create swap partition
+  "n\np\n#{CFG_KADEPLOY_PARTITION_SWAP_ID}\n\n+#{CFG_KADEPLOY_PARTITION_SWAP_SIZE}\nt\n82\n"\
   + # create prod partition
-  "n\np\n#{CFG_KADEPLOY_PARTITION_PROD_ID}\n\n+#{CFG_KADEPLOY_PARTITION_PROD_SIZE}\nt\n83\n"\
+  "n\np\n#{CFG_KADEPLOY_PARTITION_PROD_ID}\n\n+#{CFG_KADEPLOY_PARTITION_PROD_SIZE}\nt\n#{CFG_KADEPLOY_PARTITION_PROD_ID}\n83\n"\
   + # create deploy partition
   "n\np\n#{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\n\n+#{CFG_KADEPLOY_PARTITION_DEPLOY_SIZE}\nt\n#{CFG_KADEPLOY_PARTITION_DEPLOY_ID}\nPARTTYPE\n"\
-  + # create swap partition
-  "n\np\n#{CFG_KADEPLOY_PARTITION_SWAP_ID}\n\n+#{CFG_KADEPLOY_PARTITION_SWAP_SIZE}\nt\n#{CFG_KADEPLOY_PARTITION_SWAP_ID}\n82\n"\
+  + # extended partition
+  "n\ne\n\n\n"\
   + # create tmp partition
-  "n\np\n\n\nt\n#{CFG_KADEPLOY_PARTITION_TMP_ID}\n83\n"\
+  "n\n\n\nt\n#{CFG_KADEPLOY_PARTITION_TMP_ID}\n83\n"\
   + # write changes
   "w\n"\
   "\n"
@@ -707,7 +710,7 @@ def cfg_kadeploy_specific_conf(cluster)
           'params' => cfg_kadeploy_deploy_kernel_args(cluster),
         },
         'user' => {
-          'kernel_params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
         },
       },
       'kexec' => {
