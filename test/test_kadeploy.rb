@@ -210,7 +210,7 @@ class TestKadeploy < Test::Unit::TestCase
     tgzfile = `tempfile`.strip
 
     scriptfile.write(
-      "#!/bin/sh\n"\
+      "#!/bin/bash -e\n"\
       "cat ${KADEPLOY_PREPOST_EXTRACTION_DIR}/#{File.basename(partfile.path)} | fdisk ${KADEPLOY_BLOCK_DEVICE}\n"\
       "partprobe ${KADEPLOY_BLOCK_DEVICE}\n"\
       "sleep 2\n"\
@@ -357,16 +357,19 @@ class TestKadeploy < Test::Unit::TestCase
 
       pre = ''
       post = ''
+      exe = ''
+      send = ''
+      run = ''
       begin
         Net::SSH.start(@nodes.first,'root') do |ssh|
-          exec = ssh.exec!('cat /TEST_EXEC').strip
+          exe = ssh.exec!('cat /TEST_EXEC').strip
           send = ssh.exec!("cat /#{File.basename(@tmp[:localfile])}").strip
           run = ssh.exec!('cat /TEST_RUN').strip
         end
       rescue Net::SSH::AuthenticationFailed, SocketError
         assert(false,'Unable to contact nodes')
       end
-      assert(exec == 'OK','Custom exec action does not work properly')
+      assert(exe == 'OK','Custom exec action does not work properly')
       assert(send == 'OK','Custom send action does not work properly')
       assert(run == 'OK','Custom run action does not work properly')
     ensure
