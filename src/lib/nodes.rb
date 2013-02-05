@@ -335,13 +335,13 @@ module Nodes
           else
             if array_host1[i] =~ /[0-9]+/ && array_host2[i] =~ /[0-9]+/
               diff_array += [[array_host1[i]] + [array_host2[i]]]
-              head = similar_array.to_s
+              head = similar_array.join('')
               similar_array = []
             end
           end
         end
       end
-      tail = similar_array.to_s
+      tail = similar_array.join('')
       return [[head] + [tail] + diff_array]
     end
 
@@ -515,7 +515,7 @@ module Nodes
       else
         array += [name_array]
       end
-      return array.compact
+      return array.compact.join('')
     end
 
     # Add a node to the set

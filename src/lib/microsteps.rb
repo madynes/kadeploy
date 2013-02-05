@@ -16,7 +16,7 @@ require 'process_management'
 require 'port_scanner'
 
 #Ruby libs
-require 'ftools'
+require 'fileutils'
 require 'socket'
 require 'tempfile'
 
@@ -1836,7 +1836,7 @@ class Microstep < Automata::QueueTask
           thr = Thread.new do
             nodeid = get_nodeid(node,vlan)
 
-            if Ping.pingecho(nodeid, 1, context[:common].ssh_port) then
+            if PortScanner.ping(nodeid, 1, context[:common].ssh_port) then
               unless PortScanner.ports_test(nodeid,ports_up,true)
                 node.state = 'KO'
                 next

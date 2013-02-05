@@ -4,7 +4,7 @@
 # For details on use and redistribution please refer to License.txt
 
 #Ruby libs
-require 'ftools'
+require 'fileutils'
 
 module Cache
   private
