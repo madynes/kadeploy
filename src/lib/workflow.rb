@@ -339,7 +339,11 @@ class Workflow < Automata::TaskManager
       Execute[cmd.gsub('WORKFLOW_ID',context[:deploy_id])].run!.wait
     end
 
-    context[:client].generate_files(@nodes_ok, @nodes_ko) if context[:client]
+    nodes_ok = Nodes::NodeSet.new
+    @nodes_ok.linked_copy(nodes_ok)
+    @nodes_brk.linked_copy(nodes_ok)
+
+    context[:client].generate_files(nodes_ok, @nodes_ko) if context[:client]
   end
 
   def retry!(task)
