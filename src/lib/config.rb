@@ -3406,11 +3406,11 @@ module ConfigInformation
     #                    [1] is the number of retries available for the instance
     #                    [2] is the timeout for the instance
     def get_instance
-      return @array_of_instances[@current]
+      return @array_of_instances[@current].dup
     end
 
     def get_instances
-      return @array_of_instances
+      return @array_of_instances.collect{|inst| inst.dup}
     end
   end
 end
