@@ -42,7 +42,7 @@ module PortScanner
     ret = true
     ports.each do |port|
       begin
-        s = TCPsocket.open(nodeid, port)
+        s = TCPSocket.open(nodeid, port)
         s.close
         unless accept
           ret = false
@@ -57,6 +57,20 @@ module PortScanner
         ret = false
         break
       end
+    end
+    ret
+  end
+
+  def self.ping(hostname, timeout, port)
+    ret = true
+    begin
+      timeout(timeout) do
+	      s = TCPSocket.new(hostname, port)
+	      s.close
+      end
+    rescue Errno::ECONNREFUSED
+    rescue Timeout::Error, StandardError
+      ret = false
     end
     ret
   end

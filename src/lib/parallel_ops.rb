@@ -9,7 +9,6 @@ require 'taktuk'
 #Ruby libs
 require 'yaml'
 require 'socket'
-require 'ping'
 
 #module ParallelOperations
   #class ParallelOps
