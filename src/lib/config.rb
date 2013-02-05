@@ -3251,7 +3251,7 @@ module ConfigInformation
       dest.name = @name
       dest.workflow_steps = Array.new
       @workflow_steps.each_index { |i|
-        dest.workflow_steps[i] = @workflow_steps[i].clone
+        dest.workflow_steps[i] = Marshal.load(Marshal.dump(@workflow_steps[i]))
       }
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_kernel_args = @deploy_kernel_args.clone
@@ -3361,11 +3361,11 @@ module ConfigInformation
     #                    [1] is the number of retries available for the instance
     #                    [2] is the timeout for the instance
     def get_instance
-      return @array_of_instances[@current].dup
+      return @array_of_instances[@current]
     end
 
     def get_instances
-      return @array_of_instances.collect{|inst| inst.dup}
+      return @array_of_instances
     end
   end
 end
