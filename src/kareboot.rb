@@ -38,7 +38,7 @@ class KarebootClient
     if (@site == nil) then
       puts msg
     else
-      puts "#{@site} server: #{msg}"
+      puts "(#{@site}) #{msg}"
     end
   end
 
@@ -220,7 +220,7 @@ if (exec_specific_config != nil) then
       kadeploy_server = DRbObject.new(nil, uri)
 
       if exec_specific_config.get_version then
-        puts "server #{server}: Kareboot version: #{kadeploy_server.get_version()}"
+        puts "(#{server}) Kareboot version: #{kadeploy_server.get_version()}"
       else
         #Launch the listener on the client
         if (exec_specific_config.multi_server) then

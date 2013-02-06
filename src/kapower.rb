@@ -34,7 +34,7 @@ class KapowerClient
     if (@site == nil) then
       puts msg
     else
-      puts "#{@site} server: #{msg}"
+      puts "(#{@site}) #{msg}"
     end
   end
 
@@ -140,7 +140,7 @@ if exec_specific_config != nil then
       kadeploy_server = DRbObject.new(nil, uri)
 
       if exec_specific_config.get_version then
-        puts "Kapower version: #{kadeploy_server.get_version()}"
+        puts "(#{server}) Kapower version: #{kadeploy_server.get_version()}"
       else
         if (exec_specific_config.multi_server) then
           kapower_client = KapowerClient.new(server, files_ok_nodes, files_ko_nodes)
