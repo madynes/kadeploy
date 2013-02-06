@@ -6,8 +6,8 @@ require 'fileutils'
 
 # Config
 SSH_KEY='~/.ssh/id_rsa.pub'
-BBT_SCRIPT='./blackbox_tests.rb'
-CONLOG_SCRIPT='./conmanlogger.sh'
+BBT_SCRIPT=File.join(File.dirname(__FILE__),'..','..','test','blackbox_tests.rb')
+CONLOG_SCRIPT=File.join(File.dirname(__FILE__),'conmanlogger.sh')
 KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
 
 KADEPLOY_BIN='kadeploy3'
@@ -28,9 +28,6 @@ MACROSTEPS = {
       'Nfsroot',
       'Dummy',
     ],
-    :type => 'Untrusted',
-    :timeout => 450,
-    :retries => 0,
   },
   :BroadcastEnv => {
     :types => [
@@ -40,9 +37,6 @@ MACROSTEPS = {
       'Bittorrent',
       'Dummy',
     ],
-    :type => 'Kastafior',
-    :timeout => 500,
-    :retries => 0,
   },
   :BootNewEnv => {
     :types => [
@@ -52,9 +46,6 @@ MACROSTEPS = {
       'HardReboot',
       'Dummy',
     ],
-    :type => 'Classical',
-    :timeout => 300,
-    :retries => 0,
   },
 }
 
@@ -78,26 +69,28 @@ def check_macro(type,macro)
       check_macro(type,m)
     end
   else
-    if macro['type'].nil?
-      macro['type'] = MACROSTEPS[type][:type]
-    else
-      check_field('type',macro['type'])
-      yaml_error("macrostep #{type.to_s} should be #{MACROSTEPS[type][:types].join(' or ')}") unless MACROSTEPS[type][:types].include?(macro['type'])
-    end
-
-    if macro['timeout'].nil?
-      macro['timeout'] = MACROSTEPS[type][:timeout]
-    else
-      if macro['timeout'] <= 0
-        yaml_error("'macrosteps/timeout' field should be > 0")
+    unless macro.empty?
+      if macro['type'].nil?
+        yaml_error("macrostep #{type.to_s}/type is empty")
+      else
+        check_field('type',macro['type'])
+        yaml_error("macrostep #{type.to_s} should be #{MACROSTEPS[type][:types].join(' or ')}") unless MACROSTEPS[type][:types].include?(macro['type'])
       end
-    end
 
-    if macro['retries'].nil?
-      macro['retries'] = MACROSTEPS[type][:retries]
-    else
-      if macro['retries'] < 0
-        yaml_error("'macrosteps/retries' field should be >= 0")
+      if macro['timeout'].nil?
+        yaml_error("macrostep #{type.to_s}/timeout is empty")
+      else
+        if macro['timeout'] <= 0
+          yaml_error("'macrosteps/timeout' field should be > 0")
+        end
+      end
+
+      if macro['retries'].nil?
+        yaml_error("macrostep #{type.to_s}/retries is empty")
+      else
+        if macro['retries'] < 0
+          yaml_error("'macrosteps/retries' field should be >= 0")
+        end
       end
     end
   end
@@ -138,6 +131,8 @@ end
 def gen_macro(type,macro)
   if macro.is_a?(Array)
     macro.collect{ |m| gen_macro(type,m) }.join(',')
+  elsif macro.empty?
+    ''
   else
     "#{type.to_s}#{macro['type']}:#{macro['retries']}:#{macro['timeout']}"
   end
@@ -207,12 +202,16 @@ $exps.each do |exp|
     "BroadcastEnvDummy:0:10|"\
     "BootNewEnvDummy:0:10\n"
   )
-  automata_file.write(
-    "simple #{automata_name} "\
-    "#{gen_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])}|"\
-    "#{gen_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])}|"\
-    "#{gen_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])}"
-  )
+  automata_val = "simple #{automata_name}"
+  tmp = gen_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])
+  automata_val += (tmp.empty? ? '' : " #{tmp}|")
+  tmp = gen_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])
+  automata_val += (tmp.empty? ? '' : "#{tmp}|")
+  tmp = gen_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])
+  automata_val += (tmp.empty? ? '' : "#{tmp}")
+
+  automata_file.write(automata_val)
+
   automata_file.close
 
   puts "  Start to iterate"
@@ -251,7 +250,7 @@ $exps.each do |exp|
       puts '      Running bbt'
       system(
         "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
-	"-f #{$nodefile} -k #{SSH_KEY} "\
+	      "-f #{$nodefile} -k #{SSH_KEY} "\
         "--env-list #{env} --max-simult 1 "\
         "-a #{automata_file.path} &> #{envlogfile}"
       )

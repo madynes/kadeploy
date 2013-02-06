@@ -105,7 +105,16 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_
   nodes.each { |node|
     node_list += " -m #{node}"
   }
-  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" --verbose-level 0 -k #{key} --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko}"
+  automata_opt=''
+  if step1 and step2 and step3
+    automata_opt = "--force-steps \""\
+      "SetDeploymentEnv|#{step1}&"\
+      "BroadcastEnv|#{step2}&"\
+      "BootNewEnv|#{step3}"\
+    "\""
+  end
+
+  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" --verbose-level 0 -k #{key} -o #{ok} -n #{ko} #{automata_opt}"
   system(cmd)
   if (count_lines(ko) > 0) then
     IO.readlines(ko).each { |node|
@@ -235,7 +244,7 @@ end
 
 IO.readlines(automata_file).each { |line|
   if not (/^#/ =~ line) then
-    if /\A(dummy|simple|simult)\s+([a-zA-Z0-9\-]+)\s+([a-zA-Z0-9:,]+)\|([a-zA-Z0-9:,]+)\|([a-zA-Z0-9:,]+)\Z/ =~ line then
+    if /\A(dummy|simple|simult)\s+([a-zA-Z0-9\-]+)\s*(?:\s+([a-zA-Z0-9:,]+)\|([a-zA-Z0-9:,]+)\|([a-zA-Z0-9:,]+))?\Z/ =~ line then
       content = Regexp.last_match
       kind = content[1]
       test_name = content[2]
