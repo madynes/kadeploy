@@ -149,7 +149,7 @@ def kadeploy_cmd()
 end
 
 if ARGV.size < 3
-  exit_error("usage: #{$0} <name> <yaml_expfile> <nodefile>")
+  exit_error("usage: #{$0} <name> <yaml_expfile> <nodefile> [<dest_dir>]")
 end
 
 if ARGV[0].empty?
@@ -173,9 +173,14 @@ if !ARGV[2] or !File.exists?(ARGV[2]) or ARGV[2].empty?
 end
 $nodefile = ARGV[2]
 
+dir = '.'
+if ARGV[3] and !ARGV[3].empty?
+  FileUtils.mkdir_p(ARGV[3])
+  dir = ARGV[3]
+end
 
 $scriptname=File.basename($0,File.extname($0))
-$savedir = "#{$scriptname}-#{$name}"
+$savedir = File.join(dir,"#{$scriptname}-#{$name}")
 
 puts "Creating directory '#{$savedir}'"
 FileUtils.mkdir_p($savedir)
