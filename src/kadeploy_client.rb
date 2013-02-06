@@ -48,7 +48,7 @@ class KadeployClient
     if (@site == nil) then
       puts msg
     else
-      puts "#{@site} server: #{msg}"
+      puts "(#{@site}) #{msg}"
     end
     STDOUT.flush
   end
@@ -298,7 +298,7 @@ if (exec_specific_config != nil) then
         kadeploy_server = DRbObject.new(nil, uri)
 
         if exec_specific_config.get_version then
-          puts "#{server} server: Kadeploy version: #{kadeploy_server.get_version()}"
+          puts "(#{server}) Kadeploy version: #{kadeploy_server.get_version()}"
         else
           #Launch the listener on the client
           if (exec_specific_config.multi_server) then
@@ -329,7 +329,7 @@ if (exec_specific_config != nil) then
 
             kadeploy_server.run("kadeploy_sync", cloned_config, client_host, client_port)
           else
-            puts "#{server} server: The URI #{local.uri} is not correct"
+            puts "(#{server}) The URI #{local.uri} is not correct"
           end
           local.stop_service()
         end

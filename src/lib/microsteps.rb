@@ -59,16 +59,16 @@ class Microstep < Automata::QueueTask
     if ret
       @timestart = Time.now.to_i
       if @name.to_s =~ /^custom_sub_.*$/
-        debug(3,"Substitution operation #{@name.to_s.sub(/^custom_sub_/,'')}",false)
+        debug(3,"#{@name.to_s.sub(/^custom_sub_/,'')}",false)
         ret = ret && send(:custom,*@params)
       elsif @name.to_s =~ /^custom_pre_.*$/
-        debug(3,"Custom pre-operation #{@name.to_s.sub(/^custom_pre_/,'')}",false)
+        debug(3,"#{@name.to_s.sub(/^custom_pre_/,'')}",false)
         ret = ret && send(:custom,*@params)
       elsif @name.to_s =~ /^custom_post_.*$/
-        debug(3,"Custom post-operation #{@name.to_s.sub(/^custom_post_/,'')}",false)
+        debug(3,"#{@name.to_s.sub(/^custom_post_/,'')}",false)
         ret = ret && send(:custom,*@params)
       else
-        debug(3,"Running #{@name.to_s}",false)
+        debug(3,"#{@name.to_s}",false)
         ret = ret && send("ms_#{@name.to_s}".to_sym,*@params)
       end
       debug(4, " ~ Time in #{@name.to_s}: #{Time.now.to_i - @timestart}s",false)
