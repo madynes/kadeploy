@@ -235,7 +235,7 @@ end
 
 IO.readlines(automata_file).each { |line|
   if not (/^#/ =~ line) then
-    if /\A(dummy|simple|simult)\ ([a-zA-Z0-9\-]+)\ ([a-zA-Z0-9\:]+)\,([a-zA-Z0-9\:]+)\,([a-zA-Z0-9\:]+)\Z/ =~ line then
+    if /\A(dummy|simple|simult)\s+([a-zA-Z0-9\-]+)\s+([a-zA-Z0-9:,]+)\|([a-zA-Z0-9:,]+)\|([a-zA-Z0-9:,]+)\Z/ =~ line then
       content = Regexp.last_match
       kind = content[1]
       test_name = content[2]

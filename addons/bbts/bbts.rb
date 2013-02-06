@@ -30,7 +30,7 @@ MACROSTEPS = {
     ],
     :type => 'Untrusted',
     :timeout => 450,
-    :retries => 1,
+    :retries => 0,
   },
   :BroadcastEnv => {
     :types => [
@@ -42,7 +42,7 @@ MACROSTEPS = {
     ],
     :type => 'Kastafior',
     :timeout => 500,
-    :retries => 1,
+    :retries => 0,
   },
   :BootNewEnv => {
     :types => [
@@ -54,7 +54,7 @@ MACROSTEPS = {
     ],
     :type => 'Classical',
     :timeout => 300,
-    :retries => 1,
+    :retries => 0,
   },
 }
 
@@ -73,26 +73,32 @@ def check_field(name,val,type=nil)
 end
 
 def check_macro(type,macro)
-  if macro['type'].nil?
-    macro['type'] = MACROSTEPS[type][:type]
-  else
-    check_field('type',macro['type'])
-    yaml_error("macrostep #{type.to_s} should be #{MACROSTEPS[type][:types].join(' or ')}") unless MACROSTEPS[type][:types].include?(macro['type'])
-  end
-
-  if macro['timeout'].nil?
-    macro['timeout'] = MACROSTEPS[type][:timeout]
-  else
-    if macro['timeout'] <= 0
-      yaml_error("'macrosteps/timeout' field should be > 0")
+  if macro.is_a?(Array)
+    macro.each do |m|
+      check_macro(type,m)
     end
-  end
-
-  if macro['retries'].nil?
-    macro['retries'] = MACROSTEPS[type][:retries]
   else
-    if macro['retries'] <= 0
-      yaml_error("'macrosteps/retries' field should be > 0")
+    if macro['type'].nil?
+      macro['type'] = MACROSTEPS[type][:type]
+    else
+      check_field('type',macro['type'])
+      yaml_error("macrostep #{type.to_s} should be #{MACROSTEPS[type][:types].join(' or ')}") unless MACROSTEPS[type][:types].include?(macro['type'])
+    end
+
+    if macro['timeout'].nil?
+      macro['timeout'] = MACROSTEPS[type][:timeout]
+    else
+      if macro['timeout'] <= 0
+        yaml_error("'macrosteps/timeout' field should be > 0")
+      end
+    end
+
+    if macro['retries'].nil?
+      macro['retries'] = MACROSTEPS[type][:retries]
+    else
+      if macro['retries'] < 0
+        yaml_error("'macrosteps/retries' field should be >= 0")
+      end
     end
   end
 end
@@ -117,12 +123,23 @@ def check_exp(exps)
       check_env(env)
     end
     exp['macrosteps'] = {} if exp['macrosteps'].nil?
+
     exp['macrosteps']['SetDeploymentEnv'] = {} if exp['macrosteps']['SetDeploymentEnv'].nil?
     check_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])
+
     exp['macrosteps']['BroadcastEnv'] = {} if exp['macrosteps']['BroadcastEnv'].nil?
     check_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])
+
     exp['macrosteps']['BootNewEnv'] = {} if exp['macrosteps']['BootNewEnv'].nil?
     check_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])
+  end
+end
+
+def gen_macro(type,macro)
+  if macro.is_a?(Array)
+    macro.collect{ |m| gen_macro(type,m) }.join(',')
+  else
+    "#{type.to_s}#{macro['type']}:#{macro['retries']}:#{macro['timeout']}"
   end
 end
 
@@ -186,20 +203,15 @@ $exps.each do |exp|
   automata_name="#{$name}-#{exp['name']}"
   automata_file = Tempfile.new($scriptname)
   automata_file.write("dummy Dummy "\
-    "SetDeploymentEnvDummy:1:10,"\
-    "BroadcastEnvDummy:1:10,"\
-    "BootNewEnvDummy:1:10\n"
+    "SetDeploymentEnvDummy:0:10|"\
+    "BroadcastEnvDummy:0:10|"\
+    "BootNewEnvDummy:0:10\n"
   )
-  automata_file.write("simple #{automata_name} "\
-    "SetDeploymentEnv#{exp['macrosteps']['SetDeploymentEnv']['type']}"\
-      ":#{exp['macrosteps']['SetDeploymentEnv']['retries']}"\
-      ":#{exp['macrosteps']['SetDeploymentEnv']['timeout']},"\
-    "BroadcastEnv#{exp['macrosteps']['BroadcastEnv']['type']}"\
-      ":#{exp['macrosteps']['BroadcastEnv']['retries']}"\
-      ":#{exp['macrosteps']['BroadcastEnv']['timeout']},"\
-    "BootNewEnv#{exp['macrosteps']['BootNewEnv']['type']}"\
-      ":#{exp['macrosteps']['BootNewEnv']['retries']}"\
-      ":#{exp['macrosteps']['BootNewEnv']['timeout']}\n"\
+  automata_file.write(
+    "simple #{automata_name} "\
+    "#{gen_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])}|"\
+    "#{gen_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])}|"\
+    "#{gen_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])}"
   )
   automata_file.close
 
