@@ -5,6 +5,7 @@
 
 #Kadelpoy libs
 require 'automata'
+require 'netboot'
 require 'debug'
 
 class Macrostep < Automata::TaskedTaskManager
@@ -171,8 +172,8 @@ class Macrostep < Automata::TaskedTaskManager
       or cexec.environment.environment_kind != 'linux'
 
     delete_task(:install_bootloader) \
-      if context[:common].bootloader == 'chainload_pxe' \
-      and cexec.disable_bootloader_install
+      if context[:common].pxe[:local].is_a?(NetBoot::GrubPXE)  \
+      or cexec.disable_bootloader_install
 
     delete_task(:manage_admin_pre_install) \
       if cexec.environment.preinstall.nil? \
