@@ -46,7 +46,13 @@ postinstall:
     format: tgz
     file: /home/ejeanvoi/work/kadeploy-svn/branches/ruby/kadeploy-v3/test/admin_post_install_g5kdev.tgz
 pxe: 
-  headers: PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 1\n\nlabel bootlabel\n
+  headers:
+    dhcp: |
+      PROMPT 1
+      SERIAL 0 38400
+      TIMEOUT 50
+    localboot: |
+      timeout=0
 automata: 
   macrosteps: 
     BootNewEnv: 
