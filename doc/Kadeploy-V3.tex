@@ -375,13 +375,28 @@ environments:
   max_postinstall_size: 10
   max_preinstall_size: 10
 pxe:
-  kind: PXElinux
-  repository: /var/lib/tftpboot/
-  export: /
-  kernels:
-    directory: kernels
-    max_size: 4000
-  bootloader: chainload_pxe
+  dhcp:
+    method: PXElinux
+    repository: /var/lib/tftpboot
+    export:
+      kind: tftp
+      server: kadeploy-server
+    profiles:
+      directory: pxelinux.cfg
+      filename: ip_hex
+    userfiles:
+      directory: userfiles
+      max_size: 200
+  localboot:
+    method: GrubPXE
+    binary: grubpxe.0
+    repository: /var/lib/tftpboot
+    export:
+      kind: tftp
+      server: kadeploy-server
+    profiles:
+      directory: grub.cfg
+      filename: ip
 hooks: 
   async: 
     end_of_reboot: echo REBOOT_ID
@@ -491,18 +506,71 @@ external:
     \item \yfieldd{rambin\_dir}{String}{/rambin} path of the ramdisk directory in the deployment environment
   \end{itemize}
 
-  \item \ypath{/pxe}
+  \item \ypath{/pxe/dhcp} the default method used to PXE boot. Further information are available in the paragraph \texttt{Booting over the network}.
   \begin{itemize}
-    \item \yfieldd{kind}{String}{PXElinux} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux or IPXE)
-    \item \yfield{repository}{String} absolute path of the repository where PXE profiles are accessibles (TFTP, HTTP, ...). This path should not include the 'pxelinux.cfg' directory, Kadeploy find it automatically. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
-    \item \yfieldd{export}{String}{/} the root path to be used in pxe profiles. If the service used to serve PXE profiles is TFTP, it should be '/', if the service is HTTP, 'http://domain.tld/' or 'http://IP\_ADDR/'.
-    \item \yfieldd{bootloader}{String}{chainload\_pxe} kind of bootloader used to boot the deployed nodes (expected values are chainload\_pxe and pure\_pxe)
+    \item \yfield{method}{String} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
+    \item \yfield{repository}{String} absolute path of the repository where PXE files are accessibles (TFTP, HTTP, ...). Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
+  \end{itemize}
+  \item \ypath{/pxe/dhcp/export}
+  \begin{itemize}
+    \item \yfield{kind}{String} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
+    \item \yfield{server}{String} The server where PXE files are stored.
+  \end{itemize}
+  \item \ypath{/pxe/dhcp/profiles}
+  \begin{itemize}
+    \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
+
+For sample, with PXElinux, this directory is \emph{pxelinux.cfg}.
+    \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
+
+The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For sample, with PXElinux, it will be \emph{ip\_hex}.
+  \end{itemize}
+  \item \ypath{/pxe/dhcp/userfiles}
+  \begin{itemize}
+    \item \yfield{directory}{String} The directory where PXE user custom files (option \emph{--upload-pxe-files}) are to be saved. This path is relative to the PXE repository path.
+    \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE user custom files sub-directory
+   \end{itemize}
+
+  \item \ypath{/pxe/networkboot} the method used boot operating system images sent from the network (the deployment environment kernel). This setting is optional by default, the DHCP method is used.
+  \begin{itemize}
+    \item \yfield{method}{String} the PXE method used to boot the nodes (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
+    \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For sample, for PXElinux, this file is \emph{pxeliux.0}.
+    \item \yfield{repository}{String} absolute path of the repository where PXE files (deployment environments kernels) are accessibles. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
+  \end{itemize}
+  \item \ypath{/pxe/networkboot/export}
+  \begin{itemize}
+    \item \yfield{kind}{String} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
+    \item \yfield{server}{String} The server where PXE files are stored.
+  \end{itemize}
+  \item \ypath{/pxe/networkboot/profiles}
+  \begin{itemize}
+    \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
+
+For sample, with PXElinux, this directory is \emph{pxelinux.cfg}.
+    \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
+
+The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For sample, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
 
-  \item \ypath{/pxe/kernels}
+  \item \ypath{/pxe/localboot} the method used to boot an operating system that's installed on nodes hard disk. This setting is optional by default, the DHCP method is used.
   \begin{itemize}
-    \item \yfield{directory}{String} relative path of the PXE kernels sub-repository
-    \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE kernels sub-repository
+    \item \yfield{method}{String} the PXE method used to boot the nodes (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
+    \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For sample, for PXElinux, this file is \emph{pxeliux.0}.
+    \item \yfield{repository}{String} absolute path of the repository where PXE files are accessibles (TFTP, HTTP, ...). Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
+  \end{itemize}
+  \item \ypath{/pxe/localboot/export}
+  \begin{itemize}
+    \item \yfield{kind}{String} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
+    \item \yfield{server}{String} The server where PXE files are stored.
+  \end{itemize}
+  \item \ypath{/pxe/localboot/profiles}
+  \begin{itemize}
+    \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
+
+For sample, with PXElinux, this directory is \emph{pxelinux.cfg}.
+    \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
+
+The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For sample, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
 
   \item \ypath{/hooks/async}
@@ -537,8 +605,42 @@ external:
   \end{itemize}
 \end{itemize}
 
+\section{Booting over the network}\label{sec:netboot}
+In the \ypath{/pxe} configuration field, you can define how the nodes are booting from the network.
 
-\section{Clusters file}
+As far as you are using Kadeploy3 on your cluster, a PXE boot have to be setup on your nodes, so that implies that your nodes have a compatible Network Interface Card and that your DHCP server is configured a specific way. There is a lot of different software (Network Bootstrap Programs or NBP) that can be use to make  nodes boot over the network: PXElinux, GPXElinux, iPXE, Etherboot, Grub disks, ... .
+
+For most of Network Bootstrap Programs, the booting method is the same:
+\begin{enumerate}
+  \item The Network Iterface Card ask an IP address to the DHCP server;
+  \item The DHCP answer and give an extra instruction that specifies to download and run a specific software, the Network Bootstrap Program (for sample, with PXElinux, this file is pxelinux.0)
+  \item The NBP download a boot profile on the network that specifies how to boot the node. The profile file has a specific name (the hostname of the node, it's IP address, ...) so that the software will be sure to download the profile of this specific node.
+  \item The NBP read the profile and boot the node according to it's instructions (download and boot a specific kernel, boot on node's local hard disk, ...)
+\end{enumerate}
+
+To be able to control node's boot, Kadeploy3 is editing this profiles. That's why it's necessary to tell it what NBP is used to boot your nodes over the network and how you want their profiles to be written.
+
+Some of this softwares gives you the choice of the method used to download the files you want to boot (TFTP/HTTP/FTP/...), i.e. how you want your PXE files to be exported. You'll be able to specify how you want your files to be download in Kadeploy3 configuration.
+
+Kadeploy will boot the nodes three different ways:
+\begin{itemize}
+  \item (1) Booting a minimal kernel that was downloaded from the network (done in the first macrostep (SetupDeploymentEnv) to boot on the deployment environment);
+  \item (2) Booting a kernel located on a partition of the local hard disk (done in the third macrostep (BootNewEnv) to boot the installed system);
+  \item (3) Booting with some user's custom files with a user specified profile (done when the user is using the options \emph{-x} and \emph{-w}).
+\end{itemize}
+
+In the field \ypath{/pxe/dhcp} of the global configuration file, you will specify which NBP is setup on your DHCP server and give some information about the exports and profiles. This settings will be used every times Kadeploy3 will reboot your nodes unless you defile the fields \ypath{/pxe/networkboot} or \ypath{/pxe/localboot}.
+
+If you define the field \ypath{/pxe/networkboot}, it will overwrite the settings \ypath{/pxe/dhcp} when Kadeploy3 will make a reboot kind (1).
+
+If you define the field \ypath{/pxe/localboot}, it will overwrite the settings \ypath{/pxe/dhcp} when Kadeploy3 will make a reboot kind (2).
+
+When the method (NBP) specified in \ypath{/pxe/networkboot} or \ypath{/pxe/localboot} is different than the method specified \ypath{/pxe/dhcp}, Kadeploy3 make the NBPs chainload each other. For sample if \ypath{/pxe/dhcp} is set to boot with PXElinux and \ypath{/pxe/networkboot} with a GRUB disk \emph{grubpxe.0}, Kadeploy3 will make PXElinux load \emph{grubpxe.0} by writting \emph{PXE grubpxe.0} in the PXElinux profile. Then it writes the GRUB profile (that will be loaded by \emph{grubpxe.0}), that profile will make the node download and boot a kernel from the network.
+
+One important thing is that every NBP have to be available in you PXE (TFTP in most of the cases) repository. Another one is that the Kadeploy user should be able (have the rights) to write the profiles inside the PXE repository.
+
+
+\section{Clusters file\label{sec:clusters_conf}}
 This file describes the list of all the clusters, the location of their specific setting files and their nodes. All the nodes of the clusters that aim to be deployed must be declared in this file. It must be defined in the  \texttt{/etc/kadeploy3/clusters.yml} file.
 
 Warning, a cluster-specific configuration file and some partitioning/bootloader\_install scripts must be defined for each cluster define in this file.
@@ -786,8 +888,8 @@ automata:
 
   \item \ypath{/kernels/deploy}
   \begin{itemize}
-    \item \yfield{vmlinuz}{String} name of the kernel used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/export} and \ypath{pxe/kernels/directory} settings of the general configuration file.
-    \item \yfield{initrd}{String} name of the initrd used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/export} and \ypath{pxe/kernels/directory} settings of the general configuration file.
+    \item \yfield{vmlinuz}{String} name of the kernel used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
+    \item \yfield{initrd}{String} name of the initrd used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfieldd{params}{String}{''} boot parameters of the deployment environment kernel
     \item \yfieldd{drivers}{String}{''} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
   \end{itemize}
