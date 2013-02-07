@@ -1,0 +1,54 @@
+This script can be used to generate a -network bootable- GRUB disk (in other words a GRUB Network Bootstrap Program).
+
+With this grub disk, you'll be able to boot your node's operating systems from network or local disk without have to install GRUB on the hard disk since it will be loaded from the disk throught the network.
+
+
+### How to generate a disk ###
+First of all, you have to be sure that a recent version of GRUB is installed on your machine (GRUB version >= 1.99-26).
+
+Then you can specify the modules you'll want to be present on your disk in the modules.conf file
+
+After that, you just have to use the command "make", by default, your image will be saved in the file "grubpxe.0".
+
+
+### The grub.cfg file ###
+The idea here is to embed a default configuration file in the GRUB disk that makes it download a GRUB configuration file (profile) that specify how to boot the node on the TFTP/HTTP server.
+
+The idea is to make the GRUB disk works pretty much as PXElinux: the Network Bootstrap Program grubpxe.0 boots and load a node-specific profile (that specifies how to boot the node) on the TFTP/HTTP server.
+
+For PXElinux, these profiles are contained in the files "pxelinux.cfg/HEXA_IP_OF_THE_NODE".
+
+By default with this scripts the GRUB profiles have to be written in the files "grub.cfg/IP_OF_THE_NODE".
+
+You can change this settings by editing the grub.cfg file that specify to the GRUB disk how it should download the node's profile.
+
+In the default configuration file, the path to the node's profile is /grub.cfg/$net_pxe_ip, where $net_pxe_ip will be substitued by the node's IP address.
+You can ask GRUB to go to download the profile depending on other criteria since GRUB exports other variables, a list of them is available at: http://www.gnu.org/software/grub/manual/grub.html#Network .
+
+If you want the grubpxe.0 NBP to download the profiles over HTTP, you need to use the (http,SERVER) export instead of the (pxe) one (that can also be written (tftp,SERVER)).
+
+
+### The modules.conf file ###
+In this file, you can specify which modules you want to be included in your GRUB disk. At least, you should include the modules "pxe" and "configfile" for grub to be able to download node's profile on the PXE server. Depending on your version of GRUB, the module "pxecmd" should also be needed.
+
+You should make the list of the modules you need depending on the usage you want to do of your GRUB disk.
+
+For sample, if you want to boot a GNU/Linux that is installed on your -msdos-formated- hard disk, you should include the modules "bios_disk", "part_msdos", "boot", "linux" and "ext2" (if your GNU/Linux system is installed on a ext2 formated partition).
+
+A list of supported partition types is available in the file partmap.lst of GRUB modules directory.
+A list of supported filesystems is available in the file fs.lst of GRUB modules directory.
+
+Usually the GRUB modules directory is /usr/lib/grub or /usr/lib/grub/ARCH .
+
+
+### How to create the image with a custom version of GRUB ###
+If you want to use a custom version of grub-mkimage to create your image, for sample, if you want to create it with a non-installed version of grub you compiled from the trunk, you can edit the file generate.conf and specify which binary to use editing the BINARY variable and where are the GRUB modules located editing the MODULES_DIR variable.
+
+
+### How to use the grubpxe.0 file ###
+Depending on your netboot method, you'll first have to copy grubpxe.0 in your TFTP/HTTP/FTP/... server's directory.
+
+Then, there is different ways to load grubpxe.0:
+  - Make your nodes load the file directly after the DHCPDISCOVER answer: reconfigure your DHCP server (grubpxe.0 will take the place of pxelinux.0 if your nodes was netbooting with PXElinux)
+  - Chainload grubpxe.0 from PXElinux/GPXElinux using "PXE grubpxe.0" in your profiles
+  - Chainload grubpxe.0 from iPXE using "chain grubpxe.0" in your profiles
