@@ -39,8 +39,8 @@ require 'macrostep'
         [ :kexec,
           'linux',
           context[:cluster].kexec_repository,
-          context[:cluster].deploy_kernel,
-          context[:cluster].deploy_initrd,
+          File.basename(context[:cluster].deploy_kernel),
+          File.basename(context[:cluster].deploy_initrd),
           context[:cluster].deploy_kernel_args
         ],
         [ :wait_reboot, "kexec" ],
