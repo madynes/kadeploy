@@ -233,17 +233,61 @@ def cfg_kadeploy_conf()
   pxe_kind = nil
 	case $deploysendmeth
 		when :HTTP
-      pxe_kind = 'IPXE'
-      pxe_export = "http://#{$services[:www][:fqdn]}"
-    when :TFTP
-      pxe_kind = 'PXElinux'
-      pxe_export = '/'
+      pxe_kind = 'GPXElinux'
     else
       pxe_kind = 'PXElinux'
-      pxe_export = '/'
   end
 
   if $version >= 5
+    pxe = nil
+    if $version >= 7
+      case $deploysendmeth
+        when :HTTP
+          pxe_binary = 'gpxelinux.0'
+          pxe_export_kind = 'http'
+          pxe_export_server = $services[:www][:fqdn]
+        else
+          pxe_binary = 'pxelinux.0'
+          pxe_export_kind = 'tftp'
+          pxe_export_server = $services[:kadeploy][:fqdn]
+      end
+      pxe = {
+        'dhcp' => {
+          'method' => pxe_kind,
+          #'binary' => pxe_binary,
+          'repository' => cfg_pxe_path(),
+          'export' => {
+            'kind' => pxe_export_kind,
+            'server' => pxe_export_server,
+          },
+          'profiles' => {
+            'directory' => CFG_PXE_PROFILES_DIR,
+            'filename' => 'ip_hex',
+          },
+          'userfiles' => {
+            'directory' => CFG_PXE_USERS_DIR,
+            'max_size' => 600,
+          },
+        }
+      }
+    else
+      case $deploysendmeth
+        when :HTTP
+          pxe_export = "http://#{$services[:www][:fqdn]}"
+        else
+          pxe_export = '/'
+      end
+      pxe = {
+        'kind' => pxe_kind,
+        'export' => pxe_export,
+        'repository' => cfg_pxe_path(),
+        'bootloader' => 'chainload_pxe',
+        'kernels' => {
+          'directory' => CFG_PXE_KERNELS_DIR,
+          'max_size' => 600,
+        },
+      }
+    end
     {
       'database' => {
         'kind' => 'mysql',
@@ -302,16 +346,7 @@ def cfg_kadeploy_conf()
           'tarball_dir' => '/tmp',
         },
       },
-      'pxe' => {
-        'kind' => pxe_kind,
-        'export' => pxe_export,
-        'repository' => cfg_pxe_path(),
-        'bootloader' => 'chainload_pxe',
-        'kernels' => {
-          'directory' => 'kernels',
-          'max_size' => 600,
-        },
-      },
+      'pxe' => pxe,
       'external' => {
         'mkfs' => [
           {
@@ -331,10 +366,16 @@ def cfg_kadeploy_conf()
       },
     }.to_yaml
   else
+    case $deploysendmeth
+      when :HTTP
+        pxe_export = "http://#{$services[:www][:fqdn]}"
+      else
+        pxe_export = '/'
+    end
     "verbose_level = #{CFG_KADEPLOY_VERBOSE}\n"\
     "pxe_kind = #{pxe_kind}\n"\
     "pxe_repository = #{cfg_pxe_path()}\n"\
-    "pxe_repository_kernels = kernels\n"\
+    "pxe_repository_kernels = #{CFG_PXE_KERNELS_DIR}\n"\
     "pxe_repository_kernels_max_size = 600\n"\
     "pxe_export = #{pxe_export}\n"\
     "db_kind = mysql\n"\
@@ -648,6 +689,27 @@ CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 180
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
   if $version >= 5
+    pxe_headers = nil
+    deploy_kernel = nil
+    if $version >= 7
+      pxe_headers = {
+        'dhcp' => CFG_PXE_HEADER,
+        'localboot' => CFG_PXE_HEADER,
+        'networkboot' => CFG_PXE_HEADER,
+      }
+      deploy_kernel = {
+        'vmlinuz' => File.join(CFG_PXE_KERNELS_DIR,File.basename(cluster[:kernel][:vmlinuz])),
+        'initrd' => File.join(CFG_PXE_KERNELS_DIR,File.basename(cluster[:kernel][:initrd])),
+        'params' => cfg_kadeploy_deploy_kernel_args(cluster),
+      }
+    else
+      pxe_headers = "#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')
+      deploy_kernel = {
+        'vmlinuz' => File.basename(cluster[:kernel][:vmlinuz]),
+        'initrd' => File.basename(cluster[:kernel][:initrd]),
+        'params' => cfg_kadeploy_deploy_kernel_args(cluster),
+      }
+    end
     cfg = {
       'partitioning' => {
         'block_device' => cfg_kadeploy_disk_device(),
@@ -704,11 +766,7 @@ def cfg_kadeploy_specific_conf(cluster)
         ],
       },
       'kernels' => {
-        'deploy' => {
-          'vmlinuz' => File.basename(cluster[:kernel][:vmlinuz]),
-          'initrd' => File.basename(cluster[:kernel][:initrd]),
-          'params' => cfg_kadeploy_deploy_kernel_args(cluster),
-        },
+        'deploy' => deploy_kernel,
         'user' => {
           'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
         },
@@ -717,7 +775,7 @@ def cfg_kadeploy_specific_conf(cluster)
         'repository' => '/dev/shm/kexec_repository',
       },
       'pxe' => {
-        'headers' => CFG_PXE_HEADER.gsub("\n",'\n'),
+        'headers' => pxe_headers,
       },
       'automata' => {
         'macrosteps' => {
@@ -778,7 +836,7 @@ def cfg_kadeploy_specific_conf(cluster)
     "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8\n"\
     + # >>> TODO: UPDATE
     "partition_creation_kind = fdisk\n"\
-    "pxe_header = #{CFG_PXE_HEADER.gsub("\n",'\n')}\n"\
+    "pxe_header = #{"#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')}\n"\
     "use_ip_to_deploy = true\n"\
     + #Automata description
     "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1)}\n"\
@@ -891,13 +949,11 @@ CFG_PXE_BOOTFILES = [
 ]
 CFG_PXE_PROFILES_DIR = 'pxelinux.cfg'
 CFG_PXE_KERNELS_DIR = 'kernels'
+CFG_PXE_USERS_DIR = 'userfiles'
 CFG_PXE_HEADER = \
   "PROMPT 1\n"\
   "SERIAL 0 #{DEFAULT_CONSOLE_BAUD_RATE}\n"\
-  "DEFAULT bootlabel\n"\
-  "DISPLAY messages\n"\
-  "TIMEOUT 50\n\n"\
-  "label bootlabel\n"
+  "TIMEOUT 50\n\n"
 
 def cfg_pxe_path(suffix=nil)
   ret = ''
@@ -912,6 +968,7 @@ end
 
 def cfg_pxe(bootkernel=CFG_PXE_KERNEL,bootdisk=CFG_PXE_DISK,bootpart=CFG_PXE_PART)
   CFG_PXE_HEADER +
+  "LABEL bootlabel\n"\
   "KERNEL #{bootkernel}\n"\
   "APPEND #{bootdisk} #{bootpart}\n"
 end
@@ -1300,6 +1357,7 @@ $gateway = nil
 $deploysendmeth = :HTTP
 $configs = {}
 $tunnels = true
+$git = false
 $version = 7
 
 options = {}
@@ -1774,25 +1832,29 @@ end
 def kadeploy_tunnel(host,session)
 	case $mode
 		when :KAVLAN, :VLANKVM
-			msg('Creating tunnel to kadeploy repository',MSG_INFO)
-			sexec(session,"sed -i -e '/^.*#{DEB_REPOSITORY.gsub('/','\/')}.*$/d' /etc/apt/sources.list")
-			sexec(session,"echo 'deb #{DEB_REPOSITORY} / ' >> /etc/apt/sources.list")
+      unless $git
+        msg('Creating tunnel to kadeploy repository',MSG_INFO)
+        sexec(session,"sed -i -e '/^.*#{DEB_REPOSITORY.gsub('/','\/')}.*$/d' /etc/apt/sources.list")
+        sexec(session,"echo 'deb #{DEB_REPOSITORY} / ' >> /etc/apt/sources.list")
+      end
 
 			http_tunnel(host,session) do
 				yield
 			end
 			msg('Destroying tunnel to kadeploy repository',MSG_INFO)
 		when :KVM
-			msg('Creating tunnel to kadeploy repository',MSG_INFO)
-			randport=get_open_port()
-  		uri = URI.parse(URI.decode(DEB_REPOSITORY))
-			url = "#{uri.scheme}://#{getgw()}:#{randport}#{uri.path}"
-			sexec(session,"sed -i -e '/^.*#{getgw()}.*$/d' /etc/apt/sources.list")
-			sexec(session,"echo 'deb #{url} / ' >> /etc/apt/sources.list")
+      unless $git
+        msg('Creating tunnel to kadeploy repository',MSG_INFO)
+        randport=get_open_port()
+        uri = URI.parse(URI.decode(DEB_REPOSITORY))
+        url = "#{uri.scheme}://#{getgw()}:#{randport}#{uri.path}"
+        sexec(session,"sed -i -e '/^.*#{getgw()}.*$/d' /etc/apt/sources.list")
+        sexec(session,"echo 'deb #{url} / ' >> /etc/apt/sources.list")
 
-			cmd="ssh #{SSH_OPTIONS} -N -L #{getgw()}:#{randport}:#{uri.host}:80 -i #{$sshkeyfile} #{KVM_G5K_USER}@#{KVM_G5K_SITE} 1>/dev/null 2>/dev/null & echo $!"
-			msg(cmd) if $debug
-			pid=`#{cmd}`
+        cmd="ssh #{SSH_OPTIONS} -N -L #{getgw()}:#{randport}:#{uri.host}:80 -i #{$sshkeyfile} #{KVM_G5K_USER}@#{KVM_G5K_SITE} 1>/dev/null 2>/dev/null & echo $!"
+        msg(cmd) if $debug
+        pid=`#{cmd}`
+      end
 
 			time_start = Time.now
 			begin
@@ -1954,6 +2016,7 @@ optparse = OptionParser.new(USAGE) do |opts|
 
 	opts.on( '', '--git [<commit>]', 'Install a git snapshot of Kadeploy3 (default: master).' ) do |c|
   	options[:git] = c || :master
+    $git = true
 	end
 
 	opts.on( '', '--debug', 'Verbose display of every instruction sent' ) do
@@ -3045,6 +3108,90 @@ end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
 msg("",MSG_INFO)
 
+
+server=$kanodes[:kadeploy]
+servername=getnode(server[:basename])
+msg('=== Setting up PXE system',MSG_INFO)
+sshgw.ssh(servername,'root') do |session|
+  msg("Connected to #{server[:basename]}",MSG_INFO)
+
+	http_tunnel(server,session) do
+		msg('Updating debian packages list',MSG_INFO)
+		apt_update(session,server)
+
+    case $deploysendmeth
+    when :TFTP
+      msg('Installing TFTP server',MSG_INFO)
+      apt_install(session,'debconf-utils',server)
+      sexec(session,"rm -Rf #{CFG_TFTP_PATH}")
+      sexec(session,"mkdir -p #{CFG_TFTP_PATH}")
+      sexec(session,"echo 'tftpd-hpa tftpd-hpa/directory string #{CFG_TFTP_PATH}' | debconf-set-selections")
+      sexec(session,"echo 'tftpd-hpa tftpd-hpa/username string #{CFG_KADEPLOY_USER}' | debconf-set-selections")
+      apt_install(session,'tftpd-hpa',server)
+
+      msg('Configuring TFTP server',MSG_INFO)
+      tempfile(cfg_tftp()) {|path| scp(servername,path,CFG_TFTP_CONF_FILE)}
+      sexec(session,'service tftpd-hpa restart')
+
+      msg('Removing configuration related packages',MSG_INFO)
+      apt_remove(session,['debconf-utils'],server)
+    when :HTTP
+      if HTTP_OVER_NFS
+        msg('Installing NFS server',MSG_INFO)
+        apt_install(session,'nfs-server',server)
+        msg('Configuring NFS server',MSG_INFO)
+        sexec(session,"rm -Rf #{cfg_pxe_path()}")
+        sexec(session,"mkdir -p #{cfg_pxe_path()}")
+        tempfile(cfg_nfs_exports(cfg_pxe_path())) {|path| scp(servername,path,CFG_NFS_EXPORT_CONF_FILE)}
+        sexec(session,'exportfs -ar')
+      else
+        msg('Installing HTTP server',MSG_INFO)
+        apt_install(session,['apache2','apache2-mpm-worker'],server)
+
+        msg('Configuring HTTP server',MSG_INFO)
+        sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
+        sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
+        tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
+        tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
+        sexec(session,'service apache2 restart')
+      end
+    end
+
+    msg('Installing PXE bootfiles',MSG_INFO)
+    apt_install(session,'syslinux-common',server)
+    CFG_PXE_BOOTFILES.each do |bootfile|
+      tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
+      msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
+        MSG_ERROR,true) if !tmp or tmp.empty? or !tmp[0] or tmp[0].empty?
+      sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
+    end
+
+    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_USERS_DIR)}") if $version >= 7
+    end
+
+    #sexec(session,"rm -Rf #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    msg('Sending deployment kernels',MSG_INFO)
+    $deplkernels.each do |name,kernel|
+      msg("\t#{name}",MSG_INFO)
+      scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+      scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
+    end
+
+    msg('Creating pxelinux configs',MSG_INFO)
+    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_PROFILES_DIR)}")
+    tempfile(cfg_pxe()) do |path|
+      scp(servername,path,File.join(cfg_pxe_path(CFG_PXE_PROFILES_DIR),'default'))
+    end
+
+    sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
+    sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{cfg_pxe_path()}")
+	end
+end
+msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
+msg("",MSG_INFO)
+
+
 server=$kanodes[:kadeploy]
 servername=getnode(server[:basename])
 msg('=== Setting up Kadeploy server',MSG_INFO)
@@ -3106,8 +3253,6 @@ sshgw.ssh(servername,'root') do |session|
 		  apt_install(session,['kadeploy-server','kadeploy-client'],server)
     end
 
-
-
 		msg('Creating Kadeploy directories',MSG_INFO)
 		sexec(session,"touch #{CFG_KADEPLOY_LOGFILE}")
 		sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_LOGFILE}")
@@ -3138,13 +3283,16 @@ sshgw.ssh(servername,'root') do |session|
     end
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_SSHKEY_PATH}")
 
+=begin
 		msg('Creating PXE directories',MSG_INFO)
     sexec(session,"rm -Rf #{cfg_pxe_path()}")
     sexec(session,"mkdir -p #{cfg_pxe_path()}")
     sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
+    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_USERS_DIR)}") if $version >= 7
     sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_PROFILES_DIR)}")
     sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} -R #{cfg_pxe_path()}")
+=end
 
 		msg('Copying clusters postinstall files',MSG_INFO)
 		$clusters.values.each do |cluster|
@@ -3281,88 +3429,6 @@ end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
 msg("",MSG_INFO)
 
-
-server=$kanodes[:kadeploy]
-servername=getnode(server[:basename])
-msg('=== Setting up PXE system',MSG_INFO)
-sshgw.ssh(servername,'root') do |session|
-  msg("Connected to #{server[:basename]}",MSG_INFO)
-
-	http_tunnel(server,session) do
-		msg('Updating debian packages list',MSG_INFO)
-		apt_update(session,server)
-
-    case $deploysendmeth
-    when :TFTP
-      msg('Installing TFTP server',MSG_INFO)
-      apt_install(session,'debconf-utils',server)
-      sexec(session,"rm -Rf #{CFG_TFTP_PATH}")
-      sexec(session,"mkdir -p #{CFG_TFTP_PATH}")
-      sexec(session,"echo 'tftpd-hpa tftpd-hpa/directory string #{CFG_TFTP_PATH}' | debconf-set-selections")
-      sexec(session,"echo 'tftpd-hpa tftpd-hpa/username string #{CFG_KADEPLOY_USER}' | debconf-set-selections")
-      apt_install(session,'tftpd-hpa',server)
-
-      msg('Configuring TFTP server',MSG_INFO)
-      tempfile(cfg_tftp()) {|path| scp(servername,path,CFG_TFTP_CONF_FILE)}
-      sexec(session,'service tftpd-hpa restart')
-
-      msg('Removing configuration related packages',MSG_INFO)
-      apt_remove(session,['debconf-utils'],server)
-    when :HTTP
-      if HTTP_OVER_NFS
-        msg('Installing NFS server',MSG_INFO)
-        apt_install(session,'nfs-server',server)
-        msg('Configuring NFS server',MSG_INFO)
-        sexec(session,"rm -Rf #{cfg_pxe_path()}")
-        sexec(session,"mkdir -p #{cfg_pxe_path()}")
-        tempfile(cfg_nfs_exports(cfg_pxe_path())) {|path| scp(servername,path,CFG_NFS_EXPORT_CONF_FILE)}
-        sexec(session,'exportfs -ar')
-      else
-        msg('Installing HTTP server',MSG_INFO)
-        apt_install(session,['apache2','apache2-mpm-worker'],server)
-
-        msg('Configuring HTTP server',MSG_INFO)
-        sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
-        sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
-        tempfile(cfg_apache()) {|path| scp(servername,path,CFG_APACHE_CONF_FILE)}
-        tempfile(cfg_apache_site()) {|path| scp(servername,path,CFG_APACHE_SITES_CONF_FILE)}
-        sexec(session,'service apache2 restart')
-      end
-    end
-
-    msg('Installing PXE bootfiles',MSG_INFO)
-    apt_install(session,'syslinux-common',server)
-    CFG_PXE_BOOTFILES.each do |bootfile|
-      tmp = sexec(session,"dpkg -L syslinux-common | grep '^.*/#{bootfile}$'",false,false)
-      msg("mandatory bootfile '#{bootfile}' not found in syslinux-common package",
-        MSG_ERROR,true) if !tmp or tmp.empty? or !tmp[0] or tmp[0].empty?
-      sexec(session,"ln -f #{tmp[0]} #{cfg_pxe_path()}")
-    end
-
-    #sexec(session,"rm -Rf #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-    sexec(session,"chmod 755 #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-    sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-    msg('Sending deployment kernels',MSG_INFO)
-    $deplkernels.each do |name,kernel|
-      msg("\t#{name}",MSG_INFO)
-      scp(servername,kernel[:vmlinuz],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-      scp(servername,kernel[:initrd],cfg_pxe_path(CFG_PXE_KERNELS_DIR))
-    end
-    sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{cfg_pxe_path(CFG_PXE_KERNELS_DIR)}")
-
-    msg('Creating pxelinux configs',MSG_INFO)
-    sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_PROFILES_DIR)}")
-    tempfile(cfg_pxe()) do |path|
-      scp(servername,path,File.join(cfg_pxe_path(CFG_PXE_PROFILES_DIR),'default'))
-    end
-
-    sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{cfg_pxe_path()}")
-    sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
-	end
-end
-msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
-msg("",MSG_INFO)
 
 
 if $deploysendmeth == :HTTP
