@@ -84,10 +84,6 @@ class KadeployServer
     return @config.common.version
   end
 
-  def get_bootloader
-    return @config.common.bootloader
-  end
-
   # Check if the server knows a set of nodes (RPC)
   #
   # Arguments
@@ -745,17 +741,14 @@ class KadeployServer
       gfm = Managers::GrabFileManager.new(config, output, client, db)
       exec_specific.pxe_upload_files.each { |pxe_file|
         user_prefix = "pxe-#{config.exec_specific.true_user}--"
-        local_pxe_file = File.join(@config.common.pxe_repository, @config.common.pxe_repository_kernels, "#{user_prefix}#{File.basename(pxe_file)}")
+        local_pxe_file = File.join(@config.common.cache[:netboot][:directory], "#{user_prefix}#{File.basename(pxe_file)}")
         unless gfm.grab_file_without_caching(
           pxe_file,
           local_pxe_file,
           "pxe_file",
           user_prefix,
-          File.join(
-            @config.common.pxe_repository,
-            @config.common.pxe_repository_kernels
-          ),
-          config.common.pxe_repository_kernels_max_size,
+          @config.common.cache[:netboot][:directory],
+          @config.common.cache[:netboot][:size],
           false,
           /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
         ) then

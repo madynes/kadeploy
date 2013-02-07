@@ -15,6 +15,7 @@ require 'stepdeployenv'
 require 'stepbroadcastenv'
 require 'stepbootnewenv'
 require 'microsteps'
+require 'netboot'
 
 #Ruby libs
 require 'optparse'
@@ -577,41 +578,83 @@ module ConfigInformation
           conf.max_postinstall_size = cp.value('max_postinstall_size',Fixnum,20)
         end
 
-        cp.parse('pxe',true) do |info|
-          conf.pxe_kind = cp.value(
-            'kind',String,'PXElinux',['PXElinux','GPXElinux','IPXE']
-          )
-          conf.pxe_export = cp.value('export',String,'/')
-          conf.pxe_repository = cp.value('repository',String,nil,Dir)
-          cp.parse('kernels',true) do
-            conf.pxe_repository_kernels = cp.value('directory',String,nil,
-              {
-                :type => 'dir',
-                :prefix => conf.pxe_repository,
-                :disable => (conf.pxe_kind == 'GPXElinux')
-              }
-            )
-            conf.pxe_repository_kernels_max_size = cp.value('max_size',Fixnum)
-          end
-          conf.bootloader = cp.value(
-            'bootloader',String,'chainload_pxe',['chainload_pxe','pure_pxe']
-          )
+        cp.parse('pxe',true) do
+          conf.cache[:netboot] = {} unless conf.cache[:netboot]
 
-          #PXE config directory
-          dir = File.join(conf.pxe_repository, 'pxelinux.cfg')
-          if not File.exist?(dir)
-            raise ArgumentError.new(ConfigParser.errmsg(
-                info[:path],"The directory '#{dir}' does not exist"
+          info = nil
+          chain = nil
+          pxemethod = Proc.new do |name|
+            unless info[:empty]
+              args = []
+              args << cp.value('method',String,nil,
+                ['PXElinux','GPXElinux','IPXE','GrubPXE']
               )
-            )
+              repo = cp.value('repository',String,nil,Dir)
+
+              if name == :dhcp
+                args << 'DHCP_PXEBIN'
+              else
+                args << cp.value('binary',String,nil,
+                  {:type => 'file', :prefix => repo}
+                )
+              end
+
+              cp.parse('export',true) do
+                args << cp.value('kind',String,nil,['http','ftp','tftp']).to_sym
+                args << cp.value('server',String)
+              end
+
+              args << repo
+              if name == :dhcp
+                cp.parse('userfiles',true) do
+                  files = cp.value('directory',String,nil,
+                    {:type => 'dir', :prefix => repo}
+                  )
+                  args << files
+                  conf.cache[:netboot][:directory] = File.join(repo,files)
+                  conf.cache[:netboot][:size] = cp.value('max_size',Fixnum)
+                end
+              else
+                args << 'PXE_CUSTOM'
+              end
+
+              cp.parse('profiles',true) do
+                profiles_dir = cp.value('directory',String)
+                args << profiles_dir
+                unless Pathname.new(profiles_dir).absolute?
+                  profiles_dir = File.join(repo,profiles_dir)
+                end
+                if !File.exist?(profiles_dir) or !File.directory?(profiles_dir)
+                  raise ArgumentError.new(ConfigParser.errmsg(info[:path],"The directory '#{profiles_dir}' does not exist"))
+                end
+                args << cp.value('filename',String,nil,
+                  ['ip','ip_hex','hostname','hostname_short']
+                )
+              end
+              args << chain
+
+              begin
+                conf.pxe[name] = NetBoot.Factory(*args)
+              rescue NetBoot::Exception => nbe
+                raise ArgumentError.new(ConfigParser.errmsg(info[:path],nbe.message))
+              end
+            end
           end
 
-          conf.pxe = PXEOperations::PXEFactory(
-            conf.pxe_kind,
-            conf.pxe_repository,
-            conf.pxe_repository_kernels,
-            conf.pxe_export
-          )
+          cp.parse('dhcp',true) do |info|
+            pxemethod.call(:dhcp)
+          end
+
+          chain = conf.pxe[:dhcp]
+          cp.parse('localboot') do |info|
+            pxemethod.call(:local)
+          end
+          conf.pxe[:local] = chain unless conf.pxe[:local]
+
+          cp.parse('networkboot') do |info|
+            pxemethod.call(:network)
+          end
+          conf.pxe[:network] = chain unless conf.pxe[:network]
         end
 
         cp.parse('hooks') do
@@ -1164,7 +1207,11 @@ module ConfigInformation
         end
 
         cp.parse('pxe') do
-          conf.pxe_header = cp.value('headers',String,'').gsub("\\n","\n")
+          cp.parse('headers') do
+            conf.pxe_header[:chain] = cp.value('dhcp',String,'')
+            conf.pxe_header[:local] = cp.value('localboot',String,'')
+            conf.pxe_header[:network] = cp.value('networkboot',String,'')
+          end
         end
 
         cp.parse('hooks') do
@@ -3083,13 +3130,9 @@ module ConfigInformation
   end
   
   class CommonConfig
+    attr_accessor :cache
     attr_accessor :verbose_level
     attr_accessor :pxe
-    attr_accessor :pxe_kind
-    attr_accessor :pxe_export
-    attr_accessor :pxe_repository
-    attr_accessor :pxe_repository_kernels
-    attr_accessor :pxe_repository_kernels_max_size
     attr_accessor :db_kind
     attr_accessor :deploy_db_host
     attr_accessor :deploy_db_name
@@ -3120,7 +3163,6 @@ module ConfigInformation
     attr_accessor :reboot_window
     attr_accessor :reboot_window_sleep_time
     attr_accessor :nodes_check_window
-    attr_accessor :bootloader
     attr_accessor :purge_deployment_timer
     attr_accessor :rambin_path
     attr_accessor :mkfs_options
@@ -3143,15 +3185,8 @@ module ConfigInformation
     # * nothing
     def initialize
       @nodes_desc = Nodes::NodeSet.new
-      #@kadeploy_disable_cache = false
-      #@log_to_file = ""
-      #@async_end_of_deployment_hook = ""
-      #@async_end_of_reboot_hook = ""
-      #@async_end_of_power_hook = ""
-      #@vlan_hostname_suffix = ""
-      #@set_vlan_cmd = ""
-      #@kastafior = "kastafior"
-      #@pxe_repository_kernels = "kernels"
+      @cache = {}
+      @pxe = {}
     end
   end
 
@@ -3227,7 +3262,7 @@ module ConfigInformation
       @cmd_power_status = nil
       @group_of_nodes = Hash.new
       @drivers = nil
-      @pxe_header = nil
+      @pxe_header = {}
       @kernel_params = nil
       @nfsroot_kernel = nil
       @nfsroot_params = nil
@@ -3274,7 +3309,7 @@ module ConfigInformation
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
       dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
-      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
+      dest.pxe_header = Marshal.load(Marshal.dump(@pxe_header))
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.nfsroot_kernel = @nfsroot_kernel.clone if (@nfsroot_kernel != nil)
       dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
@@ -3322,7 +3357,7 @@ module ConfigInformation
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
       dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
-      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
+      dest.pxe_header = Marshal.load(Marshal.dump(@pxe_header))
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.nfsroot_kernel = @nfsroot_kernel.clone if (@nfsroot_kernel != nil)
       dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
