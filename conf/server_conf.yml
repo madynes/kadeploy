@@ -48,13 +48,28 @@ environments:
     extraction_dir: /mnt/dest
     tarball_dir: /tmp
 pxe: 
-  kind: PXElinux
-  repository: /var/lib/tftpboot/
-  export: /
-  bootloader: chainload_pxe
-  kernels:
-    directory: kernels
-    max_size: 200
+  dhcp:
+    method: PXElinux
+    repository: /var/lib/tftpboot
+    export:
+      kind: tftp
+      server: kadeploy-server
+    profiles:
+      directory: pxelinux.cfg
+      filename: ip_hex
+    userfiles:
+      directory: userfiles
+      max_size: 200
+  localboot:
+    method: GrubPXE
+    binary: grubpxe.0
+    repository: /var/lib/tftpboot
+    export:
+      kind: tftp
+      server: kadeploy-server
+    profiles:
+      directory: grub.cfg
+      filename: ip
 hooks: 
   async: 
     end_of_deployment: echo WORKFLOW_ID

@@ -375,11 +375,8 @@ class Workflow < Automata::TaskManager
     cachedir,cachesize,pattern = nil
     case opts[:cache]
       when :kernels
-        cachedir = File.join(
-          context[:common].pxe_repository,
-          context[:common].pxe_repository_kernels
-        )
-        cachesize = context[:common].pxe_repository_kernels_max_size
+        cachedir = context[:common].cache[:netboot][:directory]
+        cachesize = context[:common].cache[:netboot][:size]
         pattern = /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
       #when :kadeploy
       else
