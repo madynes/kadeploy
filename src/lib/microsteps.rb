@@ -9,7 +9,7 @@ require 'nodes'
 require 'automata'
 require 'parallel_ops'
 require 'parallel_runner'
-require 'pxe_ops'
+require 'netboot'
 require 'cache'
 require 'bittorrent'
 require 'process_management'
@@ -763,6 +763,10 @@ class Microstep < Automata::QueueTask
     end
   end
 
+  def get_block_device_num
+    get_block_device_str().strip[-1] - 'a'[0]
+  end
+
   # Get the name of the deployment partition
   #
   # Arguments
@@ -1125,9 +1129,9 @@ class Microstep < Automata::QueueTask
     get_nodes = lambda { |check_vlan|
       @nodes.set.collect { |node|
         if check_vlan && (context[:execution].vlan != nil) then 
-          { 'hostname' => node.hostname, 'ip' => context[:execution].ip_in_vlan[node.hostname] }
+          { :hostname => node.hostname, :ip => context[:execution].ip_in_vlan[node.hostname] }
         else
-          { 'hostname' => node.hostname, 'ip' => node.ip }
+          { :hostname => node.hostname, :ip => node.ip }
         end
       }
     }
@@ -1135,6 +1139,9 @@ class Microstep < Automata::QueueTask
     case step
     when "prod_to_deploy_env"
       nodes = get_nodes.call(false)
+      method = context[:common].pxe[:network] || context[:common].pxe[:dhcp]
+      header = context[:cluster].pxe_header[:network] || context[:cluster].pxe_header[:dhcp]
+=begin
       if not context[:common].pxe.set_pxe_for_linux(
           nodes,
           context[:cluster].deploy_kernel,
@@ -1142,26 +1149,57 @@ class Microstep < Automata::QueueTask
           context[:cluster].deploy_initrd,
           "",
           context[:cluster].pxe_header) then
-        failed_microstep("Cannot perform the set_pxe_for_linux operation")
+=end
+      unless method.boot(
+        :network,
+        nodes,
+        header,
+        context[:cluster].deploy_kernel,
+        context[:cluster].deploy_initrd,
+        context[:cluster].deploy_kernel_args,
+      ) then
+        failed_microstep("Cannot perform the set_pxe_for_deploy operation")
         return false
       end
     when "prod_to_nfsroot_env"
-      nodes = get_nodes.call(falpse)
+      nodes = get_nodes.call(false)
+      method = context[:common].pxe[:network] || context[:common].pxe[:dhcp]
+      header = context[:cluster].pxe_header[:network] || context[:cluster].pxe_header[:dhcp]
+=begin
       if not context[:common].pxe.set_pxe_for_nfsroot(
         nodes,
         context[:cluster].nfsroot_kernel,
         context[:cluster].nfsroot_params,
         context[:cluster].pxe_header) then
+=end
+      unless method.boot(
+        :network,
+        nodes,
+        header,
+        context[:cluster].nfsroot_kernel,
+        nil,
+        context[:cluster].nfsroot_params,
+      ) then
         failed_microstep("Cannot perform the set_pxe_for_nfsroot operation")
         return false
       end
     when "set_pxe"
       nodes = get_nodes.call(false)
+=begin
       unless context[:common].pxe.set_pxe_for_custom(
         nodes,
         pxe_profile_msg,
         context[:execution].pxe_profile_singularities,
         context[:execution].true_user
+      ) then
+=end
+      unless context[:common].pxe[:dhcp].boot(
+        :custom,
+        nodes,
+        nil,
+        pxe_profile_msg,
+        context[:execution].true_user,
+        context[:execution].pxe_profile_singularities
       ) then
         failed_microstep("Cannot perform the set_pxe_for_custom operation")
         return false
@@ -1169,16 +1207,41 @@ class Microstep < Automata::QueueTask
     when "deploy_to_deployed_env"
       nodes = get_nodes.call(true)
       if (context[:execution].pxe_profile_msg != "") then
+=begin
         unless context[:common].pxe.set_pxe_for_custom(
           nodes,
           context[:execution].pxe_profile_msg,
           context[:execution].pxe_profile_singularities,
           context[:execution].true_user
         ) then
+=end
+        unless context[:common].pxe[:dhcp].boot(
+          :custom,
+          nodes,
+          nil,
+          context[:execution].pxe_profile_msg,
+          context[:execution].true_user,
+          context[:execution].pxe_profile_singularities
+        ) then
           failed_microstep("Cannot perform the set_pxe_for_custom operation")
           return false
         end
       else
+        method = context[:common].pxe[:local] || context[:common].pxe[:dhcp]
+        header = context[:cluster].pxe_header[:local] || context[:cluster].pxe_header[:dhcp]
+        unless method.boot(
+          :local,
+          nodes,
+          header,
+          context[:execution].environment,
+          get_block_device_str(),
+          get_block_device_num(),
+          get_deploy_part_num()
+        ) then
+          failed_microstep("Cannot perform the set_pxe_for_local operation")
+          return false
+        end
+=begin
         case context[:common].bootloader
         when "pure_pxe"
           images_dir = File.join(
@@ -1256,6 +1319,7 @@ class Microstep < Automata::QueueTask
             context[:cluster].pxe_header
           )
         end
+=end
       end
     end
     return true
@@ -1417,10 +1481,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the kernel files have been sent successfully
   def ms_send_deployment_kernel(scattering_kind)
-    pxedir = File.join(
-      context[:common].pxe.pxe_repository,
-      context[:common].pxe.pxe_repository_kernels
-    )
+    pxedir = context[:common].cache[:netboot][:network][:directory]
 
     ret = parallel_exec("mkdir -p #{context[:cluster].kexec_repository}")
 

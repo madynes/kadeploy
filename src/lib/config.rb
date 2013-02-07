@@ -15,6 +15,7 @@ require 'stepdeployenv'
 require 'stepbroadcastenv'
 require 'stepbootnewenv'
 require 'microsteps'
+require 'netboot'
 
 #Ruby libs
 require 'optparse'
@@ -577,7 +578,71 @@ module ConfigInformation
           conf.max_postinstall_size = cp.value('max_postinstall_size',Fixnum,20)
         end
 
-        cp.parse('pxe',true) do |info|
+        cp.parse('pxe',true) do
+          conf.cache[:netboot] = {} unless conf.cache[:netboot]
+
+          pxemethod = Proc.new do |name|
+            conf.cache[:netboot][name] = {}
+            args = []
+            args << cp.value('method',String,nil,
+              ['PXElinux','GPXElinux','IPXE','GrubPXE']
+            )
+            args << cp.value('binary',String)
+
+            cp.parse('export',true) do
+              args << cp.value('kind',String,nil,['http','ftp','tftp']).to_sym
+              args << cp.value('server',String)
+            end
+
+            cp.parse('repository',true) do
+              repo = cp.value('directory',String,nil,Dir)
+              args << repo
+              conf.cache[:netboot][name][:directory] = repo
+              conf.cache[:netboot][name][:size] = cp.value('max_size',Fixnum)
+            end
+
+            cp.parse('profiles',true) do
+              args << cp.value('directory',String,nil,Dir)
+              args << cp.value('filename',String,nil,
+                ['ip','ip_hex','hostname','hostname_short']
+              )
+            end
+
+            begin
+              conf.pxe[name] = NetBoot.Factory(*args)
+            rescue NetBoot::NetBootException => nbe
+              raise ArgumentError.new(ConfigParser.errmsg(info[:path],nbe.message))
+            end
+          end
+
+          chain = nil
+          cp.parse('dhcp',true) do |path|
+            pxemethod.call(:dhcp)
+          end
+
+          chain = conf.pxe[:dhcp]
+
+          cp.parse('localboot') do |path|
+            pxemethod.call(:local)
+          end
+
+          unless conf.pxe[:local]
+            conf.pxe[:local] = chain
+            conf.cache[:netboot][:local][:directory] = conf.cache[:netboot][:dhcp][:directory]
+            conf.cache[:netboot][:local][:size] = conf.cache[:netboot][:dhcp][:size]
+            conf.cache[:netboot][name][:size] = cp.value('max_size',Fixnum)
+          end
+
+          cp.parse('netboot') do |path|
+            pxemethod.call(:network)
+          end
+          unless conf.pxe[:network]
+            conf.pxe[:network] = chain
+            conf.cache[:netboot][:network][:directory] = conf.cache[:netboot][:dhcp][:directory]
+            conf.cache[:netboot][:local][:size] = conf.cache[:netboot][:dhcp][:size]
+            conf.cache[:netboot][name][:size] = cp.value('max_size',Fixnum)
+          end
+=begin
           conf.pxe_kind = cp.value(
             'kind',String,'PXElinux',['PXElinux','GPXElinux','IPXE']
           )
@@ -612,6 +677,7 @@ module ConfigInformation
             conf.pxe_repository_kernels,
             conf.pxe_export
           )
+=end
         end
 
         cp.parse('hooks') do
@@ -1164,7 +1230,11 @@ module ConfigInformation
         end
 
         cp.parse('pxe') do
-          conf.pxe_header = cp.value('headers',String,'').gsub("\\n","\n")
+          cp.parse('headers') do
+            conf.pxe_header[:chain] = cp.value('dhcp',String,'')
+            conf.pxe_header[:local] = cp.value('localboot',String,'')
+            conf.pxe_header[:network] = cp.value('netboot',String,'')
+          end
         end
 
         cp.parse('hooks') do
@@ -3083,13 +3153,9 @@ module ConfigInformation
   end
   
   class CommonConfig
+    attr_accessor :cache
     attr_accessor :verbose_level
     attr_accessor :pxe
-    attr_accessor :pxe_kind
-    attr_accessor :pxe_export
-    attr_accessor :pxe_repository
-    attr_accessor :pxe_repository_kernels
-    attr_accessor :pxe_repository_kernels_max_size
     attr_accessor :db_kind
     attr_accessor :deploy_db_host
     attr_accessor :deploy_db_name
@@ -3120,7 +3186,6 @@ module ConfigInformation
     attr_accessor :reboot_window
     attr_accessor :reboot_window_sleep_time
     attr_accessor :nodes_check_window
-    attr_accessor :bootloader
     attr_accessor :purge_deployment_timer
     attr_accessor :rambin_path
     attr_accessor :mkfs_options
@@ -3143,6 +3208,8 @@ module ConfigInformation
     # * nothing
     def initialize
       @nodes_desc = Nodes::NodeSet.new
+      @cache = {}
+      @pxe = {}
       #@kadeploy_disable_cache = false
       #@log_to_file = ""
       #@async_end_of_deployment_hook = ""
@@ -3227,7 +3294,7 @@ module ConfigInformation
       @cmd_power_status = nil
       @group_of_nodes = Hash.new
       @drivers = nil
-      @pxe_header = nil
+      @pxe_header = {}
       @kernel_params = nil
       @nfsroot_kernel = nil
       @nfsroot_params = nil
@@ -3274,7 +3341,7 @@ module ConfigInformation
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
       dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
-      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
+      dest.pxe_header = Marshal.load(Marshal.dump(@pxe_header))
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.nfsroot_kernel = @nfsroot_kernel.clone if (@nfsroot_kernel != nil)
       dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
@@ -3322,7 +3389,7 @@ module ConfigInformation
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
       dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
-      dest.pxe_header = @pxe_header.clone if (@pxe_header != nil)
+      dest.pxe_header = Marshal.load(Marshal.dump(@pxe_header))
       dest.kernel_params = @kernel_params.clone if (@kernel_params != nil)
       dest.nfsroot_kernel = @nfsroot_kernel.clone if (@nfsroot_kernel != nil)
       dest.nfsroot_params = @nfsroot_params.clone if (@nfsroot_params != nil)
