@@ -468,6 +468,7 @@ class KadeployServer
         :check => @nodes_check_window,
       },
       :nodesets_id => 0,
+      :async => client.nil?,
     }
 
     @workflow_info_hash_lock.lock

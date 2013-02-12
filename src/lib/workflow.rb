@@ -336,7 +336,7 @@ class Workflow < Automata::TaskManager
 
     if context[:async] and !context[:common].async_end_of_deployment_hook.empty?
       cmd = context[:common].async_end_of_deployment_hook
-      Execute[cmd.gsub('WORKFLOW_ID',context[:deploy_id])].run!.wait
+      Execute[cmd.gsub('WORKFLOW_ID',context[:deploy_id]).split(' ')].run!.wait
     end
 
     nodes_ok = Nodes::NodeSet.new
