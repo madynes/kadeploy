@@ -334,8 +334,8 @@ if (exec_specific_config != nil) then
           local.stop_service()
         end
         distant.stop_service()
-      rescue DRb::DRbConnError => dce
-        puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
+      rescue DRb::DRbError, Exception => dce
+        puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}) [#{dce.class.name}]"
         puts "---- Stack trace ----"
         puts dce.backtrace
         puts "---------------------"
@@ -366,8 +366,7 @@ if (exec_specific_config != nil) then
   threads.each do |thr|
     begin
       thr.join
-    rescue SystemExit
-    rescue Exception => e
+    rescue SystemExit, Exception => e
       server = "(#{thr[:server][0]}:#{thr[:server][1]})" if thr and thr[:server]
       puts "[ERROR] Server disconnection: an exception was raised #{server}"
       puts "---- #{e.class.name} ----"
