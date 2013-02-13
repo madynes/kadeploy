@@ -560,14 +560,16 @@ class KadeployServer
             begin
               client.test()
             rescue DRb::DRbConnError
-              workflows.each do |workflow|
-                workflow.output.disable_client_output()
+              unless finished
+                workflows.each do |workflow|
+                  workflow.output.disable_client_output()
+                end
+                workflows.first.output.verbosel(3, "Client disconnection")
+                kadeploy_sync_kill_workflow(wid)
+                drb_server.stop_service()
+                db.disconnect()
+                finished = true
               end
-              workflows.first.output.verbosel(3, "Client disconnection")
-              kadeploy_sync_kill_workflow(wid)
-              drb_server.stop_service()
-              db.disconnect()
-              finished = true
             end
             sleep(1)
           end
