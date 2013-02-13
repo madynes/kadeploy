@@ -351,7 +351,7 @@ module Automata
             threads.delete(key)
           end
         end
-        @threads.delete(task) if @threads[task].empty?
+        @threads.delete(task) if @threads[task] and @threads[task].empty?
       end
     end
 
@@ -361,7 +361,7 @@ module Automata
           thread.join
           threads.delete(key)
         end
-        @threads.delete(task) if @threads[task].empty?
+        @threads.delete(task) if @threads[task] and @threads[task].empty?
       end
       @cleaner.join
     end

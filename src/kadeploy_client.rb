@@ -29,6 +29,7 @@ class KadeployClient
   attr_accessor :workflow_id
   @files_ok_nodes = nil
   @files_ko_nodes = nil
+  attr_accessor :mutex
   
   def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
     @kadeploy_server = kadeploy_server
@@ -36,6 +37,7 @@ class KadeployClient
     @workflow_id = nil
     @files_ok_nodes = files_ok_nodes
     @files_ko_nodes = files_ko_nodes
+    @mutex = Mutex.new
   end
   
   # Print a message (RPC)
@@ -60,6 +62,7 @@ class KadeployClient
   # Output
   # * nothing
   def test
+    @mutex.synchronize{}
   end
 
   # Get a file from the client (RPC)
@@ -331,11 +334,13 @@ if (exec_specific_config != nil) then
           else
             puts "(#{server}) The URI #{local.uri} is not correct"
           end
-          local.stop_service()
+          wid = kadeploy_client.workflow_id
+          kadeploy_server.kasync(wid){ local.stop_service() }
+          kadeploy_server.delete_kasync(wid)
         end
         distant.stop_service()
-      rescue DRb::DRbConnError => dce
-        puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
+      rescue DRb::DRbError => dce
+        puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]}) [#{dce.class.name}]"
         puts "---- Stack trace ----"
         puts dce.backtrace
         puts "---------------------"
