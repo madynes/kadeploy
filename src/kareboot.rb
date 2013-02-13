@@ -18,12 +18,14 @@ require 'timeout'
 class KarebootClient
   @kadeploy_server = nil
   @site = nil
+  attr_accessor :workflow_id
   @files_ok_nodes = nil
   @files_ko_nodes = nil
 
   def initialize(kadeploy_server, site, files_ok_nodes, files_ko_nodes)
     @kadeploy_server = kadeploy_server
     @site = site
+    @workflow_id = nil
     @files_ok_nodes = files_ok_nodes
     @files_ko_nodes = files_ko_nodes
   end
@@ -49,6 +51,16 @@ class KarebootClient
   # Output
   # * nothing
   def test
+  end
+
+  # Set the workflow id (RPC)
+  #
+  # Arguments
+  # * id: id of the workflow
+  # Output
+  # * nothing
+  def set_workflow_id(id)
+    @workflow_id = id
   end
 
   # Get a file from the client (RPC)
@@ -253,7 +265,9 @@ if (exec_specific_config != nil) then
         cloned_config = exec_specific_config.clone
         cloned_config.node_array = nodes_by_server[server]
         ret = kadeploy_server.run("kareboot_sync", cloned_config, client_host, client_port)
-        local.stop_service()
+        wid = kadeploy_client.workflow_id
+        kadeploy_server.kasync(wid){ local.stop_service() }
+        kadeploy_server.delete_kasync(wid)
         exit(ret) if ret != 0
       end
       distant.stop_service()

@@ -15,11 +15,13 @@ require 'timeout'
 
 class KapowerClient
   @site = nil
+  attr_accessor :workflow_id
   @files_ok_nodes = nil
   @files_ko_nodes = nil
   
   def initialize(site, files_ok_nodes, files_ko_nodes)
     @site = site
+    @workflow_id = nil
     @files_ok_nodes = files_ok_nodes
     @files_ko_nodes = files_ko_nodes
   end
@@ -36,6 +38,16 @@ class KapowerClient
     else
       puts "(#{@site}) #{msg}"
     end
+  end
+
+  # Set the workflow id (RPC)
+  #
+  # Arguments
+  # * id: id of the workflow
+  # Output
+  # * nothing
+  def set_workflow_id(id)
+    @workflow_id = id
   end
 
   # Print the results of the deployment (RPC)
@@ -165,7 +177,9 @@ if exec_specific_config != nil then
         else
           puts "The URI #{local.uri} is not correct"
         end
-        local.stop_service()
+        wid = kadeploy_client.workflow_id
+        kadeploy_server.kasync(wid){ local.stop_service() }
+        kadeploy_server.delete_kasync(wid)
       end
       distant.stop_service()
     }
