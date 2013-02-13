@@ -969,22 +969,24 @@ class KadeployServer
             begin
               client.test()
             rescue DRb::DRbConnError
-              disconnected = true
-              output.disable_client_output()
-              output.verbosel(3, "Client disconnection")
-              client_disconnected = true
-              microthreads.each { |thread| thread.kill }
-              micros.each do |micro|
-                micro.output.disable_client_output()
-                micro.debug(3,"Kill a reboot step")
-                micro.kill
+              unless finished
+                disconnected = true
+                output.disable_client_output()
+                output.verbosel(3, "Client disconnection")
+                client_disconnected = true
+                microthreads.each { |thread| thread.kill }
+                micros.each do |micro|
+                  micro.output.disable_client_output()
+                  micro.debug(3,"Kill a reboot step")
+                  micro.kill
+                end
+                @reboot_info_hash_lock.synchronize {
+                  kareboot_delete_reboot_info(rid)
+                }
+                drb_server.stop_service()
+                db.disconnect()
+                finished = true
               end
-              @reboot_info_hash_lock.synchronize {
-                kareboot_delete_reboot_info(rid)
-              }
-              drb_server.stop_service()
-              db.disconnect()
-              finished = true
             end
             sleep(1)
           end
@@ -1134,10 +1136,12 @@ class KadeployServer
         begin
           client.test()
         rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+          unless finished
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
         end
           sleep(1)
       end
@@ -1377,10 +1381,12 @@ class KadeployServer
         begin
           client.test()
         rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+          unless finished
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
         end
           sleep(1)
       end
@@ -1508,10 +1514,12 @@ class KadeployServer
         begin
           client.test()
         rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+          unless finished
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
         end
         sleep(1)
       end
@@ -1714,10 +1722,12 @@ class KadeployServer
         begin
           client.test()
         rescue DRb::DRbConnError
+          unless finished
             Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
         end
         sleep(1)
       end
@@ -2511,23 +2521,24 @@ class KadeployServer
             begin
               client.test()
             rescue DRb::DRbConnError
-            finished = true
-              disconnected = true
-              output.disable_client_output()
-              output.verbosel(3, "Client disconnection")
-              client_disconnected = true
-              microthreads.each { |thread| thread.kill }
-              micros.each do |micro|
-                micro.output.disable_client_output()
-                micro.debug(3,"Kill a power step")
-                micro.kill
+              unless finished
+                disconnected = true
+                output.disable_client_output()
+                output.verbosel(3, "Client disconnection")
+                client_disconnected = true
+                microthreads.each { |thread| thread.kill }
+                micros.each do |micro|
+                  micro.output.disable_client_output()
+                  micro.debug(3,"Kill a power step")
+                  micro.kill
+                end
+                @power_info_hash_lock.synchronize {
+                  kapower_delete_power_info(pid)
+                }
+                drb_server.stop_service()
+                db.disconnect()
+                finished = true
               end
-              @power_info_hash_lock.synchronize {
-                kapower_delete_power_info(pid)
-              }
-              drb_server.stop_service()
-              db.disconnect()
-              finished = true
             end
             sleep(1)
           end
