@@ -249,33 +249,33 @@ Here are some examples:
 \begin{small}
 \begin{alltt}
 --- 
-sample-array:{\footnotesize # This is an Associative array containing 3} elements
+example-array:{\footnotesize # This is an Associative array containing 3} elements
   elem1: 8{\footnotesize # Integer}
   elem2: "8"{\footnotesize # String}
   elem3:\textbf{\footnotesize vREF1}
-sample-list:{\footnotesize # This is an Ordered list of 2 elements}
+example-list:{\footnotesize # This is an Ordered list of 2 elements}
   - true{\footnotesize # Boolean}
   - "true"{\footnotesize # String}
-sample-mix-1:{\footnotesize # An Ordered list of identical Associative arrays}
+example-mix-1:{\footnotesize # An Ordered list of identical Associative arrays}
   - elem1: value1{\footnotesize # String}
     elem2:\textbf{\footnotesize vREF2}
   - elem1: value2{\footnotesize # String}
     elem2:\textbf{\footnotesize vREF3}
-sample-mix-2:{\footnotesize # An Associative array of Ordered lists}
+example-mix-2:{\footnotesize # An Associative array of Ordered lists}
   elem1:
     - 1.42{\footnotesize # Float}
     - value1
   elem2:
     - value2
     - value3
-sample-complex:{\footnotesize # Complex structure}
+example-complex:{\footnotesize # Complex structure}
   mylist:
     - size: 16
       name:\textbf{\footnotesize vREF4}
     - size: 32
       name:\textbf{\footnotesize vREF5}
   value: myval
-  mysample:
+  myexample:
     file: filename
     ext: ext
     mode:\textbf{\footnotesize vREF6}
@@ -285,13 +285,13 @@ sample-complex:{\footnotesize # Complex structure}
 \paragraph{Documentation: paths\\}
 Kadeploy configuration settings will be described by giving a \emph{path} to each resources. A \emph{path} explicit the hierarchy structure to follow to spefify a setting in the configuration file. In a \emph{path}, the character \texttt{/} describes a nested \emph{Associative array}, characters \texttt{$[...]$} describes an \emph{Ordered list} of identical \emph{Associative arrays}.\\
 
-Sample of \emph{path}s in our sample:
+Example of \emph{path}s:
 \begin{itemize}
-  \item \texttt{\small /sample-array/elem3} refers to the value \texttt{\small vREF1};
-  \item \texttt{\small /$[$sample-mix-1$]$/elem2} refers to values such as \texttt{\small vREF2} and \texttt{\small vREF3};
-  \item \texttt{\small /sample-complex/$[$mylist$]$} refers to the \emph{Ordered List} \texttt{\small mylist};
-  \item \texttt{\small /sample-complex/$[$mylist$]$/name} refers to values such as \texttt{\small vREF4} and \texttt{\small vREF5};
-  \item \texttt{\small /sample-complex/mysample/mode} refers to value \texttt{\small vREF5}.
+  \item \texttt{\small /example-array/elem3} refers to the value \texttt{\small vREF1};
+  \item \texttt{\small /$[$example-mix-1$]$/elem2} refers to values such as \texttt{\small vREF2} and \texttt{\small vREF3};
+  \item \texttt{\small /example-complex/$[$mylist$]$} refers to the \emph{Ordered List} \texttt{\small mylist};
+  \item \texttt{\small /example-complex/$[$mylist$]$/name} refers to values such as \texttt{\small vREF4} and \texttt{\small vREF5};
+  \item \texttt{\small /example-complex/myexample/mode} refers to value \texttt{\small vREF5}.
 \end{itemize}
 
 \paragraph{Documentation: configuration files fields\\}
@@ -304,18 +304,18 @@ In the following, fields descriptions are given using the formalism:
 \end{itemize}
 If no default value is specified, the field is mandatory.
 
-Sample of field description:
+Example of field description:
 \begin{itemize}
-  \item \ypath{/sample-complex}
+  \item \ypath{/example-complex}
   \begin{itemize}
     \item \yfield{myvalue}{String} the value of the element
   \end{itemize}
-  \item \ypath{/sample-complex/mysample}
+  \item \ypath{/example-complex/myexample}
   \begin{itemize}
-    \item \yfieldd{file}{String}{sample} the name of the sample file
-    \item \yfieldd{ext}{String}{txt} the extension of the sample file
+    \item \yfieldd{file}{String}{example} the name of the example file
+    \item \yfieldd{ext}{String}{txt} the extension of the example file
   \end{itemize}
-  \item \ypath{/sample-complex/[mylist]}
+  \item \ypath{/example-complex/[mylist]}
   \begin{itemize}
     \item \yfield{name}{String} the name of the element
     \item \yfieldd{size}{Integer}{8} the maximal size (MB) of the element
@@ -520,10 +520,10 @@ external:
   \begin{itemize}
     \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
 
-For sample, with PXElinux, this directory is \emph{pxelinux.cfg}.
+For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
 
-The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For sample, with PXElinux, it will be \emph{ip\_hex}.
+The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For example, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
   \item \ypath{/pxe/dhcp/userfiles}
   \begin{itemize}
@@ -534,7 +534,7 @@ The information used to generate this filenames are the one specified for each n
   \item \ypath{/pxe/networkboot} the method used boot operating system images sent from the network (the deployment environment kernel). This setting is optional by default, the DHCP method is used.
   \begin{itemize}
     \item \yfield{method}{String} the PXE method used to boot the nodes (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
-    \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For sample, for PXElinux, this file is \emph{pxeliux.0}.
+    \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For example, for PXElinux, this file is \emph{pxeliux.0}.
     \item \yfield{repository}{String} absolute path of the repository where PXE files (deployment environments kernels) are accessibles. Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
   \end{itemize}
   \item \ypath{/pxe/networkboot/export}
@@ -546,16 +546,16 @@ The information used to generate this filenames are the one specified for each n
   \begin{itemize}
     \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
 
-For sample, with PXElinux, this directory is \emph{pxelinux.cfg}.
+For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
 
-The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For sample, with PXElinux, it will be \emph{ip\_hex}.
+The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For example, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
 
   \item \ypath{/pxe/localboot} the method used to boot an operating system that's installed on nodes hard disk. This setting is optional by default, the DHCP method is used.
   \begin{itemize}
     \item \yfield{method}{String} the PXE method used to boot the nodes (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
-    \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For sample, for PXElinux, this file is \emph{pxeliux.0}.
+    \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For example, for PXElinux, this file is \emph{pxeliux.0}.
     \item \yfield{repository}{String} absolute path of the repository where PXE files are accessibles (TFTP, HTTP, ...). Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
   \end{itemize}
   \item \ypath{/pxe/localboot/export}
@@ -567,10 +567,10 @@ The information used to generate this filenames are the one specified for each n
   \begin{itemize}
     \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
 
-For sample, with PXElinux, this directory is \emph{pxelinux.cfg}.
+For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
 
-The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For sample, with PXElinux, it will be \emph{ip\_hex}.
+The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For example, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
 
   \item \ypath{/hooks/async}
@@ -613,7 +613,7 @@ As far as you are using Kadeploy3 on your cluster, a PXE boot have to be setup o
 For most of Network Bootstrap Programs, the booting method is the same:
 \begin{enumerate}
   \item The Network Iterface Card ask an IP address to the DHCP server;
-  \item The DHCP answer and give an extra instruction that specifies to download and run a specific software, the Network Bootstrap Program (for sample, with PXElinux, this file is pxelinux.0)
+  \item The DHCP answer and give an extra instruction that specifies to download and run a specific software, the Network Bootstrap Program (for example, with PXElinux, this file is pxelinux.0)
   \item The NBP download a boot profile on the network that specifies how to boot the node. The profile file has a specific name (the hostname of the node, it's IP address, ...) so that the software will be sure to download the profile of this specific node.
   \item The NBP read the profile and boot the node according to it's instructions (download and boot a specific kernel, boot on node's local hard disk, ...)
 \end{enumerate}
@@ -635,7 +635,7 @@ If you define the field \ypath{/pxe/networkboot}, it will overwrite the settings
 
 If you define the field \ypath{/pxe/localboot}, it will overwrite the settings \ypath{/pxe/dhcp} when Kadeploy3 will make a reboot kind (2).
 
-When the method (NBP) specified in \ypath{/pxe/networkboot} or \ypath{/pxe/localboot} is different than the method specified \ypath{/pxe/dhcp}, Kadeploy3 make the NBPs chainload each other. For sample if \ypath{/pxe/dhcp} is set to boot with PXElinux and \ypath{/pxe/networkboot} with a GRUB disk \emph{grubpxe.0}, Kadeploy3 will make PXElinux load \emph{grubpxe.0} by writting \emph{PXE grubpxe.0} in the PXElinux profile. Then it writes the GRUB profile (that will be loaded by \emph{grubpxe.0}), that profile will make the node download and boot a kernel from the network.
+When the method (NBP) specified in \ypath{/pxe/networkboot} or \ypath{/pxe/localboot} is different than the method specified \ypath{/pxe/dhcp}, Kadeploy3 make the NBPs chainload each other. For instance, if \ypath{/pxe/dhcp} is set to boot with PXElinux and \ypath{/pxe/networkboot} with a GRUB disk \emph{grubpxe.0}, Kadeploy3 will make PXElinux load \emph{grubpxe.0} by writting \emph{PXE grubpxe.0} in the PXElinux profile. Then it writes the GRUB profile (that will be loaded by \emph{grubpxe.0}), that profile will make the node download and boot a kernel from the network.
 
 One important thing is that every NBP have to be available in you PXE (TFTP in most of the cases) repository. Another one is that the Kadeploy user should be able (have the rights) to write the profiles inside the PXE repository.
 
@@ -1149,7 +1149,7 @@ You can use the Kadeploy3 environment variables in your script (see section \ref
 
 Be careful to install the bootloader on the deployment partition (Kadeploy3 environment variable \texttt{KADEPLOY\_DEPLOY\_PART}) in order for kadeploy to be able to chainload on it.
 
-Samples of scripts are provided in the distribution (in the directory \texttt{scripts/bootloader/}).
+Examples of scripts are provided in the distribution (in the directory \texttt{scripts/bootloader/}).
 
 \section{Partitioning script}\label{sec:partscript}
 A partitioning script must be provided for each cluster.
@@ -1160,7 +1160,7 @@ Be careful to write the partition type on MSDOS partitions, some bootloaders wil
 
 You should also use the \emph{/sbin/partprobe} at the end of your script to inform the OS (deployment environment) of partition table changes.
 
-Samples of scripts are provided in the distribution (in the directory \texttt{scripts/partitioning/}).
+Examples of scripts are provided in the distribution (in the directory \texttt{scripts/partitioning/}).
 
 \section{Specific commands configuration files}
 In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd.yml} in the configuration directory.
@@ -1219,7 +1219,7 @@ This methods consists in creating a kernel/initrd that contains all the tools re
 
 The \texttt{kadeploy-deploy-kernel/debirf.conf} configuration file can be tuned if you want to add or remove some packages in the filesystem. To do this, you can modify the \texttt{INCLUDE} and \texttt{INCLUDE} values.
 
-You can also add custom debirf modules in the \texttt{kadeploy-deploy-kernel/modules/} directory. You can find a module sample named \texttt{blacklist\_sample} in this directory. Please refer to debirf documentation for further information.
+You can also add custom debirf modules in the \texttt{kadeploy-deploy-kernel/modules/} directory. You can find a module example named \texttt{blacklist\_example} in this directory. Please refer to debirf documentation for further information.
 
 Once you've executed the make command, you can find the kernel/initrd files of the deployment environment in the directory \texttt{kadeploy-deploy-kernel/}.
 
@@ -1266,7 +1266,7 @@ In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastaf
 \chapter{Client side configuration}
 On the client side, you only have to configure the file named \texttt{client\_conf.yml}. This file defines Kadeploy servers and a default server.
 
-\paragraph{Sample of a client configuration file}
+\paragraph{Example of a client configuration file}
 \begin{verbatim}
 ---
 default: nancy
@@ -1812,7 +1812,7 @@ Explanation of the fields used in the environment description:
     \item \yfieldd{hypervisor}{String}{''} path of the hypervisor in the tarball. This fields is only required for the Xen based environments
     \item \yfieldd{hypervisor\_params}{String}{''} set of parameters that must be applied to the hypervisor for a correct boot. This fields is only required for the Xen based environments
   \end{itemize}
-  \item \yfieldd{partition\_type}{Integer}{0} the MS-DOS partition type, you can specify hexadecimal values using the prefix \texttt{0x}. For sample, \texttt{0x83} or \texttt{131} for Linux, \texttt{0xa5} for FreeBSD, ... (useless unless the kind of image is \texttt{tar})
+  \item \yfieldd{partition\_type}{Integer}{0} the MS-DOS partition type, you can specify hexadecimal values using the prefix \texttt{0x}. For example, \texttt{0x83} or \texttt{131} for Linux, \texttt{0xa5} for FreeBSD, ... (useless unless the kind of image is \texttt{tar})
   \item \yfieldd{filesystem}{String}{''} type of filesystem wished on the deployment partition. It must be known by the mkfs command (useless unless the kind of image is \texttt{tar})
 \end{itemize}
 
@@ -2096,7 +2096,7 @@ When writing a script for an admin pre-install, an admin/user post-install or so
 \item \texttt{KADEPLOY\_ENV\_KERNEL} : the path to the kernel file inside the deployed environment directory
 \item \texttt{KADEPLOY\_ENV\_INITRD} : the path to the initrd file inside the deployed environment directory
 \item \texttt{KADEPLOY\_ENV\_KERNEL\_PARAMS} : the deployed environment kernel parameters
-\item \texttt{KADEPLOY\_ENV\_HYPERVISOR} : the path to the hypervisor's kernel file inside the deployed environment directory (usefull when deploying a Xen environment for sample)
+\item \texttt{KADEPLOY\_ENV\_HYPERVISOR} : the path to the hypervisor's kernel file inside the deployed environment directory (usefull when deploying a Xen environment for example)
 \item \texttt{KADEPLOY\_ENV\_HYPERVISOR\_PARAMS} : the deployed environment hypervisor parameters
 \item \texttt{KADEPLOY\_DEPLOY\_PART} : deployment partition
 \item \texttt{KADEPLOY\_BLOCK\_DEVICE} : the block device used in deployment
@@ -2145,14 +2145,14 @@ Be careful to use the same partitioning scheme than the one which is configured 
 
 If you want to change the partitioning scheme, you'll have to substitute the microsteps format\_deploy\_part, mount\_deploy\_part, umount\_deploy\_part, format\_swap\_part and format\_tmp\_part in order to mount and format the right partitions during the deployment.
 
-Here is a sample of the client command:
+Here is a example of the client command:
 \begin{verbatim}
     > kadeploy3 -m griffon-1.nancy.grid5000.fr \
                 -e squeeze-x64-base \
                 --set-custom-operations ~/custom_ops.yml
 \end{verbatim}
 
-Here is a sample of a the custom operations file:
+Here is a example of a the custom operations file:
 \begin{small}
 \begin{verbatim}
     > cat ~/custom_ops.yml
