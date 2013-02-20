@@ -332,8 +332,10 @@ if (exec_specific_config != nil) then
             puts "(#{server}) The URI #{local.uri} is not correct"
           end
           wid = kadeploy_client.workflow_id
-          kadeploy_server.kasync(wid){ local.stop_service() }
-          kadeploy_server.delete_kasync(wid)
+          if wid
+            kadeploy_server.kasync(wid){ local.stop_service() }
+            kadeploy_server.delete_kasync(wid)
+          end
         end
         distant.stop_service()
       rescue DRb::DRbConnError => dce
