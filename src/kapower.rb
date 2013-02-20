@@ -178,8 +178,10 @@ if exec_specific_config != nil then
           puts "The URI #{local.uri} is not correct"
         end
         wid = kapower_client.workflow_id
-        kadeploy_server.kasync(wid){ local.stop_service() }
-        kadeploy_server.delete_kasync(wid)
+        if wid
+          kadeploy_server.kasync(wid){ local.stop_service() }
+          kadeploy_server.delete_kasync(wid)
+        end
       end
       distant.stop_service()
     }
