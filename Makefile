@@ -14,7 +14,18 @@ SCRIPTS=$(KADEPLOY_ROOT)/scripts
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
 RELEASE_VERSION:=$(shell cat release_version)
-DIST_DIR=$(KADEPLOY_ROOT)/kadeploy-$(MAJOR_VERSION).$(MINOR_VERSION)
+DIST_DIR_NAME=kadeploy-$(MAJOR_VERSION).$(MINOR_VERSION)
+DIST_DIR=$(KADEPLOY_ROOT)/$(DIST_DIR_NAME)
+DIST_TGZ=$(KADEPLOY_ROOT)/$(DIST_DIR_NAME).tar.gz
+ifndef BUILD_DIR
+BUILD_DIR=$(CURRENT_DIR)/builds
+endif
+ifndef PKG_DIR
+PKG_DIR=$(CURRENT_DIR)/packages
+endif
+ifndef AR_DIR
+AR_DIR=$(CURRENT_DIR)/archives
+endif
 
 
 api: cleanapi
@@ -126,20 +137,44 @@ dist: dist-clean
 	@./make_dist_dir.sh $(DIST_DIR)
 
 dist-tgz: dist
-	@tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
-	@rm -rf $(DIST_DIR)
+	@tar czf $(DIST_TGZ) $(DIST_DIR_NAME)
 
 dist-clean:
 	@rm -rf $(DIST_DIR)
+	@rm -f $(DIST_TGZ)
 
-rpm: dist
+build:
+	@mkdir -p $(BUILD_DIR)
+
+build-clean:
+	@rm -rf $(BUILD_DIR)
+
+pkg:
+	@mkdir -p $(PKG_DIR)
+
+pkg-clean:
+	@rm -rf $(PKG_DIR)
+
+ar:
+	@mkdir -p $(AR_DIR)
+
+ar-clean:
+	@rm -rf $(AR_DIR)
+
+rpm: build-clean build pkg dist-tgz
 	@(cd $(PKG)/fedora && sh set_version.sh) > $(DIST_DIR)/kadeploy.spec
-	@tar czf $(DIST_DIR).tar.gz $(shell basename $(DIST_DIR))
-	@rpmbuild -ta $(DIST_DIR).tar.gz
-	@rm -rf $(DIST_DIR) $(DIST_DIR).tar.gz
+	@rpmbuild --define "_topdir $(BUILD_DIR)" -ta $(DIST_TGZ)
+	@cp -r $(BUILD_DIR)/RPMS/* $(PKG_DIR)
+	@$(MAKE) dist-clean
 
-deb:
-	@(cd $(PKG)/debian; make package_all; mv kadeploy-*.deb $(CURRENT_DIR); make clean; cd $(CURRENT_DIR))
+deb: build-clean build pkg
+	@(cd $(PKG)/debian; PKG_DIR="$(PKG_DIR)" BUILD_DIR="$(BUILD_DIR)" make package_all; cd $(CURRENT_DIR))
+
+tgz: ar dist
+	@tar czf $(AR_DIR)/$(DIST_DIR_NAME).tar.gz $(DIST_DIR_NAME)
+	@$(MAKE) dist-clean
 
 mrproper: cleanapi dist-clean uninstall
 	@find . -name '*~' | xargs rm -f	
+
+.PHONY : pkg ar build build-clean
