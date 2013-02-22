@@ -349,20 +349,22 @@ if (exec_specific_config != nil) then
 
   starttime = Time.now.to_i
 
-  status_thr = Thread.new do
-    last_status = Time.now
-    while true
-      gets
-      if Time.now - last_status > STATUS_UPDATE_DELAY
-        prefix = (remoteobjects.size > 1)
-        remoteobjects.each do |obj|
-          display_status(
-            obj[:server].async_deploy_get_status(obj[:client].workflow_id),
-            starttime,
-            (prefix ? "[#{obj[:name]}] " : '')
-          )
+  if STDIN.tty? and !STDIN.closed?
+    status_thr = Thread.new do
+      last_status = Time.now
+      while true
+        STDIN.gets
+        if Time.now - last_status > STATUS_UPDATE_DELAY
+          prefix = (remoteobjects.size > 1)
+          remoteobjects.each do |obj|
+            display_status(
+              obj[:server].async_deploy_get_status(obj[:client].workflow_id),
+              starttime,
+              (prefix ? "[#{obj[:name]}] " : '')
+            )
+          end
+          last_status = Time.now
         end
-        last_status = Time.now
       end
     end
   end
@@ -383,8 +385,10 @@ if (exec_specific_config != nil) then
     end
   end
 
-  status_thr.kill
-  status_thr.join
+  if STDIN.tty? and !STDIN.closed?
+    status_thr.kill
+    status_thr.join
+  end
 
   #We merge the files
   if (exec_specific_config.nodes_ok_file != "") then
