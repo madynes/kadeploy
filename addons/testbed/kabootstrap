@@ -3238,10 +3238,10 @@ sshgw.ssh(servername,'root') do |session|
       sexec(session, "useradd --user-group #{CFG_KADEPLOY_USER}")
 
 		  msg("Building Kadeploy packages",MSG_INFO)
-      sexec(session,"cd #{tmpdir} && make deb")
+      sexec(session,"cd #{tmpdir} && PKG_DIR=#{File.join(tmpdir,'packages')} make deb")
 
 		  msg('Installing Kadeploy server/client',MSG_INFO)
-      sexec(session,"dpkg --force-all -i #{tmpdir}/*.deb")
+      sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'packages','*.deb')}")
 
 		  msg('Remove the temporary directory',MSG_INFO)
       sexec(session,"rm -Rf #{tmpdir}")
