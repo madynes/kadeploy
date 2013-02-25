@@ -148,11 +148,13 @@ ar:
 ar-clean:
 	@rm -rf $(AR_DIR)
 
-rpm: build-clean build pkg dist-tgz
+rpm: build-clean build pkg dist
 	@(cd $(PKG)/fedora && sh set_version.sh) > $(DIST_DIR)/kadeploy.spec
+	@tar czf $(DIST_TGZ) $(DIST_DIR_NAME)
 	@rpmbuild --define "_topdir $(BUILD_DIR)" -ta $(DIST_TGZ)
-	@cp -r $(BUILD_DIR)/RPMS/* $(PKG_DIR)
+	@cp -r $(BUILD_DIR)/RPMS/*/*.rpm $(PKG_DIR)
 	@$(MAKE) dist-clean
+	@$(MAKE) build-clean
 
 deb: build-clean build pkg
 	@(cd $(PKG)/debian; PKG_DIR="$(PKG_DIR)" BUILD_DIR="$(BUILD_DIR)" make package_all; cd $(CURRENT_DIR))
