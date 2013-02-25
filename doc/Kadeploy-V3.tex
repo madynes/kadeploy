@@ -800,14 +800,14 @@ automata:
             post-ops:
               - action: send
                 file: hostname
-                destination: \$KADEPLOY_ENV_EXTRACTION_DIR/etc/
+                destination: $KADEPLOY_ENV_EXTRACTION_DIR/etc/
                 retries: 1
                 scattering: chain
               - action: exec
-                command: mkdir -p \$KADEPLOY_ENV_EXTRACTION_DIR/mypath
+                command: mkdir -p $KADEPLOY_ENV_EXTRACTION_DIR/mypath
               - action: send
                 file: myfile
-                destination: \$KADEPLOY_ENV_EXTRACTION_DIR/mypath
+                destination: $KADEPLOY_ENV_EXTRACTION_DIR/mypath
                 timeout: 10
     BootNewEnv: 
       - type: Kexec
