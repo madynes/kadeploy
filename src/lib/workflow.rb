@@ -156,8 +156,8 @@ class Workflow < Automata::TaskManager
         error(KadeployAsyncError::CONFLICTING_OPTIONS)
       end
       # Without specifying the partition to chainload on
-      if cexec.chainload_part.nil?
-        debug(0,"You must specify the partition to chainload on when deploying directly on block device")
+      if cexec.boot_part.nil?
+        debug(0,"You must specify the partition to boot on when deploying directly on block device")
         error(KadeployAsyncError::CONFLICTING_OPTIONS)
       end
     end

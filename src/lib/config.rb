@@ -354,7 +354,7 @@ module ConfigInformation
       exec_specific.true_user = USER
       exec_specific.block_device = String.new
       exec_specific.deploy_part = String.new
-      exec_specific.chainload_part = nil
+      exec_specific.boot_part = nil
       exec_specific.verbose_level = nil
       exec_specific.debug = false
       exec_specific.script = String.new
@@ -1706,9 +1706,9 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-c", "--chainload-partition NUMBER", "Specify the number of the partition to chainload on (use 0 to chainload on the MBR)") { |c|
+        opt.on("-c", "--boot-partition NUMBER", "Specify the number of the partition to boot on (use 0 to boot on the MBR)") { |c|
           if /\A\d+\Z/ =~ c then
-            exec_specific.chainload_part = c.to_i
+            exec_specific.boot_part = c.to_i
           else
             error("Invalid chainload partition number")
             return false

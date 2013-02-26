@@ -1199,7 +1199,7 @@ class Microstep < Automata::QueueTask
           context[:execution].environment,
           get_block_device_str(),
           get_block_device_num(),
-          get_deploy_part_num(),
+          context[:execution].boot_part || get_deploy_part_num(),
           context[:cluster].kernel_params
         ) then
           failed_microstep("Cannot perform the set_pxe_for_local operation")
