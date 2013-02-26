@@ -99,6 +99,10 @@ module EnvironmentManagement
     attr_reader :visibility
     attr_reader :demolishing_env
 
+    def debug(client,msg)
+      Debug::distant_client_print(msg,client)
+    end
+
     def error(client,msg)
       Debug::distant_client_error(msg,client)
     end
@@ -235,8 +239,12 @@ module EnvironmentManagement
         @fdisk_type = cp.value('partition_type',Fixnum,0).to_s(16) #numeric or hexa
 
       rescue ArgumentError => ae
-        error(client,"Error(#{(filename ? filename : 'env_desc')}) #{ae.message}")
+        debug(client,"Error(#{(filename ? filename : 'env_desc')}) #{ae.message}")
         return false
+      end
+
+      cp.unused().each do |path|
+        debug(client,"Warning(#{(filename ? filename : 'env_desc')}) Unused field '#{path}'")
       end
 
       ret = check_os_values()
