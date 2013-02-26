@@ -627,7 +627,7 @@ class KadeployServer
       msg = KadeployAsyncError.to_msg(ke.errno)
       Debug::distant_client_error(msg + " (error ##{ke.errno})",client) if msg and !msg.empty?
       #Debug::distant_client_error("Cannot run the deployment",client)
-      kadeploy_sync_kill_workflow(ke.context[:wid])
+      kadeploy_sync_kill_workflow(ke.context[:wid],false)
     end
     return true
   end
@@ -638,12 +638,12 @@ class KadeployServer
   # * workflow_id: id of the workflow
   # Output
   # * nothing  
-  def kadeploy_sync_kill_workflow(workflow_id)
+  def kadeploy_sync_kill_workflow(workflow_id,killrun=true)
     # id == -1 means that the workflow has not been launched yet
     @workflow_info_hash_lock.synchronize {
       if ((workflow_id != -1) && (@workflow_info_hash.has_key?(workflow_id))) then
         @workflow_info_hash[workflow_id][:runthread].kill \
-          if @workflow_info_hash[workflow_id][:runthread].alive?
+          if @workflow_info_hash[workflow_id][:runthread].alive? and killrun
         #@workflow_info_hash[workflow_id][:runthread].join
 
         @workflow_info_hash[workflow_id][:workflows].each do |workflow|
