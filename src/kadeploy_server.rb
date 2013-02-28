@@ -498,6 +498,38 @@ class KadeployServer
     kadeploy_create_workflow_info(workflow_id)
     context[:deploy_id] = workflow_id
 
+    unless context[:common].kadeploy_disable_cache
+      # Set the prefix of the files in the cache
+      if context[:execution].load_env_kind == 'file'
+        context[:execution].prefix_in_cache =
+          "e-anon-#{context[:execution].true_user}-#{Time.now.to_i}--"
+      else
+        context[:execution].prefix_in_cache =
+          "e-#{context[:execution].environment.id}--"
+      end
+
+      begin
+        Managers::GrabFileManager.grab_user_files(
+          context,
+          Debug::OutputControl.new(
+            context[:execution].verbose_level || context[:common].verbose_level,
+            context[:execution].debug,
+            context[:client],
+            context[:execution].true_user,
+            context[:deploy_id],
+            context[:common].dbg_to_syslog,
+            context[:common].dbg_to_syslog_level,
+            context[:syslock],
+            ''
+          )
+        )
+      rescue KadeployError => ke
+        @workflow_info_hash_lock.unlock
+        exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
+        raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+      end
+    end
+
     workflows = []
     clusters = exec_specific.node_set.group_by_cluster
     if clusters.size > 1
