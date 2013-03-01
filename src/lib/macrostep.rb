@@ -145,24 +145,20 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:format_swap_part)
     end
 
-    # ddgz or ddbz2 image
-    if cexec.environment.image[:kind] == 'dd'
-      delete_task(:format_deploy_part)
-      # if not mountable
-      delete_task(:mount_deploy_part)
-      delete_task(:umount_deploy_part)
-      delete_task(:manage_admin_post_install)
-      delete_task(:manage_user_post_install)
-      delete_task(:check_kernel_files)
-      delete_task(:send_key)
-      delete_task(:install_bootloader)
-    end
-
     # FSA image
     if cexec.environment.image[:kind] == 'fsa'
+      delete_task(:mount_deploy_part) if self.class.superclass == SetDeploymentEnv
+    else
+      delete_task(:decompress_environment)
+      delete_task(:mount_deploy_part) if self.class.superclass == BroadcastEnv
+    end
+
+    if ['dd','fsa'].include?(cexec.environment.image[:kind])
       delete_task(:format_deploy_part)
-      #delete_task(:mount_deploy_part) if self.class.superclass == SetDeploymentEnv
-      # if not mountable
+    end
+
+    # The filesystem is not supported by the deployment kernel
+    unless context[:cluster].deploy_supported_fs.include?(cexec.environment.filesystem)
       delete_task(:mount_deploy_part)
       delete_task(:umount_deploy_part)
       delete_task(:manage_admin_post_install)
@@ -170,19 +166,12 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:check_kernel_files)
       delete_task(:send_key)
       delete_task(:install_bootloader)
-    else
-      delete_task(:decompress_environment)
-      #delete_task(:mount_deploy_part) if self.class.superclass == BroadcastEnv
     end
 
     # Multi-partitioned environment
     if cexec.environment.multipart
       delete_task(:format_tmp_part)
       delete_task(:format_swap_part)
-    end
-
-    if ['dd','fsa'].include?(cexec.environment.image[:kind])
-      delete_task(:format_deploy_part)
     end
 
     if !cexec.key or cexec.key.empty?
@@ -219,7 +208,6 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:format_swap_part) if part == context[:cluster].swap_part.to_i
       delete_task(:format_tmp_part) if part == context[:cluster].tmp_part.to_i
     end
-    # delete_task(:send_key) if self.superclass == SetDeploymentEnv
   end
 
   def create_task(idx,subidx,nodes,nsid,context)

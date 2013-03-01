@@ -1082,6 +1082,9 @@ module ConfigInformation
             conf.drivers = cp.value(
               'drivers',String,''
             ).split(',').collect{ |v| v.strip }
+            conf.deploy_supported_fs = cp.value(
+              'supported_fs',String
+            ).split(',').collect{ |v| v.strip }
           end
 
           cp.parse('nfsroot') do
@@ -3220,6 +3223,7 @@ module ConfigInformation
     attr_accessor :deploy_kernel
     attr_accessor :deploy_kernel_args
     attr_accessor :deploy_initrd
+    attr_accessor :deploy_supported_fs
     attr_accessor :kexec_repository
     attr_accessor :block_device
     attr_accessor :deploy_part
@@ -3265,6 +3269,7 @@ module ConfigInformation
       @deploy_kernel = nil
       @deploy_kernel_args = ""
       @deploy_initrd = nil
+      @deploy_supported_fs = []
       @kexec_repository = '/tmp/karepository'
       @block_device = nil
       @deploy_part = nil
@@ -3312,7 +3317,7 @@ module ConfigInformation
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_kernel_args = @deploy_kernel_args.clone
       dest.deploy_initrd = @deploy_initrd.clone
-      dest.kexec_repository = @kexec_repository.clone
+      dest.deploy_supported_fs = @deploy_supported_fs.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone
       dest.prod_part = @prod_part.clone
@@ -3360,6 +3365,7 @@ module ConfigInformation
       dest.deploy_kernel = @deploy_kernel.clone
       dest.deploy_kernel_args = @deploy_kernel_args.clone
       dest.deploy_initrd = @deploy_initrd.clone
+      dest.deploy_supported_fs = @deploy_supported_fs.clone
       dest.kexec_repository = @kexec_repository.clone
       dest.block_device = @block_device.clone
       dest.deploy_part = @deploy_part.clone

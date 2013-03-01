@@ -127,18 +127,11 @@ class Workflow < Automata::TaskManager
           "Using classical reboot instead of kexec one with this "\
           "non-linux environment"
         )
-      # TODO: only if fs is not supported
-      elsif context[:execution].environment.image[:kind] == 'dd'
+      # The filesystem is not supported by the deployment kernel
+      elsif !context[:cluster].deploy_supported_fs.include?(context[:execution].environment.filesystem)
         setclassical.call(
           instance,
-          "Using classical reboot instead of kexec one with this "\
-          "dd environment"
-        )
-      elsif context[:execution].environment.image[:kind] == 'fsa'
-        setclassical.call(
-          instance,
-          "Using classical reboot instead of kexec one with this "\
-          "FSA environment"
+          "Using classical reboot instead of kexec since the filesystem of the boot partition is not supported"
         )
       end
 

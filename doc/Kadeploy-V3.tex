@@ -753,6 +753,7 @@ kernels:
     vmlinuz: deploy-vmlinuz-2.6.27.8-bt
     initrd: deploy-initrd-2.6.27.8-bt
     params: console=tty0 console=ttyS0,38400n8 ramdisk_size=260000 rw
+    supported_fs: ext2, ext3, vfat
     drivers: ata_piix,ata_generic
   nfsroot:
     vmlinuz: deploy-vmlinuz-2.6.27.7-nfsroot
@@ -883,16 +884,17 @@ automata:
     \item \yfield{cmd}{String} generic console command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
   \end{itemize}
 
-  \item \ypath{/kernels/user}
+  \item \ypath{/kernels/user} Default options for user kernels
   \begin{itemize}
     \item \yfieldd{params}{String}{''} default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
   \end{itemize}
 
-  \item \ypath{/kernels/deploy}
+  \item \ypath{/kernels/deploy} The deployment environment
   \begin{itemize}
     \item \yfield{vmlinuz}{String} name of the kernel used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfield{initrd}{String} name of the initrd used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfieldd{params}{String}{''} boot parameters of the deployment environment kernel
+    \item \yfield{supported\_fs}{String} list of filesystems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
     \item \yfieldd{drivers}{String}{''} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
   \end{itemize}
 
@@ -997,7 +999,7 @@ Here is a custom operation description:
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
   \item \yfieldd{scattering}{String}{'tree'} The scattering kind for this custom operation (expected values are \emph{tree} and \emph{chain})
 \end{itemize} 
-\paragraph{The automata macro-steps\\}
+\paragraph{The automata macro-steps\\\label{sec:macro_desc}}
 Here is the list of the macro-step and their implementation:
 \begin{itemize}
 \item \texttt{SetDeploymentEnv}
@@ -1006,8 +1008,8 @@ Here is the list of the macro-step and their implementation:
     \begin{itemize}
     \item check\_nodes
     \item format\_deploy\_part
-    \item mount\_deploy\_part
-    \item format\_tmp\_part
+    \item mount\_deploy\_part \texttt{[only with non-fsa and supported fs]}
+    \item format\_tmp\_part \texttt{[only if non-multipart]}
     \end{itemize}
   \item \texttt{SetDeploymentEnvUntrusted}
     \begin{itemize}
@@ -1016,10 +1018,10 @@ Here is the list of the macro-step and their implementation:
     \item wait\_reboot
     \item send\_key\_in\_deploy\_env
     \item create\_partition\_table
-    \item format\_deploy\_part
-    \item mount\_deploy\_part
-    \item format\_tmp\_part
-    \item format\_swap\_part
+    \item format\_deploy\_part \texttt{[only if supported fs]}
+    \item mount\_deploy\_part \texttt{[only if non-fsa and supported fs]}
+    \item format\_tmp\_part \texttt{[only if non-multipart]}
+    \item format\_swap\_part \texttt{[only if non-multipart]}
     \end{itemize}
   \item \texttt{SetDeploymentEnvKexec}
     \begin{itemize}
@@ -1028,10 +1030,10 @@ Here is the list of the macro-step and their implementation:
     \item wait\_reboot
     \item send\_key\_in\_deploy\_env
     \item create\_partition\_table
-    \item format\_deploy\_part
-    \item mount\_deploy\_part
-    \item format\_tmp\_part
-    \item format\_swap\_part
+    \item format\_deploy\_part \texttt{[only if supported fs]}
+    \item mount\_deploy\_part \texttt{[only if non-fsa and supported fs]}
+    \item format\_tmp\_part \texttt{[only if non-multipart]}
+    \item format\_swap\_part \texttt{[only if non-multipart]}
     \end{itemize}
   \item \texttt{SetDeploymentEnvUntrustedCustomPreInstall}
     \begin{itemize}
@@ -1048,9 +1050,9 @@ Here is the list of the macro-step and their implementation:
     \item wait\_reboot
     \item send\_key\_in\_deploy\_env
     \item create\_partition\_table
-    \item format\_deploy\_part
-    \item mount\_deploy\_part
-    \item format\_tmp\_part
+    \item format\_deploy\_part \texttt{[only if supported fs]}
+    \item mount\_deploy\_part \texttt{[only if non-fsa and supported fs]}
+    \item format\_tmp\_part \texttt{[only if non-multipart]}
     \end{itemize}
   \item \texttt{SetDeploymentEnvDummy}
   \end{itemize}
@@ -1059,39 +1061,46 @@ Here is the list of the macro-step and their implementation:
     \item \texttt{BroadcastEnvChain}
       \begin{itemize}
       \item send\_environment(``chain'')
-      \item manage\_admin\_post\_install
-      \item manage\_user\_post\_install
-      \item check\_kernel\_files
-      \item send\_key
-      \item install\_bootloader
+      \item decompress\_environment \texttt{[only with fsa]}
+      \item mount\_deploy\_part \texttt{[only with fsa and supported fs]}
+      \item manage\_admin\_post\_install \texttt{[only if supported fs]}
+      \item manage\_user\_post\_install \texttt{[only if supported fs]}
+      \item check\_kernel\_files \texttt{[only if supported fs]}
+      \item send\_key \texttt{[only if supported fs]}
+      \item install\_bootloader \texttt{[only if supported fs]}
       \end{itemize}
     \item \texttt{BroadcastEnvKastafior}
       \begin{itemize}
       \item send\_environment(``kastafior'')
-      \item decompress\_environment \texttt{[only with fsa images]}
-      \item manage\_admin\_post\_install
-      \item manage\_user\_post\_install
-      \item check\_kernel\_files
-      \item send\_key
-      \item install\_bootloader
+      \item decompress\_environment \texttt{[only with fsa]}
+      \item mount\_deploy\_part \texttt{[only with fsa and supported fs]}
+      \item manage\_admin\_post\_install \texttt{[only if supported fs]}
+      \item manage\_user\_post\_install \texttt{[only if supported fs]}
+      \item check\_kernel\_files \texttt{[only if supported fs]}
+      \item send\_key \texttt{[only if supported fs]}
+      \item install\_bootloader \texttt{[only if supported fs]}
       \end{itemize}
     \item \texttt{BroadcastEnvTree}
       \begin{itemize}
-      \item send\_environment(``tree'')
-      \item manage\_admin\_post\_install
-      \item manage\_user\_post\_install
-      \item check\_kernel\_files
-      \item send\_key
-      \item install\_bootloader
+      \item send\_environment(``tree'') \texttt{[only if supported fs]}
+      \item decompress\_environment \texttt{[only with fsa]}
+      \item mount\_deploy\_part \texttt{[only with fsa and supported fs]}
+      \item manage\_admin\_post\_install \texttt{[only if supported fs]}
+      \item manage\_user\_post\_install \texttt{[only if supported fs]}
+      \item check\_kernel\_files \texttt{[only if supported fs]}
+      \item send\_key \texttt{[only if supported fs]}
+      \item install\_bootloader \texttt{[only if supported fs]}
       \end{itemize}
     \item \texttt{BroadcastEnvBittorrent}
       \begin{itemize}
       \item send\_environment(``bittorrent'')
-      \item manage\_admin\_post\_install
-      \item manage\_user\_post\_install
-      \item check\_kernel\_files
-      \item send\_key
-      \item install\_bootloader
+      \item decompress\_environment \texttt{[only with fsa]}
+      \item mount\_deploy\_part \texttt{[only with fsa and supported fs]}
+      \item manage\_admin\_post\_install \texttt{[only if supported fs]}
+      \item manage\_user\_post\_install \texttt{[only if supported fs]}
+      \item check\_kernel\_files \texttt{[only if supported fs]}
+      \item send\_key \texttt{[only if supported fs]}
+      \item install\_bootloader \texttt{[only if supported fs]}
       \end{itemize}
     \item \texttt{BroadcastEnvDummy}
   \end{itemize}
@@ -1100,11 +1109,11 @@ Here is the list of the macro-step and their implementation:
     \item \texttt{BootNewEnvClassical}
       \begin{itemize}
       \item switch\_pxe
-      \item umount\_deploy\_part
+      \item umount\_deploy\_part \texttt{[only if supported fs]}
       \item reboot\_from\_deploy\_env
       \item wait\_reboot
       \end{itemize}
-    \item \texttt{BootNewEnvKexec}
+    \item \texttt{BootNewEnvKexec} \texttt{[only if supported fs and linux]}
       \begin{itemize}
       \item switch\_pxe
       \item umount\_deploy\_part
@@ -1800,7 +1809,7 @@ Explanation of the fields used in the environment description:
     \item \yfield{compression}{String} the compression of archive (expected values are \texttt{gzip} or \texttt{bzip2})
     \item \yfieldd{script}{String}{none} the script to execute. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. Finally, the script value can be \textit{none} if no script must be launched. Warning, if the \texttt{preinstall} field is fulfilled, the entire \texttt{SetDeploymentEnv} step defined by the administrator will be bypassed. Refer to the~\ref{sec:custom-preinstall} part concerning build of a pre-install.
   \end{itemize}
-  \item \ypath{/[postinstalls]} some post-installation script that will be executed after the environment is sent and installed (useless unless the kind of image is \texttt{tar})
+  \item \ypath{/[postinstalls]} some post-installation script that will be executed after the environment is sent and installed (useless unless the kind of image is \texttt{tar}). It will only be executed if the filesystem is readable/writable.
   \begin{itemize}
     \item \yfield{archive}{String} the path to the archive that contains the scripts (can be local path or URL)
     \item \yfield{compression}{String} the compression of the archive (expected values are \texttt{gzip} or \texttt{bzip2})
