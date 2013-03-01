@@ -33,7 +33,7 @@ require 'macrostep'
       [
         [ :send_environment, :kastafior ],
         [ :decompress_environment, :tree ],
-        #[ :mount_deploy_part ],
+        [ :mount_deploy_part ],
         [ :manage_admin_post_install, :tree ],
         [ :manage_user_post_install, :tree ],
         [ :check_kernel_files ],
