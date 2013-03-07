@@ -572,7 +572,7 @@ class KadeployServer
       workflows.each do |workflow|
         tmp += "  #{Debug.prefix(workflow.context[:cluster].prefix)}: #{workflow.context[:cluster].name}\n"
       end
-      workflows.first.output.verbosel(0,"\nClusters involved in the deployment:\n#{tmp}\n",nil,false)
+      client.print("\nClusters involved in the deployment:\n#{tmp}\n") if client
     end
 
     # Run workflows
