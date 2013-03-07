@@ -48,7 +48,9 @@ class KadeployClient
     if (@site == nil) then
       puts msg
     else
-      puts "(#{@site}) #{msg}"
+      msg.split("\n").each do |line|
+        puts "(#{@site}) #{line}"
+      end
     end
     STDOUT.flush
   end
