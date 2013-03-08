@@ -265,11 +265,7 @@ if (exec_specific_config != nil) then
         cloned_config = exec_specific_config.clone
         cloned_config.node_array = nodes_by_server[server]
         ret = kadeploy_server.run("kareboot_sync", cloned_config, client_host, client_port)
-        wid = kareboot_client.workflow_id
-        if wid
-          kadeploy_server.kasync(wid){ local.stop_service() }
-          kadeploy_server.delete_kasync(wid)
-        end
+        local.stop_service()
         exit(ret) if ret != 0
       end
       distant.stop_service()
