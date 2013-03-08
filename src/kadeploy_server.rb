@@ -618,15 +618,14 @@ class KadeployServer
       run_kadeploy(db,exec_specific,client) do |wid,workflows|
         # Prepare client
         client.set_workflow_id(wid)
-        create_kasync(wid)
         client.write_workflow_id(exec_specific.write_workflow_id) if exec_specific.write_workflow_id != ""
 
         # Client disconnection fallback
         finished = false
-        Thread.new do
+        finthr = Thread.new do
           while (not finished) do
             begin
-              kasync(wid){ client.test() }
+              client.test()
             rescue DRb::DRbConnError
               workflows.each do |workflow|
                 workflow.output.disable_client_output()
@@ -634,7 +633,6 @@ class KadeployServer
               workflows.first.output.verbosel(3, "Client disconnection")
               kadeploy_sync_kill_workflow(wid)
               drb_server.stop_service()
-              delete_kasync(wid)
               db.disconnect()
               finished = true
             end
@@ -675,6 +673,7 @@ class KadeployServer
           end
         end
         finished = true
+        finthr.join
       end
     rescue KadeployError => ke
       msg = KadeployAsyncError.to_msg(ke.errno)
@@ -1019,7 +1018,6 @@ class KadeployServer
     begin
       run_kareboot(output, db, exec_specific, client) do |rid,microthreads|
         client.set_workflow_id(rid)
-        create_kasync(rid)
         # Client disconnection fallback
         micros = []
         microthreads.each do |microthread|
@@ -1032,10 +1030,10 @@ class KadeployServer
         end
 
         finished = false
-        Thread.new do
+        finthr = Thread.new do
           while (not finished) do
             begin
-              kasync(rid){ client.test() }
+              client.test()
             rescue DRb::DRbConnError
               disconnected = true
               output.disable_client_output()
@@ -1051,7 +1049,6 @@ class KadeployServer
                 kareboot_delete_reboot_info(rid)
               }
               drb_server.stop_service()
-              delete_kasync(rid)
               db.disconnect()
               finished = true
             end
@@ -1074,6 +1071,7 @@ class KadeployServer
           end
         end
         finished = true
+        finthr.join
 
         if (not disconnected) then
           client.generate_files(@reboot_info_hash[rid][0],@reboot_info_hash[rid][1])
@@ -1198,7 +1196,7 @@ class KadeployServer
       else
       end
     }
-    Thread.new {
+    finthr = Thread.new {
       while (not finished) do
         begin
           client.test()
@@ -1213,6 +1211,7 @@ class KadeployServer
     }
     tid.join
     finished = true
+    finthr.join
     return res
   end
 
@@ -1441,7 +1440,7 @@ class KadeployServer
         res = kanodes_get_yaml_dump(exec_specific, client)
       end
     }
-    Thread.new {
+    finthr = Thread.new {
       while (not finished) do
         begin
           client.test()
@@ -1456,6 +1455,7 @@ class KadeployServer
     }
     tid.join
     finished = true
+    finthr.join
     return res
   end
   
@@ -1572,7 +1572,7 @@ class KadeployServer
         res = karights_show_rights(exec_specific, client, db)
       end
     }
-    Thread.new {
+    finthr = Thread.new {
       while (not finished) do
         begin
           client.test()
@@ -1587,6 +1587,7 @@ class KadeployServer
     }
     tid.join
     finished = true
+    finthr.join
     return res
   end
 
@@ -1778,7 +1779,7 @@ class KadeployServer
         ret = kaenv_move_files(exec_specific, client, db)
       end
     }
-    Thread.new {
+    finthr = Thread.new {
       while (not finished) do
         begin
           client.test()
@@ -1793,6 +1794,7 @@ class KadeployServer
     }
     tid.join
     finished = true
+    finthr.join
     return ret
   end
 
@@ -2564,7 +2566,6 @@ class KadeployServer
     begin
       run_kapower(output, db, exec_specific, client) do |pid,microthreads|
         client.set_workflow_id(pid)
-        create_kasync(pid)
         # Client disconnection fallback
         micros = []
         microthreads.each do |microthread|
@@ -2577,10 +2578,10 @@ class KadeployServer
         end
 
         finished = false
-        Thread.new do
+        finthr = Thread.new do
           while (not finished) do
             begin
-              kasync(pid){ client.test() }
+              client.test()
             rescue DRb::DRbConnError
               disconnected = true
               output.disable_client_output()
@@ -2596,7 +2597,6 @@ class KadeployServer
                 kapower_delete_power_info(pid)
               }
               drb_server.stop_service()
-              delete_kasync(pid)
               db.disconnect()
               finished = true
             end
@@ -2623,6 +2623,7 @@ class KadeployServer
           end
         end
         finished = true
+        finthr.join
 
         if (not disconnected) then
           client.generate_files(@power_info_hash[pid][0],@power_info_hash[pid][1])
