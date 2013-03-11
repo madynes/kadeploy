@@ -98,7 +98,7 @@ module KaTestCase
 
   def load_config()
     if ARGV.size < 2
-      puts "usage: ruby #{$0} -- <yaml_config> <nodefile> (see --help)"
+      puts "usage: ruby #{$0} -- <yaml_config> <nodefile> [<vlan_id>] (see --help)"
       exit 0
     end
 
@@ -137,6 +137,8 @@ module KaTestCase
 
     @nodefile = ARGV[1]
     @nodes = File.read(ARGV[1]).split("\n").uniq
+
+    @vlan = ARGV[2] if ARGV.size > 2
 
     @tmp = {
       :envname => '_TMP_KATESTSUITE',
