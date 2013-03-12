@@ -331,9 +331,9 @@ if (exec_specific_config != nil) then
           else
             puts "(#{server}) The URI #{local.uri} is not correct"
           end
-          local.stop_service()
+          local.stop_service() if local
         end
-        distant.stop_service()
+        distant.stop_service() if distant
       rescue DRb::DRbConnError => dce
         puts "[ERROR] Server disconnection: #{dce.message} (#{exec_specific_config.servers[server][0]}:#{exec_specific_config.servers[server][1]})"
         puts "---- Stack trace ----"
