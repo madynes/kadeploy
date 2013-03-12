@@ -48,7 +48,9 @@ class KadeployClient
     if (@site == nil) then
       puts msg
     else
-      puts "(#{@site}) #{msg}"
+      msg.split("\n").each do |line|
+        puts "(#{@site}) #{line}"
+      end
     end
     STDOUT.flush
   end
@@ -216,7 +218,9 @@ end
 def display_status(stats,starttime,prefix='')
   puts "#{prefix}---"
   puts "#{prefix}Nodes status (#{Time.now.to_i - starttime}s):"
-  if stats.size == 1
+  if stats.empty?
+    puts "#{prefix}  Deployment done"
+  elsif stats.size == 1
     if stats[stats.keys[0]].empty?
       puts "#{prefix}  Deployment did not start at the moment"
     else
