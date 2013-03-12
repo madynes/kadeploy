@@ -34,6 +34,15 @@ class TestKadeploy < Test::Unit::TestCase
     run_kadeploy()
   end
 
+  def test_multi_server
+    run_kadeploy('--multi-server')
+  end
+
+  def test_vlan
+    @connect = false
+    run_kadeploy('--vlan',@vlan) if @vlan
+  end
+
   def test_breakpoint
     @connect = false
     run_kadeploy('--breakpoint','SetDeploymentEnvUntrusted:reboot')
@@ -244,7 +253,7 @@ class TestKadeploy < Test::Unit::TestCase
     res = ''
     begin
       @env = nil
-      run_kadeploy('-a',envfile.path,'-V4','--debug')
+      run_kadeploy('-a',envfile.path)
 
       begin
         Net::SSH.start(@nodes.first,'root') do |ssh|
