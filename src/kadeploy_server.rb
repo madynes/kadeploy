@@ -306,6 +306,18 @@ class KadeployServer
   # * return true if the deployment has been freed and nil if workflow id does no exist
   def async_deploy_free(workflow_id)
     return async_deploy_lock_wid(workflow_id) { |info|
+      output = info[:workflows].first.output
+      context = info[:workflows].first.context
+
+      # Clean cache files
+      unless context[:common].kadeploy_disable_cache
+        Cache::remove_files(
+          context[:common].kadeploy_cache_dir,
+          /#{context[:execution].prefix_in_cache}/,
+          output
+        ) if context[:execution].load_env_kind == "file"
+      end
+
       info[:workflows].first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
       begin
@@ -494,6 +506,38 @@ class KadeployServer
     kadeploy_create_workflow_info(workflow_id)
     context[:deploy_id] = workflow_id
 
+    tmpoutput = nil
+    unless context[:common].kadeploy_disable_cache
+      # Set the prefix of the files in the cache
+      if context[:execution].load_env_kind == 'file'
+        context[:execution].prefix_in_cache =
+          "e-anon-#{context[:execution].true_user}-#{Time.now.to_i}--"
+      else
+        context[:execution].prefix_in_cache =
+          "e-#{context[:execution].environment.id}--"
+      end
+
+      tmpoutput = Debug::OutputControl.new(
+        context[:execution].verbose_level || context[:common].verbose_level,
+        context[:execution].debug,
+        context[:client],
+        context[:execution].true_user,
+        context[:deploy_id],
+        context[:common].dbg_to_syslog,
+        context[:common].dbg_to_syslog_level,
+        context[:syslock],
+        ''
+      )
+
+      begin
+        Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+      rescue KadeployError => ke
+        @workflow_info_hash_lock.unlock
+        exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
+        raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+      end
+    end
+
     workflows = []
     clusters = exec_specific.node_set.group_by_cluster
     if clusters.size > 1
@@ -535,6 +579,15 @@ class KadeployServer
     if block_given?
       begin
         yield(workflow_id,workflows)
+
+        # Clean cache files
+        unless context[:common].kadeploy_disable_cache
+          Cache::remove_files(
+            context[:common].kadeploy_cache_dir,
+            /#{context[:execution].prefix_in_cache}/,
+            tmpoutput
+          ) if context[:execution].load_env_kind == "file"
+        end
       ensure
         #let's free memory at the end of the workflow
         @workflow_info_hash_lock.synchronize {

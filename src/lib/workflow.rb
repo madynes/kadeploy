@@ -8,7 +8,6 @@ require 'debug'
 require 'nodes'
 require 'automata'
 require 'config'
-require 'cache'
 require 'macrostep'
 require 'stepdeployenv'
 require 'stepbroadcastenv'
@@ -294,16 +293,7 @@ class Workflow < Automata::TaskManager
       context[:dblock].unlock
     end
 
-    # Set the prefix of the files in the cache
-    if context[:execution].load_env_kind == 'file'
-      context[:execution].prefix_in_cache =
-        "e-anon-#{context[:execution].true_user}-#{Time.now.to_i}--"
-    else
-      context[:execution].prefix_in_cache =
-        "e-#{context[:execution].environment.id}--"
-    end
-
-    grab_user_files() if !context[:common].kadeploy_disable_cache
+    load_custom_operations()
   end
 
   def break!(task,nodeset)
@@ -344,12 +334,6 @@ class Workflow < Automata::TaskManager
       "after #{Time.now.to_i - @start_time}s"
     )
 
-    Cache::remove_files(
-      context[:common].kadeploy_cache_dir,
-      /#{context[:execution].prefix_in_cache}/,
-      @output
-    ) if context[:execution].load_env_kind == "file"
-
     @logger.dump
 
     if context[:async] and !context[:common].async_end_of_deployment_hook.empty?
@@ -387,129 +371,7 @@ class Workflow < Automata::TaskManager
 
   private
 
-  def grab_file(gfm,remotepath,prefix,filetag,errno,opts={})
-    return unless remotepath
-
-    cachedir,cachesize,pattern = nil
-    case opts[:cache]
-      when :kernels
-        cachedir = context[:common].cache[:netboot][:directory]
-        cachesize = context[:common].cache[:netboot][:size]
-        pattern = /^(e\d+--.+)|(e-anon-.+)|(pxe-.+)$/
-      #when :kadeploy
-      else
-        cachedir = context[:common].kadeploy_cache_dir
-        cachesize = context[:common].kadeploy_cache_size
-        pattern = /./
-    end
-
-    localpath = File.join(cachedir, "#{prefix}#{File.basename(remotepath)}")
-
-    begin
-      res = nil
-
-      if opts[:caching]
-        res = gfm.grab_file(
-          remotepath,
-          localpath,
-          opts[:md5],
-          filetag,
-          prefix,
-          cachedir,
-          cachesize,
-          context[:async],
-          pattern
-        )
-      else
-        res = gfm.grab_file_without_caching(
-          remotepath,
-          localpath,
-          filetag,
-          prefix,
-          cachedir,
-          cachesize,
-          context[:async],
-          pattern
-        )
-      end
-
-      if res and opts[:maxsize]
-        if (File.size(localpath) / 1024**2) > opts[:maxsize]
-          debug(0,
-            "The #{filetag} file #{remotepath} is too big "\
-            "(#{opts[:maxsize]} MB is the maximum size allowed)"
-          )
-          File.delete(localpath)
-          error(opts[:error_maxsize])
-        end
-      end
-
-      error(errno) unless res
-    rescue TempfileException
-      error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE)
-    rescue MoveException
-      error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE)
-    end
-
-    if opts[:mode]
-      if not system("chmod #{opts[:mode]} #{localpath}") then
-        debug(0, "Unable to change the rights on #{localpath}")
-        return false
-      end
-    end
-
-    remotepath.gsub!(remotepath,localpath) if !opts[:noaffect] and localpath
-  end
-
-  def grab_user_files()
-    env_prefix = context[:execution].prefix_in_cache
-    user_prefix = "u-#{context[:execution].true_user}--"
-
-    gfm = Managers::GrabFileManager.new(
-      context[:config], @output,
-      context[:client], context[:database]
-    )
-
-    # Env image
-    file = context[:execution].environment.image
-    grab_file(
-      gfm, file[:file], env_prefix, 'image',
-      FetchFileError::INVALID_ENVIRONMENT_TARBALL,
-      :md5 => file[:md5], :caching => true
-    )
-
-    # SSH key file
-    if file = context[:execution].key and !file.empty?
-      grab_file(
-        gfm, file, user_prefix, 'key',
-        FetchFileError::INVALID_KEY, :caching => false
-      )
-    end
-
-    # Preinstall archive
-    if file = context[:execution].environment.preinstall
-      grab_file(
-        gfm, file['file'], env_prefix, 'preinstall',
-        FetchFileError::INVALID_PREINSTALL,
-        :md5 => file['md5'], :caching => true,
-        :maxsize => context[:common].max_preinstall_size,
-        :error_maxsize => FetchFileError::PREINSTALL_TOO_BIG
-      )
-    end
-
-    # Postinstall archive
-    if context[:execution].environment.postinstall
-      context[:execution].environment.postinstall.each do |file|
-        grab_file(
-          gfm, file['file'], env_prefix, 'postinstall',
-          FetchFileError::INVALID_POSTINSTALL,
-          :md5 => file['md5'], :caching => true,
-          :maxsize => context[:common].max_postinstall_size,
-          :error_maxsize => FetchFileError::POSTINSTALL_TOO_BIG
-        )
-      end
-    end
-
+  def load_custom_operations
     # Custom files
     if context[:execution].custom_operations
       context[:execution].custom_operations[:operations].each_pair do |macro,micros|
@@ -546,17 +408,12 @@ class Workflow < Automata::TaskManager
             end
 
             if entry[:action] == :send
-              filename = File.basename(entry[:file].dup)
-              grab_file(
-                gfm, entry[:file], user_prefix, 'custom_file',
-                FetchFileError::INVALID_CUSTOM_FILE, :caching => false
-              )
               target << {
                 :name => entry[:name],
                 :action => :send,
                 :file => entry[:file],
                 :destination => entry[:destination],
-                :filename => filename,
+                :filename => entry[:filename],
                 :timeout => entry[:timeout],
                 :retries => entry[:retries],
                 :destination => entry[:destination],
@@ -572,10 +429,6 @@ class Workflow < Automata::TaskManager
                 :scattering => entry[:scattering]
               }
             elsif entry[:action] == :run
-              grab_file(
-                gfm, entry[:file], user_prefix, 'custom_file',
-                FetchFileError::INVALID_CUSTOM_FILE, :caching => false
-              )
               target << {
                 :name => entry[:name],
                 :action => :run,
@@ -589,19 +442,6 @@ class Workflow < Automata::TaskManager
               error(FetchFileError::INVALID_CUSTOM_FILE)
             end
           end
-        end
-      end
-    end
-
-    # Custom PXE files
-    if context[:execution].pxe_profile_msg != ''
-      unless context[:execution].pxe_upload_files.empty?
-        context[:execution].pxe_upload_files.each do |pxefile|
-          grab_file(
-            gfm, pxefile, "pxe-#{context[:execution].true_user}--", 'pxe_file',
-            FetchFileError::INVALID_PXE_FILE, :caching => false,
-            :cache => :kernels, :noaffect => true, :mode => '744'
-          )
         end
       end
     end
