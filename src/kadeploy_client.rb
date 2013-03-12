@@ -8,7 +8,7 @@ STATUS_UPDATE_DELAY = 2
 
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
-  exit(1)
+  exit!(1)
 end
 
 #Kadeploy libs
