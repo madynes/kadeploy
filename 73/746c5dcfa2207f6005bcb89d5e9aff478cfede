@@ -1,0 +1,8 @@
+Change-Id: I73746c5dcfa2207f6005bcb89d5e9aff478cfede
+Code-Review+2: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Verified+1: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-by: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-at: Wed, 13 Mar 2013 15:14:26 +0100
+Reviewed-on: http://localhost:8081/766
+Project: kadeploy3
+Branch: refs/heads/master
