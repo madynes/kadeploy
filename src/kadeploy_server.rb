@@ -6,6 +6,7 @@
 # For details on use and redistribution please refer to License.txt
 
 DEPLOYMENT_STATUS_CHECK_PITCH=2
+RESULTS_PRINT_PITCH=200
 
 Signal.trap("TERM") do
   puts "TERM trapped, let's clean everything ..."
@@ -1273,33 +1274,42 @@ class KadeployServer
     return [args, ret]
   end
 
-
-  # Select the fields to output
-  #
-  # Arguments
-  # * row: hashtable that contains a line of information fetched in the database
-  # * exec_specific: instance of Config.exec_specific
-  # * default_fields: array of fields used to produce the output if no fields are given in the command line
-  # Output
-  # * string that contains the selected fields in a result line
-  def kastat_select_fields(row, exec_specific, default_fields)
-    ret = []
-
+  def db_generate_fields(base_fields, exec_fields, default_fields)
     fields = nil
-    unless exec_specific.fields.empty? then
-      fields = exec_specific.fields
-    else
+    if exec_fields.empty?
       fields = default_fields
+    else
+      fields = exec_fields
     end
+    fields.collect{|f| base_fields.index(f) }
+  end
 
-    fields.each{ |f|
-      if row[f].is_a?(String)
-        ret << row[f].gsub(/\n/, "\\n").gsub(/\r/, "\\r")
-      else
-        ret << row[f].to_s
+  def db_print_results(results,fields)
+    i = 0
+    buff = ""
+    results.each_array do |row|
+      fields.each do |j|
+        if row[j].is_a?(String)
+          row[j].gsub!(/\n/, "\\n")
+          row[j].gsub!(/\r/, "\\r")
+          buff.concat(row[j])
+          buff.concat(",")
+        else
+          buff.concat(row[j].to_s)
+          buff.concat(",")
+        end
       end
-    }
-    return ret.join(",")
+      buff.chop!
+      buff.concat("\n")
+      i+=1
+      if (i%RESULTS_PRINT_PITCH == 0)
+        yield(buff)
+        buff.gsub!(/.*/,'') # String.clear in ruby 1.9
+      end
+    end
+    yield(buff) unless buff.empty?
+    buff = nil
+    GC.start
   end
 
   # List the information about the nodes that require a given number of retries to be deployed
@@ -1311,9 +1321,10 @@ class KadeployServer
   # Output
   # * print the filtred information about the nodes that require a given number of retries to be deployed
   def kastat_list_retries(exec_specific, client, db)
-    args, generic_where_clause = kastat_generic_where_clause(exec_specific)
+    tmpargs, generic_where_clause = kastat_generic_where_clause(exec_specific)
     step_list = String.new
 
+    args = []
     if (not exec_specific.steps.empty?) then
       steps = []
       exec_specific.steps.each { |step|
@@ -1334,17 +1345,24 @@ class KadeployServer
       step_list = "(retry_step1 >= ? OR retry_step2 >= ? OR retry_step3 >= ?)"
       3.times{ args << exec_specific.min_retries }
     end
+    args += tmpargs
 
     query = "SELECT * FROM log WHERE #{step_list}"
     query += " AND #{generic_where_clause}" unless generic_where_clause.empty?
     res = db.run_query(query,*args)
     if (res.num_rows > 0) then
-      res.each_hash { |row|
-        Debug::distant_client_print(kastat_select_fields(row, exec_specific, ["start","hostname","retry_step1","retry_step2","retry_step3"]), client)
-      }
+      fields = db_generate_fields(res.fields,exec_specific.fields,
+        ["start","hostname","retry_step1","retry_step2","retry_step3"]
+      )
+      db_print_results(res,fields) do |str|
+        Debug::distant_client_print(str,client)
+      end
     else
       Debug::distant_client_print("No information is available", client)
     end
+    res = nil
+    GC.start
+    true
   end
 
   # List the information about the nodes that have at least a given failure rate
@@ -1358,33 +1376,45 @@ class KadeployServer
   def kastat_list_failure_rate(exec_specific, client, db)
     args, generic_where_clause = kastat_generic_where_clause(exec_specific)
 
-    query = "SELECT * FROM log"
+    query = "SELECT hostname,COUNT(*) FROM log"
     query += " WHERE #{generic_where_clause}" unless generic_where_clause.empty?
+    query += " GROUP BY hostname"
 
     res = db.run_query(query,*args)
-    if (res.num_rows > 0) then
-      hash = Hash.new
-      res.each_hash { |row|
-        if (not hash.has_key?(row["hostname"])) then
-          hash[row["hostname"]] = Array.new
-        end
-        hash[row["hostname"]].push(row["success"])
-      }
-      hash.each_pair { |hostname, array|
-        success = 0
-        array.each { |val|
-          if (val == "true") then
-            success += 1
-          end
-        }
-        rate = 100 - (100 * success / array.length)
-        if ((exec_specific.min_rate == nil) || (rate >= exec_specific.min_rate)) then
-          Debug::distant_client_print("#{hostname}: #{rate}%", client)
-        end
-      }
-    else
+    unless res.num_rows > 0
       Debug::distant_client_print("No information is available", client)
+      return
     end
+
+    total = {}
+    res.to_array.each do |row|
+      total[row[0]] = row[1]
+    end
+
+    query = "SELECT hostname,COUNT(*) FROM log"
+    query += " WHERE success = ?"
+    query += " AND #{generic_where_clause}" unless generic_where_clause.empty?
+    query += " GROUP BY hostname"
+    args = ['true'] + args
+    res = db.run_query(query,*args)
+
+    success = {}
+    total.keys.each do |node|
+      success[node] = 0
+    end
+    res.to_array.each do |row|
+      success[row[0]] = row[1]
+    end
+
+    total.each_pair do |node,tot|
+      rate = 100 - (100 * success[node].to_f / tot)
+      if (exec_specific.min_rate == nil) or (rate >= exec_specific.min_rate)
+        Debug::distant_client_print("#{node}: #{'%.2f'%rate}%", client)
+      end
+    end
+    res = nil
+    GC.start
+    true
   end
 
   # List the information about all the nodes
@@ -1403,20 +1433,26 @@ class KadeployServer
 
     res = db.run_query(query,*args)
     if (res.num_rows > 0) then
-      res.each_hash { |row|
-        Debug::distant_client_print(kastat_select_fields(row, exec_specific,
-                                                         ["user","hostname","step1","step2","step3",
-                                                          "timeout_step1","timeout_step2","timeout_step3",
-                                                          "retry_step1","retry_step2","retry_step3",
-                                                          "start",
-                                                          "step1_duration","step2_duration","step3_duration",
-                                                          "env","anonymous_env","md5",
-                                                          "success","error"]),
-                                    client)
-      }
+      fields = db_generate_fields(res.fields,exec_specific.fields,
+        [
+          "user","hostname","step1","step2","step3",
+          "timeout_step1","timeout_step2","timeout_step3",
+          "retry_step1","retry_step2","retry_step3",
+          "start",
+          "step1_duration","step2_duration","step3_duration",
+          "env","anonymous_env","md5",
+          "success","error"
+        ]
+      )
+      db_print_results(res,fields) do |str|
+        Debug::distant_client_print(str,client)
+      end
     else
       Debug::distant_client_print("No information is available", client)
     end
+    res = nil
+    GC.start
+    true
   end
 
 
