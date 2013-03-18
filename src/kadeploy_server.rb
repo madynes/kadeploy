@@ -1462,9 +1462,10 @@ class KadeployServer
 
     res = db.run_query(query,*args)
     if (res.num_rows > 0)
-      res.each { |row|
-        Debug::distant_client_print("#{row[0]},#{row[1]},#{row[2]},#{row[3]},#{row[4]},#{row[5]}", client)
-      }
+      fields = db_generate_fields(res.fields,[],res.fields)
+      db_print_results(res,fields) do |str|
+        Debug::distant_client_print(str,client)
+      end
     else
       Debug::distant_client_print("No information concerning these nodes", client)
       return(1)
