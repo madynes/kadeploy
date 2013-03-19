@@ -76,6 +76,13 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>-l</option></term>
+	<term><option>--last</option></term>
+	<listitem>
+	  <para>Only print the most recent information of selected machines.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-m</option></term>
 	<term><option>--machine <replaceable>MACHINE</replaceable></option></term>
 	<listitem>
