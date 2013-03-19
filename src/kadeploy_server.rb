@@ -7,6 +7,7 @@
 
 DEPLOYMENT_STATUS_CHECK_PITCH=2
 RESULTS_PRINT_PITCH=200
+RESULTS_MAX_PER_REQUEST=20000
 
 Signal.trap("TERM") do
   puts "TERM trapped, let's clean everything ..."
@@ -1288,21 +1289,32 @@ class KadeployServer
     end
     args += tmpargs
 
-    query = "SELECT * FROM log WHERE #{step_list}"
+    query = "SELECT COUNT(*) FROM log WHERE #{step_list}"
     query += " AND #{generic_where_clause}" unless generic_where_clause.empty?
     res = db.run_query(query,*args)
-    if (res.num_rows > 0) then
+
+    if res.to_array[0][0] == 0
+      Debug::distant_client_print("No information is available", client)
+      return false
+    end
+
+    (res.to_array[0][0]*1.0/RESULTS_MAX_PER_REQUEST).ceil.times do |i|
+      query = "SELECT * FROM log WHERE #{step_list}"
+      query += " AND #{generic_where_clause}" unless generic_where_clause.empty?
+      query += " LIMIT #{i*RESULTS_MAX_PER_REQUEST},#{RESULTS_MAX_PER_REQUEST}"
+
+      res = db.run_query(query,*args)
+
       fields = db_generate_fields(res.fields,exec_specific.fields,
         ["start","hostname","retry_step1","retry_step2","retry_step3"]
       )
       db_print_results(res,fields) do |str|
         Debug::distant_client_print(str,client)
       end
-    else
-      Debug::distant_client_print("No information is available", client)
+
+      res = nil
+      GC.start
     end
-    res = nil
-    GC.start
     true
   end
 
@@ -1369,11 +1381,22 @@ class KadeployServer
   def kastat_list_all(exec_specific, client, db)
     args, generic_where_clause = kastat_generic_where_clause(exec_specific)
 
-    query = "SELECT * FROM log"
+    query = "SELECT COUNT(*) FROM log"
     query += " WHERE #{generic_where_clause}" unless generic_where_clause.empty?
-
     res = db.run_query(query,*args)
-    if (res.num_rows > 0) then
+
+    if res.to_array[0][0] == 0
+      Debug::distant_client_print("No information is available", client)
+      return false
+    end
+
+    (res.to_array[0][0]*1.0/RESULTS_MAX_PER_REQUEST).ceil.times do |i|
+      query = "SELECT * FROM log"
+      query += " WHERE #{generic_where_clause}" unless generic_where_clause.empty?
+      query += " LIMIT #{i*RESULTS_MAX_PER_REQUEST},#{RESULTS_MAX_PER_REQUEST}"
+
+      res = db.run_query(query,*args)
+
       fields = db_generate_fields(res.fields,exec_specific.fields,
         [
           "user","hostname","step1","step2","step3",
@@ -1388,11 +1411,10 @@ class KadeployServer
       db_print_results(res,fields) do |str|
         Debug::distant_client_print(str,client)
       end
-    else
-      Debug::distant_client_print("No information is available", client)
+
+      res = nil
+      GC.start
     end
-    res = nil
-    GC.start
     true
   end
 
