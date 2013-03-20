@@ -2826,19 +2826,21 @@ sshgw.ssh(servername,'root') do |session|
 
   msg('Getting network information',MSG_INFO)
 	set_default_route(session) if $mode == :KVM
-  tmp = sexec(session,'route -n')
-  msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
-  defaultiface = nil
-  tmp.each do |line|
-    if $network.empty? and line =~ /^(\S+)\s+0\.0\.0\.0\s+(\S+)\s+.+$/
-      $network[:ipv4] = Regexp.last_match(1)
-      $network[:mask] = Regexp.last_match(2)
-      $network[:ipaddr] = IPAddr.new("#{$network[:ipv4]}/#{$network[:mask]}")
-      $network[:broadcast] = ($network[:ipaddr] | (~$network[:ipaddr].instance_variable_get(:@mask_addr) & IPAddr::IN4MASK)).to_s
-    elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/
-      $network[:gateway] = Regexp.last_match(1) if $network.empty? or !$network[:gateway]
-      $network[:dns] = Regexp.last_match(1) unless $network[:dns]
-      defaultiface = Regexp.last_match(2)
+  if $network.empty?
+    tmp = sexec(session,'route -n')
+    msg('can\'t get route informations',MSG_ERRO,true) if !tmp or tmp.empty?
+    defaultiface = nil
+    tmp.each do |line|
+      if line =~ /^(\S+)\s+0\.0\.0\.0\s+(\S+)\s+.+$/
+        $network[:ipv4] = Regexp.last_match(1)
+        $network[:mask] = Regexp.last_match(2)
+        $network[:ipaddr] = IPAddr.new("#{$network[:ipv4]}/#{$network[:mask]}")
+        $network[:broadcast] = ($network[:ipaddr] | (~$network[:ipaddr].instance_variable_get(:@mask_addr) & IPAddr::IN4MASK)).to_s
+      elsif line =~ /^0\.0\.0\.0\s+(\S+)\s+.+\s+(\S+)\s*$/
+        $network[:gateway] = Regexp.last_match(1) if $network.empty? or !$network[:gateway]
+        $network[:dns] = Regexp.last_match(1) unless $network[:dns]
+        defaultiface = Regexp.last_match(2)
+      end
     end
   end
 
