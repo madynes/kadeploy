@@ -246,8 +246,8 @@ module EnvironmentManagement
         cp.parse('options',@multipart) do |info|
           unless info[:empty]
             @options['partitions'] = []
-            cp.parse('partitions',true,Array) do |info|
-              unless info[:empty]
+            cp.parse('partitions',true,Array) do |info2|
+              unless info2[:empty]
                 tmp = {
                   'id' => cp.value('id',Fixnum),
                   'device' => cp.value('device',String),
@@ -258,7 +258,7 @@ module EnvironmentManagement
                 }.empty?
                   raise ArgumentError.new(
                     "Partition id ##{tmp['id']} is already defined "\
-                    "[field: #{info[:path]}]"
+                    "[field: #{info2[:path]}]"
                   )
                 end
 
@@ -268,7 +268,7 @@ module EnvironmentManagement
                 }.empty?
                   raise ArgumentError.new(
                     "Partition device '#{tmp['device']}' is already defined "\
-                    "[field: #{info[:path]}]"
+                    "[field: #{info2[:path]}]"
                   )
                 end
                 @options['partitions'] << tmp

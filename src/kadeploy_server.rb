@@ -99,7 +99,7 @@ class KadeployServer
     nodes_ok = Array.new
     nodes_ko = Array.new
     nodes.each { |n|
-      if (/\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ n) then
+      if /\A(?:A-Za-z\.\-)+\d*\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*\Z/ =~ n
          node_list = node_list + Nodes::NodeSet::nodes_list_expand("#{n}")
       else
         node_list.push(n)
@@ -1040,7 +1040,6 @@ class KadeployServer
               disconnected = true
               output.disable_client_output()
               output.verbosel(3, "Client disconnection")
-              client_disconnected = true
               microthreads.each { |thread| thread.kill }
               micros.each do |micro|
                 micro.output.disable_client_output()
@@ -1227,7 +1226,7 @@ class KadeployServer
     unless exec_specific.node_list.empty? then
       nbnodes = 0
       exec_specific.node_list.each { |node|
-        if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        if /\A(?:A-Za-z\.\-)+[0-9]*\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*\Z/ =~ node then
           nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
         else
           nodes = [node]
@@ -1755,7 +1754,7 @@ class KadeployServer
     values_to_insert = 0
     exec_specific.node_list.each { |node|
       exec_specific.part_list.each { |part|
-        if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node
+        if /\A(?:A-Za-z\.\-)+[0-9]*\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*\Z/ =~ node
           nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
         else
           nodes = [node]
@@ -1813,7 +1812,7 @@ class KadeployServer
     res = true
     exec_specific.node_list.each { |node|
       exec_specific.part_list.each { |part|
-        if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ node then
+        if /\A(?:A-Za-z\.\-)+[0-9]*\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*\Z/ =~ node then
           nodes = Nodes::NodeSet::nodes_list_expand("#{node}")
         else
           nodes = [node]
@@ -2681,7 +2680,6 @@ class KadeployServer
               disconnected = true
               output.disable_client_output()
               output.verbosel(3, "Client disconnection")
-              client_disconnected = true
               microthreads.each { |thread| thread.kill }
               micros.each do |micro|
                 micro.output.disable_client_output()

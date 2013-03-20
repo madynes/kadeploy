@@ -208,7 +208,7 @@ module Managers
                            (cache_size * 1024 * 1024) -  file_size,
                            0.5, cache_pattern,
                            @output)
-        resp,etag = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
+        resp,_ = HTTP::fetch_file(client_file, local_file, cache_dir, nil)
         case resp
         when -1
           @output.verbosel(0, "Tempfiles cannot be created")
@@ -403,11 +403,11 @@ module Managers
 
       # Postinstall archive
       if context[:execution].environment.postinstall
-        context[:execution].environment.postinstall.each do |file|
+        context[:execution].environment.postinstall.each do |f|
           grab_file_client(
-            gfm, context, file['file'], env_prefix, 'postinstall',
+            gfm, context, f['file'], env_prefix, 'postinstall',
             FetchFileError::INVALID_POSTINSTALL,
-            :md5 => file['md5'], :caching => true,
+            :md5 => f['md5'], :caching => true,
             :maxsize => context[:common].max_postinstall_size,
             :error_maxsize => FetchFileError::POSTINSTALL_TOO_BIG
           )
