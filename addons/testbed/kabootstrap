@@ -686,6 +686,7 @@ def cfg_kadeploy_specific_conf_filename(cluster)
   end
 end
 CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 180
+CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,fat'
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
@@ -702,6 +703,7 @@ def cfg_kadeploy_specific_conf(cluster)
         'vmlinuz' => File.join(CFG_PXE_KERNELS_DIR,File.basename(cluster[:kernel][:vmlinuz])),
         'initrd' => File.join(CFG_PXE_KERNELS_DIR,File.basename(cluster[:kernel][:initrd])),
         'params' => cfg_kadeploy_deploy_kernel_args(cluster),
+        'supported_fs' => CFG_DEPLOY_ENV_SUPPORTED_FS,
       }
     else
       pxe_headers = "#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')
