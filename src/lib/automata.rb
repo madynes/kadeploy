@@ -655,7 +655,7 @@ module Automata
         if rnsid != task.nsid
           new_nsid = rnsid
         elsif !task.nodes.equal?(task.nodes_ok)
-          nsid1,new_nsid = split_nodeset(task)
+          _,new_nsid = split_nodeset(task)
         else
           new_nsid = task.nsid
         end
@@ -673,7 +673,7 @@ module Automata
         if rnsid != task.nsid
           new_nsid = rnsid
         elsif !task.nodes.equal?(task.nodes_ko)
-          nsid1,new_nsid = split_nodeset(task)
+          _,new_nsid = split_nodeset(task)
         else
           new_nsid = task.nsid
         end

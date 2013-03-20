@@ -108,7 +108,7 @@ class Workflow < Automata::TaskManager
     end
 
     # BootNewEnv step
-    n = @nodes.length
+    n = n = @nodes.length
     setclassical = lambda do |inst,msg|
       if inst[0] == 'BootNewEnvKexec'
         inst[0] = 'BootNewEnvClassical'
@@ -262,7 +262,7 @@ class Workflow < Automata::TaskManager
 
     # Check nodes deploying
     unless context[:execution].ignore_nodes_deploying
-      nothing,to_discard = @nodes.check_nodes_in_deployment(
+      _,to_discard = @nodes.check_nodes_in_deployment(
         context[:database],
         context[:common].purge_deployment_timer
       )

@@ -647,7 +647,6 @@ class Microstep < Automata::QueueTask
       all_links_followed = false
       initial_file = file
       while (not all_links_followed) 
-        prev_file = file
         case archive_kind
         when "tgz"
           cmd = "tar -C #{dest_dir} -xzf #{archive} #{file}"          
@@ -872,7 +871,7 @@ class Microstep < Automata::QueueTask
         res = nil
         parallel_run(ns.id) do |pr|
           ns.set.each do |node|
-            kastafior_hostname = node.ip
+            #kastafior_hostname = node.ip
             cmd = "#{context[:common].taktuk_connector} #{node.ip} \"echo #{node.ip} > /tmp/kastafior_hostname\""
             pr.add(cmd, node)
           end
@@ -1596,7 +1595,7 @@ class Microstep < Automata::QueueTask
           || context[:cluster].timeout_reboot_classical
       end
     end
-    n = @nodes.length
+    n = n = @nodes.length
     timeout = eval(timeout).to_i
 
     unless ports_up
@@ -1827,12 +1826,12 @@ class Microstep < Automata::QueueTask
       end
       return true
     elsif (context[:cluster].admin_pre_install != nil) then
-      context[:cluster].admin_pre_install.each do |preinstall|
-        if not send_tarball_and_uncompress_with_taktuk(scattering_kind, preinstall["file"], preinstall["kind"], context[:common].rambin_path, "") then
+      context[:cluster].admin_pre_install.each do |preinst|
+        if not send_tarball_and_uncompress_with_taktuk(scattering_kind, preinst["file"], preinst["kind"], context[:common].rambin_path, "") then
           return false
         end
-        if (preinstall["script"] != "none")
-          if not parallel_exec("#{set_env()} #{context[:common].rambin_path}/#{preinstall["script"]}") then
+        if (preinst["script"] != "none")
+          if not parallel_exec("#{set_env()} #{context[:common].rambin_path}/#{preinst["script"]}") then
             return false
           end
         end
