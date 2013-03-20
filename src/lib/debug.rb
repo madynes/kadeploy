@@ -390,7 +390,7 @@ module Debug
     # * nothing
     def dump_to_db
       @nodes.each_pair { |hostname, node_infos|
-        res = @db.run_query(
+        @db.run_query(
          "INSERT INTO log ( \
           deploy_id, \
           user, \

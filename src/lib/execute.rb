@@ -118,7 +118,7 @@ class Execute
           @stderr = @parent_io[2].read unless @parent_io[2].closed?
         end
 
-        pid, @status = Process.wait2(@exec_pid)
+        _, @status = Process.wait2(@exec_pid)
       rescue Errno::ECHILD
         @status = nil
       ensure

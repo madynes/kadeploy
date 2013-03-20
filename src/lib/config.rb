@@ -111,35 +111,34 @@ module ConfigInformation
       end
 
       #Rights check
-      allowed_to_deploy = true
       #The rights must be checked for each cluster if the node_list contains nodes from several clusters
       exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
-        if (allowed_to_deploy) then
-          b=nil
-          if exec_specific_config.block_device != ""
-            b = exec_specific_config.block_device
-          else
-            b = @cluster_specific[cluster].block_device
-          end
-          p=nil
-          if exec_specific_config.deploy_part.nil?
-            p = ''
-          elsif exec_specific_config.deploy_part != ""
-            p = exec_specific_config.deploy_part
-          else
-            p = @cluster_specific[cluster].deploy_part
-          end
+        b=nil
+        if exec_specific_config.block_device != ""
+          b = exec_specific_config.block_device
+        else
+          b = @cluster_specific[cluster].block_device
+        end
+        p=nil
+        if exec_specific_config.deploy_part.nil?
+          p = ''
+        elsif exec_specific_config.deploy_part != ""
+          p = exec_specific_config.deploy_part
+        else
+          p = @cluster_specific[cluster].deploy_part
+        end
 
-          part = b + p
-          allowed_to_deploy = CheckRights::CheckRightsFactory.create(@common.rights_kind,
-                                                                     exec_specific_config.true_user,
-                                                                     client, set, db, part).granted?
+        part = b + p
+        unless CheckRights::CheckRightsFactory.create(
+          @common.rights_kind, exec_specific_config.true_user,
+          client, set, db, part
+        ).granted?
+          Debug::distant_client_error(
+            "You do not have the right to deploy on all the nodes", client
+          )
+          return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
         end
       }
-      if (not allowed_to_deploy) then
-        Debug::distant_client_error("You do not have the right to deploy on all the nodes", client)
-        return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
-      end
 
       #Environment load
       case exec_specific_config.load_env_kind
@@ -744,8 +743,8 @@ module ConfigInformation
             name = cp.value('name',String)
             address = cp.value('address',String)
 
-            if name =~ /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\Z/ \
-            and address =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\Z/
+            if name =~ /\A((?:A-Za-z0-9\.\-)+\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*)\Z/ \
+            and address =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[(?:\d{1,3}\-,\d{1,3})*\])\Z/
 
               hostnames = Nodes::NodeSet::nodes_list_expand(name)
               addresses = Nodes::NodeSet::nodes_list_expand(address)
@@ -954,7 +953,7 @@ module ConfigInformation
                   )
                 )
               end
-              name = cp.value('name',String)
+              _ = cp.value('name',String)
               cmd = cp.value('cmd',String)
               conf.cmd_power_status = cmd
             end
@@ -968,7 +967,7 @@ module ConfigInformation
                 )
               )
             end
-            name = cp.value('name',String)
+            _ = cp.value('name',String)
             cmd = cp.value('cmd',String)
             conf.cmd_console = cmd
           end
@@ -1065,26 +1064,26 @@ module ConfigInformation
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]
                   microconf = nil
-                  cp.parse('microsteps',false,Array) do |info|
-                    unless info[:empty]
+                  cp.parse('microsteps',false,Array) do |info2|
+                    unless info2[:empty]
                       microconf = {} unless microconf
                       microname = cp.value('name',String,nil,microsteps)
 
                       custom_sub = []
-                      cp.parse('substitute',false,Array) do |info|
-                        treatcustom.call(info,microname,custom_sub)
+                      cp.parse('substitute',false,Array) do |info3|
+                        treatcustom.call(info3,microname,custom_sub)
                       end
                       custom_sub = nil if custom_sub.empty?
 
                       custom_pre = []
-                      cp.parse('pre-ops',false,Array) do |info|
-                        treatcustom.call(info,microname,custom_pre)
+                      cp.parse('pre-ops',false,Array) do |info3|
+                        treatcustom.call(info3,microname,custom_pre)
                       end
                       custom_pre = nil if custom_pre.empty?
 
                       custom_post = []
-                      cp.parse('post-ops',false,Array) do |info|
-                        treatcustom.call(info,microname,custom_post)
+                      cp.parse('post-ops',false,Array) do |info3|
+                        treatcustom.call(info3,microname,custom_post)
                       end
                       custom_post = nil if custom_post.empty?
 
@@ -1171,7 +1170,7 @@ module ConfigInformation
             puts "The cluster #{cluster} has not been defined in #{CLUSTERS_CONFIGURATION_FILE}"
           end
         end
-        if /\A([A-Za-z0-9\.\-]+\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[[\d{1,3}\-,\d{1,3}]*\])\ ([A-Za-z0-9\.\-]+)\Z/ =~ line then
+        if /\A((?:A-Za-z0-9\.\-)+\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[(?:\d{1,3}\-,\d{1,3})*\])\ ((?:A-Za-z0-9\.\-)+)\Z/ =~ line then
           content = Regexp.last_match
           hostnames = content[1]
           ips = content[2]
@@ -1366,7 +1365,7 @@ module ConfigInformation
           return false
         end
 
-        http_response, etag = HTTP::fetch_file(srcfile, tmpfile.path, nil, nil)
+        http_response, _ = HTTP::fetch_file(srcfile, tmpfile.path, nil, nil)
         case http_response
         when -1
           error("The file #{srcfile} cannot be fetched: impossible to create a tempfile in the cache directory")
@@ -1674,7 +1673,7 @@ module ConfigInformation
           end
         }
         opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (ext[234] are allowed)") { |t|
-          if not (/\A(ext2|ext3|ext4)\Z/ =~ t) then
+          unless /\A(ext2|ext3|ext4)\Z/ =~ t
             error("Invalid FSTYPE, only ext2, ext3 and ext4 are allowed")
             return false
           end
@@ -1725,7 +1724,7 @@ module ConfigInformation
           else
             exec_specific.pxe_profile_singularities = Hash.new
             IO.readlines(f).each { |l|
-              if (not (/^#/ =~ l)) and (not (/^$/ =~ l)) then #we ignore commented and empty lines
+              if !(/^#/ =~ l) and !(/^$/ =~ l) then #we ignore commented and empty lines
                 content = l.split(",")
                 exec_specific.pxe_profile_singularities[content[0]] = content[1].strip
               end
@@ -1906,13 +1905,13 @@ module ConfigInformation
     # Output
     # * return true if the node exists in the Kadeploy configuration, false otherwise
     def add_to_node_set(hostname, exec_specific)
-      if /\A[A-Za-z\.\-]+[0-9]*\[[\d{1,3}\-,\d{1,3}]+\][A-Za-z0-9\.\-]*\Z/ =~ hostname
+      if /\A(?:A-Za-z\.\-)+[0-9]*\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*\Z/ =~ hostname
         hostnames = Nodes::NodeSet::nodes_list_expand("#{hostname}") 
       else
         hostnames = [hostname]
       end
-      hostnames.each{|hostname|
-        n = @common.nodes_desc.get_node_by_host(hostname)
+      hostnames.each{|host|
+        n = @common.nodes_desc.get_node_by_host(host)
         if (n != nil) then
           exec_specific.node_set.push(n)
         else
@@ -2403,7 +2402,7 @@ module ConfigInformation
         end
       }
       if (exec_specific.date_min != 0) then
-        if not (/^\d{4}:\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/ === exec_specific.date_min) then
+        unless /^\d{4}:\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/ === exec_specific.date_min
           error("The date #{exec_specific.date_min} is not correct")
           return false
         else
@@ -2412,7 +2411,7 @@ module ConfigInformation
         end
       end
       if (exec_specific.date_max != 0) then
-        if not (/^\d{4}:\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/ === exec_specific.date_max) then
+        unless /^\d{4}:\d{2}:\d{2}:\d{2}:\d{2}:\d{2}$/ === exec_specific.date_max
           error("The date #{exec_specific.date_max} is not correct")
           return false
         else
@@ -2685,7 +2684,7 @@ module ConfigInformation
           else
             exec_specific.pxe_profile_singularities = Hash.new
             IO.readlines(f).each { |l|
-              if (not (/^#/ =~ l)) and (not (/^$/ =~ l)) then #we ignore commented and empty lines
+              if !(/^#/ =~ l) and !(/^$/ =~ l) then #we ignore commented and empty lines
                 content = l.split(",")
                 exec_specific.pxe_profile_singularities[content[0]] = content[1].strip
               end
@@ -2849,7 +2848,7 @@ module ConfigInformation
         opt.separator "General options:"
         opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |hostname|
           hostname.strip!
-          if not (R_HOSTNAME =~ hostname) then
+          unless R_HOSTNAME =~ hostname
             error("Invalid hostname: #{hostname}")
             return false
           end
@@ -3344,7 +3343,7 @@ module ConfigInformation
     # Output
     # * return true if a next instance exists, false otherwise
     def use_next_instance
-      if (@array_of_instances.length > (@current +1)) then
+      if (@array_of_instances.length > (@current + 1)) then
         @current += 1
         return true
       else
