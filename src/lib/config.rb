@@ -2464,6 +2464,9 @@ module ConfigInformation
         opt.on("-f", "--field FIELD", "Only print the given fields (user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
           exec_specific.fields.push(f)
         }
+        opt.on("-l", "--last", "Only print the most recent information of selected machines") {
+          exec_specific.operation = "list_last"
+        }
         opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |hostname|
           return false unless load_machine(exec_specific.node_list, hostname)
         }

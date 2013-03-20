@@ -1189,6 +1189,8 @@ class KadeployServer
       case exec_specific.operation
       when "list_all"
         res = kastat_list_all(exec_specific, client, db)
+      when "list_last"
+        res = kastat_list_last(exec_specific, client, db)
       when "list_retries"
         res = kastat_list_retries(exec_specific, client, db)
       when "list_failure_rate"
@@ -1470,6 +1472,40 @@ class KadeployServer
     true
   end
 
+  def kastat_list_last(exec_specific, client, db)
+    args, generic_where_clause = generic_where_nodelist(exec_specific,'l1.hostname')
+    query = "SELECT * FROM log l1 INNER JOIN ("\
+      " SELECT hostname,MAX(start) as maxstart FROM log GROUP BY hostname"\
+    ") l2 ON l1.hostname = l2.hostname AND l1.start = l2.maxstart"
+    query += " WHERE #{generic_where_clause}" unless generic_where_clause.empty?
+    query += " GROUP BY l1.hostname;"
+
+    res = db.run_query(query,*args)
+
+    if res.num_rows == 0
+      Debug::distant_client_print("No information is available", client)
+      return false
+    end
+
+    fields = db_generate_fields(res.fields,exec_specific.fields,
+      [
+        "user","hostname","step1","step2","step3",
+        "timeout_step1","timeout_step2","timeout_step3",
+        "retry_step1","retry_step2","retry_step3",
+        "start",
+        "step1_duration","step2_duration","step3_duration",
+        "env","anonymous_env","md5",
+        "success","error"
+      ]
+    )
+    db_print_results(res,fields) do |str|
+      Debug::distant_client_print(str,client)
+    end
+
+    res = nil
+    GC.start
+    true
+  end
 
 
 
