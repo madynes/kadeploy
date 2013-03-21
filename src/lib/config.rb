@@ -825,7 +825,7 @@ module ConfigInformation
           clfile = cp.value(
             'conf_file',String,nil,{ :type => 'file', :readable => true }
           )
-          conf.prefix = cp.value('prefix',String,'')
+          conf.prefix = cp.value('prefix',String,'').freeze
           return false unless load_cluster_specific_config_file(clname,clfile)
 
           cp.parse('nodes',true,Array) do |info|
@@ -3347,7 +3347,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partitioning_script = @partitioning_script.clone
       dest.bootloader_script = @bootloader_script.clone
-      dest.prefix = @prefix.dup
+      dest.prefix = @prefix.clone
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
     
@@ -3396,7 +3396,7 @@ module ConfigInformation
       dest.admin_post_install = @admin_post_install.clone if (@admin_post_install != nil)
       dest.partitioning_script = @partitioning_script.clone
       dest.bootloader_script = @bootloader_script.clone
-      dest.prefix = @prefix.dup
+      dest.prefix = @prefix.clone
       dest.use_ip_to_deploy = @use_ip_to_deploy
     end
 
