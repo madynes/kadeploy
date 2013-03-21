@@ -39,7 +39,7 @@ module HTTP
       cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} --header='If-None-Match: \"#{expected_etag}\"' 2> #{wget_output.path}"
     end
     system(cmd)
-    http_response = `grep "HTTP/1\.." #{wget_output.path}|cut -f 2 -d' '`.chomp
+    http_response = `grep "^HTTP/1\.." #{wget_output.path}|tail -1|cut -f 2 -d' '`.chomp
     if (http_response == "200") then
       if not system("mv #{wget_download.path} #{output}") then
         return -2,0
