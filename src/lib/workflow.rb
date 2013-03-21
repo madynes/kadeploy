@@ -68,6 +68,10 @@ class Workflow < Automata::TaskManager
     -1
   end
 
+  def done?()
+    super() or !@errno.nil?
+  end
+
   def error(errno,abrt=true)
     @errno = errno
     @nodes.set_deployment_state('aborted',nil,context[:database],'') if abrt
@@ -239,7 +243,14 @@ class Workflow < Automata::TaskManager
   end
 
   def run!
-    Thread.new { self.start }
+    Thread.new do
+      begin
+        yield if block_given?
+        self.start
+      rescue KadeployError => ke
+        error(ke.errno)
+      end
+    end
   end
 
   def kill
