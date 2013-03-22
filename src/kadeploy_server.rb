@@ -266,6 +266,14 @@ class KadeployServer
         res = workflow.errno
         break if res
       end
+
+      unless info[:grabthread].alive?
+        begin
+          info[:grabthread].join
+        rescue KadeployError => ke
+          res = ke.errno
+        end
+      end
       res || FetchFileError::NO_ERROR
     }
   end
@@ -535,12 +543,13 @@ class KadeployServer
         ''
       )
 
-      begin
-        Managers::GrabFileManager.grab_user_files(context,tmpoutput)
-      rescue KadeployError => ke
-        @workflow_info_hash_lock.unlock
-        exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
-        raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+      @workflow_info_hash[workflow_id][:grabthread] = Thread.new do
+        begin
+          Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+        rescue KadeployError => ke
+          exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
+          raise KadeployError.new(ke.errno,{ :wid => workflow_id })
+        end
       end
     end
 
@@ -646,6 +655,9 @@ class KadeployServer
           end
         end
 
+        # Wait that every files are cached
+        @workflow_info_hash[wid][:grabthread].join
+
         # Run workflows
         threads = {}
         workflows.each { |workflow| threads[workflow] = workflow.run! }
@@ -683,7 +695,7 @@ class KadeployServer
       end
     rescue KadeployError => ke
       msg = KadeployAsyncError.to_msg(ke.errno)
-      Debug::distant_client_error(msg + " (error ##{ke.errno})",client) if msg and !msg.empty?
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
       #Debug::distant_client_error("Cannot run the deployment",client)
       kadeploy_sync_kill_workflow(ke.context[:wid],false)
     end
@@ -703,6 +715,9 @@ class KadeployServer
         @workflow_info_hash[workflow_id][:runthread].kill \
           if @workflow_info_hash[workflow_id][:runthread].alive? and killrun
         #@workflow_info_hash[workflow_id][:runthread].join
+        @workflow_info_hash[workflow_id][:grabthread].kill \
+          if @workflow_info_hash[workflow_id][:grabthread].alive? and killrun
+        #@workflow_info_hash[workflow_id][:grabthread].join
 
         @workflow_info_hash[workflow_id][:workflows].each do |workflow|
           workflow.kill()
@@ -715,6 +730,7 @@ class KadeployServer
   def kadeploy_create_workflow_info(workflow_id)
     @workflow_info_hash[workflow_id] = {}
     @workflow_info_hash[workflow_id][:runthread] = Thread.current
+    @workflow_info_hash[workflow_id][:grabthread] = nil
     @workflow_info_hash[workflow_id][:workflows] = []
   end
 
@@ -760,7 +776,17 @@ class KadeployServer
       return nil, ke.errno
     end
 
-    workflows.each { |workflow| workflow.run! }
+    workflows.each do |workflow|
+      workflow.run!{ @workflow_info_hash[wid][:grabthread].join }
+    end
+
+    unless @workflow_info_hash[wid][:grabthread].alive?
+      begin
+        @workflow_info_hash[wid][:grabthread].join
+      rescue KadeployError => ke
+        return wid, ke.errno
+      end
+    end
 
     return wid, KadeployAsyncError::NO_ERROR
   end
