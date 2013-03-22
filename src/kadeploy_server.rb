@@ -1331,7 +1331,7 @@ class KadeployServer
       i+=1
       if (i%RESULTS_PRINT_PITCH == 0)
         yield(buff)
-        buff.gsub!(/.*/,'') # String.clear in ruby 1.9
+        buff = ""
       end
     end
     yield(buff) unless buff.empty?
