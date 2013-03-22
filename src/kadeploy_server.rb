@@ -1579,12 +1579,14 @@ class KadeployServer
     if (@workflow_info_hash.has_key?(workflow_id)) then
       hash = Hash.new
 
-      workflows = @workflow_info_hash[workflow_id]
       states = nil
-      workflows.each do |workflow|
-        state = workflow.get_state
-        states = tmp if states.nil?
-        states['nodes'].merge!(state['nodes'])
+      @workflow_info_hash[workflow_id][:workflows].each do |workflow|
+        state = workflow.state
+        if states.nil?
+          states = state
+        else
+          states['nodes'].merge!(state['nodes'])
+        end
       end
       hash[workflow_id] = states
 
@@ -1594,10 +1596,13 @@ class KadeployServer
       hash = Hash.new
       @workflow_info_hash.each_pair { |key,workflow_info_hash|
         states = nil
-        workflow_info_hash.each do |workflow|
-          state = workflow.get_state
-          states = tmp if states.nil?
-          states['nodes'].merge!(state['nodes'])
+        workflow_info_hash[:workflows].each do |workflow|
+          state = workflow.state
+          if states.nil?
+            states = state
+          else
+            states['nodes'].merge!(state['nodes'])
+          end
         end
         hash[key] = states
       }
