@@ -823,8 +823,16 @@ class KadeployServer
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new("empty")
     config.common = @config.common.clone
-    config.cluster_specific = @config.cluster_specific.clone
     config.exec_specific = exec_specific
+    config.cluster_specific = Hash.new
+
+    exec_specific.node_set.group_by_cluster.each_key do |cluster|
+      config.cluster_specific[cluster] =
+        ConfigInformation::ClusterSpecificConfig.new
+      @config.cluster_specific[cluster].duplicate_all(
+        config.cluster_specific[cluster]
+      )
+    end
 
     reboot_id = Digest::SHA1.hexdigest(
       config.exec_specific.true_user \
@@ -2519,8 +2527,17 @@ class KadeployServer
     #We create a new instance of Config with a specific exec_specific part
     config = ConfigInformation::Config.new("empty")
     config.common = @config.common.clone
-    config.cluster_specific = @config.cluster_specific.clone
     config.exec_specific = exec_specific
+    config.cluster_specific = Hash.new
+
+    exec_specific.node_set.group_by_cluster.each_key do |cluster|
+      config.cluster_specific[cluster] =
+        ConfigInformation::ClusterSpecificConfig.new
+      @config.cluster_specific[cluster].duplicate_all(
+        config.cluster_specific[cluster]
+      )
+    end
+
     nodes_ok = Nodes::NodeSet.new
     nodes_ko = Nodes::NodeSet.new
     global_nodes_mutex = Mutex.new
