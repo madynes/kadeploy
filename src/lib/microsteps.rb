@@ -1423,7 +1423,13 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true (should be false sometimes :D)
   def ms_reboot(reboot_kind)
-    first_attempt = (context[:local][:parent].context[:local][:retries] == 0)
+    first_attempt = nil
+    if context[:local][:parent].is_a?(Automata::Task)
+      first_attempt = (context[:local][:parent].context[:local][:retries] == 0)
+    else
+      first_attempt = true
+    end
+
     case reboot_kind
     when "soft"
       if first_attempt then
