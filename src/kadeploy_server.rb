@@ -161,11 +161,18 @@ class KadeployServer
   # * other kinds: return true if the command has been correctly performed, false otherwise
   def run(kind, exec_specific_config, host, port)
     db = Database::DbFactory.create(@config.common.db_kind)
-    if not db.connect(@config.common.deploy_db_host,
-                      @config.common.deploy_db_login,
-                      @config.common.deploy_db_passwd,
-                      @config.common.deploy_db_name) then
-      puts "Kadeploy server cannot connect to DB"
+    unless db.connect(
+      @config.common.deploy_db_host,
+      @config.common.deploy_db_login,
+      @config.common.deploy_db_passwd,
+      @config.common.deploy_db_name)
+    then
+      distant = DRb.start_service("druby://localhost:0")
+      uri = "druby://#{host}:#{port}"
+      client = DRbObject.new(nil, uri)
+      Debug::distant_client_error("Kadeploy server cannot connect to DB #{@config.common.deploy_db_login}@#{@config.common.deploy_db_host}/#{@config.common.deploy_db_name}",client)
+      client.print('Please contact the administration team.')
+      distant.stop_service()
       return false
     end
 
