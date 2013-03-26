@@ -7,6 +7,10 @@
 
 
 PID=0
+Exit_handler_int()
+{
+    ssh-agent -k 1>/dev/null
+}
 Exit_handler_kill()
 {
     ssh-agent -k 1>/dev/null
@@ -46,6 +50,7 @@ else
   ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" &
 fi
 PID=$!
+trap Exit_handler_int INT
 trap Exit_handler_term TERM
 trap Exit_handler_kill KILL
 
