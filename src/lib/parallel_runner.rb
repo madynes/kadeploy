@@ -15,6 +15,7 @@ require 'thread'
     @execs = nil
     @output = nil
     @threads = nil
+    @runthread = nil
 
 
     # Constructor of PRunner
@@ -49,9 +50,28 @@ require 'thread'
     # Output
     # * nothing
     def run
+      @runthread = Thread.new do
+        Thread.current[:launched] = false
+        @execs.each_value do |exec|
+          exec.run
+        end
+        Thread.current[:launched] = true
+        while true do
+          if Thread.current[:quit]
+            break
+          elsif Thread.current[:kill]
+            @execs.each_value do |exec|
+              exec.kill
+            end
+            break
+          end
+          sleep 1
+        end
+      end
+      sleep 1 while !@runthread[:launched]
       @execs.each_pair do |node,exec|
         tid = Thread.new do
-          exec.run
+          #exec.run
           status,stdout,stderr = exec.wait
           node.last_cmd_stdout = stdout.chomp
           node.last_cmd_stderr = stderr.chomp
@@ -71,6 +91,9 @@ require 'thread'
       @threads.list.each do |thr|
         thr.join
       end
+      @runthread[:quit] = true
+      @runthread.join
+      @runthread = nil
       @threads = ThreadGroup.new
     end
 
@@ -80,9 +103,17 @@ require 'thread'
         thr.kill! if thr.alive?
         thr.join
       end
+=begin
+i = 1
       @execs.each_value do |exec|
+puts i
+i += 1
         exec.kill
       end
+=end
+      @runthread[:kill] = true
+      @runthread.join
+      @runthread = nil
     end
 
     # Get the results of the execution
