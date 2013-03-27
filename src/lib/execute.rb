@@ -90,12 +90,28 @@ class Execute
     end
   end
 
+  def self.kill_recursive(pid)
+    begin
+      # SIGSTOPs the process to avoid it creating new childs
+      Process.kill('STOP',pid)
+      # Gather the list of childs before killing the parent in order to
+      # be able to kill childs that will be re-attached to init
+      childs = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
+      # Directly kill the process not to generate <defunct> childs
+      Process.kill('KILL',pid)
+      childs.each do |cpid|
+        kill_recursive(cpid)
+      end
+    rescue Errno::ESRCH
+    end
+  end
+
   def kill()
     @parent_io.each { |io| io.close unless io.closed? } if @parent_io
     @child_io.each { |io| io.close unless io.closed? } if @child_io
     unless @exec_pid.nil?
       begin
-        Process.kill('TERM',@exec_pid)
+        Execute.kill_recursive(@exec_pid)
         Process.wait(@exec_pid)
       rescue Errno::ESRCH
       end
