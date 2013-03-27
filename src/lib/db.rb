@@ -141,7 +141,7 @@ module Database
       rescue Mysql::Error => e
         $stderr.puts "MySQL error (code): #{e.errno}"
         $stderr.puts "MySQL error (message): #{e.error}"
-        $stderr.puts e.backtrace
+        $stderr.puts "Kadeploy server cannot connect to DB #{user}@#{host}/#{base}"
         ret = false
       end
       return ret
