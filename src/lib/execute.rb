@@ -18,29 +18,42 @@ class Execute
     self.new(*cmd)
   end
 
-  def self.init_ios(opts={})
-    in_r, in_w = IO::pipe
-    in_w.sync = true
+  def self.init_ios(opts={:stdin => false})
+    if opts[:stdin]
+      in_r, in_w = IO::pipe
+      in_w.sync = true
 
-    out_r, out_w = IO::pipe
-    err_r, err_w = IO::pipe
+      out_r, out_w = IO::pipe
+      err_r, err_w = IO::pipe
 
-    [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
+      [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
+    else
+      out_r, out_w = IO::pipe
+      err_r, err_w = IO::pipe
+
+      [ [nil,out_w,err_w], [nil,out_r,err_r] ]
+    end
   end
 
-  def run(opts={})
+  def run(opts={:stdin => false})
     @child_io, @parent_io = Execute.init_ios(opts) unless @child_io and @parent_io
     @exec_pid = fork {
-      @parent_io.each { |io| io.close unless io.closed? }
-      std = [STDIN, STDOUT, STDERR]
+      @parent_io.each { |io| io.close if io and !io.closed? }
+      std = nil
+      if opts[:stdin]
+        std = [STDIN, STDOUT, STDERR]
+      else
+        std = [nil, STDOUT, STDERR]
+      end
       std.each_index do |i|
+        next unless std[i]
         std[i].reopen(@child_io[i])
         @child_io[i].close
       end
       exec(*@command)
     }
 
-    @child_io.each { |io| io.close unless io.closed? }
+    @child_io.each { |io| io.close if io and !io.closed? }
     result = [@exec_pid, *@parent_io]
     if block_given?
       begin
@@ -52,7 +65,7 @@ class Execute
     result
   end
 
-  def run!(opts={})
+  def run!(opts={:stdin => false})
     if block_given?
       run(opts,Proc.new)
     else
@@ -81,7 +94,7 @@ class Execute
       rescue Errno::ECHILD
         @status = nil
       ensure
-        @parent_io.each { |io| io.close unless io.closed? }
+        @parent_io.each { |io| io.close if io and !io.closed? }
         @child_io = nil
         @parent_io = nil
         @exec_pid = nil
@@ -107,8 +120,8 @@ class Execute
   end
 
   def kill()
-    @parent_io.each { |io| io.close unless io.closed? } if @parent_io
-    @child_io.each { |io| io.close unless io.closed? } if @child_io
+    @parent_io.each { |io| io.close if io and !io.closed? } if @parent_io
+    @child_io.each { |io| io.close if io and !io.closed? } if @child_io
     unless @exec_pid.nil?
       begin
         Execute.kill_recursive(@exec_pid)
