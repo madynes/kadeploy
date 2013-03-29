@@ -1,6 +1,7 @@
 # To be used as you're using Open3.popen3 in ruby 1.9.2
 class Execute
   require 'thread'
+  require 'fcntl'
   attr_reader :command, :exec_pid, :stdout, :stderr, :status
   @@forkmutex = Mutex.new
 
@@ -41,6 +42,7 @@ class Execute
   def run(opts={:stdin => false})
     @@forkmutex.synchronize do
       @child_io, @parent_io = Execute.init_ios(opts)
+      @parent_io.each { |io| io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC) }
       @exec_pid = fork {
         @parent_io.each { |io| io.close if io and !io.closed? }
         std = nil
