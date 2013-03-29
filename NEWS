@@ -1,3 +1,50 @@
+## New in 3.1.7 ##
+== User interface ==
+* Environments description files are now written in YAML
+  A migration script is available in addons/kaenv_migration
+  (see doc sec/4.2.4, Environment description)
+* It is now possible to deploy multi-partitioned FSArchiver images
+  (see doc sec/4.7)
+* Kastat now have an option only to display statistics of the last deployment
+
+== Internals ==
+* Partitioning operation is now performed with an administrator-providen script
+  (see doc sec/2.6)
+* Bootloader install is now performed with an administrator-providen script
+  (see doc sec/2.5)
+* Deployment of multi-partitioned environments (see doc sec/4.7)
+* Handle of GrubPXE disks as PXE boot method (see doc sec/2.2)
+* PXE profiles handling is now customizable (see doc sec/2.1,2.2)
+  - Each kind of reboot (local, network, user) can be made using a different
+    boot method (PXElinux, iPXE, GrubPXE, ...)
+  - The directory containing the profile is customizable
+  - The way to generate the filename of profiles is customizable
+* Filesystems suported by the deployment environment are now explicit in the
+  configuration so the deployment process can be modified if the filesystem
+  of the deployed environment is or isn't known by the deployment environment
+  (see doc sec/2.4,2.4.2)
+* Rewritten caching system, no more 1-hour lock on the cached files
+
+!! Changes in configuration files !!
+* General configuration (doc sec/2.1)
+  - The way to specify PXE configuration has changed
+* Cluster specific configuration (doc sec/2.3)
+  - A script have to be specified for the partitioning operations
+  - A script have to be specified for the bootloader install
+  - A specific PXE header can be specified for each kind of reboot
+  - The string \n is no more replaced by a new line in PXE headers
+    (use YAML notation for multi-line headers)
+  - A list of supported filesystems have to be given for the deployment env.
+* Clusters configuration file (doc sec/2.2)
+  - The fields concerning the partition maps have been removed, this
+    functionality is no more supported
+* Changes in the partitioning maps (doc sec/2.4)
+  - Partition maps are not needed anymore
+
+!! Database update !!
+* The Kadeploy3 database have to be updated with the script db/update-3.1.7.sql
+
+
 ## New in 3.1.6 ##
 == User interface ==
 * The CLI display has been modified to look more clear
