@@ -84,6 +84,7 @@ class Execute
   def wait(opts={})
     unless @exec_pid.nil?
       begin
+        @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
         if opts[:stdout_size]
           @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
           @parent_io[1].read unless @parent_io[1].closed?
