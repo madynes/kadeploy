@@ -41,6 +41,7 @@ class Execute
   def run(opts={:stdin => false})
     @@forkmutex.synchronize do
       @child_io, @parent_io = Execute.init_ios(opts)
+      @parent_io.each { |io| io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC) }
       @exec_pid = fork {
         @parent_io.each { |io| io.close if io and !io.closed? }
         std = nil
