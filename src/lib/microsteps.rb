@@ -1196,9 +1196,9 @@ class Microstep < Automata::QueueTask
   end
 
   def set_parttype(map,val,empty)
-    map.gsub!(/PARTTYPE#{get_deploy_part_num()}(\D)/,"#{val}\\1")
+    map.gsub!(/PARTTYPE#{get_deploy_part_num()}(\D)/,"#{val}\\1") if val
     map.gsub!(/PARTTYPE\d+/,empty)
-    map.gsub!('PARTTYPE',val)
+    map.gsub!('PARTTYPE',val || empty)
     map
   end
 
