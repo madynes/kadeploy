@@ -84,6 +84,7 @@ class Execute
   def wait(opts={})
     unless @exec_pid.nil?
       begin
+        @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
         if opts[:stdout_size]
           @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
           @parent_io[1].read unless @parent_io[1].closed?
@@ -115,14 +116,14 @@ class Execute
 
   def self.kill_recursive(pid)
     begin
-      # SIGSTOPs the process to avoid it creating new childs
+      # SIGSTOPs the process to avoid it creating new children
       Process.kill('STOP',pid)
-      # Gather the list of childs before killing the parent in order to
-      # be able to kill childs that will be re-attached to init
-      childs = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
-      # Directly kill the process not to generate <defunct> childs
+      # Gather the list of children before killing the parent in order to
+      # be able to kill children that will be re-attached to init
+      children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
+      # Directly kill the process not to generate <defunct> children
       Process.kill('KILL',pid)
-      childs.each do |cpid|
+      children.each do |cpid|
         kill_recursive(cpid)
       end
     rescue Errno::ESRCH
