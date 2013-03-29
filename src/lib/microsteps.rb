@@ -1109,6 +1109,59 @@ class Microstep < Automata::QueueTask
     File.join(context[:common].rambin_path,'_FSARCHIVE.fsa')
   end
 
+  def set_parttype(map,val,empty)
+    map.gsub!(/PARTTYPE#{get_deploy_part_num()}(\D)/,"#{val}\\1") if val
+    map.gsub!(/PARTTYPE\d+/,empty)
+    map.gsub!('PARTTYPE',val || empty)
+    map
+  end
+
+  # Perform a fdisk on the nodes
+  #
+  # Arguments
+  # * env: kind of environment on wich the fdisk operation is performed
+  # Output
+  # * return true if the fdisk has been successfully performed, false otherwise
+  def do_fdisk()
+    begin
+      temp = Tempfile.new("fdisk_#{context[:cluster].name}")
+    rescue StandardError
+      failed_microstep("Cannot create the fdisk tempfile")
+      return false
+    end
+
+    map = File.read(context[:cluster].partition_file)
+    map = set_parttype(map,context[:execution].environment.fdisk_type,'0')
+    temp.write(map)
+    temp.close
+
+    unless parallel_exec(
+      "fdisk #{get_block_device_str()}",
+      { :input_file => temp.path, :scattering => :tree }
+    )
+      failed_microstep("Cannot perform the fdisk operation")
+      return false
+    end
+
+    temp.unlink
+    return true
+  end
+
+  # Perform a parted on the nodes
+  #
+  # Arguments
+  # Output
+  # * return true if the parted has been successfully performed, false otherwise
+  def do_parted()
+    map = File.read(context[:cluster].partition_file)
+    map.gsub!("\n",' ')
+    map = set_parttype(map, context[:execution].environment.filesystem, '')
+    return parallel_exec(
+      "parted -a optimal #{get_block_device_str()} --script #{map}",
+      { :scattering => :tree }
+    )
+  end
+
   public
 
   def ms_dummy()
