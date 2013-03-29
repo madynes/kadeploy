@@ -50,8 +50,8 @@ require 'thread'
     # * nothing
     def run
       @execs.each_pair do |node,exec|
+        exec.run
         tid = Thread.new do
-          exec.run
           status,stdout,stderr = exec.wait
           node.last_cmd_stdout = stdout.chomp
           node.last_cmd_stderr = stderr.chomp
