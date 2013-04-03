@@ -44,21 +44,37 @@ class Execute
       @child_io, @parent_io = Execute.init_ios(opts)
       @parent_io.each { |io| io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC) if io }
       @exec_pid = fork {
-        @parent_io.each { |io| io.close if io and !io.closed? }
+        @parent_io.each do |io|
+          begin
+            io.close if io and !io.closed?
+          rescue IOError
+          end
+        end
+
         std = nil
         if opts[:stdin]
           std = [STDIN, STDOUT, STDERR]
         else
           std = [nil, STDOUT, STDERR]
         end
+
         std.each_index do |i|
           next unless std[i]
           std[i].reopen(@child_io[i])
-          @child_io[i].close
+          begin
+            @child_io[i].close
+          rescue IOError
+          end
         end
         exec(*@command)
       }
-      @child_io.each { |io| io.close if io and !io.closed? }
+
+      @child_io.each do |io|
+        begin
+          io.close if io and !io.closed?
+        rescue IOError
+        end
+      end
     end
     result = [@exec_pid, *@parent_io]
     if block_given?
@@ -83,13 +99,18 @@ class Execute
   def wait(opts={})
     unless @exec_pid.nil?
       begin
-        @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
+        begin
+          @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
+        rescue IOError
+        end
+
         if opts[:stdout_size]
           @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
           @parent_io[1].read unless @parent_io[1].closed?
         else
           @stdout = @parent_io[1].read unless @parent_io[1].closed?
         end
+
         if opts[:stderr_size]
           @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
           @parent_io[2].read unless @parent_io[2].closed?
@@ -101,7 +122,12 @@ class Execute
       rescue Errno::ECHILD
         @status = nil
       ensure
-        @parent_io.each { |io| io.close if io and !io.closed? }
+        @parent_io.each do |io|
+          begin
+            io.close if io and !io.closed?
+          rescue IOError
+          end
+        end
         @child_io = nil
         @parent_io = nil
         @exec_pid = nil
@@ -127,8 +153,20 @@ class Execute
   end
 
   def kill()
-    @parent_io.each { |io| io.close if io and !io.closed? } if @parent_io
-    @child_io.each { |io| io.close if io and !io.closed? } if @child_io
+    @parent_io.each do |io|
+      begin
+        io.close if io and !io.closed?
+      rescue IOError
+      end
+    end if @parent_io
+
+    @child_io.each do |io|
+      begin
+        io.close if io and !io.closed?
+      rescue IOError
+      end
+    end if @child_io
+
     unless @exec_pid.nil?
       begin
         Execute.kill_recursive(@exec_pid)
