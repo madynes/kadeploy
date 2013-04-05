@@ -1,6 +1,8 @@
 # To be used as you're using Open3.popen3 in ruby 1.9.2
 class Execute
+  require 'thread'
   attr_reader :command, :exec_pid, :stdout, :stderr, :status
+  @@forkmutex = Mutex.new
 
   def initialize(*cmd)
     @command = *cmd
@@ -11,7 +13,8 @@ class Execute
     @stderr = nil
     @status = nil
 
-    @child_io, @parent_io = Execute.init_ios()
+    @child_io = nil
+    @parent_io = nil
   end
 
   def self.[](*cmd)
@@ -36,24 +39,25 @@ class Execute
   end
 
   def run(opts={:stdin => false})
-    @child_io, @parent_io = Execute.init_ios(opts) unless @child_io and @parent_io
-    @exec_pid = fork {
-      @parent_io.each { |io| io.close if io and !io.closed? }
-      std = nil
-      if opts[:stdin]
-        std = [STDIN, STDOUT, STDERR]
-      else
-        std = [nil, STDOUT, STDERR]
-      end
-      std.each_index do |i|
-        next unless std[i]
-        std[i].reopen(@child_io[i])
-        @child_io[i].close
-      end
-      exec(*@command)
-    }
-
-    @child_io.each { |io| io.close if io and !io.closed? }
+    @@forkmutex.synchronize do
+      @child_io, @parent_io = Execute.init_ios(opts)
+      @exec_pid = fork {
+        @parent_io.each { |io| io.close if io and !io.closed? }
+        std = nil
+        if opts[:stdin]
+          std = [STDIN, STDOUT, STDERR]
+        else
+          std = [nil, STDOUT, STDERR]
+        end
+        std.each_index do |i|
+          next unless std[i]
+          std[i].reopen(@child_io[i])
+          @child_io[i].close
+        end
+        exec(*@command)
+      }
+      @child_io.each { |io| io.close if io and !io.closed? }
+    end
     result = [@exec_pid, *@parent_io]
     if block_given?
       begin
