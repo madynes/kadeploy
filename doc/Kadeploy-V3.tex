@@ -531,7 +531,7 @@ The information used to generate this filenames are the one specified for each n
     \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE user custom files sub-directory
    \end{itemize}
 
-  \item \ypath{/pxe/networkboot} the method used boot operating system images sent from the network (the deployment environment kernel). This setting is optional by default, the DHCP method is used.
+  \item \ypath{/pxe/networkboot} the method used to boot operating system images sent from the network (the deployment environment kernel). This setting is optional by default, the DHCP method is used.
   \begin{itemize}
     \item \yfield{method}{String} the PXE method used to boot the nodes (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
     \item \yfield{binary}{String} the binary of the Network Bootstrap Program (if this method is different than the DHCP one, this file will be loaded by the PXE method). For example, for PXElinux, this file is \emph{pxeliux.0}.
@@ -769,7 +769,13 @@ postinstall:
       format: tgz
       script: launch.sh
 pxe: 
-  headers: PROMPT 1\nSERIAL 0 38400\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n
+  headers:
+    dhcp: &id001 |-
+      PROMPT 1
+      SERIAL 0 38400
+      TIMEOUT 50
+    netboot: *id001
+    localboot: set timeout=5
 kexec:
   repository: /dev/shm/kexec_repository
 hooks:
@@ -918,9 +924,11 @@ automata:
     \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
   \end{itemize}
 
-  \item \ypath{/pxe}
+  \item \ypath{/pxe/headers} PXE headers to be used for the different kind of reboots
   \begin{itemize}
-    \item \yfieldd{headers}{String}{''} default PXE header (must be defined in one line, you can use the \\n notation to add newlines)
+    \item \yfieldd{dhcp}{String}{''} PXE headers to be used for the the default method. Further information are available in the paragraph \texttt{Booting over the network}.
+    \item \yfieldd{networkboot}{String}{''} PXE headers to be used when booting operating system images sent from the network. Further information are available in the paragraph \texttt{Booting over the network}.
+    \item \yfieldd{localboot}{String}{''} PXE headers to be used when booting operating system from hard disk. Further information are available in the paragraph \texttt{Booting over the network}.
   \end{itemize}
 
   \item \ypath{/kexec}
