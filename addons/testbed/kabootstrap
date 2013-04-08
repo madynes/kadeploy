@@ -151,10 +151,17 @@ def cfg_environment_desc(env)
       postinstall = "postinstall : #{File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))}|#{env[:postinstall][:filetype]}|#{env[:postinstall][:args]}\n"
     end
 
+    if $version <= 5
+      demolishing = (env[:demolishing] ? 1 : 0)
+    else
+      demolishing = env[:demolishing].to_s
+    end
+
     "###\n"\
     "name : #{env[:name]}\n"\
     "#{env[:desc]}\n"\
     "tarball : #{File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))}|tgz\n"\
+    + "demolishing_env : #{demolishing}\n"\
     + postinstall
   end
 end
@@ -857,7 +864,7 @@ end
 CFG_KASTAFIOR_BIN_FILE = '/usr/bin/kastafior'
 
 # frontend default config
-CFG_FRONTEND_USER = 'testuser'
+CFG_FRONTEND_USER = 'frontend'
 CFG_FRONTEND_USER_PASS = 'pass'
 CFG_FRONTEND_SHELL = 'bash'
 CFG_FRONTEND_PACKAGES = [
@@ -2234,7 +2241,13 @@ envfiles = Dir.entries(ARGV[1])
 envfiles.delete('.')
 envfiles.delete('..')
 
-envfiles = envfiles.select { |env| File.file?(File.join(ARGV[1],env)) }
+envfiles = envfiles.select do |env|
+  File.file?(File.join(ARGV[1],env)) and (
+    ($version >= 7 and ['.yml','.yaml'].include?(File.extname(env))) \
+    or \
+    ($version < 7 and ['.dsc','.desc','.env'].include?(File.extname(env))) \
+  )
+end
 
 envfiles.each do |env|
 	$kaenvs[env] = {}
@@ -2263,6 +2276,12 @@ envfiles.each do |env|
         $kaenvs[env][:postinstall][:file] = Regexp.last_match(1).strip
         $kaenvs[env][:postinstall][:filetype] = Regexp.last_match(2).strip
         $kaenvs[env][:postinstall][:args] = Regexp.last_match(3).strip
+      elsif line =~ /^\s*demolishing_env\s*:\s*([^ ]+)\s*$/
+        if $version <= 5
+          $kaenvs[env][:demolishing] = (Regexp.last_match(1).to_i != 0)
+        else
+          $kaenvs[env][:demolishing] = (Regexp.last_match(1) == 'true')
+        end
       elsif line.strip != '###' and !line.strip.empty?
         $kaenvs[env][:desc] = [] unless $kaenvs[env][:desc]
         $kaenvs[env][:desc] << line
@@ -3241,13 +3260,17 @@ sshgw.ssh(servername,'root') do |session|
 
 		  msg("Creating the #{CFG_KADEPLOY_USER} user",MSG_INFO)
       sexec(session, "userdel --force --remove #{CFG_KADEPLOY_USER}; true")
-      sexec(session, "useradd --user-group #{CFG_KADEPLOY_USER}")
+      sexec(session, "useradd -U -m #{CFG_KADEPLOY_USER}")
 
 		  msg("Building Kadeploy packages",MSG_INFO)
       sexec(session,"cd #{tmpdir} && PKG_DIR=#{File.join(tmpdir,'packages')} make deb")
 
 		  msg('Installing Kadeploy server/client',MSG_INFO)
-      sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'packages','*.deb')}")
+      if $version > 5
+        sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'packages','*.deb')}")
+      else
+        sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'*.deb')}")
+      end
 
 		  msg('Remove the temporary directory',MSG_INFO)
       sexec(session,"rm -Rf #{tmpdir}")
@@ -3289,7 +3312,7 @@ sshgw.ssh(servername,'root') do |session|
     end
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_SSHKEY_PATH}")
 
-=begin
+#=begin
 		msg('Creating PXE directories',MSG_INFO)
     sexec(session,"rm -Rf #{cfg_pxe_path()}")
     sexec(session,"mkdir -p #{cfg_pxe_path()}")
@@ -3298,7 +3321,7 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_PROFILES_DIR)}")
     sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} -R #{cfg_pxe_path()}")
-=end
+#=end
 
 		msg('Copying clusters postinstall files',MSG_INFO)
 		$clusters.values.each do |cluster|
