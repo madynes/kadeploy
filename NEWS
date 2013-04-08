@@ -31,6 +31,7 @@
 * Cluster specific configuration (doc sec/2.3)
   - A script have to be specified for the partitioning operations
   - A script have to be specified for the bootloader install
+  - The 'kernels' field has been moved to 'boot/kernels'
   - A specific PXE header can be specified for each kind of reboot
   - The string \n is no more replaced by a new line in PXE headers
     (use YAML notation for multi-line headers)

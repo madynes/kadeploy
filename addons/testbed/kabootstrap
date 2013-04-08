@@ -768,12 +768,6 @@ def cfg_kadeploy_specific_conf(cluster)
           },
         ],
       },
-      'kernels' => {
-        'deploy' => deploy_kernel,
-        'user' => {
-          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
-        },
-      },
       'kexec' => {
         'repository' => '/dev/shm/kexec_repository',
       },
@@ -806,10 +800,22 @@ def cfg_kadeploy_specific_conf(cluster)
 
     if $version >= 7
       cfg['partitioning']['script'] = CFG_KADEPLOY_PARTITIONING_SCRIPT
-      cfg['bootloader'] = {}
-      cfg['bootloader']['script'] = CFG_KADEPLOY_BOOTLOADER_SCRIPT
+      cfg['boot'] = {}
+      cfg['boot']['install_bootloader'] = CFG_KADEPLOY_BOOTLOADER_SCRIPT
+      cfg['boot']['kernels'] = {
+        'deploy' => deploy_kernel,
+        'user' => {
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+        },
+      }
     else
       cfg['partitioning']['kind'] = 'fdisk'
+      cfg['kernels'] = {
+        'deploy' => deploy_kernel,
+        'user' => {
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+        },
+      }
     end
 
     cfg.to_yaml
