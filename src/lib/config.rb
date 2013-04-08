@@ -276,7 +276,7 @@ module ConfigInformation
 
     def check_kaenv_config(exec_specific_config, db, client)
       #Environment load
-      if exec_specific_config.operation == "add"
+      if exec_specific_config.operation == "add" or exec_specific_config.operation == "migrate"
         # almighty users can add environments for other users
         user = nil
         if exec_specific_config.user \
@@ -294,7 +294,8 @@ module ConfigInformation
           user,
           client,
           true,
-          exec_specific_config.load_env_file
+          exec_specific_config.load_env_file,
+          exec_specific_config.operation == "migrate"
         ))
           return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
         end
@@ -2176,6 +2177,15 @@ module ConfigInformation
         opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
           exec_specific.operation = "move-files"
         }
+        opt.on("", "--migrate ENVFILE", "Convert an old environment description file to the new format (3.1.7)") { |f|
+          if tmp = load_envfile(f)
+            exec_specific.load_env_desc = tmp
+            exec_specific.load_env_file = f
+            exec_specific.operation = "migrate"
+          else
+            return false
+          end
+        }
       end
       @opts = opts
       begin
@@ -2251,6 +2261,11 @@ module ConfigInformation
         if (exec_specific.files_to_move.empty?) then
           error("You must define some files to move")
           return false          
+        end
+      when "migrate"
+        if (exec_specific.load_env_desc == "") then
+          error("You must choose a file that contains the environment description")
+          return false
         end
       else
         error("You must choose an operation")
