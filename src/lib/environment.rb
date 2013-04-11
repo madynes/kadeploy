@@ -138,6 +138,211 @@ module EnvironmentManagement
       return [true,'']
     end
 
+    # Deprecated, to be removed in 3.1.8
+    def old_load_from_file(description, almighty_env_users, user, client, record_in_db,migration=false)
+      @preinstall = nil
+      @postinstall = nil
+      @environment_kind = nil
+      @demolishing_env = "0"
+      @author = "no author"
+      @description = "no description"
+      @kernel = nil
+      @kernel_params = nil
+      @initrd = nil
+      @hypervisor = nil
+      @hypervisor_params = nil
+      @fdisk_type = nil
+      @filesystem = nil
+      @visibility = "shared"
+      @user = user
+      @version = 0
+      @id = -1
+      @multipart = false
+      @options = {}
+      @image = nil
+
+      client.print("!!! Warning: using old environment description format, consider to convert the environment description file to the new format using \"kaenv --migrate\" !!!\n\n") unless migration
+
+      description.split("\n").each { |line|
+        if /\A(\w+)\s*:\s*(.+)\Z/ =~ line then
+          content = Regexp.last_match
+          attr = content[1]
+          val = content[2]
+          case attr
+          when "name"
+            @name = val
+          when "version"
+            if val =~ /\A\d+\Z/ then
+              @version = val
+            else
+              Debug::distant_client_error("The environment version must be a number", client)
+              return false
+            end
+          when "description"
+            @description = val
+          when "author"
+            @author = val
+          when "tarball"
+            #filename|tgz
+            if val =~ /\A.+\|(tgz|tbz2|ddgz|ddbz2)\Z/ then
+              @tarball = Hash.new
+              tmp = val.split("|")
+              @tarball["file"] = tmp[0]
+              @tarball["kind"] = tmp[1]
+              if @tarball["file"] =~ /^http[s]?:\/\// then
+                Debug::distant_client_print("#{@tarball["file"]} is an HTTP file, let's bypass the md5sum", client) unless migration
+                @tarball["md5"] = ""
+              else
+                if (record_in_db) then
+                  md5 = client.get_file_md5(@tarball["file"])
+                  if (md5 != 0) then
+                    @tarball["md5"] = md5
+                  elsif !migration
+                    Debug::distant_client_error("The tarball file #{@tarball["file"]} cannot be read", client)
+                    return false
+                  end
+                end
+              end
+
+              @image = {
+                :file => tmp[0],
+                :shortkind => tmp[1],
+                :md5 => @tarball['md5'],
+              }
+              @image[:kind], @image[:compression] =
+                EnvironmentManagement.image_type_long(tmp[1])
+            else
+              Debug::distant_client_error("The environment tarball must be described like filename|kind where kind is tgz, tbz2, ddgz, or ddbz2", client)
+              return false
+            end
+          when "preinstall"
+            if val =~ /\A.+\|(tgz|tbz2)\|.+\Z/ then
+              entry = val.split("|")
+              @preinstall = Hash.new
+              @preinstall["file"] = entry[0]
+              @preinstall["kind"] = entry[1]
+              @preinstall["script"] = entry[2]
+              if @preinstall["file"] =~ /^http[s]?:\/\// then
+                Debug::distant_client_print("#{@preinstall["file"]} is an HTTP file, let's bypass the md5sum", client) unless migration
+                @preinstall["md5"] = ""
+              else
+                if (record_in_db) then
+                  md5 = client.get_file_md5(@preinstall["file"])
+                  if (md5 != 0) then
+                    @preinstall["md5"] = md5
+                  elsif !migration
+                    Debug::distant_client_error("The pre-install file #{@preinstall["file"]} cannot be read", client)
+                    return false
+                  end
+                end
+              end
+            else
+              Debug::distant_client_error("The environment preinstall must be described like filename|kind1|script where kind is tgz or tbz2", client)
+              return false
+            end
+          when "postinstall"
+            #filename|tgz|script,filename|tgz|script...
+            if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
+              @postinstall = Array.new
+              val.split(",").each { |tmp|
+                tmp2 = tmp.split("|")
+                entry = Hash.new
+                entry["file"] = tmp2[0]
+                entry["kind"] = tmp2[1]
+                entry["script"] = tmp2[2]
+                if entry["file"] =~ /^http[s]?:\/\// then
+                  Debug::distant_client_print("#{entry["file"]} is an HTTP file, let's bypass the md5sum", client) unless migration
+                  entry["md5"] = ""
+                else
+                  if (record_in_db) then
+                    md5 = client.get_file_md5(entry["file"])
+                    if (md5 != 0) then
+                      entry["md5"] = md5
+                    elsif !migration
+                      Debug::distant_client_error("The post-install file #{entry["file"]} cannot be read", client)
+                      return false
+                    end
+                  end
+                end
+                @postinstall.push(entry)
+              }
+            else
+              Debug::distant_client_error("The environment postinstall must be described like filename1|kind1|script1,filename2|kind2|script2,...  where kind is tgz or tbz2", client)
+              return false
+            end
+          when "kernel"
+            @kernel = val
+          when "kernel_params"
+            @kernel_params = val
+          when "initrd"
+            @initrd = val
+          when "hypervisor"
+            @hypervisor = val
+          when "hypervisor_params"
+            @hypervisor_params = val
+          when "fdisktype"
+            @fdisk_type = val
+          when "filesystem"
+            @filesystem = val
+          when "environment_kind"
+            if val =~ /\A(linux|xen|other)\Z/ then
+              @environment_kind = val
+            else
+              Debug::distant_client_error("The environment kind must be linux, xen or other", client)
+              return false
+            end
+          when "visibility"
+            if val =~ /\A(private|shared|public)\Z/ then
+              @visibility = val
+              if (@visibility == "public") && (not almighty_env_users.include?(@user)) && (not migration) then
+                Debug::distant_client_error("Only the environment administrators can set the \"public\" tag", client)
+                return false
+              end
+            else
+              Debug::distant_client_error("The environment visibility must be private, shared or public", client)
+              return false
+            end
+          when "demolishing_env"
+            if val =~ /\A(true|false)\Z/ then
+              if val.downcase == 'true'
+                @demolishing_env = true
+              else
+                @demolishing_env = false
+              end
+            else
+              Debug::distant_client_error("The environment demolishing_env must be a 'true' or 'false'", client)
+              return false
+            end
+          else
+            Debug::distant_client_error("#{attr} is an invalid attribute", client)
+            return false
+          end
+        end
+      }
+      case @environment_kind
+      when "linux"
+        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
+          Debug::distant_client_error("The name, tarball, kernel, fdisktype, filesystem, and environment_kind fields are mandatory", client)
+          return false
+        end
+      when "xen"
+        if ((@name == nil) || (@tarball == nil) || (@kernel == nil) || (@hypervisor == nil) ||(@fdisk_type == nil) || (@filesystem == nil)) then
+          Debug::distant_client_error("The name, tarball, kernel, hypervisor, fdisktype, filesystem, and environment_kind fields are mandatory", client)
+          return false
+        end
+      when "other"
+        if ((@name == nil) || (@tarball == nil) ||(@fdisk_type == nil)) then
+          Debug::distant_client_error("The name, tarball, fdisktype, and environment_kind fields are mandatory", client)
+          return false
+        end        
+      when nil
+        Debug::distant_client_error("The environment_kind field is mandatory", client)
+        return false       
+      end
+
+      return true
+    end
+
     # Load an environment file
     #
     # Arguments
@@ -148,11 +353,21 @@ module EnvironmentManagement
     # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(description, almighty_env_users, user, client, setmd5, filename=nil)
+    def load_from_file(description, almighty_env_users, user, client, setmd5, filename=nil,migration=false)
       @user = user
       @preinstall = nil
       @postinstall = []
       @id = description['id'] || -1
+
+      if description['image'].nil?
+        return old_load_from_file(
+          description.to_yaml.split("\n")[1..-1].join("\n"),
+          almighty_env_users, user, client, setmd5, migration
+        )
+      elsif migration
+        Debug::distant_client_error("The description file is already in the new version", client)
+        return false
+      end
 
       filemd5 = Proc.new do |f|
         ret = nil

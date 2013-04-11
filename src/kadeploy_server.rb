@@ -1917,6 +1917,8 @@ class KadeployServer
         ret = kaenv_set_visibility_tag(exec_specific, client, db)
       when "move-files"
         ret = kaenv_move_files(exec_specific, client, db)
+      when "migrate"
+        ret = kaenv_migrate_environment(exec_specific, client, db)
       end
     }
     finthr = Thread.new {
@@ -1936,6 +1938,15 @@ class KadeployServer
     finished = true
     finthr.join
     return ret
+  end
+
+  def kaenv_migrate_environment(exec_specific, client, db)
+    if (env = exec_specific.environment)
+      env.full_view(client)
+      return 0
+    else
+      return 1
+    end
   end
 
   # List the environments of a user defined in exec_specific.user
