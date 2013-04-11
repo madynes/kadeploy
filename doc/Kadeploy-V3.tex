@@ -693,17 +693,29 @@ To define the specific configuration of a cluster, you must create a specific fi
 \subsection{Example of a cluster-specific configuration file}
 \begin{small}
 \begin{verbatim}
---- 
-partitioning: 
+---
+partitioning:
   block_device: /dev/sda
   partitions:
     swap: 1
     prod: 2
     deploy: 3
     tmp: 5
-  script: partitioning-griffon
-bootloader:
-  script: install_grub2
+  script: parted_sample
+boot:
+  install_bootloader: install_grub2
+  kernels:
+    user:
+      params: console=tty0 console=ttyS1,38400n8
+    deploy:
+      vmlinuz: deploy-vmlinuz-2.6.27.8-bt
+      initrd: deploy-initrd-2.6.27.8-bt
+      params: console=tty0 console=ttyS0,38400n8 ramdisk_size=260000 rw
+      supported_fs: ext2, ext3, vfat
+      drivers: ata_piix,ata_generic
+    nfsroot:
+      vmlinuz: deploy-vmlinuz-2.6.27.7-nfsroot
+      params: rw console=tty0 root=/dev/nfs ip=dhcp nfsroot=10.0.100.35:/mnt/nfsroot/rootfs
 timeouts: 
   reboot: 200 + 150 * Math.log(n)
   kexec: 60
@@ -746,18 +758,6 @@ remoteops:
   console: 
     - name: soft
       cmd: /usr/local/conman/bin/conman -d conman HOSTNAME_SHORT
-kernels:
-  user: 
-    params: console=tty0 console=ttyS1,38400n8
-  deploy:
-    vmlinuz: deploy-vmlinuz-2.6.27.8-bt
-    initrd: deploy-initrd-2.6.27.8-bt
-    params: console=tty0 console=ttyS0,38400n8 ramdisk_size=260000 rw
-    supported_fs: ext2, ext3, vfat
-    drivers: ata_piix,ata_generic
-  nfsroot:
-    vmlinuz: deploy-vmlinuz-2.6.27.7-nfsroot
-    params: rw console=ttyS0,38400n8 console=tty0 root=/dev/nfs ip=dhcp nfsroot=10.0.100.35:/mnt/nfsroot/rootfs init=/sbin/init
 preinstall: 
   files:
     - file: /g5k/admin_pre_install.tgz
@@ -846,10 +846,32 @@ automata:
     \item \yfield{tmp}{Integer} number of the tmp partition on the disk
   \end{itemize}
 
-  \item \ypath{/bootloader}
+  \item \ypath{/boot}
   \begin{itemize}
-    \item \yfield{script}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
+    \item \yfield{install\_bootloader}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
+
+  \item \ypath{/boot/kernels} Options of OS kernel's that are booted by Kadeploy3
+  \item \ypath{/boot/kernels/user} Default options for user kernels
+  \begin{itemize}
+    \item \yfieldd{params}{String}{''} default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
+  \end{itemize}
+
+  \item \ypath{/boot/kernels/deploy} The deployment environment (see section \ref{sec:deployment})
+  \begin{itemize}
+    \item \yfield{vmlinuz}{String} name of the kernel file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
+    \item \yfield{initrd}{String} name of the initrd file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
+    \item \yfieldd{params}{String}{''} boot parameters of the deployment environment kernel
+    \item \yfield{supported\_fs}{String} list of file systems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
+    \item \yfieldd{drivers}{String}{''} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
+  \end{itemize}
+
+  \item \ypath{/boot/kernels/nfsroot} Used when booting with NFS-root in the \texttt{SetDeploymentEnv} macro-step.
+  \begin{itemize}
+    \item \yfieldd{vmlinuz}{String}{''} kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+    \item \yfieldd{params}{String}{''} kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+  \end{itemize}
+
 
   \item \ypath{/timeouts}
   \begin{itemize}
@@ -888,26 +910,6 @@ automata:
   \begin{itemize}
     \item \yfield{name}{String} the name of the command (used in the display)
     \item \yfield{cmd}{String} generic console command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
-  \end{itemize}
-
-  \item \ypath{/kernels/user} Default options for user kernels
-  \begin{itemize}
-    \item \yfieldd{params}{String}{''} default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
-  \end{itemize}
-
-  \item \ypath{/kernels/deploy} The deployment environment
-  \begin{itemize}
-    \item \yfield{vmlinuz}{String} name of the kernel used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
-    \item \yfield{initrd}{String} name of the initrd used by the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
-    \item \yfieldd{params}{String}{''} boot parameters of the deployment environment kernel
-    \item \yfield{supported\_fs}{String} list of filesystems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
-    \item \yfieldd{drivers}{String}{''} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
-  \end{itemize}
-
-  \item \ypath{/kernels/nfsroot}
-  \begin{itemize}
-    \item \yfieldd{vmlinuz}{String}{''} kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
-    \item \yfieldd{params}{String}{''} kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
   \end{itemize}
 
   \item \ypath{/preinstall/[files]} list of pre-install to execute at the pre-install of a deployment. This fields are not mandatory. 

@@ -923,10 +923,32 @@ module ConfigInformation
           )
         end
 
-        cp.parse('bootloader',true) do
+        cp.parse('boot',true) do
           conf.bootloader_script = cp.value(
-            'script',String,nil,{ :type => 'file', :readable => true }
+            'install_bootloader',String,nil,{ :type => 'file', :readable => true }
           )
+          cp.parse('kernels',true) do
+            cp.parse('user') do
+              conf.kernel_params = cp.value('params',String,'')
+            end
+
+            cp.parse('deploy',true) do
+              conf.deploy_kernel = cp.value('vmlinuz',String)
+              conf.deploy_initrd = cp.value('initrd',String)
+              conf.deploy_kernel_args = cp.value('params',String,'')
+              conf.drivers = cp.value(
+                'drivers',String,''
+              ).split(',').collect{ |v| v.strip }
+              conf.deploy_supported_fs = cp.value(
+                'supported_fs',String
+              ).split(',').collect{ |v| v.strip }
+            end
+
+            cp.parse('nfsroot') do
+              conf.nfsroot_kernel = cp.value('vmlinuz',String,'')
+              conf.nfsroot_params = cp.value('params',String,'')
+            end
+          end
         end
 
         cp.parse('timeouts',true) do |info|
@@ -1065,29 +1087,6 @@ module ConfigInformation
             _ = cp.value('name',String)
             cmd = cp.value('cmd',String)
             conf.cmd_console = cmd
-          end
-        end
-
-        cp.parse('kernels',true) do
-          cp.parse('user') do
-            conf.kernel_params = cp.value('params',String,'')
-          end
-
-          cp.parse('deploy',true) do
-            conf.deploy_kernel = cp.value('vmlinuz',String)
-            conf.deploy_initrd = cp.value('initrd',String)
-            conf.deploy_kernel_args = cp.value('params',String,'')
-            conf.drivers = cp.value(
-              'drivers',String,''
-            ).split(',').collect{ |v| v.strip }
-            conf.deploy_supported_fs = cp.value(
-              'supported_fs',String
-            ).split(',').collect{ |v| v.strip }
-          end
-
-          cp.parse('nfsroot') do
-            conf.nfsroot_kernel = cp.value('vmlinuz',String,'')
-            conf.nfsroot_params = cp.value('params',String,'')
           end
         end
 
