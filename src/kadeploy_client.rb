@@ -302,6 +302,19 @@ if (exec_specific_config != nil) then
 
         if exec_specific_config.get_version then
           puts "(#{server}) Kadeploy version: #{kadeploy_server.get_version()}"
+        elsif exec_specific_config.get_users_info then
+          info = kadeploy_server.get_users_info()
+          puts "(#{server}) Kadeploy server configuration:"
+          puts "(#{server})   Custom PXE boot method: #{info[:pxe]}"
+          puts "(#{server})   Deployment environment:"
+          puts "(#{server})     Supported file systems:"
+          info[:supported_fs].each_pair do |clname,fslist|
+            puts "(#{server})       #{clname}: #{fslist.join(',')}"
+          end
+          puts "(#{server})     Variables exported to custom scripts:"
+          info[:vars].each do |var|
+            puts "(#{server})       #{var}"
+          end
         else
           #Launch the listener on the client
           if (exec_specific_config.multi_server) then

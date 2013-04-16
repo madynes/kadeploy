@@ -1067,28 +1067,56 @@ class Microstep < Automata::QueueTask
     return path
   end
 
-  def deploy_context
+  def self.load_deploy_context(vals={:env=>{},:parts=>{}})
     {
-      'KADEPLOY_CLUSTER' => context[:cluster].name,
-      'KADEPLOY_ENV' => context[:execution].environment.name,
-      'KADEPLOY_ENV_KERNEL' => context[:execution].environment.kernel,
-      'KADEPLOY_ENV_INITRD' => context[:execution].environment.initrd,
-      'KADEPLOY_ENV_KERNEL_PARAMS' => get_kernel_params(),
-      'KADEPLOY_ENV_HYPERVISOR' => context[:execution].environment.hypervisor,
-      'KADEPLOY_ENV_HYPERVISOR_PARAMS' => context[:execution].environment.hypervisor_params,
-      'KADEPLOY_DEPLOY_PART' => get_deploy_part_str(),
-      'KADEPLOY_BLOCK_DEVICE' => get_block_device_str(),
-      'KADEPLOY_DEPLOY_PART_NUM' => get_deploy_part_num(),
-      'KADEPLOY_SWAP_PART_NUM' => context[:cluster].swap_part,
-      'KADEPLOY_PROD_PART_NUM' => context[:cluster].prod_part,
-      'KADEPLOY_TMP_PART_NUM' => context[:cluster].tmp_part,
-      'KADEPLOY_ENV_EXTRACTION_DIR' => context[:common].environment_extraction_dir,
-      'KADEPLOY_PREPOST_EXTRACTION_DIR' => context[:common].rambin_path,
-      'KADEPLOY_TMP_DIR' => '/tmp',
-      'KADEPLOY_OS_KIND' => context[:execution].environment.environment_kind,
-      'KADEPLOY_PART_TYPE' => context[:execution].environment.fdisk_type,
-      'KADEPLOY_FS_TYPE' => context[:execution].environment.filesystem
+      'KADEPLOY_CLUSTER' => vals[:cluster],
+      'KADEPLOY_ENV' => vals[:env][:name],
+      'KADEPLOY_ENV_KERNEL' => vals[:env][:kernel],
+      'KADEPLOY_ENV_INITRD' => vals[:env][:initrd],
+      'KADEPLOY_ENV_KERNEL_PARAMS' => vals[:env][:kernel_params],
+      'KADEPLOY_ENV_HYPERVISOR' => vals[:env][:hypervisor],
+      'KADEPLOY_ENV_HYPERVISOR_PARAMS' => vals[:env][:hypervisor_params],
+      'KADEPLOY_OS_KIND' => vals[:env][:kind],
+      'KADEPLOY_DEPLOY_PART' => vals[:deploy_part],
+      'KADEPLOY_BLOCK_DEVICE' => vals[:block_device],
+      'KADEPLOY_DEPLOY_PART_NUM' => vals[:parts][:deploy],
+      'KADEPLOY_SWAP_PART_NUM' => vals[:parts][:swap],
+      'KADEPLOY_PROD_PART_NUM' => vals[:parts][:prod],
+      'KADEPLOY_TMP_PART_NUM' => vals[:parts][:tmp],
+      'KADEPLOY_ENV_EXTRACTION_DIR' => vals[:extractdir],
+      'KADEPLOY_PREPOST_EXTRACTION_DIR' => vals[:prepostdir],
+      'KADEPLOY_TMP_DIR' => vals[:tmpdir],
+      'KADEPLOY_PART_TYPE' => vals[:parttype],
+      'KADEPLOY_FS_TYPE' => vals[:fstype],
     }
+  end
+
+  def deploy_context
+    self.class.load_deploy_context({
+      :cluster => context[:cluster].name,
+      :env => {
+        :name => context[:execution].environment.name,
+        :kind => context[:execution].environment.environment_kind,
+        :kernel => context[:execution].environment.kernel,
+        :initrd => context[:execution].environment.initrd,
+        :kernel_params => get_kernel_params(),
+        :hypervisor => context[:execution].environment.hypervisor,
+        :hypervisor_params => context[:execution].environment.hypervisor_params,
+      },
+      :deploy_part => get_deploy_part_str(),
+      :block_device => get_block_device_str(),
+      :parts => {
+        :deploy => get_deploy_part_num(),
+        :swap => context[:cluster].swap_part,
+        :prod => context[:cluster].prod_part,
+        :tmp => context[:cluster].tmp_part,
+      },
+      :extractdir => context[:common].environment_extraction_dir,
+      :prepostdir => context[:common].rambin_path,
+      :tmpdir => '/tmp',
+      :parttype => context[:execution].environment.fdisk_type,
+      :fstype => context[:execution].environment.filesystem
+    })
   end
 
   # Create a string containing the environment variables for pre/post installs

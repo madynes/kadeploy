@@ -83,6 +83,13 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>-i</option></term>
+	<term><option>--server-info</option></term>
+	<listitem>
+	  <para>Get information about the server's configuration</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-k</option></term>
 	<term><option>--key <replaceable>[FILE]</replaceable></option></term>
 	<listitem>
