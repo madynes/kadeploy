@@ -132,9 +132,9 @@
       </varlistentry>
       <varlistentry>
 	<term><option>-r</option></term>
-	<term><option>--partition-number <replaceable>FSTYPE</replaceable></option></term>
+	<term><option>--reformat-tmp <replaceable>FSTYPE</replaceable></option></term>
 	<listitem>
-	  <para>Reformat the /tmp partition with the given filesystem type (ext[234] are allowed).</para>
+	  <para>Reformat the /tmp partition with the given filesystem type (this filesystem has to be supported by the deployment environment).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>

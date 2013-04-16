@@ -1785,11 +1785,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (ext[234] are allowed)") { |t|
-          unless /\A(ext2|ext3|ext4)\Z/ =~ t
-            error("Invalid FSTYPE, only ext2, ext3 and ext4 are allowed")
-            return false
-          end
+        opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (this filesystem need to be supported by the deployment environment)") { |t|
           exec_specific.reformat_tmp = true
           exec_specific.reformat_tmp_fstype = t
         }

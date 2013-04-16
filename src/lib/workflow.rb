@@ -164,6 +164,11 @@ class Workflow < Automata::TaskManager
       end
     end
 
+    if cexec.reformat_tmp and !context[:cluster].deploy_supported_fs.include?(cexec.reformat_tmp_fstype)
+      debug(0,"The filesystem '#{cexec.reformat_tmp_fstype}' is not supported by the deployment environment")
+      error(KadeployAsyncError::CONFLICTING_OPTIONS)
+    end
+
 =begin
     # Deploy FSA images
     if cexec.environment.image[:kind] == 'fsa'
