@@ -167,7 +167,7 @@
 	<term><option>-x</option></term>
 	<term><option>--upload-pxe-files <replaceable>FILE</replaceable></option></term>
 	<listitem>
-	  <para>Upload a list of files (file1,file2,file3) to the "tftp_images_path" directory. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX--</para>
+	  <para>Upload a list of files (file1,file2,file3) to the "tftp_images_path" directory. Those files will then be available with the prefix FILES_PREFIX--</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
