@@ -6,6 +6,8 @@
 * It is now possible to deploy multi-partitioned FSArchiver images
   (see doc sec/4.7)
 * Kastat now have an option only to display statistics of the last deployment
+* An option, --server-info or -i, now allow users to get information about
+  the Kadeploy server's configuration (see doc sec/4.2.2)
 
 == Internals ==
 * Partitioning operation is now performed with an administrator-providen script
