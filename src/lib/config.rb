@@ -1840,7 +1840,7 @@ module ConfigInformation
             }
           end
         }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX-- ") { |l|
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |l|
           l.split(",").each { |file|
             if (file =~ R_HTTP) then
               exec_specific.pxe_upload_files.push(file) 
@@ -2818,7 +2818,7 @@ module ConfigInformation
             }
           end
         }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available in the KERNELS_DIR directory with the prefix FILES_PREFIX-- ") { |l|
+        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |l|
           l.split(",").each { |file|
             if (file =~ R_HTTP) then
               exec_specific.pxe_upload_files.push(file) 
