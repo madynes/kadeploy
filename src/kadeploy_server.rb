@@ -88,6 +88,18 @@ class KadeployServer
     return @config.common.version
   end
 
+  def get_users_info
+    ret = {}
+
+    ret[:pxe] = @config.common.pxe[:dhcp].class.name.split('::').last
+    ret[:supported_fs] = {}
+    @config.cluster_specific.each_pair do |cluster,conf|
+      ret[:supported_fs][cluster] = conf.deploy_supported_fs
+    end
+    ret[:vars] = Microstep.load_deploy_context().keys.sort
+    return ret
+  end
+
   # Check if the server knows a set of nodes (RPC)
   #
   # Arguments

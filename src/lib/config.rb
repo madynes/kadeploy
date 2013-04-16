@@ -400,6 +400,7 @@ module ConfigInformation
       exec_specific.nodes_state = Hash.new
       exec_specific.write_workflow_id = String.new
       exec_specific.get_version = false
+      exec_specific.get_users_info = false
       exec_specific.prefix_in_cache = String.new
       exec_specific.chosen_server = String.new
       exec_specific.servers = Config.load_client_config_file
@@ -1749,6 +1750,9 @@ module ConfigInformation
         opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
           return false unless load_machinelist(exec_specific.node_array, f)
         }
+        opt.on("-i", "--server-info", "Get information about the server's configuration") {
+          exec_specific.get_users_info = true
+        }
         opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
           if (f != nil) then
             if (f =~ R_HTTP) then
@@ -2002,7 +2006,7 @@ module ConfigInformation
       exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
       exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
 
-      if not exec_specific.get_version then
+      if not exec_specific.get_version and not exec_specific.get_users_info then
         if exec_specific.node_array.empty? then
           error("You must specify some nodes to deploy")
           return false
