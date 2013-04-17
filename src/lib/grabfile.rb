@@ -68,24 +68,39 @@ module Managers
     def size
       if File.readable?(@path)
         File.size(@path)
+      elsif @client
+        if (ret = @client.get_file_size(@path)) == 0
+          error(@errno,"Unable to grab the file #{@path}")
+        end
+        ret
       else
-        @client.get_file_size(@path)
+        error(@errno,"Unable to grab the file #{@path}")
       end
     end
 
     def checksum
       if File.readable?(@path)
         MD5::get_md5_sum(@path)
+      elsif @client
+        if (ret = @client.get_file_md5(@path)) == 0
+          error(@errno,"Unable to grab the file #{@path}")
+        end
+        ret
       else
-        @client.get_file_md5(@path)
+        error(@errno,"Unable to grab the file #{@path}")
       end
     end
 
     def mtime
       if File.readable?(@path)
         File.mtime(@path).to_i
+      elsif @client
+        if (ret = @client.get_file_mtime(@path)) == 0
+          error(@errno,"Unable to grab the file #{@path}")
+        end
+        ret
       else
-        @client.get_file_mtime(@path)
+        error(@errno,"Unable to grab the file #{@path}")
       end
     end
 
@@ -96,12 +111,16 @@ module Managers
         rescue
           error(@errno,"Unable to grab the file #{@path}")
         end
-      else
+      elsif @client
         begin
-          @client.get_file(@path,dest)
+          unless @client.get_file(@path,dest)
+            error(@errno,"Unable to grab the file #{@path}")
+          end
         rescue
           error(@errno,"Unable to grab the file #{@path}")
         end
+      else
+        error(@errno,"Unable to grab the file #{@path}")
       end
     end
 
