@@ -31,6 +31,8 @@ class KadeployError < Exception
       "You must choose an environment"
     when KadeployAsyncError::CONFLICTING_OPTIONS
       "Some options are conflicting"
+    when KadeployAsyncError::DB_ERROR
+      "Database issue"
     when FetchFileError::INVALID_ENVIRONMENT_TARBALL
       "Invalid environment image archive"
     when FetchFileError::INVALID_PREINSTALL
@@ -103,6 +105,7 @@ class KadeployAsyncError
   LOAD_ENV_FROM_DB_ERROR = 207
   NO_ENV_CHOSEN = 208
   CONFLICTING_OPTIONS = 209
+  DB_ERROR = 210
 end
 
 class KarebootAsyncError
