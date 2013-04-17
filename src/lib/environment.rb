@@ -175,7 +175,7 @@ module EnvironmentManagement
           except = FetchFileError::INVALID_POSTINSTALL
         end
         begin
-          ret = Managers::Fetch[f,except].checksum()
+          ret = Managers::Fetch[f,except,client].checksum()
         rescue KadeployError => ke
           msg = KadeployError.to_msg(ke.errno)
           error(client,"#{msg} (error ##{ke.errno})") if msg and !msg.empty?
