@@ -720,8 +720,6 @@ class KadeployServer
       client.print(ke.message) if ke.message and !ke.message.empty?
       #Debug::distant_client_error("Cannot run the deployment",client)
       kadeploy_sync_kill_workflow(ke.context[:wid],false)
-    rescue
-
     end
     return true
   end
@@ -1161,7 +1159,10 @@ class KadeployServer
         end
       end
     rescue KadeployError => ke
-      Debug::distant_client_error("Cannot run the reboot",client)
+      msg = KadeployError.to_msg(ke.errno)
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
+      #Debug::distant_client_error("Cannot run the reboot",client)
       @reboot_info_hash_lock.synchronize {
         # Unlock the cached files
         if @reboot_info_hash[reboot_id].size >= 4
@@ -1282,39 +1283,47 @@ class KadeployServer
   # Output
   # * return true if everything is ok, false otherwise
   def run_kastat(db, client, exec_specific, drb_server)
-    finished = false
-    res = nil
-    tid = Thread.new {
-      case exec_specific.operation
-      when "list_all"
-        res = kastat_list_all(exec_specific, client, db)
-      when "list_last"
-        res = kastat_list_last(exec_specific, client, db)
-      when "list_retries"
-        res = kastat_list_retries(exec_specific, client, db)
-      when "list_failure_rate"
-        res = kastat_list_failure_rate(exec_specific, client, db)
-      when "list_min_failure_rate"
-        res = kastat_list_failure_rate(exec_specific, client, db)
-      else
-      end
-    }
-    finthr = Thread.new {
-      while (not finished) do
-        begin
-          client.test()
-        rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+    begin
+      finished = false
+      res = nil
+      tid = Thread.new {
+        case exec_specific.operation
+        when "list_all"
+          res = kastat_list_all(exec_specific, client, db)
+        when "list_last"
+          res = kastat_list_last(exec_specific, client, db)
+        when "list_retries"
+          res = kastat_list_retries(exec_specific, client, db)
+        when "list_failure_rate"
+          res = kastat_list_failure_rate(exec_specific, client, db)
+        when "list_min_failure_rate"
+          res = kastat_list_failure_rate(exec_specific, client, db)
+        else
         end
-          sleep(1)
-      end
-    }
-    tid.join
-    finished = true
-    finthr.join
+      }
+      finthr = Thread.new {
+        while (not finished) do
+          begin
+            client.test()
+          rescue DRb::DRbConnError
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
+            sleep(1)
+        end
+      }
+      tid.join
+      finished = true
+      finthr.join
+    rescue KadeployError => ke
+      msg = KadeployError.to_msg(ke.errno)
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
+      finished = true
+      finthr.join
+    end
     return res
   end
 
@@ -1623,32 +1632,40 @@ class KadeployServer
   # Output
   # * return true if everything is ok, false otherwise
   def run_kanodes(db, client, exec_specific, drb_server)
-    finished = false
-    res = nil
-    tid = Thread.new {
-      case exec_specific.operation
-      when "get_deploy_state"
-        res = kanodes_get_deploy_state(exec_specific, client, db)
-      when "get_yaml_dump"
-        res = kanodes_get_yaml_dump(exec_specific, client)
-      end
-    }
-    finthr = Thread.new {
-      while (not finished) do
-        begin
-          client.test()
-        rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+    begin
+      finished = false
+      res = nil
+      tid = Thread.new {
+        case exec_specific.operation
+        when "get_deploy_state"
+          res = kanodes_get_deploy_state(exec_specific, client, db)
+        when "get_yaml_dump"
+          res = kanodes_get_yaml_dump(exec_specific, client)
         end
-          sleep(1)
-      end
-    }
-    tid.join
-    finished = true
-    finthr.join
+      }
+      finthr = Thread.new {
+        while (not finished) do
+          begin
+            client.test()
+          rescue DRb::DRbConnError
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
+            sleep(1)
+        end
+      }
+      tid.join
+      finished = true
+      finthr.join
+    rescue KadeployError => ke
+      msg = KadeployError.to_msg(ke.errno)
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
+      finished = true
+      finthr.join
+    end
     return res
   end
   
@@ -1759,34 +1776,42 @@ class KadeployServer
   # Output
   # * return true if everything is ok, false otherwise
   def run_karights(db, client, exec_specific, drb_server)
-    finished = false
-    res = nil
-    tid = Thread.new {
-      case exec_specific.operation  
-      when "add"
-        res = karights_add_rights(exec_specific, client, db)
-      when "delete"
-        res = karights_delete_rights(exec_specific, client, db)
-      when "show"
-        res = karights_show_rights(exec_specific, client, db)
-      end
-    }
-    finthr = Thread.new {
-      while (not finished) do
-        begin
-          client.test()
-        rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+    begin
+      finished = false
+      res = nil
+      tid = Thread.new {
+        case exec_specific.operation  
+        when "add"
+          res = karights_add_rights(exec_specific, client, db)
+        when "delete"
+          res = karights_delete_rights(exec_specific, client, db)
+        when "show"
+          res = karights_show_rights(exec_specific, client, db)
         end
-        sleep(1)
-      end
-    }
-    tid.join
-    finished = true
-    finthr.join
+      }
+      finthr = Thread.new {
+        while (not finished) do
+          begin
+            client.test()
+          rescue DRb::DRbConnError
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
+          sleep(1)
+        end
+      }
+      tid.join
+      finished = true
+      finthr.join
+    rescue KadeployError => ke
+      msg = KadeployError.to_msg(ke.errno)
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
+      finished = true
+      finthr.join
+    end
     return res
   end
 
@@ -1952,50 +1977,58 @@ class KadeployServer
   # Output
   # * return true if everything is ok, false otherwise
   def run_kaenv(db, client, exec_specific, drb_server)
-    finished = false
-    ret = nil
-    tid = Thread.new {
-      case exec_specific.operation
-      when "list"
-        ret = kaenv_list_environments(exec_specific, client, db)
-      when "add"
-        ret = kaenv_add_environment(exec_specific, client, db)
-      when "delete"
-        ret = kaenv_delete_environment(exec_specific, client, db)
-      when "print"
-        ret = kaenv_print_environment(exec_specific, client, db)
-      when "update-tarball-md5"
-        ret = kaenv_update_tarball_md5(exec_specific, client, db)
-      when "update-preinstall-md5"
-        ret = kaenv_update_preinstall_md5(exec_specific, client, db)
-      when "update-postinstalls-md5"
-        ret = kaenv_update_postinstall_md5(exec_specific, client, db)
-      when "remove-demolishing-tag"
-        ret = kaenv_remove_demolishing_tag(exec_specific, client, db)
-      when "set-visibility-tag"
-        ret = kaenv_set_visibility_tag(exec_specific, client, db)
-      when "move-files"
-        ret = kaenv_move_files(exec_specific, client, db)
-      when "migrate"
-        ret = kaenv_migrate_environment(exec_specific, client, db)
-      end
-    }
-    finthr = Thread.new {
-      while (not finished) do
-        begin
-          client.test()
-        rescue DRb::DRbConnError
-          Thread.kill(tid)
-          drb_server.stop_service()
-          db.disconnect()
-          finished = true
+    begin
+      finished = false
+      ret = nil
+      tid = Thread.new {
+        case exec_specific.operation
+        when "list"
+          ret = kaenv_list_environments(exec_specific, client, db)
+        when "add"
+          ret = kaenv_add_environment(exec_specific, client, db)
+        when "delete"
+          ret = kaenv_delete_environment(exec_specific, client, db)
+        when "print"
+          ret = kaenv_print_environment(exec_specific, client, db)
+        when "update-tarball-md5"
+          ret = kaenv_update_tarball_md5(exec_specific, client, db)
+        when "update-preinstall-md5"
+          ret = kaenv_update_preinstall_md5(exec_specific, client, db)
+        when "update-postinstalls-md5"
+          ret = kaenv_update_postinstall_md5(exec_specific, client, db)
+        when "remove-demolishing-tag"
+          ret = kaenv_remove_demolishing_tag(exec_specific, client, db)
+        when "set-visibility-tag"
+          ret = kaenv_set_visibility_tag(exec_specific, client, db)
+        when "move-files"
+          ret = kaenv_move_files(exec_specific, client, db)
+        when "migrate"
+          ret = kaenv_migrate_environment(exec_specific, client, db)
         end
-        sleep(1)
-      end
-    }
-    tid.join
-    finished = true
-    finthr.join
+      }
+      finthr = Thread.new {
+        while (not finished) do
+          begin
+            client.test()
+          rescue DRb::DRbConnError
+            Thread.kill(tid)
+            drb_server.stop_service()
+            db.disconnect()
+            finished = true
+          end
+          sleep(1)
+        end
+      }
+      tid.join
+      finished = true
+      finthr.join
+    rescue KadeployError => ke
+      msg = KadeployError.to_msg(ke.errno)
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
+      finished = true
+      finthr.join
+    end
     return ret
   end
 
@@ -2882,7 +2915,10 @@ class KadeployServer
         end
       end
     rescue KadeployError => ke
-      Debug::distant_client_error("Cannot run the power operation",client)
+      msg = KadeployError.to_msg(ke.errno)
+      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+      client.print(ke.message) if ke.message and !ke.message.empty?
+      #Debug::distant_client_error("Cannot run the power operation",client)
       @power_info_hash_lock.synchronize {
         kapower_delete_power_info(ke.context[:pid])
       }
