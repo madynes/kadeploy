@@ -114,7 +114,7 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_
     "\""
   end
 
-  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" --verbose-level 0 -k #{key} -o #{ok} -n #{ko} #{automata_opt}"
+  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" -k #{key} -o #{ok} -n #{ko} #{automata_opt}"
   system(cmd)
   if (count_lines(ko) > 0) then
     IO.readlines(ko).each { |node|
@@ -215,7 +215,7 @@ def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_si
   nodes.each { |node|
     node_list += " -m #{node}"
   }
-  cmd = "#{kadeploy} #{node_list} -e \"#{env_list.split(",")[0]}\" --verbose-level 0 --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko}"
+  cmd = "#{kadeploy} #{node_list} -e \"#{env_list.split(",")[0]}\" --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko}"
   start = Time.now.to_i
   system(cmd)
   time = Time.now.to_i - start
