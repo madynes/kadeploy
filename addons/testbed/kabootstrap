@@ -3318,7 +3318,7 @@ sshgw.ssh(servername,'root') do |session|
     end
 		sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_SSHKEY_PATH}")
 
-#=begin
+=begin
 		msg('Creating PXE directories',MSG_INFO)
     sexec(session,"rm -Rf #{cfg_pxe_path()}")
     sexec(session,"mkdir -p #{cfg_pxe_path()}")
@@ -3327,7 +3327,7 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"mkdir -p #{cfg_pxe_path(CFG_PXE_PROFILES_DIR)}")
     sexec(session,"chmod -R 755 #{cfg_pxe_path()}")
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} -R #{cfg_pxe_path()}")
-#=end
+=end
 
 		msg('Copying clusters postinstall files',MSG_INFO)
 		$clusters.values.each do |cluster|
