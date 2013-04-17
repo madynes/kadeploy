@@ -2217,6 +2217,7 @@ module ConfigInformation
         opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
           exec_specific.operation = "move-files"
         }
+=begin
         opt.on("", "--migrate ENVFILE", "Convert an old environment description file to the new format (3.1.7)") { |f|
           if tmp = load_envfile(f)
             exec_specific.load_env_desc = tmp
@@ -2226,6 +2227,7 @@ module ConfigInformation
             return false
           end
         }
+=end
       end
       @opts = opts
       begin

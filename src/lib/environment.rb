@@ -394,16 +394,6 @@ module EnvironmentManagement
       @postinstall = []
       @id = description['id'] || -1
 
-      if description['image'].nil?
-        return old_load_from_file(
-          description.to_yaml.split("\n")[1..-1].join("\n"),
-          almighty_env_users, user, client, setmd5, migration
-        )
-      elsif migration
-        Debug::distant_client_error("The description file is already in the new version", client)
-        return false
-      end
-
       filemd5 = Proc.new do |f,kind|
         ret = nil
         except = nil
