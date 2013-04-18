@@ -757,7 +757,11 @@ module EnvironmentManagement
       @fdisk_type = hash['fdisk_type']
       @filesystem = hash['filesystem']
       @multipart = (hash['multipart'] == 0 ? false : true)
-      @options = (!hash['options'] or hash['options'].empty? ? {} : YAML.load(hash['options']))
+      if (!hash['options'] or hash['options'].empty?)
+        @options = {}
+      else
+        @options = YAML.load(hash['options'])
+      end
       @recorded = true
       self
     end
