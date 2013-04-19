@@ -57,11 +57,15 @@ module Automata
       raise 'Should be reimplemented'
     end
 
-    def kill()
+    def kill(dofree=true)
       raise 'Should be reimplemented'
     end
 
     def status()
+      raise 'Should be reimplemented'
+    end
+
+    def free()
       raise 'Should be reimplemented'
     end
 
@@ -113,6 +117,24 @@ module Automata
       @nodes_ko = Nodes::NodeSet.new(@nodes.id)
     end
 
+    def free()
+      @name = nil
+      @nodes = nil
+      @nsid = nil
+      @idx = nil
+      @subidx = nil
+      @mqueue = nil
+      @context = nil
+      @params = nil
+      @mutex = nil
+      #@nodes_brk.free(false) if @nodes_brk
+      @nodes_brk = nil
+      #@nodes_ok.free(false) if @nodes_ok
+      @nodes_ok = nil
+      #@nodes_ko.free(false) if @nodes_ko
+      @nodes_ko = nil
+    end
+
     def cleaner
       nil
     end
@@ -139,6 +161,24 @@ module Automata
       load_tasks()
       load_config()
       init_queue()
+    end
+
+    def free
+      @config = nil
+      @static_context = nil
+      @queue = nil
+      if @threads
+        @threads.each_key do |task|
+          task.free
+          task = nil
+        end
+      end
+      @threads = nil
+      @nodes = nil
+      #@nodes_done.free(false) if @nodes_done
+      @nodes_done = nil
+      @runthread = nil
+      @cleaner = nil
     end
 
     def create_task(idx,subidx,nodes,nsid,context)
@@ -351,7 +391,21 @@ module Automata
             threads.delete(key)
           end
         end
-        @threads.delete(task) if @threads[task] and @threads[task].empty?
+
+        # Treatment of this task is done, cleaning everything
+        if @threads[task] and @threads[task].empty? and task.nodes.empty?
+          if task.cleaner
+            task.cleaner.kill if task.cleaner.alive?
+            task.cleaner.join
+          end
+          task.free
+          @threads.delete(task)
+
+          begin
+            GC.start
+          rescue TypeError
+          end
+        end
       end
     end
 
@@ -369,7 +423,9 @@ module Automata
     def run_task(task)
       if @config[task.name] and @config[task.name][:breakpoint]
         clean_nodeset(task.nodes)
-        @queue.push({ :task => task, :status => :BRK, :nodes => task.nodes})
+        nodes = Nodes::NodeSet.new(task.nodes)
+        task.nodes.linked_copy(nodes)
+        @queue.push({ :task => task, :status => :BRK, :nodes => nodes})
         return
       end
 
@@ -390,7 +446,7 @@ module Automata
         end
         if thr.alive?
           thr.kill
-          task.kill
+          task.kill(false)
           success = false
           timeout!(task)
         end
@@ -425,10 +481,12 @@ module Automata
             # consider them as KO
             clean_nodeset(task.nodes_ok,treated)
             task.nodes_ok.linked_copy(treated)
+            nodes = Nodes::NodeSet.new(task.nodes_ok)
+            task.nodes_ok.linked_copy(nodes)
             @queue.push({
               :task => task,
               :status => :OK,
-              :nodes => task.nodes_ok,
+              :nodes => nodes,
               :nsid => ok_nsid
             })
           end
@@ -439,20 +497,25 @@ module Automata
             tmp.move(task.nodes_ko)
           end
 
+          nodes = Nodes::NodeSet.new(task.nodes_ko)
+          task.nodes_ko.linked_copy(nodes)
           @queue.push({
             :task => task,
             :status => :KO,
-            :nodes => task.nodes_ko,
+            :nodes => nodes,
             :nsid => ko_nsid
           }) unless task.nodes_ko.empty?
 
+          treated.free(false)
         elsif !task.nodes.empty?
           task.nodes_ko().clean()
           task.nodes().linked_copy(task.nodes_ko())
+          nodes = Nodes::NodeSet.new(task.nodes_ko)
+          task.nodes_ko.linked_copy(nodes)
           @queue.push({
             :task => task,
             :status => :KO,
-            :nodes => task.nodes_ko,
+            :nodes => nodes,
             :nsid => task.nsid
           })
         end
@@ -570,7 +633,7 @@ module Automata
       curtask
     end
 
-    def kill()
+    def kill(dofree=true)
       clean_threads()
       @queue.clear()
 
@@ -587,11 +650,12 @@ module Automata
       end
 
       @threads.each_pair do |task,threads|
-        task.kill
+        task.kill(false)
         threads.each_pair do |key,thread|
           thread.kill
           thread.join
         end
+        task.free
       end
 
       @threads = {}
@@ -600,10 +664,12 @@ module Automata
       @nodes.linked_copy(@nodes_done)
 
       kill!
+      free() if dofree
     end
   end
 
   class TaskedTaskManager < TaskManager
+    alias_method :__free__, :free
     alias_method :__kill__, :kill
     alias_method :__status__, :status
     include Task
@@ -629,6 +695,22 @@ module Automata
       @nodes_brk = Nodes::NodeSet.new(@nodes.id)
       @nodes_ok = Nodes::NodeSet.new(@nodes.id)
       @nodes_ko = Nodes::NodeSet.new(@nodes.id)
+    end
+
+    def free
+      __free__()
+      @name = nil
+      @idx = nil
+      @subidx = nil
+      @mqueue = nil
+      @params = nil
+      @mutex = nil
+      #@nodes_brk.free(false) if @nodes_brk
+      @nodes_brk = nil
+      #@nodes_ok.free(false) if @nodes_ok
+      @nodes_ok = nil
+      #@nodes_ko.free(false) if @nodes_ko
+      @nodes_ko = nil
     end
 
     def context
@@ -700,10 +782,11 @@ module Automata
       return true
     end
 
-    def kill()
-      __kill__()
+    def kill(dofree=true)
+      __kill__(false)
       @nodes_ok.clean()
       @nodes.linked_copy(@nodes_ko)
+      free() if dofree
     end
 
     def status()

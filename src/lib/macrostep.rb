@@ -19,6 +19,14 @@ class Macrostep < Automata::TaskedTaskManager
     @start_time = nil
   end
 
+  def free()
+    super()
+    @tasks = nil
+    @output = nil
+    @logger = nil
+    @start_time = nil
+  end
+
   def microclass
     Microstep
   end

@@ -37,6 +37,15 @@ require 'socket'
 
     def kill
       @taktuk.kill! unless @taktuk.nil?
+      free()
+    end
+
+    def free
+      @nodes = nil
+      @output = nil
+      @context = nil
+      @taktuk.free! if @taktuk
+      @taktuk = nil
     end
 
     # Exec a command with TakTuk

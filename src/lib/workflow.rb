@@ -60,6 +60,23 @@ class Workflow < Automata::TaskManager
     @start_time = nil
   end
 
+  def free()
+    super()
+    @tasks = nil
+    @errno = nil
+    @output.free if @output
+    @output = nil
+    #@nodes_brk.free(false) if @nodes_brk
+    @nodes_brk = nil
+    #@nodes_ok.free(false) if @nodes_ok
+    @nodes_ok = nil
+    #@nodes_ko.free(false) if @nodes_ko
+    @nodes_ko = nil
+    @logger.free if @logger
+    @logger = nil
+    @start_time = nil
+  end
+
   def context
     @static_context
   end
@@ -242,10 +259,11 @@ class Workflow < Automata::TaskManager
     end
   end
 
-  def kill
-    super()
+  def kill(dofree=true)
+    super(false)
     @nodes_ok.clean()
     @nodes.linked_copy(@nodes_ko)
+    free() if dofree
   end
 
   def start!

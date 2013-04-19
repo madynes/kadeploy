@@ -18,6 +18,16 @@ class Execute
     @parent_io = nil
   end
 
+  def free
+    @command = nil
+    @exec_pid = nil
+    @stdout = nil
+    @stderr = nil
+    @status = nil
+    @child_io = nil
+    @parent_io = nil
+  end
+
   def self.[](*cmd)
     self.new(*cmd)
   end
@@ -175,6 +185,7 @@ class Execute
       end
       @exec_pid = nil
     end
+    free()
   end
 
   def self.do(*cmd,&block)

@@ -691,9 +691,10 @@ module Nodes
     # * nothing
     # Output
     # * nothing
-    def free
-      @set.each { |node| node.free }
-      @set.delete_if { true }      
+    def free(recursive=true)
+      @set.each { |node| node.free } if recursive
+      @set = nil
+      @id = nil
     end
 
     # Create an array from the IP of the nodes in a NodeSet

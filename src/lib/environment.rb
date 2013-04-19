@@ -35,6 +35,29 @@ module EnvironmentManagement
     attr_reader :visibility
     attr_reader :demolishing_env
 
+    def free()
+      @id = nil
+      @user = nil
+      @name = nil
+      @version = nil
+      @description = nil
+      @author = nil
+      @visibility = nil
+      @demolishing_env = nil
+      @environment_kind = nil
+      @tarball = nil
+      @image = nil
+      @preinstall = nil
+      @postinstall = nil
+      @kernel = nil
+      @kernel_params = nil
+      @initrd = nil
+      @hypervisor = nil
+      @hypervisor_params = nil
+      @fdisk_type = nil
+      @filesystem = nil
+    end
+
     # Load an environment file
     #
     # Arguments
