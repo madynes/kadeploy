@@ -68,8 +68,9 @@ $stats.each_pair do |automata,kinds|
     envs.each_pair do |nodes,tots|
       puts "    #{nodes}:"
       tots.each_pair do |tot,stats|
+        nozero = stats.select { |node| node[:ok] > 0 }
         puts "      #{tot} nodes:"
-        times = stats.collect { |node| node[:time] }
+        times = nozero.collect { |node| node[:time] }
         avg = average(times)
         std = stddev(times,avg)
         conf = confint(times,1.96,avg,std)
@@ -82,7 +83,7 @@ $stats.each_pair do |automata,kinds|
         puts "          nb val: #{times.size}"
         puts "          values: {#{times.join(', ')}}"
 
-        oks = stats.collect { |node| node[:ok] }
+        oks = nozero.collect { |node| node[:ok] }
         avg = average(oks)
         std = stddev(oks,avg)
         conf = confint(oks,1.96,avg,std)
@@ -94,6 +95,7 @@ $stats.each_pair do |automata,kinds|
         puts "          95% conf. int.: [#{sprintf('%.1f',conf.first)};#{sprintf('%.1f',conf.last)}]"
         puts "          nb val: #{oks.size}"
         puts "          values: {#{oks.join(', ')}}"
+        puts "        total fails: #{stats.size - nozero.size}"
       end
     end
   end
