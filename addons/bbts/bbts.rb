@@ -7,7 +7,7 @@ require 'fileutils'
 # Config
 SSH_KEY='~/.ssh/id_rsa.pub'
 BBT_SCRIPT=File.join(File.dirname(__FILE__),'..','..','test','blackbox_tests.rb')
-CONLOG_SCRIPT=File.join(File.dirname(__FILE__),'conmanlogger.sh')
+CONLOG_SCRIPT=File.join(File.dirname(__FILE__),'conlogger.sh')
 KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
 
 KADEPLOY_BIN='kadeploy3'
