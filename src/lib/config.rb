@@ -419,6 +419,56 @@ module ConfigInformation
       end
     end
 
+    def Config.free_kadeploy_exec_specific(exec_specific)
+      exec_specific.environment.free if exec_specific.environment
+      exec_specific.environment = nil
+      exec_specific.nodesetid = nil
+      exec_specific.node_set.free(false) if exec_specific.node_set
+      exec_specific.node_set = nil
+      exec_specific.node_array = nil
+      exec_specific.load_env_kind = nil
+      exec_specific.load_env_desc = nil
+      exec_specific.load_env_file = nil
+      exec_specific.env_version = nil
+      exec_specific.user = nil
+      exec_specific.true_user = nil
+      exec_specific.block_device = nil
+      exec_specific.deploy_part = nil
+      exec_specific.boot_part = nil
+      exec_specific.verbose_level = nil
+      exec_specific.debug = false
+      #exec_specific.script = nil
+      exec_specific.key = nil
+      exec_specific.reformat_tmp = nil
+      exec_specific.pxe_profile_msg = nil
+      exec_specific.pxe_upload_files = nil
+      exec_specific.pxe_profile_singularities = nil
+      exec_specific.steps = nil
+      exec_specific.ignore_nodes_deploying = nil
+      exec_specific.breakpoint_on_microstep = nil
+      exec_specific.breakpointed = nil
+      exec_specific.custom_operations_file = nil
+      exec_specific.custom_operations = nil
+      exec_specific.disable_bootloader_install = nil
+      exec_specific.disable_disk_partitioning = nil
+      #exec_specific.nodes_ok_file = nil
+      #exec_specific.nodes_ko_file = nil
+      exec_specific.nodes_state = nil
+      exec_specific.write_workflow_id = nil
+      exec_specific.get_version = nil
+      exec_specific.get_users_info = nil
+      exec_specific.chosen_server = nil
+      #exec_specific.servers = nil
+      exec_specific.multi_server = false
+      exec_specific.kadeploy_server = nil
+      exec_specific.kadeploy_server_port = nil
+      exec_specific.reboot_classical_timeout = nil
+      exec_specific.reboot_kexec_timeout = nil
+      exec_specific.vlan = nil
+      exec_specific.ip_in_vlan = nil
+      exec_specific = nil
+    end
+
     # Set the state of the node from the deployment workflow point of view
     #
     # Arguments

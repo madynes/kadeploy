@@ -84,6 +84,19 @@ module Debug
       @cluster_id = cluster_id
     end
 
+    def free()
+      @verbose_level = nil
+      @debug = nil
+      @client = nil
+      @user = nil
+      @deploy_id = nil
+      @syslog = nil
+      @syslog_dbg_level = nil
+      @syslog_lock = nil
+      @client_output = nil
+      @cluster_id = nil
+    end
+
     # Disable the output redirection on the client
     #
     # Arguments
@@ -254,6 +267,13 @@ module Debug
       @config = config
       @db = db
       @syslog_lock = syslog_lock
+    end
+
+    def free()
+      @nodes = nil
+      @config = nil
+      @db = nil
+      @syslog_lock = nil
     end
 
     # Create an hashtable that contains all the information to log
