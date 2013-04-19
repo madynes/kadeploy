@@ -353,10 +353,6 @@ class KadeployServer
 
       info[:workflows].first.context[:database].disconnect
       kadeploy_delete_workflow_info(workflow_id)
-      begin
-        GC.start
-      rescue TypeError
-      end
       true
     }
   end
@@ -720,6 +716,10 @@ class KadeployServer
       client.print(ke.message) if ke.message and !ke.message.empty?
       #Debug::distant_client_error("Cannot run the deployment",client)
       kadeploy_sync_kill_workflow(ke.context[:wid],false)
+    rescue Exception => e
+      puts e.message
+      puts e.backtrace
+      raise e
     end
     return true
   end
@@ -782,6 +782,15 @@ class KadeployServer
   # Output
   # * nothing
   def kadeploy_delete_workflow_info(workflow_id)
+    if @workflow_info_hash[workflow_id][:workflows]
+      @workflow_info_hash[workflow_id][:workflows].each do |workflow|
+        workflow.free
+      end
+    end
+    begin
+      GC.start
+    rescue TypeError
+    end
     @workflow_info_hash.delete(workflow_id)
   end
 
@@ -1048,6 +1057,8 @@ class KadeployServer
           end
         end
         micro.debug(0,"Done rebooting the nodes #{nodeset.to_s_fold}",nil)
+        micro.free
+        micro = nil
         ret
       end
     end
@@ -2811,6 +2822,8 @@ class KadeployServer
           }
         end
         micro.debug(0,"Done power operation on the nodes #{set.to_s_fold}",nil)
+        micro.free
+        micro = nil
       end
     end
 
