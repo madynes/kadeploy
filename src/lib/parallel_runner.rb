@@ -31,6 +31,13 @@ require 'thread'
       @threads = ThreadGroup.new
     end
 
+    def free
+      @execs = nil
+      @output = nil
+      @nodesetid = nil
+      @threads = nil
+    end
+
     # Add a command related to a node
     #
     # Arguments
@@ -83,6 +90,7 @@ require 'thread'
       @execs.each_value do |exec|
         exec.kill
       end
+      free()
     end
 
     # Get the results of the execution
