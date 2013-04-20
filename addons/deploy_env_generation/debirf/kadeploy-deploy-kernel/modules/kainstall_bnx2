@@ -1,0 +1,7 @@
+#!/bin/bash -e
+
+SOURCE="deb http://ftp.fr.debian.org/debian/ ${DEBIRF_SUITE} main contrib non-free"
+
+echo $SOURCE > $DEBIRF_ROOT/etc/apt/sources.list
+debirf_exec apt-get update
+debirf_exec apt-get install -y firmware-bnx2
