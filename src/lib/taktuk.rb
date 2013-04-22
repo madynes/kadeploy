@@ -109,6 +109,11 @@ module TakTuk
       @template = template
     end
 
+    def free
+      @type = nil
+      @template = nil
+    end
+
     def parse(string)
       ret = Result.new
       if @template
@@ -303,6 +308,10 @@ module TakTuk
       @hostlist=hostlist
     end
 
+    def free
+      @hostlist = nil
+    end
+
     def exclude(node)
       @hostlist.remove(node) if @hostlist.is_a?(Array)
     end
@@ -444,6 +453,27 @@ module TakTuk
         @exec.kill
         @exec = nil
       end
+      free!()
+    end
+
+    def free!()
+      @binary = nil
+      @options = nil
+      if @streams
+        @streams.each_value do |stream|
+          stream.free if stream
+          stream = nil
+        end
+      end
+      @hostlist.free if @hostlist
+      @hostlist = nil
+      @commands = nil
+      @args = nil
+      @stdout = nil
+      @stderr = nil
+      @status = nil
+      @exec = nil
+      @curthread = nil
     end
 
     def raw!(string)

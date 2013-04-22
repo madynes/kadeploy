@@ -94,7 +94,7 @@ class Microstep < Automata::QueueTask
     }
   end
 
-  def kill
+  def kill(dofree=true)
     # Be carefull to kill @runthread before killing @current_operation, in order to avoid the res condition: @runthread create the Operation object but do not set @current_operation because it was killed
     unless @runthread.nil?
       @runthread.kill! if @runthread.alive?
@@ -105,6 +105,17 @@ class Microstep < Automata::QueueTask
       thr.join
     end
     @current_operation.kill unless @current_operation.nil?
+    free() if dofree
+  end
+
+  def free
+    super()
+    @output = nil
+    @runthread = nil
+    @current_operation.free if @current_operation
+    @current_operation = nil
+    @waitreboot_threads = nil
+    @timestart = nil
   end
 
   private
@@ -199,6 +210,7 @@ class Microstep < Automata::QueueTask
     @current_operation.run(opts)
     res = @current_operation.wait(opts)
     yield(*res) if block_given?
+    @current_operation.free
     @current_operation = nil
     (res[0].exitstatus == 0)
   end
@@ -207,6 +219,7 @@ class Microstep < Automata::QueueTask
     raise '@current_operation should not be set' if @current_operation
     @current_operation = obj
     yield(obj)
+    @current_operation.free
     @current_operation = nil
   end
 
