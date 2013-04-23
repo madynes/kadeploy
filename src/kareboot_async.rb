@@ -41,27 +41,8 @@ if (exec_specific_config != nil) then
     puts res.to_yaml
 
     kadeploy_server.async_reboot_free(reboot_id)
-  end
-  
-  case error
-  when KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
-    puts "Reboot failed on some nodes"
-  when KarebootAsyncError::DEMOLISHING_ENV
-    puts "Cannot reboot since the nodes have been previously deployed with a demolishinf environment"
-  when KarebootAsyncError::PXE_FILE_FETCH_ERROR
-    puts "Some PXE files cannot be fetched"
-  when KarebootAsyncError::NO_RIGHT_TO_DEPLOY
-    puts "You do not have the right to deploy on all the nodes"
-  when KarebootAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
-    puts "Unknown node in singularity file"
-  when KarebootAsyncError::NODE_NOT_EXIST
-    puts "At least one node in your node list does not exist"
-  when KarebootAsyncError::VLAN_MGMT_DISABLED
-    puts "The VLAN management has been disabled on the site"
-  when KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
-    puts "The environment does not exist"
-  when FetchFileError::INVALID_KEY
-    puts "The ssh key cannot be grabbed"
+  else
+    $stderr.puts KadeployError.to_msg(error) + " (error ##{error})"
   end
 
   distant.stop_service()
