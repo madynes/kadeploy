@@ -936,10 +936,8 @@ class KadeployServer
           )
         rescue KadeployError => ke
           gfm.clean
-          output.verbosel(0,
-            "Reboot not performed since some pxe files cannot be grabbed")
           raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,
-            :rid => reboot_id, :status => 3)
+            { :rid => ke.context[:rid], :status => 3}, ke.message)
         end
       end
       files += gfm.files
@@ -955,10 +953,8 @@ class KadeployServer
         gfm = nil
       rescue KadeployError => ke
         gfm.clean
-        output.verbosel(0, "Reboot not performed since the SSH key file "\
-          "cannot be grabbed")
-        raise KadeployError.new(FetchFileError::INVALID_KEY, rid => reboot_id,
-          :status => 4)
+        raise KadeployError.new(FetchFileError::INVALID_KEY,
+          { :rid => ke.context[:rid], :status => 4}, ke.message)
       end
     end
 
@@ -1182,8 +1178,8 @@ class KadeployServer
       #Debug::distant_client_error("Cannot run the reboot",client)
       @reboot_info_hash_lock.synchronize {
         # Unlock the cached files
-        if @reboot_info_hash[reboot_id].size >= 4
-          @reboot_info_hash[reboot_id][4].each do |file|
+        if @reboot_info_hash[ke.context[:rid]] and @reboot_info_hash[ke.context[:rid]].size >= 4
+          @reboot_info_hash[ke.context[:rid]][4].each do |file|
             file.release
           end
         end

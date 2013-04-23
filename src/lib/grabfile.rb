@@ -263,33 +263,39 @@ module Managers
     end
 
     def self.grab(gfm,context,path,prio,tag,errno,opts={})
-      return if !path or path.empty?
-      version,user = nil
-      if opts[:env] and opts[:env].recorded?
-        #version = "#{opts[:env].name}/#{opts[:env].version.to_s}"
-        version = 'env'
-        user = opts[:env].user
-      elsif prio != :anon
-        version = 'file'
-      else
-        version = context[:deploy_id].to_s
-        opts[:md5] = nil
+      file = nil
+      begin
+        return if !path or path.empty?
+        version,user = nil
+        if opts[:env] and opts[:env].recorded?
+          #version = "#{opts[:env].name}/#{opts[:env].version.to_s}"
+          version = 'env'
+          user = opts[:env].user
+        elsif prio != :anon
+          version = 'file'
+        else
+          version = context[:deploy_id].to_s
+          opts[:md5] = nil
+        end
+
+        user = context[:execution].true_user unless user
+
+        file = gfm.grab(
+          path,
+          version,
+          user,
+          Cache::PRIORITIES[prio],
+          tag,
+          errno,
+          opts[:md5],
+          opts
+        )
+
+        path.gsub!(path,file.file)
+      rescue KadeployError => ke
+        ke.context = context
+        raise ke
       end
-
-      user = context[:execution].true_user unless user
-
-      file = gfm.grab(
-        path,
-        version,
-        user,
-        Cache::PRIORITIES[prio],
-        tag,
-        errno,
-        opts[:md5],
-        opts
-      )
-
-      path.gsub!(path,file.file)
 
       file
     end
