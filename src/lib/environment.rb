@@ -203,7 +203,7 @@ module EnvironmentManagement
             @name = val
           when "version"
             if val =~ /\A\d+\Z/ then
-              @version = val
+              @version = val.to_i
             else
               Debug::distant_client_error("The environment version must be a number", client)
               return false
