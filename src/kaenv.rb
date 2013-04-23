@@ -90,7 +90,7 @@ if exec_specific_config != nil then
   ret = kadeploy_server.run("kaenv", exec_specific_config, client_host, client_port)
   local.stop_service()
   distant.stop_service()
-  exit(ret||1)
+  exit((ret)?0:1)
 else
   exit(1)
 end
