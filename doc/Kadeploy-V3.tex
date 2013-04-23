@@ -127,7 +127,7 @@ or if you do not install the server side on the same machine than the client sid
 \subsection{Debian packages}
 The following installation method works only an Debian based distribution.
 \subsubsection{Build}
-\noindent First, you have to uncompress the Kadeploy tarball. 
+\noindent First, you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{Verbatim}[commandchars=\\\{\}]
 > tar xzf kadeploy-\version.tar.gz -C DESTINATION_DIR
@@ -168,12 +168,12 @@ This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, 
 \end{small}
 
 \paragraph{Warning}
-In order to preserve your configuration files, the removal of a Kadeploy package will preserve the configuration files (unless you specify the \texttt{--purge} tag).
+In order to preserve your configuration files, the removal of a Kadeploy package will preserve the configuration files (unless you specify the \texttt{-{}-purge} tag).
 
 \subsection{Fedora packages}
 The following installation method works only an Fedora based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
 \subsubsection{Build}
-\noindent First, you have to uncompress the Kadeploy tarball. 
+\noindent First, you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{Verbatim}[commandchars=\\\{\}]
 > tar xzf kadeploy-\version.tar.gz -C DESTINATION_DIR
@@ -248,7 +248,7 @@ YAML provides a way to describe hierarchy between elements using \emph{Associati
 Here are some examples:
 \begin{small}
 \begin{alltt}
---- 
+---
 example-array:{\footnotesize # This is an Associative array containing 3} elements
   elem1: 8{\footnotesize # Integer}
   elem2: "8"{\footnotesize # String}
@@ -328,7 +328,7 @@ The general configuration file is named \texttt{server\_conf.yml} and is located
 \subsection{Example of a general configuration file}
 \begin{small}
 \begin{verbatim}
---- 
+---
 database:
   host: mysql.lan
   name: deploy3
@@ -356,19 +356,19 @@ network:
   vlan:
     set_cmd: kavlan NODES -s -i VLAN_ID -u USER
     hostname_suffix: -kavlan-VLAN_ID
-  ports: 
+  ports:
     ssh: 22
     kadeploy_server: 25300
     test_deploy_env: 25300
   tcp_buffer_size: 8192
-windows: 
-  check: 
+windows:
+  check:
     size: 90
-  reboot: 
+  reboot:
     size: 100
     sleep_time: 10
-environments: 
-  deployment: 
+environments:
+  deployment:
     extraction_dir: /mnt/dest
     tarball_dir: /tmp
     rambin_dir: /rambin
@@ -397,13 +397,13 @@ pxe:
     profiles:
       directory: grub.cfg
       filename: ip
-hooks: 
-  async: 
+hooks:
+  async:
     end_of_reboot: echo REBOOT_ID
     end_of_power: echo POWER_ID
     end_of_deployment: echo WORKFLOW_ID
 external:
-  taktuk: 
+  taktuk:
     auto_propagate: false
     connector: |-
       ssh -q -o StrictHostKeyChecking=no \
@@ -411,7 +411,7 @@ external:
       -o PreferredAuthentications=publickey \
       -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy
     tree_arity: 0
-  bittorrent: 
+  bittorrent:
     tracker_ip: 10.0.0.4
     download_timeout: 1800
   mkfs:
@@ -525,9 +525,9 @@ For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
 
 The information used to generate this filenames are the one specified for each nodes in the clusters configuration file (see section \ref{sec:clusters_conf}). For example, with PXElinux, it will be \emph{ip\_hex}.
   \end{itemize}
-  \item \ypath{/pxe/dhcp/userfiles} PXE user custom files (option \emph{--upload-pxe-files}). \textbf{Be careful}, this directory is emptied at each server launch.
+  \item \ypath{/pxe/dhcp/userfiles} PXE user custom files (option \emph{-{}-upload-pxe-files}). \textbf{Be careful}, this directory is emptied at each server launch.
   \begin{itemize}
-    \item \yfield{directory}{String} The directory where PXE user custom files (option \emph{--upload-pxe-files}) are to be saved. This path is relative to the PXE repository path.
+    \item \yfield{directory}{String} The directory where PXE user custom files (option \emph{-{}-upload-pxe-files}) are to be saved. This path is relative to the PXE repository path.
     \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE user custom files sub-directory
    \end{itemize}
 
@@ -650,12 +650,12 @@ Warning, a cluster-specific configuration file and some partitioning/bootloader\
 \subsection{Example of a clusters file\\}
 \begin{small}
 \begin{verbatim}
---- 
+---
 clusters:
 - name: graphene
   prefix: gra
   conf_file: cluster_conf-graphene.yml
-  nodes: 
+  nodes:
     - name: graphene-1.nancy.grid5000.fr # Full version
       address: 10.0.66.1
     - name: graphene-2.nancy.grid5000.fr
@@ -666,7 +666,7 @@ clusters:
       address: 10.0.66.4
 - name: griffon
   conf_file: cluster_conf-griffon.yml
-  nodes: 
+  nodes:
     - name: griffon-[1-92].nancy.grid5000.fr # Digest version
       address: 10.0.65.[1-92]
 \end{verbatim}
@@ -716,11 +716,11 @@ boot:
     nfsroot:
       vmlinuz: deploy-vmlinuz-2.6.27.7-nfsroot
       params: rw console=tty0 root=/dev/nfs ip=dhcp nfsroot=10.0.100.35:/mnt/nfsroot/rootfs
-timeouts: 
+timeouts:
   reboot: 200 + 150 * Math.log(n)
   kexec: 60
-remoteops: 
-  reboot: 
+remoteops:
+  reboot:
     - name: soft
       cmd: |-
         ssh -A -q \
@@ -740,7 +740,7 @@ remoteops:
       name: hard
 #   - name: very_hard
 #      cmd: ...
-  power_off: 
+  power_off:
     - name: soft
       cmd: |-
         ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o \
@@ -752,23 +752,23 @@ remoteops:
       cmd: /usr/bin/lanpower -c off -m HOSTNAME_SHORT
 #   - name: very_hard
 #      cmd: ...
-  power_status: 
+  power_status:
     - name: soft
       cmd: /usr/bin/lanpower -m HOSTNAME_FQDN -s
-  console: 
+  console:
     - name: soft
       cmd: /usr/local/conman/bin/conman -d conman HOSTNAME_SHORT
-preinstall: 
+preinstall:
   files:
     - file: /g5k/admin_pre_install.tgz
       format: tgz
       script: launch.sh
-postinstall: 
+postinstall:
   files:
     - file: /g5k/admin_post_install.tgz
       format: tgz
       script: launch.sh
-pxe: 
+pxe:
   headers:
     dhcp: &id001 |-
       PROMPT 1
@@ -780,7 +780,7 @@ kexec:
   repository: /dev/shm/kexec_repository
 hooks:
   use_ip_to_deploy: true
-automata: 
+automata:
   macrosteps:
     SetDeploymentEnv:
       - type: Prod
@@ -798,7 +798,7 @@ automata:
                 timeout: 16
       - type: Untrusted
         timeout: 400
-    BroadcastEnv: 
+    BroadcastEnv:
       - type: Kastafior
         retries: 1
         timeout: 900
@@ -816,7 +816,7 @@ automata:
                 file: myfile
                 destination: $KADEPLOY_ENV_EXTRACTION_DIR/mypath
                 timeout: 10
-    BootNewEnv: 
+    BootNewEnv:
       - type: Kexec
         timeout: 100
 #     - type: Classical
@@ -912,18 +912,18 @@ automata:
     \item \yfield{cmd}{String} generic console command. You can use the HOSTNAME\_FQDN and HOSTNAME\_SHORT variables in the command-line.
   \end{itemize}
 
-  \item \ypath{/preinstall/[files]} list of pre-install to execute at the pre-install of a deployment. This fields are not mandatory. 
+  \item \ypath{/preinstall/[files]} list of pre-install to execute at the pre-install of a deployment. This fields are not mandatory.
   \begin{itemize}
     \item \yfield{file}{String} the absolute path to the archive containing the scripts
     \item \yfield{format}{String} the kind of file (expected values are \emph{tgz} or \emph{tbz2})
-    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
+    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug.
   \end{itemize}
 
-  \item \ypath{/postinstall/[files]} list of post-install to execute at the post-install of a deployment. This fields are not mandatory. 
+  \item \ypath{/postinstall/[files]} list of post-install to execute at the post-install of a deployment. This fields are not mandatory.
   \begin{itemize}
     \item \yfield{file}{String} the absolute path to the archive containing the scripts
     \item \yfield{format}{String} the kind of file (expected values are \emph{tgz} or \emph{tbz2})
-    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
+    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug.
   \end{itemize}
 
   \item \ypath{/pxe/headers} PXE headers to be used for the different kind of reboots
@@ -955,7 +955,7 @@ automata:
     \item \yfield{name}{String} the name of the micro-step, see the list bellow to get the different micro-steps names.
     \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this micro-step
     \item \yfieldd{retries}{Integer}{0} the number of retries for this micro-step. Since most of micro-steps perform some modifications on the running system and are do not perform any cleaning operation before their execution, be very careful when using this setting.
-  \end{itemize} 
+  \end{itemize}
   \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/[substitute]} Substitute this micro-step with some custom operations (see the paragraph bellow for custom operations description)
   \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/[pre-ops]} A list of operations that have to be done before executing the micro-step (see the paragraph bellow for custom operation description)
   \item \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see the paragraph bellow for custom operation description)
@@ -972,7 +972,7 @@ automata:
     \item \yfield{name}{String} the name of the micro-step, see the list bellow to get the different micro-steps names.
     \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this micro-step
     \item \yfieldd{retries}{Integer}{0} the number of retries for this micro-step. Since most of micro-steps perform some modifications on the running system and are do not perform any cleaning operation before their execution, be very careful when using this setting.
-  \end{itemize} 
+  \end{itemize}
   \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]/[substitute]} Substitute this micro-step with some custom operations (see the paragraph bellow for custom operations description)
   \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]/[pre-ops]} A list of operations that have to be done before executing the micro-step (see the paragraph bellow for custom operation description)
   \item \ypath{/automata/macrosteps/[BroadcastEnv]/[microsteps]/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see the paragraph bellow for custom operation description)
@@ -983,13 +983,13 @@ automata:
     \item \yfield{type}{String} the type of the macro-step (expected values are \emph{Classical}, \emph{Kexec}, \emph{HardReboot}, \emph{PivotRoot} (not implemented yet) and \emph{Dummy})
     \item \yfieldd{retries}{Integer}{0} the number of retries for this macro-step
     \item \yfield{timeout}{Integer} the timeout (seconds) of this macro-step
-  \end{itemize} 
+  \end{itemize}
   \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]} Microsteps specific configuration (this field is not mandatory)
   \begin{itemize}
     \item \yfield{name}{String} the name of the micro-step, see the list bellow to get the different micro-steps names.
     \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this micro-step
     \item \yfieldd{retries}{Integer}{0} the number of retries for this micro-step. Since most of micro-steps perform some modifications on the running system and are do not perform any cleaning operation before their execution, be very careful when using this setting.
-  \end{itemize} 
+  \end{itemize}
   \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]/[substitute]} Substitute this micro-step with some custom operations (see the paragraph bellow for custom operations description)
   \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]/[pre-ops]} A list of operations that have to be done before executing the micro-step (see the paragraph bellow for custom operation description)
   \item \ypath{/automata/macrosteps/[BootNewEnv]/[microsteps]/[post-ops]} A list of custom operations that have to be done after executing the micro-step (see the paragraph bellow for custom operation description)
@@ -1008,7 +1008,7 @@ Here is a custom operation description:
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
   \item \yfieldd{scattering}{String}{'tree'} The scattering kind for this custom operation (expected values are \emph{tree} and \emph{chain})
-\end{itemize} 
+\end{itemize}
 \paragraph{The automata macro-steps\\\label{sec:macro_desc}}
 Here is the list of the macro-step and their implementation:
 \begin{itemize}
@@ -1358,7 +1358,7 @@ General options:
   -d, --debug-mode                 Activate the debug mode
   -e, --env-name ENVNAME           Name of the recorded environment to deploy
   -f, --file MACHINELIST           Files containing list of nodes (- means stdin)
-  -k, --key [FILE]                 Public key to copy in the root's authorized_keys, 
+  -k, --key [FILE]                 Public key to copy in the root's authorized_keys,
                                    if no argument is specified, use the authorized_keys
   -i, --server-info                Get information about the server's configuratio
   -m, --machine MACHINE            Node to run on
@@ -1373,7 +1373,7 @@ General options:
   -v, --version                    Get the version
       --vlan VLANID                Set the VLAN"
   -w, --set-pxe-profile FILE       Set the PXE profile (use with caution)
-      --set-pxe-pattern FILE      Specify a file containing the substituation of a pattern for 
+      --set-pxe-pattern FILE      Specify a file containing the substituation of a pattern for
                                   each node in the PXE profile (the NODE_SINGULARITY pattern must
                                   be used in the PXE profile)
   -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
@@ -1383,12 +1383,12 @@ General options:
   -V, --verbose-level VALUE        Verbose level between 0 to 5
 Advanced options:
       --write-workflow-id FILE     Write the workflow id in a file
-      --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying" 
+      --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying"
                                    (use this only if you know what you do)
-      --disable-bootloader-install Disable the automatic installation of a bootloader for a 
+      --disable-bootloader-install Disable the automatic installation of a bootloader for a
                                    Linux based environment
       --disable-disk-partitioning  Disable the disk partitioning
-      --breakpoint MICROSTEP       Set a breakpoint just before launching the give micro-step, the 
+      --breakpoint MICROSTEP       Set a breakpoint just before launching the give micro-step, the
                                    syntax is macrostep:microstep (use this only if you know what you do)
       --set-custom-operations FILE Add some custom operations defined in a file
       --reboot-classical-timeout V Overload the default timeout for classical reboots
@@ -1398,8 +1398,8 @@ Advanced options:
 \end{verbatim}
 \end{small}
 
-At least, Kadeploy must be called with one node and an environment. The nodes to deploy can be specified by using several \texttt{-m|--machine} options, or the \texttt{-f|--file} options (one node per line in the file), or a mix of both.
-The environment can be specified with the \texttt{-e|--env-name} option if you want to use an environment recorded in the environment database or with the \texttt{-a|--env-file} options if you want to use an environment described in a file. Refer to the~\ref{sec:kaenv} part for information about the environment description. Here are some examples:
+At least, Kadeploy must be called with one node and an environment. The nodes to deploy can be specified by using several \texttt{-m|-{}-machine} options, or the \texttt{-f|-{}-file} options (one node per line in the file), or a mix of both.
+The environment can be specified with the \texttt{-e|-{}-env-name} option if you want to use an environment recorded in the environment database or with the \texttt{-a|-{}-env-file} options if you want to use an environment described in a file. Refer to the~\ref{sec:kaenv} part for information about the environment description. Here are some examples:
 \begin{verbatim}
 > kadeploy3 -m gdx-5.orsay.grid5000.fr -e lenny-x64-nfs-1.0 -o nodes_ok -n nodes_ko
 > kadeploy3 -m gdx-[5-12].orsay.grid5000.fr -e lenny-x64-base -o nodes_ok -n nodes_ko
@@ -1435,7 +1435,7 @@ This command performs the deployment of the environment \textit{lenny-x64-base} 
             -l johnsmith \
             -o nodes_ok -n nodes_ko
 \end{verbatim}
-This command uses the environment \textit{custom\_env} of the user \textit{johnsmith} to deploy the nodes specified in \textit{~/machinefile}. The list of the nodes correctly deployed will be written in the file specified with the \texttt{-o|--output-ok-nodes} option. Idem for the nodes not correctly deployed with the \texttt{-o|--output-ko-nodes} option. Refer to the part~\ref{sec:kaenv} about Kaenv to know more about the environment management.
+This command uses the environment \textit{custom\_env} of the user \textit{johnsmith} to deploy the nodes specified in \textit{~/machinefile}. The list of the nodes correctly deployed will be written in the file specified with the \texttt{-o|-{}-output-ok-nodes} option. Idem for the nodes not correctly deployed with the \texttt{-o|-{}-output-ko-nodes} option. Refer to the part~\ref{sec:kaenv} about Kaenv to know more about the environment management.
 
 \paragraph{Use case 4 - basic usage - execution of a script after deployment}
 \begin{verbatim}
@@ -1464,7 +1464,7 @@ This kind of command can be used for debug purpose. It performs a deployment wit
             -w ~/pxe_profile -x "~/custom-kernel,~/custom-initrd" \
             --set-pxe-pattern ~/singularities
 \end{verbatim}
-In some specific case, you may want to use a specific PXE profile to boot your nodes. To do this, you have to provide a PXE profile. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server. So Kadeploy offers a feature to stage some files in an area where the files can be read by the TFTP server. This can be achieved with the \texttt{-x|--upload-pxe-files} option. You must know that such uploaded files will be copied in the \texttt{tftp\_images\_path}. Those files will then be available with the prefix \texttt{FILES\_PREFIX--}.
+In some specific case, you may want to use a specific PXE profile to boot your nodes. To do this, you have to provide a PXE profile. Warning, the files used in your PXE profil (Comboot, kernel, initrd, ...) must be readable by the TFTP server on the Kadeploy server. So Kadeploy offers a feature to stage some files in an area where the files can be read by the TFTP server. This can be achieved with the \texttt{-x|-{}-upload-pxe-files} option. You must know that such uploaded files will be copied in the \texttt{tftp\_images\_path}. Those files will then be available with the prefix \texttt{FILES\_PREFIX-{}-}.
 
 Here is an example of PXE profile that uses uploaded files:
 \begin{verbatim}
@@ -1479,9 +1479,9 @@ label bootlabel
         APPEND initrd=FILES_PREFIX--custom-initrd root=/dev/sda3 node_id=NODE_SINGULARITY
 \end{verbatim}
 
-In this example, \texttt{FILES\_PREFIX--} will be replaced by the prefix added to each files sent into the TFTP repository via the \texttt{-x|--upload-pxe-files} option (be careful not to forget the \texttt{--} suffix).
+In this example, \texttt{FILES\_PREFIX-{}-} will be replaced by the prefix added to each files sent into the TFTP repository via the \texttt{-x|-{}-upload-pxe-files} option (be careful not to forget the \texttt{-{}-} suffix).
 
-You can notice the \texttt{NODE\_SINGULARITY} pattern used in the PXE profile. Thanks to the \texttt{--set-pxe-pattern} option, you can also provide a file that defines a value in the PXE profile that depends on the node concerned. This file must define on each line a couple of value as follows : hostname,node singularity. In our example, the file \texttt{~/singularities} can contains something like:
+You can notice the \texttt{NODE\_SINGULARITY} pattern used in the PXE profile. Thanks to the \texttt{-{}-set-pxe-pattern} option, you can also provide a file that defines a value in the PXE profile that depends on the node concerned. This file must define on each line a couple of value as follows : hostname,node singularity. In our example, the file \texttt{~/singularities} can contains something like:
 \begin{verbatim}
 gdx-5.orsay.grid5000.fr,1
 gdx-6.orsay.grid5000.fr,2
@@ -1515,7 +1515,7 @@ This command performs the deployment of the \textit{Custom\_linux\_env} environm
                            BroadcastEnv|BroadcastEnvKastafior:2:300&
                            BootNewEnv|BootNewEnvKexec:1:150"
 \end{verbatim}
-If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{--force-steps} option is the same that for the \ypath{/automata/macrosteps} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
+If you are a power user, you can specify the full Kadeploy workflow and bypass the default configuration. Use it at your own risk since the nodes may not support all the Kadeploy features like the \textit{Kexec} optimization for instance. The syntax for the \texttt{-{}-force-steps} option is the same that for the \ypath{/automata/macrosteps} field if the Kadeploy configuration. The difference is that the three macrostep are defined on the same line, with the \texttt{\&} character as a delimiter between the macro-steps. Warning, you must define at least one implementation for each macro-step, without newline (unlike the example).
 
 \paragraph{Use case 10 - expert usage - insert custom operations in the deployment workflow}
 \begin{verbatim}
@@ -1592,7 +1592,7 @@ General options:
   -c, --check-demolishing-tag    Check if some nodes was deployed with an environment that have the demolishing tag
   -e, --env-name ENVNAME         Name of the recorded environment
   -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
-  -k, --key [FILE]               Public key to copy in the root's authorized_keys, 
+  -k, --key [FILE]               Public key to copy in the root's authorized_keys,
                                  if no argument is specified, use the authorized_keys
   -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
   -m, --machine MACHINE          Reboot the given machines
@@ -1600,12 +1600,12 @@ General options:
   -n, --output-ko-nodes FILENAME File that will contain the nodes not correctly rebooted
   -o, --output-ok-nodes FILENAME File that will contain the nodes correctly rebooted
   -p, --partition-number NUMBER  Specify the partition number to use
-  -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot, 
+  -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot,
                                  deploy_env, env_recorded)
   -u, --user USERNAME            Specify the user
   -v, --version                  Get the version
   -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
-      --set-pxe-pattern FILE     Specify a file containing the substituation of a pattern for 
+      --set-pxe-pattern FILE     Specify a file containing the substituation of a pattern for
                                  each node in the PXE profile (the NODE_SINGULARITY pattern must
                                  be used in the PXE profile)
   -x, --upload-pxe-files FILES   Upload a list of files (file1,file2,file3) to the "tftp_images_path"
@@ -1618,12 +1618,12 @@ General options:
 \end{verbatim}
 \end{small}
 
-At least, Kareboot must be called with one node and a reboot kind. The nodes to reboot can be specified by using several \texttt{-m|--machine} options, or the \texttt{-f|--file} options (one node per line in the file), or a mix of both. The expected values for the \texttt{-r|--reboot-kind} are:
+At least, Kareboot must be called with one node and a reboot kind. The nodes to reboot can be specified by using several \texttt{-m|-{}-machine} options, or the \texttt{-f|-{}-file} options (one node per line in the file), or a mix of both. The expected values for the \texttt{-r|-{}-reboot-kind} are:
 \begin{itemize}
 \item \texttt{simple\_reboot}: perform a simple reboot of the nodes. Kareboot firstly tries to perform a soft reboot, then a hard reboot is performed and lastly a very hard reboot if it doesn't success before.
-\item \texttt{set\_pxe}: modify the PXE profile with the one given with the \texttt{-w|--set-pxe-profile} options and perform a simple reboot.
+\item \texttt{set\_pxe}: modify the PXE profile with the one given with the \texttt{-w|-{}-set-pxe-profile} options and perform a simple reboot.
 \item \texttt{env\_recorded}: perform a reboot on an environment that is already deployed (for instance, the production environment on the production part). This operation must be used with the \texttt{-e} and \texttt{-p} options at least.
-\item \texttt{deploy\_env}: perform a reboot on the deployment environment. This can be used with the \texttt{-k|--key} option.
+\item \texttt{deploy\_env}: perform a reboot on the deployment environment. This can be used with the \texttt{-k|-{}-key} option.
 \end{itemize}
 
 Here are some basic examples:
@@ -1645,11 +1645,11 @@ Here are some basic examples:
             --no-wait
 \end{verbatim}
 
-Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|--check-demolishing-tag} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the recorded environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the recorded environment has been destroyed and that it should be deployed again.
+Kareboot can be used to manage the demolishing environment. Typically, at the end of a reservation with deployment, the resource manager will perform a reboot on the production environment. By using the \texttt{-c|-{}-check-demolishing-tag} option (for instance: \texttt{kareboot -f nodes -r env\_recorded -c}), Kareboot firstly checks if the deployed environment on the involved nodes is tagged like a demolishing environment. If the environment is considered as \textit{demolishing}, Kareboot does not perform a reboot and returns the \texttt{2} value. In this case, the recorded environment has been destroyed and should be deployed again. If the environment is not considered as \textit{demolishing}, the reboot is performed. If the nodes are correctly rebooted on the production environment, Kareboot returns the \texttt{0} value. Otherwise it returns the \texttt{1} value, what means that the recorded environment has been destroyed and that it should be deployed again.
 
 In the Kaenv part you can find the way to remove the \textit{demolishing} tag of an environment.
 
-Warning, if the \texttt{--no-wait} option is used, Kareboot won't wait the end of the reboot to exit. Thus, this option cannot be used with the \texttt{-o, --output-ok-nodes} and \texttt{-n, --output-ko-nodes} options.
+Warning, if the \texttt{-{}-no-wait} option is used, Kareboot won't wait the end of the reboot to exit. Thus, this option cannot be used with the \texttt{-o, -{}-output-ok-nodes} and \texttt{-n, -{}-output-ko-nodes} options.
 
 
 \subsection{Kaenv}\label{sec:kaenv}
@@ -1692,13 +1692,13 @@ This command lists the environment that you have previously recorded, and the pu
 \begin{verbatim}
 > kaenv3 -l -u johnsmith -s
 \end{verbatim}
-This command lists the environment of the user \textit{johnsmith}. If you use ``*'' as a user value, it lists the environments of all the users. Furthermore, the \texttt{-s|--show-all-versions} option is used to show all the versions of each environment. If this option is not specified, only the version is displayed.
+This command lists the environment of the user \textit{johnsmith}. If you use ``*'' as a user value, it lists the environments of all the users. Furthermore, the \texttt{-s|-{}-show-all-versions} option is used to show all the versions of each environment. If this option is not specified, only the version is displayed.
 
 \paragraph{Use case 3 - print an environment}
 \begin{verbatim}
 > kaenv3 -p FreeBSD --env-version 3 -u johnsmith
 \end{verbatim}
-This command lists prints the version \textit{3} of the environment \textit{FreeBSD} that belongs to \textit{johnsmith}. If no version number is given, the last version of the environment is printed. To print an environment you own, there is no need to use the \texttt{-u|--user} option.
+This command lists prints the version \textit{3} of the environment \textit{FreeBSD} that belongs to \textit{johnsmith}. If no version number is given, the last version of the environment is printed. To print an environment you own, there is no need to use the \texttt{-u|-{}-user} option.
 
 \paragraph{Use case 4 - add an environment described in a file}
 \begin{verbatim}
@@ -1864,7 +1864,7 @@ Contact: kadeploy3-users@lists.grid5000.fr
 General options:
   -a, --list-min-retries NB        Print the statistics about the nodes that need several attempts
   -b, --list-failure-rate          Print the failure rate for the nodes
-  -c, --list-min-failure-rate RATE Print the nodes which have a minimum failure-rate of 
+  -c, --list-min-failure-rate RATE Print the nodes which have a minimum failure-rate of
                                    RATE (0 <= RATE <= 100
   -d, --list-all                   Print all the information
   -f, --field FIELD                Only print the given fields (user,hostname,step1,step2,step3,
@@ -1883,7 +1883,7 @@ General options:
 \end{verbatim}
 \end{small}
 
-We present now the use cases. Note that all the commands can be filtered with a period by using the \texttt{-x|--date-min} and \texttt{-y|--date-max} options.
+We present now the use cases. Note that all the commands can be filtered with a period by using the \texttt{-x|-{}-date-min} and \texttt{-y|-{}-date-max} options.
 \paragraph{Use case 1 - get the information about the deployments performed on a node}
 \begin{verbatim}
 > kastat3 -d -m gdx-25.orsay.grid5000.fr
@@ -1900,13 +1900,13 @@ This command prints all the deployment performed on the nodes \textit{gdx-25.ors
 \begin{verbatim}
 > kastat3 -d -f hostname -f env -f success
 \end{verbatim}
-This command prints all the deployment performed. Because the \texttt{-f|--field} option is used, only the fields \textit{hostname}, \textit{env}, and \textit{success} are printed. If the option \texttt{-f|--field} is not used, all the fields are printed.
+This command prints all the deployment performed. Because the \texttt{-f|-{}-field} option is used, only the fields \textit{hostname}, \textit{env}, and \textit{success} are printed. If the option \texttt{-f|-{}-field} is not used, all the fields are printed.
 
 \paragraph{Use case 4 - print the failure rate about the nodes wrt the deployments that occurs between two dates}
 \begin{verbatim}
 > kastat3 -b -x 2009:02:12:08:00:00 -y 2009:02:13:08:00:00
 \end{verbatim}
-This command prints the failure rate of all the nodes (at least deployed one time) during the period between the 2009/02/12 - 8h00 and the 2009/02/13 - 8h00. The \texttt{-x|--date-min} and \texttt{-y|--date-max} options can be used separately or can be omitted.
+This command prints the failure rate of all the nodes (at least deployed one time) during the period between the 2009/02/12 - 8h00 and the 2009/02/13 - 8h00. The \texttt{-x|-{}-date-min} and \texttt{-y|-{}-date-max} options can be used separately or can be omitted.
 
 \paragraph{Use case 5 - print the information about the nodes that have at least a given failure rate}
 \begin{verbatim}
@@ -1918,7 +1918,7 @@ This command prints the nodes that have a failure rate of at least 25\% from the
 \begin{verbatim}
 > kastat3 -a 3 -s 1
 \end{verbatim}
-This command prints the information about the deployments that requires at least 3 retries in the macro-step 1. If the \texttt{-s|--step} option is not set, the information about the deployments that requires at least 3 retries in any macro-step are printed.
+This command prints the information about the deployments that requires at least 3 retries in the macro-step 1. If the \texttt{-s|-{}-step} option is not set, the information about the deployments that requires at least 3 retries in any macro-step are printed.
 
 
 \subsection{Kanodes}\label{sec:kanodes}
@@ -1933,7 +1933,7 @@ General options:
   -f, --file MACHINELIST       Only print information about the given machines (- means stdin)
   -m, --machine MACHINE        Only print information about the given machines
   -v, --version                Get the version
-  -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump 
+  -w, --workflow-id WID        Specify a workflow id (this is use with the get_yaml_dump
                                operation. If no wid is specified, the information of all
                                the running worklfows will be dumped
   -y, --get-yaml-dump          Get the yaml dump
@@ -1987,7 +1987,7 @@ General options:
   -l, --level VALUE              Level (soft, hard, very_hard)
   -m, --machine MACHINE          Operate on the given machines
       --multi-server             Activate the multi-server mode
-  -n, --output-ko-nodes FILENAME File that will contain the nodes on which 
+  -n, --output-ko-nodes FILENAME File that will contain the nodes on which
                                  the operation has not been correctly performed
   -o, --output-ok-nodes FILENAME File that will contain the nodes on which the
                                  operation has been correctly performed
@@ -2011,7 +2011,7 @@ This command print the power status of the nodes \textit{gdx-25.orsay.grid5000.f
 \begin{verbatim}
 > kapower3 --off -f machine_file --server lille
 \end{verbatim}
-This command powers off the nodes nodes contained in the \texttt{machine\_file} file. Since the \texttt{--server} is used, the nodes of a distant site are concerned by the operation ; in this example, the \texttt{lille} site is concerned.
+This command powers off the nodes nodes contained in the \texttt{machine\_file} file. Since the \texttt{-{}-server} is used, the nodes of a distant site are concerned by the operation ; in this example, the \texttt{lille} site is concerned.
 
 \paragraph{Use case 3 - power on some nodes}
 \begin{verbatim}
@@ -2020,7 +2020,7 @@ This command powers off the nodes nodes contained in the \texttt{machine\_file} 
 This command powers on the node \textit{gdx-25.orsay.grid5000.fr} without waiting the end of the operation to return.
 
 \paragraph{Note for the administrators}
-While using the \texttt{--no-wait} option, Kapower add the \texttt{--no-wait} value to the command line used for the given operation. Thus the underlying power management tool must be able to handle this option if this Kapower option is required.
+While using the \texttt{-{}-no-wait} option, Kapower add the \texttt{-{}-no-wait} value to the command line used for the given operation. Thus the underlying power management tool must be able to handle this option if this Kapower option is required.
 
 
 \subsection{Karights}\label{sec:karights}
@@ -2168,7 +2168,7 @@ If you choose to mount more than one partition in the pre-install, remember to u
 \section{Do a custom partitioning}\label{sec:custom-partitioning}
 To perform a custom partitioning, you can use a substitute custom operation.
 
-You can use the Kadeploy3 client's option \emph{--set-custom-operations} (see \ref{sec:kadeploy_client}) to setup custom micro-step operations.
+You can use the Kadeploy3 client's option \emph{-{}-set-custom-operations} (see \ref{sec:kadeploy_client}) to setup custom micro-step operations.
 
 The field to configure is the field \ypath{/SetDeploymentEnv/create\_partition\_table/[substitute]}.
 
