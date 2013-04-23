@@ -206,6 +206,7 @@ module Managers
     end
 
     def grab(path,version,user,priority,tag,errno,checksum=nil,opts={})
+      return nil if !path or path.empty?
       cf = nil
       begin
         fetcher = Fetch[path,errno,@client]
@@ -262,6 +263,7 @@ module Managers
     end
 
     def self.grab(gfm,context,path,prio,tag,errno,opts={})
+      return if !path or path.empty?
       version,user = nil
       if opts[:env] and opts[:env].recorded?
         #version = "#{opts[:env].name}/#{opts[:env].version.to_s}"
