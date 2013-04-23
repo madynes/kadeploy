@@ -5,6 +5,7 @@
 
 class KadeployError < Exception
   attr_reader :errno, :context
+  attr_writer :context
   def initialize(errno,context={},msg='')
     super(msg)
     @errno = errno
@@ -63,6 +64,22 @@ class KadeployError < Exception
       "The cache is full"
     when FetchFileError::UNKNOWN_PROTOCOL
       "Unknown protocol"
+    when KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
+      "Reboot failed on some nodes"
+    when KarebootAsyncError::DEMOLISHING_ENV
+      "Cannot reboot since the nodes have been previously deployed with a demolishinf environment"
+    when KarebootAsyncError::PXE_FILE_FETCH_ERROR
+      "Some PXE files cannot be fetched"
+    when KarebootAsyncError::NO_RIGHT_TO_DEPLOY
+      "You do not have the right to deploy on all the nodes"
+    when KarebootAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+      "Unknown node in singularity file"
+    when KarebootAsyncError::NODE_NOT_EXIST
+      "At least one node in your node list does not exist"
+    when KarebootAsyncError::VLAN_MGMT_DISABLED
+      "The VLAN management has been disabled on the site"
+    when KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
+      "The environment does not exist"
     else
       ""
     end
