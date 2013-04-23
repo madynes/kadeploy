@@ -5,6 +5,7 @@
 
 class KadeployError < Exception
   attr_reader :errno, :context
+  attr_writer :context
   def initialize(errno,context={},msg='')
     super(msg)
     @errno = errno
