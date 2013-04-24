@@ -54,7 +54,9 @@ module NetBoot
       @export = export
       @repository_dir = repository_dir
       @custom_dir = custom_dir
-      if Pathname.new(profiles_dir).absolute?
+      if !profiles_dir or profiles_dir.empty?
+        @profiles_dir = @repository_dir
+      elsif Pathname.new(profiles_dir).absolute?
         @profiles_dir = profiles_dir
       else
         @profiles_dir = File.join(@repository_dir,profiles_dir)
