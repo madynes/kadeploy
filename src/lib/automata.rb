@@ -481,7 +481,7 @@ module Automata
             # consider them as KO
             clean_nodeset(task.nodes_ok,treated)
             task.nodes_ok.linked_copy(treated)
-            nodes = Nodes::NodeSet.new(task.nodes_ok)
+            nodes = Nodes::NodeSet.new(task.nodes_ok.id)
             task.nodes_ok.linked_copy(nodes)
             @queue.push({
               :task => task,
@@ -497,7 +497,7 @@ module Automata
             tmp.move(task.nodes_ko)
           end
 
-          nodes = Nodes::NodeSet.new(task.nodes_ko)
+          nodes = Nodes::NodeSet.new(task.nodes_ko.id)
           task.nodes_ko.linked_copy(nodes)
           @queue.push({
             :task => task,
@@ -510,7 +510,7 @@ module Automata
         elsif !task.nodes.empty?
           task.nodes_ko().clean()
           task.nodes().linked_copy(task.nodes_ko())
-          nodes = Nodes::NodeSet.new(task.nodes_ko)
+          nodes = Nodes::NodeSet.new(task.nodes_ko.id)
           task.nodes_ko.linked_copy(nodes)
           @queue.push({
             :task => task,
