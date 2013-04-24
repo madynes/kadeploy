@@ -131,7 +131,15 @@ module Managers
 
   class HTTPFetch < Fetch
     def size
-      HTTP::get_file_size(@path)
+      begin
+        HTTP::get_file_size(@path)
+      rescue KadeployHTTPError => k
+        error(@errno,"Unable to grab the file #{@path} (http error ##{k.errno})")
+      rescue Errno::ECONNREFUSED
+        error(@errno,"Unable to grab the file #{@path} (connection refused)")
+      rescue Exception => e
+        error(@errno,"Unable to grab the file #{@path} (http error: #{e.message})")
+      end
     end
 
     def checksum

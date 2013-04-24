@@ -7,6 +7,7 @@ require 'tempfile'
 require 'net/http'
 require 'net/https'
 require 'uri'
+require 'error'
 
 module HTTP
   public
@@ -78,14 +79,11 @@ module HTTP
   def HTTP::get_file_size(uri)
     url = URI.parse(uri)
     resp = nil
-    begin
-      http = Net::HTTP.new(url.host, url.port)
-      http.use_ssl = url.is_a?(URI::HTTPS)
-      http.start
-      resp = http.head(url.path)
-    rescue
-      return nil
-    end
+    http = Net::HTTP.new(url.host, url.port)
+    http.use_ssl = url.is_a?(URI::HTTPS)
+    http.start
+    resp = http.head(url.path)
+    raise KadeployHTTPError.new(resp.code) unless resp.is_a?(Net::HTTPSuccess)
     return resp['content-length'].to_i
   end
 end
