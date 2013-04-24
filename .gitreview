@@ -1,0 +1,5 @@
+[gerrit]
+host=gerrit.nancy.grid5000.fr
+port=29418
+project=kadeploy3
+defaultbranch=master
