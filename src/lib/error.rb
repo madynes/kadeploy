@@ -69,6 +69,12 @@ class KadeployError < Exception
   end
 end
 
+class KadeployHTTPError < KadeployError
+  def initialize(errno)
+    super(errno)
+  end
+end
+
 class TempfileException < RuntimeError
 end
 
