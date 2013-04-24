@@ -48,19 +48,24 @@ module Managers
       raise KadeployError.new(errno,nil,msg)
     end
 
+    def uptodate?(fchecksum,fmtime=nil)
+      !((mtime > fmtime) and (checksum != fchecksum))
+    end
+
     def size
+      raise 'Should be reimplemented'
     end
 
     def checksum
+      raise 'Should be reimplemented'
     end
 
     def mtime
+      raise 'Should be reimplemented'
     end
 
     def grab(dest,dir=nil)
-    end
-
-    def uptodate?(fchecksum,fmtime=nil)
+      raise 'Should be reimplemented'
     end
   end
 
@@ -123,10 +128,6 @@ module Managers
         error(@errno,"Unable to grab the file #{@path}")
       end
     end
-
-    def uptodate?(fchecksum,fmtime=nil)
-      !((mtime > fmtime) and (checksum != fchecksum))
-    end
   end
 
   class HTTPFetch < Fetch
@@ -154,7 +155,15 @@ module Managers
     end
 
     def mtime
-      nil
+      begin
+        HTTP::get_file_mtime(@path)
+      rescue KadeployHTTPError => k
+        error(@errno,"Unable to grab the file #{@path} (http error ##{k.errno})")
+      rescue Errno::ECONNREFUSED
+        error(@errno,"Unable to grab the file #{@path} (connection refused)")
+      rescue Exception => e
+        error(@errno,"Unable to grab the file #{@path} (http error: #{e.message})")
+      end
     end
 
     def grab(dest,dir=nil)
@@ -171,10 +180,6 @@ module Managers
       else
         error(@errno,"Unable to grab the file #{@path} (http error ##{resp})")
       end
-    end
-
-    def uptodate?(fchecksum,fmtime=nil)
-      (checksum() == fchecksum)
     end
   end
 
@@ -233,8 +238,8 @@ module Managers
 
         fmtime, fchecksum, fpath = nil
         if opts[:file]
-          error(errno,"The #{tag} file '#{path}' must be local") \
-            unless fetcher.is_a?(LocalFetch)
+          #error(errno,"The #{tag} file '#{path}' must be local") \
+          #  unless fetcher.is_a?(LocalFetch)
           fmtime = lambda{ fetcher.mtime }
           fchecksum = lambda{ fetcher.checksum }
           fpath = opts[:file]
