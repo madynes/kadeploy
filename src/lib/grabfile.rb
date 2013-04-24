@@ -44,7 +44,7 @@ module Managers
     end
 
     def error(errno,msg)
-      @client.print("Error: #{msg}") if @client
+      #@client.print("Error: #{msg}") if @client
       raise KadeployError.new(errno,nil,msg)
     end
 
