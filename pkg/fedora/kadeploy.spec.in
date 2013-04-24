@@ -4,7 +4,7 @@ Release:        RELEASE_VERSION
 Group:          System/Cluster
 License:        CeCILL V2
 URL:            http://gforge.inria.fr/scm/?group_id=2026
-Source0:        %{name}-%{version}.tar.gz
+Source0:        %{name}-%{version}.%{release}.tar.gz
 BuildRoot:      %{_tmppath}/%{name}-%{version}.%{release}-root-%(%{__id_u} -n)
 BuildArch:      noarch
 Summary:        Package of the Kadeploy deployment tool.
