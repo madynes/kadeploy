@@ -699,9 +699,11 @@ module ConfigInformation
               end
 
               cp.parse('profiles',true) do
-                profiles_dir = cp.value('directory',String)
+                profiles_dir = cp.value('directory',String,'')
                 args << profiles_dir
-                unless Pathname.new(profiles_dir).absolute?
+                if profiles_dir.empty?
+                  profiles_dir = repo
+                elsif !Pathname.new(profiles_dir).absolute?
                   profiles_dir = File.join(repo,profiles_dir)
                 end
                 if !File.exist?(profiles_dir) or !File.directory?(profiles_dir)

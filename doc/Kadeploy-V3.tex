@@ -518,7 +518,7 @@ external:
   \end{itemize}
   \item \ypath{/pxe/dhcp/profiles}
   \begin{itemize}
-    \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
+    \item \yfieldd{directory}{String}{''} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/dhcp/repository}.
 
 For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
@@ -544,7 +544,7 @@ The information used to generate this filenames are the one specified for each n
   \end{itemize}
   \item \ypath{/pxe/networkboot/profiles}
   \begin{itemize}
-    \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
+    \item \yfieldd{directory}{String}{''} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/networkboot/repository}.
 
 For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
@@ -565,7 +565,7 @@ The information used to generate this filenames are the one specified for each n
   \end{itemize}
   \item \ypath{/pxe/localboot/profiles}
   \begin{itemize}
-    \item \yfield{directory}{String} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path.
+    \item \yfieldd{directory}{String}{''} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/localboot/repository}.
 
 For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
