@@ -1009,34 +1009,6 @@ module ConfigInformation
           end
         end
 
-        cp.parse('timeouts',true) do |info|
-          code = cp.value('reboot',Object,nil,
-            { :type => 'code', :prefix => 'n=1;' }
-          ).to_s
-          begin
-            code.to_i
-          rescue
-            raise ArgumentError.new(ConfigParser.errmsg(
-                info[:path],"Expression evaluation is not an integer"
-              )
-            )
-          end
-          conf.timeout_reboot_classical = code
-
-          code = cp.value('kexec',Object,60,
-            { :type => 'code', :prefix => 'n=1;' }
-          ).to_s
-          begin
-            code.to_i
-          rescue
-            raise ArgumentError.new(ConfigParser.errmsg(
-                info[:path],"Expression evaluation is not an integer"
-              )
-            )
-          end
-          conf.timeout_reboot_kexec = code
-        end
-
         cp.parse('remoteops',true) do
           #ugly temporary hack
           group = nil
@@ -1280,6 +1252,82 @@ module ConfigInformation
             treatmacro.call('BroadcastEnv')
             treatmacro.call('BootNewEnv')
           end
+        end
+
+        cp.parse('timeouts',true) do |info|
+          code = cp.value('reboot',Object,nil,
+            { :type => 'code', :prefix => 'n=1;' }
+          ).to_s
+          begin
+            code.to_i
+          rescue
+            raise ArgumentError.new(ConfigParser.errmsg(
+                info[:path],"Expression evaluation is not an integer"
+              )
+            )
+          end
+
+          n=1
+          tmptime = eval(code)
+          conf.workflow_steps[0].get_instances.each do |macroinst|
+            if [
+              'SetDeploymentEnvUntrusted',
+              'SetDeploymentEnvNfsroot',
+            ].include?(macroinst[0]) and tmptime > macroinst[2]
+            then
+              raise ArgumentError.new(ConfigParser.errmsg(
+                  info[:path],"Global reboot timeout is greater than the timeout of the macrostep #{macroinst[0]}"
+                )
+              )
+            end
+          end
+          conf.workflow_steps[2].get_instances.each do |macroinst|
+            if [
+              'BootNewEnvClassical',
+              'BootNewEnvHardReboot',
+            ].include?(macroinst[0]) and tmptime > macroinst[2]
+            then
+              raise ArgumentError.new(ConfigParser.errmsg(
+                  info[:path],"Global reboot timeout is greater than the timeout of the macrostep #{macroinst[0]}"
+                )
+              )
+            end
+          end
+          conf.timeout_reboot_classical = code
+
+          code = cp.value('kexec',Object,60,
+            { :type => 'code', :prefix => 'n=1;' }
+          ).to_s
+          begin
+            code.to_i
+          rescue
+            raise ArgumentError.new(ConfigParser.errmsg(
+                info[:path],"Expression evaluation is not an integer"
+              )
+            )
+          end
+
+          n=1
+          tmptime = eval(code)
+          conf.workflow_steps[0].get_instances.each do |macroinst|
+            if macroinst[0] == 'SetDeploymentEnvKexec' and tmptime > macroinst[2]
+            then
+              raise ArgumentError.new(ConfigParser.errmsg(
+                  info[:path],"Global kexec timeout is greater than the timeout of the macrostep #{macroinst[0]}"
+                )
+              )
+            end
+          end
+          conf.workflow_steps[2].get_instances.each do |macroinst|
+            if macroinst[0] == 'BootNewEnvKexec' and tmptime > macroinst[2]
+            then
+              raise ArgumentError.new(ConfigParser.errmsg(
+                  info[:path],"Global kexec timeout is greater than the timeout of the macrostep #{macroinst[0]}"
+                )
+              )
+            end
+          end
+          conf.timeout_reboot_kexec = code
         end
 
         cp.parse('kexec') do
