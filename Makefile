@@ -15,8 +15,9 @@ MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
 RELEASE_VERSION:=$(shell cat release_version)
 DIST_DIR_NAME=kadeploy-$(MAJOR_VERSION).$(MINOR_VERSION)
+DIST_TGZ_NAME=$(DIST_DIR_NAME).$(RELEASE_VERSION).tar.gz
 DIST_DIR=$(KADEPLOY_ROOT)/$(DIST_DIR_NAME)
-DIST_TGZ=$(KADEPLOY_ROOT)/$(DIST_DIR_NAME).tar.gz
+DIST_TGZ=$(KADEPLOY_ROOT)/$(DIST_TGZ_NAME)
 ifndef BUILD_DIR
 BUILD_DIR=$(CURRENT_DIR)/builds
 endif
@@ -173,7 +174,7 @@ deb: build-clean build pkg
 	@(cd $(PKG)/debian; PKG_DIR="$(PKG_DIR)" BUILD_DIR="$(BUILD_DIR)" make package_all; cd $(CURRENT_DIR))
 
 tgz: ar dist
-	@tar czf $(AR_DIR)/$(DIST_DIR_NAME).tar.gz $(DIST_DIR_NAME)
+	@tar czf $(AR_DIR)/$(DIST_TGZ_NAME) $(DIST_DIR_NAME)
 	@$(MAKE) dist-clean
 
 mrproper: cleanapi dist-clean uninstall
