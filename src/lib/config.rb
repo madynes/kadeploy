@@ -743,9 +743,7 @@ module ConfigInformation
             name = cp.value('name',String)
             address = cp.value('address',String)
 
-            if name =~ /\A((?:A-Za-z0-9\.\-)+\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*)\Z/ \
-            and address =~ /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[(?:\d{1,3}\-,\d{1,3})*\])\Z/
-
+            if name =~ Nodes::REGEXP_NODELIST and address =~ Nodes::REGEXP_IPLIST
               hostnames = Nodes::NodeSet::nodes_list_expand(name)
               addresses = Nodes::NodeSet::nodes_list_expand(address)
 
@@ -1149,53 +1147,6 @@ module ConfigInformation
       end
 
       return true
-    end
-
-    # Load the nodes configuration file
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def load_nodes_config_file
-      IO.readlines(NODES_FILE).each { |line|
-        if /\A([a-zA-Z]+[-\w.]*)\ (\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\ ([\w.-]+)\Z/ =~ line then
-          content = Regexp.last_match
-          host = content[1]
-          ip = content[2]
-          cluster = content[3]
-          if @cluster_specific.has_key?(cluster) then
-            @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
-          else
-            puts "The cluster #{cluster} has not been defined in #{CLUSTERS_CONFIGURATION_FILE}"
-          end
-        end
-        if /\A((?:A-Za-z0-9\.\-)+\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*)\ (\d{1,3}\.\d{1,3}\.\d{1,3}\.\[(?:\d{1,3}\-,\d{1,3})*\])\ ((?:A-Za-z0-9\.\-)+)\Z/ =~ line then
-          content = Regexp.last_match
-          hostnames = content[1]
-          ips = content[2]
-          cluster = content[3]
-          hostnames_list = Nodes::NodeSet::nodes_list_expand(hostnames)
-          ips_list = Nodes::NodeSet::nodes_list_expand(ips)
-          if (hostnames_list.to_a.length == ips_list.to_a.length) then
-            for i in (0 ... hostnames_list.to_a.length)
-              host = hostnames_list[i] 
-              ip = ips_list[i] 
-              @common.nodes_desc.push(Nodes::Node.new(host, ip, cluster, generate_commands(host, cluster)))
-            end
-          else
-            puts line
-            puts "The number of hostnames and IP addresses are incoherent in the #{NODES_FILE} file"
-            return false
-          end
-        end
-      }
-      if @common.nodes_desc.empty? then
-        puts "The nodes list is empty"
-        return false
-      else
-        return true
-      end
     end
 
     # Eventually load some specific commands for specific nodes that override generic commands
@@ -1905,7 +1856,7 @@ module ConfigInformation
     # Output
     # * return true if the node exists in the Kadeploy configuration, false otherwise
     def add_to_node_set(hostname, exec_specific)
-      if /\A(?:A-Za-z\.\-)+[0-9]*\[(?:\d{1,3}\-,\d{1,3})+\](?:A-Za-z0-9\.\-)*\Z/ =~ hostname
+      if Nodes::REGEXP_NODELIST =~ hostname
         hostnames = Nodes::NodeSet::nodes_list_expand("#{hostname}") 
       else
         hostnames = [hostname]
