@@ -7,6 +7,8 @@ require 'drb/drb'
 require 'thread'
 
 module Nodes
+  REGEXP_NODELIST = /\A([A-Za-z0-9\.\-]+\[(?:(?:(?:\d+\-\d+|\d+),)*)(?:\d+\-\d+|\d+)\][A-Za-z0-9\.\-]*)\Z/
+  REGEXP_IPLIST = /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[(?:(?:(?:\d+\-\d+|\d+),)*)(?:\d+\-\d+|\d+)\])\Z/
   class NodeCmd
     attr_accessor :reboot_soft
     attr_accessor :reboot_hard
@@ -458,13 +460,13 @@ module Nodes
     # Output
     # * returns array of hosts
     def NodeSet::nodes_list_expand(list_factor_hosts)
-      if /\A((?:A-Za-z\.\-)+[0-9]*(?:\.\-)*)\[((?:\d+\-,\d+)+)\]((?:A-Za-z0-9\.\-)*)\Z/ =~ list_factor_hosts
+      if /\A([A-Za-z\.\-]+[0-9]*[\.\-]*)\[((?:(?:(?:\d+\-\d+|\d+),)*)(?:\d+\-\d+|\d+))\]([A-Za-z0-9\.\-]*)\Z/ =~ list_factor_hosts
         content = Regexp.last_match
         head = content[1]
         numbers_list = content[2]
         tail = content[3]
-      else 
-        if /\A(\d+\.\d+\.\d+\.)\[((?:\d+\-,\d+)+)\]\Z/ =~ list_factor_hosts
+      else
+        if /\A(\d+\.\d+\.\d+\.)\[((?:(?:(?:\d+\-\d+|\d+),)*)(?:\d+\-\d+|\d+))\]\Z/ =~ list_factor_hosts
           content = Regexp.last_match
           head = content[1]
           numbers_list = content[2]
