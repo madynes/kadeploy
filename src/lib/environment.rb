@@ -191,7 +191,7 @@ module EnvironmentManagement
       @options = {}
       @image = nil
 
-      client.print("!!! Warning: using old environment description format, consider to convert the environment description file to the new format using \"kaenv --migrate\" !!!\n\n") unless migration
+      client.print("!!! Warning: using old environment description format, consider to convert the environment description file to the new format using \"kaenv3 --migrate\" !!!\n\n") unless migration
 
       description.split("\n").each { |line|
         if /\A(\w+)\s*:\s*(.+)\Z/ =~ line then
