@@ -147,9 +147,9 @@ module Automata
     #QUEUE_CKECK_PITCH = 0.3
     CLEAN_THREADS_PITCH = 5
 
-    def initialize(nodeset,static_context = {})
+    def initialize(nodeset,static_context = {}, config = {})
       raise if nodeset.nil?
-      @config = {} unless @config
+      @config = config
       @static_context = static_context
       @queue = Queue.new
       @threads = {}
@@ -684,7 +684,7 @@ module Automata
         config(config)
         load_config()
       end
-      super(nodes,context)
+      super(nodes,context,@config)
       @name = name.to_sym
       @idx = idx
       @subidx = subidx
