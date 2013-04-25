@@ -14,6 +14,9 @@ SCRIPTS=$(KADEPLOY_ROOT)/scripts
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
 RELEASE_VERSION:=$(shell cat release_version)
+ifeq ($(strip $(RELEASE_VERSION)),git)
+        RELEASE_VERSION:=$(shell git log --pretty=format:'%H' -n 1)git
+endif
 DIST_DIR_NAME=kadeploy-$(MAJOR_VERSION).$(MINOR_VERSION)
 DIST_TGZ_NAME=$(DIST_DIR_NAME).$(RELEASE_VERSION).tar.gz
 DIST_DIR=$(KADEPLOY_ROOT)/$(DIST_DIR_NAME)
