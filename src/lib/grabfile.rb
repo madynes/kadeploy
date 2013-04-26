@@ -113,16 +113,16 @@ module Managers
       if File.readable?(@path)
         begin
           FileUtils.cp(@path,dest)
-        rescue
-          error(@errno,"Unable to grab the file #{@path}")
+        rescue Exception => e
+          error(@errno,"Unable to grab the file #{@path} (#{e.message})")
         end
       elsif @client
         begin
           unless @client.get_file(@path,dest)
             error(@errno,"Unable to grab the file #{@path}")
           end
-        rescue
-          error(@errno,"Unable to grab the file #{@path}")
+        rescue Exception => e
+          error(@errno,"Unable to grab the file #{@path} (#{e.message})")
         end
       else
         error(@errno,"Unable to grab the file #{@path}")
@@ -144,14 +144,18 @@ module Managers
     end
 
     def checksum
-      resp, etag = HTTP.check_file(@path)
-      case resp
-      when 200,304
-        nil
-      else
-        error(@errno,"Unable to grab the file #{@path} (http error ##{resp})")
+      begin
+        resp, etag = HTTP.check_file(@path)
+        case resp
+        when 200,304
+          nil
+        else
+          error(@errno,"Unable to grab the file #{@path} (http error ##{resp})")
+        end
+        etag
+      rescue Exception => e
+        error(@errno,"Unable to grab the file #{@path} (#{e.message})")
       end
-      etag
     end
 
     def mtime
@@ -167,18 +171,22 @@ module Managers
     end
 
     def grab(dest,dir=nil)
-      resp, etag = HTTP.fetch_file(@path,dest,dir,nil)
-      case resp
-      when -1
-        error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,
-          "Tempfiles cannot be created")
-      when -2
-        error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE,
-          "Environment file cannot be moved")
-      when 200
-        nil
-      else
-        error(@errno,"Unable to grab the file #{@path} (http error ##{resp})")
+      begin
+        resp, etag = HTTP.fetch_file(@path,dest,dir,nil)
+        case resp
+        when -1
+          error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,
+            "Tempfiles cannot be created")
+        when -2
+          error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE,
+            "Environment file cannot be moved")
+        when 200
+          nil
+        else
+          error(@errno,"Unable to grab the file #{@path} (http error ##{resp})")
+        end
+      rescue Exception => e
+        error(@errno,"Unable to grab the file #{@path} (#{e.message})")
       end
     end
   end
