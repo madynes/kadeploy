@@ -59,7 +59,7 @@ require 'thread'
       @execs.each_pair do |node,exec|
         exec.run
         tid = Thread.new do
-          status,stdout,stderr = exec.wait
+          status,stdout,stderr = exec.wait(:checkstatus => false)
           node.last_cmd_stdout = stdout.chomp
           node.last_cmd_stderr = stderr.chomp
           node.last_cmd_exit_status = status.exitstatus.to_s
