@@ -34,6 +34,8 @@ class KadeployError < Exception
       "Some options are conflicting"
     when KadeployAsyncError::DB_ERROR
       "Database issue"
+    when KadeployAsyncError::EXECUTE_ERROR
+      "The execution of a command failed"
     when FetchFileError::INVALID_ENVIRONMENT_TARBALL
       "Invalid environment image archive"
     when FetchFileError::INVALID_PREINSTALL
@@ -92,6 +94,12 @@ class KadeployHTTPError < KadeployError
   end
 end
 
+class KadeployExecuteError < KadeployError
+  def initialize(msg)
+    super(KadeployAsyncError::EXECUTE_ERROR,nil,msg)
+  end
+end
+
 class TempfileException < RuntimeError
 end
 
@@ -129,6 +137,7 @@ class KadeployAsyncError
   NO_ENV_CHOSEN = 208
   CONFLICTING_OPTIONS = 209
   DB_ERROR = 210
+  EXECUTE_ERROR = 211
 end
 
 class KarebootAsyncError
