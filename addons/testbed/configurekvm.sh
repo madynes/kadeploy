@@ -2,7 +2,8 @@
 
 # Users VARS
 KADEPLOY_FILES=~/kadeployfiles.yml
-CONFIG_MIGRATION=~/kaconfig_migration
+KADEPLOY_BRANCH=3.1.7
+KADEPLOY_VERSION=7
 KERNELS_DIR=~/kernels-kvm
 ENVS_DIR=~/envs-kvm
 
@@ -171,12 +172,7 @@ echo ""
 
 if [ -n "$KADEPLOY_FILES" ]
 then
-	OPT_KADEPLOY="-u $KADEPLOY_FILES"
+	OPT_KADEPLOY="-u $KADEPLOY_FILES -v $KADEPLOY_VERSION --git $KADEPLOY_BRANCH"
 fi
 
-if [ -n "$CONFIG_MIGRATION" ]
-then
-	OPT_MIGRATION="-j $CONFIG_MIGRATION"
-fi
-
-echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile $OPT_KADEPLOY $OPT_MIGRATION --no-tunnels $KERNELS_DIR $ENVS_DIR"
+echo "kabootstrap options: -V -n $networkyamlfile -g `hostname` -s $serviceyamlfile -c dns.`hostname | cut -d '.' -f 2-` -f $nodefile -F $hostfile $OPT_KADEPLOY --no-tunnels --use-http $KERNELS_DIR $ENVS_DIR"
