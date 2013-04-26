@@ -73,15 +73,21 @@ class KarebootClient
   def get_file(file_name, dest)
     if (File.exist?(file_name)) then
       if (File.readable?(file_name)) then
-        port = @kadeploy_server.create_socket_server(dest)
+        port = @kadeploy_server.create_socket_server(dest,File.size(file_name))
         if port != -1 then
+          snd = 0
           sock = TCPSocket.new(@kadeploy_server.dest_host, port)
           file = File.open(file_name)
           tcp_buffer_size = @kadeploy_server.tcp_buffer_size
           while (buf = file.read(tcp_buffer_size))
-            sock.send(buf, 0)
+            snd = sock.send(buf, 0)
           end
+          size = sock.recv(4).unpack('L')[0]
           sock.close
+          if size != File.size(file_name)
+            puts "The file #{file_name} was not correctly sent to the server"
+            return false
+          end
           return true
         else
           return false

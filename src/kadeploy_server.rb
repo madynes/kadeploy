@@ -136,7 +136,7 @@ class KadeployServer
   # * cache_dir: cache directory
   # Output
   # * return the port allocated to the socket server
-  def create_socket_server(dest)
+  def create_socket_server(dest,filesize)
     sock = Socket.new(Socket::AF_INET, Socket::SOCK_STREAM, 0)
     sockaddr = Socket.pack_sockaddr_in(0, @config.common.kadeploy_server)
     begin
@@ -148,15 +148,20 @@ class KadeployServer
     Thread.new {
       sock.listen(10)
       begin
+        totwrite = 0
+        totrecv = 0
         session = sock.accept
         file = File.new(dest, "w")
-        while ((buf = session[0].recv(@tcp_buffer_size)) != "") do
-          file.write(buf)
+        while (totrecv < filesize)
+          buf = session[0].recv(@tcp_buffer_size)
+          totrecv += buf.size
+          totwrite += file.write(buf)
         end
         file.close
+        session[0].send([totwrite].pack('L'),0)
         session[0].close
-      rescue
-        puts "The client has been probably disconnected..."
+      rescue Exception => e
+        puts "The client has been probably disconnected... (#{e.class.name}: #{e.message})"
       end
       sock.close
     }
