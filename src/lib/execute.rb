@@ -106,7 +106,7 @@ class Execute
     self
   end
 
-  def wait(opts={})
+  def wait(opts={:checkstatus => true})
     unless @exec_pid.nil?
       begin
         begin
@@ -142,6 +142,9 @@ class Execute
         @parent_io = nil
         @exec_pid = nil
       end
+      raise KadeployExecuteError.new(
+        "Command #{@command.inspect} exited with status #{@status.exitstatus}"
+      ) unless @status.success?
       [ @status, @stdout, @stderr ]
     end
   end
