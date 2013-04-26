@@ -232,7 +232,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
 \chapter{Server side configuration}
-\paragraph{Configuration files\\}
+\paragraph{Configuration files\\}\label{sec:confpath}
 Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
 
 The file \texttt{load\_kadeploy\_env} in the configuration directory contains the \texttt{KADEPLOY\_INSTALL\_DIR} variable. You should probably fill this variable with the Kadeploy installation directory you used. This directory can be anywhere in the filesystem.
@@ -1282,6 +1282,11 @@ TODO
 
 \section{Configuration of the deploy user}
 In order to use the Kastafior based file broadcaster (\texttt{BroadcastEnvKastafior} macro-step), the server must be able to perform an ssh connection on itself. Thus, you must add the deploy key installed in the \texttt{/etc/kadeploy3/keys/id\_deploy.pub} in the \texttt{.ssh/authorized\_keys} file of the \texttt{deploy} user. This step is optional if you do not plan to use the \texttt{BroadcastEnvKastafior} macro-step.
+
+\section{Configuration of SSH-agent}
+It is possible to make the Kadeploy server load an SSH-agent at launch time. This can be helpful to use SSH functionalities such as the SSH-agent forwarding to communicate with the nodes. For sample this functionality can be used in the TakTuk connector (\ypath{/external/taktuk/connector}, section \ref{sec:general_config}) or in the reboot and power operations (\ypath{/remoteops}, section \ref{sec:specific_config}).
+
+To enable this functionnality, the SSH private key to be used with the SSH-agent must be present as \texttt{keys/id\_deploy} of the server configuration directory (see section \ref{sec:confpath}). By default (if the file \texttt{/etc/kadeploy3/keys/id\_deploy} does not exist), no agent is loaded at launch time.
 
 \chapter{Client side configuration}
 On the client side, you only have to configure the file named \texttt{client\_conf.yml}. This file defines Kadeploy servers and a default server.
