@@ -161,8 +161,8 @@ module KaTestCase
 
   def env_desc(env)
     desc = run_ka(@binaries[:kaenv],'-p',env){}
-    desc = run_ka(@binaries[:kaenv],'-p',env,'-u',@deployuser){} unless desc =~ /^###.*$/
-    assert(desc =~ /^###.*$/,"Unable to gather description of '#{env}' environment")
-    desc
+    desc = run_ka(@binaries[:kaenv],'-p',env,'-u',@deployuser){} unless desc =~ /^---.*$/
+    assert(desc =~ /^---.*$/,"Unable to gather description of '#{env}' environment")
+    YAML.load(desc)
   end
 end
