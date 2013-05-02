@@ -183,11 +183,13 @@ module Database
 
         st.close
       rescue Mysql::Error => e
+        $stderr.puts "MySQL query: #{query.gsub(/\s+/," ").strip}" if query
+        $stderr.puts "MySQL args: #{args.inspect}" if args
         $stderr.puts "MySQL error (code): #{e.errno}"
         $stderr.puts "MySQL error (message): #{e.error}"
         $stderr.puts e.backtrace
         raise KadeployError.new(KadeployAsyncError::DB_ERROR,nil,
-          "MySQL error ##{e.errno}: #{e.error}")
+          "MySQL error ##{e.errno}: #{e.error.gsub(/\s+/," ").strip}")
       end
       return res
     end
