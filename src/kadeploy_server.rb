@@ -831,7 +831,6 @@ class KadeployServer
         return wid, ke.errno
       end
     end
-    ConfigInformation::Config.free_kadeploy_exec_specific(exec_specific)
 
     return wid, KadeployAsyncError::NO_ERROR
   end
