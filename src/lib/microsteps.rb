@@ -932,9 +932,9 @@ class Microstep < Automata::QueueTask
     end
 
     if context[:common].taktuk_auto_propagate then
-      cmd = "#{context[:common].kastafior} -s -c \\\"#{context[:common].taktuk_connector}\\\"  -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
+      cmd = "#{context[:common].kastafior} -s -c \\\"#{context[:common].taktuk_connector}\\\"  -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path}"
     else
-      cmd = "#{context[:common].kastafior} -c \\\"#{context[:common].taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path} -f"
+      cmd = "#{context[:common].kastafior} -c \\\"#{context[:common].taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path}"
     end
 
     @nodes_ok.clean()
@@ -1856,7 +1856,6 @@ class Microstep < Automata::QueueTask
       )
     end
     debug(3, "Broadcast time: #{Time.now.to_i - start}s") if res
-    res = res && parallel_exec('sync')
     return res
   end
 
@@ -1896,11 +1895,6 @@ class Microstep < Automata::QueueTask
 
     ret = parallel_exec(
       "fsarchiver -j #{nbcpu} #{comp} restfs #{fsarchive()} #{fsmap}",
-      { :scattering => scattering_kind }
-    )
-
-    ret = ret && parallel_exec(
-      "sync",
       { :scattering => scattering_kind }
     )
 
