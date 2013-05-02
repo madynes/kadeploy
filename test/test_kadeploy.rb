@@ -58,16 +58,11 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_env_shared
     desc = env_desc(@env)
+    desc['name'] = @tmp[:envname]
+    desc['visibility'] = 'shared'
 
-    tmp = desc.split("\n")
-    tmp.delete_if { |line| line =~ /^name\s*:.*$/ }
-    tmp << "name : #{@tmp[:envname]}"
-    tmp.delete_if { |line| line =~ /^visibility\s*:.*$/ }
-    tmp << 'visibility : shared'
-
-    desc = tmp.join("\n")
     envfile = Tempfile.new('env')
-    envfile.write(desc)
+    envfile.write(desc.to_yaml)
     envfile.close
 
     begin
@@ -82,16 +77,11 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_env_private
     desc = env_desc(@env)
+    desc['name'] = @tmp[:envname]
+    desc['visibility'] = 'private'
 
-    tmp = desc.split("\n")
-    tmp.delete_if { |line| line =~ /^name\s*:.*$/ }
-    tmp << "name : #{@tmp[:envname]}"
-    tmp.delete_if { |line| line =~ /^visibility\s*:.*$/ }
-    tmp << 'visibility : private'
-
-    desc = tmp.join("\n")
     envfile = Tempfile.new('env')
-    envfile.write(desc)
+    envfile.write(desc.to_yaml)
     envfile.close
 
     begin
@@ -106,14 +96,10 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_env_anon_nfs
     desc = env_desc(@envs[:nfs])
+    desc['visibility'] = 'private'
 
-    tmp = desc.split("\n")
-    tmp.delete_if { |line| line =~ /^visibility\s*:.*$/ }
-    tmp << 'visibility : private'
-
-    desc = tmp.join("\n")
     envfile = Tempfile.new('env')
-    envfile.write(desc)
+    envfile.write(desc.to_yaml)
     envfile.close
 
     begin
@@ -126,14 +112,10 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_env_anon_http
     desc = env_desc(@envs[:http])
+    desc['visibility'] = 'private'
 
-    tmp = desc.split("\n")
-    tmp.delete_if { |line| line =~ /^visibility\s*:.*$/ }
-    tmp << 'visibility : private'
-
-    desc = tmp.join("\n")
     envfile = Tempfile.new('env')
-    envfile.write(desc)
+    envfile.write(desc.to_yaml)
     envfile.close
 
     begin
@@ -168,18 +150,12 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_env_version
     desc = env_desc(@env)
+    desc['name'] = @tmp[:envname]
+    desc['version'] = 1
+    desc['visibility'] = 'private'
 
-    tmp = desc.split("\n")
-    tmp.delete_if { |line| line =~ /^name\s*:.*$/ }
-    tmp << "name : #{@tmp[:envname]}"
-    tmp.delete_if { |line| line =~ /^version\s*:.*$/ }
-    tmp << 'version : 1'
-    tmp.delete_if { |line| line =~ /^visibility\s*:.*$/ }
-    tmp << 'visibility : private'
-
-    desc = tmp.join("\n")
     envfile = Tempfile.new('env')
-    envfile.write(desc)
+    envfile.write(desc.to_yaml)
     envfile.close
 
     begin
@@ -220,22 +196,20 @@ class TestKadeploy < Test::Unit::TestCase
     `chmod +x #{scriptfile.path}`
     scriptfile.close
 
-    partfile.write("d\n1\nd\n2\nd\n3\nd\n4\nn\np\n1\n\n+6G\nt\n82\nn\np\n2\n\n+20G\nt\n2\n83\nn\np\n3\n\n\nt\n3\n83\nw\n")
+    partfile.write("d\n1\nd\n2\nd\n3\nd\n4\nn\np\n1\n\n+4G\nt\n82\nn\np\n2\n\n+6G\nt\n2\n83\nn\np\n3\n\n+6G\nt\n3\n83\nw\n")
     partfile.close
 
     `tar czf #{tgzfile} -C #{File.dirname(scriptfile.path)} #{File.basename(scriptfile.path)} #{File.basename(partfile.path)}`
 
     desc = env_desc(@env)
+    desc['visibility'] = 'private'
+    desc['preinstall'] = {}
+    desc['preinstall']['archive'] = tgzfile
+    desc['preinstall']['compression'] = 'gzip'
+    desc['preinstall']['script'] = File.basename(scriptfile.path)
 
-    tmp = desc.split("\n")
-    tmp.delete_if { |line| line =~ /^visibility\s*:.*$/ }
-    tmp << 'visibility : private'
-    tmp.delete_if { |line| line =~ /^preinstall\s*:.*$/ }
-    tmp << "preinstall : #{tgzfile}|tgz|#{File.basename(scriptfile.path)}"
-
-    desc = tmp.join("\n")
     envfile = Tempfile.new('env')
-    envfile.write(desc)
+    envfile.write(desc.to_yaml)
     envfile.close
 
     res = ''
@@ -262,10 +236,9 @@ class TestKadeploy < Test::Unit::TestCase
   def test_custom_pxe
     desc = env_desc(@env)
 
-    tmp = desc.split("\n")
-    envtgz = tmp.select{ |line| line =~ /^tarball\s*:.*$/ }[0].split(':',2)[1].split('|')[0].strip
-    vmlinuz = tmp.select{ |line| line =~ /^kernel\s*:.*$/ }[0].split(':',2)[1].strip
-    initrd = tmp.select{ |line| line =~ /^initrd\s*:.*$/ }[0].split(':',2)[1].strip
+    envtgz = desc['image']['file']
+    vmlinuz = desc['boot']['kernel']
+    initrd = desc['boot']['initrd']
 
     tmpdir = Dir.mktmpdir
     pxeprofile = Tempfile.new('pxe_profile')

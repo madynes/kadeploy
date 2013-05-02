@@ -1,5 +1,6 @@
 $:.unshift File.join(File.dirname(__FILE__), '..', 'src','lib')
 require 'execute'
+require 'error'
 require 'yaml'
 
 module KaTestCase
@@ -18,7 +19,7 @@ module KaTestCase
       puts "\n  #{exec.command.join(' ')}"
     end
 
-    st,out,err = exec.wait
+    st,out,err = exec.wait(:checkstatus => false)
 
     assert(err.empty?,errmsg('stderr not empty',exec,out,err))
 
@@ -161,8 +162,8 @@ module KaTestCase
 
   def env_desc(env)
     desc = run_ka(@binaries[:kaenv],'-p',env){}
-    desc = run_ka(@binaries[:kaenv],'-p',env,'-u',@deployuser){} unless desc =~ /^###.*$/
-    assert(desc =~ /^###.*$/,"Unable to gather description of '#{env}' environment")
-    desc
+    desc = run_ka(@binaries[:kaenv],'-p',env,'-u',@deployuser){} unless desc =~ /^---.*$/
+    assert(desc =~ /^---.*$/,"Unable to gather description of '#{env}' environment")
+    YAML.load(desc)
   end
 end
