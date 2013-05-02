@@ -233,7 +233,8 @@ $exps.each do |exp|
       puts "    Testing environment '#{env}'"
 
       envtestname = "#{testname}-#{env}"
-      envlogfile = File.join(logsdir,envtestname)
+      envlogfile = File.join(logsdir,"#{envtestname}.log")
+      envdebugfile = File.join(logsdir,"#{envtestname}.debug")
       envcondir = File.join(curcondir,env)
       envconbugdir = File.join(envcondir,'bugs')
 
@@ -257,7 +258,7 @@ $exps.each do |exp|
         "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
 	      "-f #{$nodefile} -k #{SSH_KEY} "\
         "--env-list #{env} --max-simult 1 "\
-        "-a #{automata_file.path} &> #{envlogfile}"
+        "-a #{automata_file.path} 1> #{envlogfile} 2> #{envdebugfile}"
       )
 
       puts '      Stop conman monitoring'
@@ -266,10 +267,11 @@ $exps.each do |exp|
       )
 
       puts '      Linking bugs'
-      File.open(envlogfile) do |file|
+      File.open(envdebugfile) do |file|
         dirls = nil
         file.each_line do |line|
-          if line =~ /^\s*The node (\S+) has not been correctly deployed\s*$/
+          if line =~ /^\s*### KO\[(\S+)\]\s*$/ \
+          or line =~ /^\s*### CantConnect\[(\S+)\]\s*$/
             nodename = Regexp.last_match(1).split('.')[0].strip
             dirls = Dir.entries(envcondir) unless dirls
             dirls.each do |filename|
