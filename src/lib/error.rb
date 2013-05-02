@@ -144,5 +144,5 @@ class KarebootAsyncError
 end
 
 class KapowerAsyncError
-  NO_ERROR = 300
+  NO_ERROR = 400
 end
