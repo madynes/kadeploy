@@ -2254,4 +2254,56 @@ options:
 %\section{Boot non-supported systems}
 % Create a GRUB PXE disk, boot with custom PXE ...
 
+\section{Kadeploy tools error numbers}\label{sec:fsa}
+\subsection{File fetching errors}
+\begin{itemize}
+  \item \texttt{100}: No error
+  \item \texttt{101}: Invalid environment image archive
+  \item \texttt{102}: Invalid environment preinstall
+  \item \texttt{103}: Environment's preinstall archive is too big
+  \item \texttt{104}: Invalid environment postinstall
+  \item \texttt{105}: Environment's postinstall archive is too big
+  \item \texttt{106}: Invalid key file
+  \item \texttt{107}: Invalid custom file
+  \item \texttt{108}: Invalid PXE file
+  \item \texttt{109}: Tempfile creation failed
+  \item \texttt{110}: File cannot be moved in cache
+  \item \texttt{111}: Invalid checksum
+  \item \texttt{112}: Internal cache error
+  \item \texttt{113}: File too big for the cache
+  \item \texttt{114}: The cache is full
+  \item \texttt{115}: Unknown protocol
+\end{itemize}
+\subsection{Kadeploy}
+\begin{itemize}
+  \item \texttt{200}: No error
+  \item \texttt{201}: All the nodes have been discarded
+  \item \texttt{202}: Invalid options or invalid rights on nodes
+  \item \texttt{203}: Unknown node in singularity file
+  \item \texttt{204}: At least one node in your node list does not exist
+  \item \texttt{205}: The VLAN management has been disabled on the site
+  \item \texttt{206}: The environment cannot be loaded from the specified file
+  \item \texttt{207}: The environment does not exist
+  \item \texttt{208}: You must choose an environment
+  \item \texttt{209}: Some options are conflicting
+  \item \texttt{210}: Database issue
+\end{itemize}
+\subsection{Kareboot}
+\begin{itemize}
+  \item \texttt{300}: No error
+  \item \texttt{301}: Reboot failed on some nodes
+  \item \texttt{302}: Cannot reboot since the nodes have been previously deployed with a demolishinf environment
+  \item \texttt{303}: Some PXE files cannot be fetched
+  \item \texttt{304}: You do not have the right to deploy on all the nodes
+  \item \texttt{305}: Unknown node in singularity file
+  \item \texttt{306}: At least one node in your node list does not exist
+  \item \texttt{307}: The VLAN management has been disabled on the site
+  \item \texttt{308}: The environment does not exist
+\end{itemize}
+\subsection{Kapower}
+\begin{itemize}
+  \item \texttt{400}: No error
+\end{itemize}
+
+
 \end{document}
