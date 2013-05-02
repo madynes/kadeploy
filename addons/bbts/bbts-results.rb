@@ -33,7 +33,13 @@ ARGV.each do |file|
 		$stderr.puts "file not found '#{file}', ignoring"
 		next
   end
-
+  content = YAML.load_file(file)
+	unless content.is_a?(Array)
+		$stderr.puts "not a valid YAML file '#{file}', ignoring"
+		next
+  end
+  content.each do |res|
+=begin
   content = File.read(file).grep(/^ *-/).join
   content.split('---').each do |block|
     res = []
@@ -43,18 +49,18 @@ ARGV.each do |file|
       res << str.gsub(/^ *- */,'').strip
     end
     res = YAML.load(res.join("\n"))
-    env = res['environment']
+=end
+    env = res['env']
     automata = res['name']
     kind = res['kind']
-    nodes = res['result'].split('-')[1].strip
-    nodes_tot = nodes.split('/')[1].strip.to_i
+    nodes_tot = res['nodes']['total']
     if nodes_tot > 0
       $stats[automata] = {} unless $stats[automata]
       $stats[automata][kind] = {} unless $stats[automata][kind]
       $stats[automata][kind][env] = {} unless $stats[automata][kind][env]
       $stats[automata][kind][env][nodes_tot] = [] unless $stats[automata][kind][env][nodes_tot]
       $stats[automata][kind][env][nodes_tot] <<  {
-        :ok => nodes.split('/')[0].strip.to_i,
+        :ok => res['nodes']['ok'],
         :time => res['time']
       }
     end
