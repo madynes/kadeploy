@@ -46,10 +46,9 @@ class TestKareboot  < Test::Unit::TestCase
   def test_set_pxe
     desc = env_desc(@env)
 
-    tmp = desc.split("\n")
-    envtgz = tmp.select{ |line| line =~ /^tarball\s*:.*$/ }[0].split(':',2)[1].split('|')[0].strip
-    vmlinuz = tmp.select{ |line| line =~ /^kernel\s*:.*$/ }[0].split(':',2)[1].strip
-    initrd = tmp.select{ |line| line =~ /^initrd\s*:.*$/ }[0].split(':',2)[1].strip
+    envtgz = desc['image']['file']
+    vmlinuz = desc['boot']['kernel']
+    initrd = desc['boot']['initrd']
 
     tmpdir = Dir.mktmpdir
     pxeprofile = Tempfile.new('pxe_profile')
