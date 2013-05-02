@@ -16,4 +16,11 @@ then
 fi
 
 source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
-ruby $KADEPLOY_INSTALL_DIR/src/kareboot.rb "$@"
+
+# Load the normal or async client
+if [[ $@ == *--async* ]]
+then
+  ruby $KADEPLOY_INSTALL_DIR/src/kareboot_async.rb "${@//--async}"
+else
+  ruby $KADEPLOY_INSTALL_DIR/src/kareboot.rb "$@"
+fi
