@@ -108,6 +108,13 @@ def check_exp(exps)
   exps.each do |exp|
     check_field('name',exp['name'])
     check_field('times',exp['times'],Fixnum)
+    if exp['simult']
+      check_field('simult',exp['simult'],Array)
+      exp['simult'].each_index do |i|
+        check_field("simult/#{i}",exp['simult'][i],Fixnum)
+      end
+      exp.delete('simult') if exp['simult'].empty?
+    end
     if exp['times'] <= 0
       yaml_error("'times' field should be > 0")
     end
@@ -148,6 +155,70 @@ def kadeploy_cmd()
   ret
 end
 
+def test_env(condir,logdir,automata_file,run_id,env,simult=nil)
+  puts "    Testing environment '#{env}'#{(simult ? " simult \##{simult}" : '')}"
+  testdir = nil
+  if simult
+    testdir = File.join(env,"simult-#{simult}")
+  else
+    testdir = env
+  end
+
+  envlogdir = File.join(logdir,testdir)
+  puts "      Creating logs dir '#{envlogdir}'"
+  FileUtils.mkdir_p(envlogdir)
+  envresultfile = File.join(envlogdir,'results')
+  envdebugfile = File.join(envlogdir,'debug')
+
+  envcondir = File.join(condir,testdir)
+  puts "      Creating consoles dir '#{envcondir}'"
+  FileUtils.mkdir_p(envcondir)
+
+  puts '      Init conman monitoring'
+  system(
+    "#{CONLOG_SCRIPT} start #{run_id} #{$nodefile} #{envcondir} &>/dev/null"
+  )
+
+  envconbugdir = File.join(envcondir,'bugs')
+  puts "      Creating consoles bugs dir '#{envconbugdir}'"
+  FileUtils.mkdir_p(envconbugdir)
+
+  sleep 1
+
+  puts '      Running bbt'
+  system(
+    "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
+    "-f #{$nodefile} -k #{SSH_KEY} "\
+    "--env-list #{env} --simult #{simult||1} "\
+    "-a #{automata_file} 1> #{envresultfile} 2> #{envdebugfile}"
+  )
+
+  puts '      Stop conman monitoring'
+  system(
+    "#{CONLOG_SCRIPT} stop #{run_id} #{$nodefile} #{envcondir} &>/dev/null"
+  )
+
+  puts '      Linking bugs'
+  File.open(envdebugfile) do |file|
+    dirls = nil
+    file.each_line do |line|
+      if line =~ /^\s*### KO\[(\S+)\]\s*$/ \
+      or line =~ /^\s*### CantConnect\[(\S+)\]\s*$/
+        nodename = Regexp.last_match(1).split('.')[0].strip
+        dirls = Dir.entries(envcondir) unless dirls
+        dirls.each do |filename|
+          if filename =~ /^#{nodename}\..*\.gz$/
+            FileUtils.ln_sf(
+              File.expand_path(File.join(envcondir,filename)),
+              envconbugdir
+            )
+          end
+        end
+      end
+    end
+  end
+end
+
 if ARGV.size < 3
   exit_error("usage: #{$0} <name> <yaml_expfile> <nodefile> [<dest_dir>]")
 end
@@ -172,6 +243,7 @@ if !ARGV[2] or !File.exists?(ARGV[2]) or ARGV[2].empty?
   exit 1
 end
 $nodefile = ARGV[2]
+$nodes = File.read($nodefile).split("\n").uniq
 
 dir = '.'
 if ARGV[3] and !ARGV[3].empty?
@@ -207,7 +279,15 @@ $exps.each do |exp|
     "BroadcastEnvDummy:0:10|"\
     "BootNewEnvDummy:0:10\n"
   )
-  automata_val = "simple #{automata_name}"
+  automata_val = nil
+  max_simult = nil
+  if exp['simult']
+    automata_val = "simult #{automata_name}"
+    max_simult = exp['simult'].join(',')
+  else
+    automata_val = "simple #{automata_name}"
+    max_simult = '1'
+  end
   tmp = gen_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])
   automata_val += (tmp.empty? ? '' : " #{tmp}|")
   tmp = gen_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])
@@ -224,68 +304,29 @@ $exps.each do |exp|
     puts "  Iteration ##{i}"
 
     testname = "test-#{i}"
-    curcondir = File.join(condir,testname)
 
+    curcondir = File.join(condir,testname)
     puts "    Creating common consoles dir '#{curcondir}'"
     FileUtils.mkdir_p(curcondir)
 
+    curlogdir = File.join(logsdir,testname)
+    puts "    Creating common logs dir '#{curlogdir}'"
+    FileUtils.mkdir_p(curlogdir)
+
     exp['environments'].each do |env|
-      puts "    Testing environment '#{env}'"
-
-      envtestname = "#{testname}-#{env}"
-      envlogfile = File.join(logsdir,"#{envtestname}.log")
-      envdebugfile = File.join(logsdir,"#{envtestname}.debug")
-      envcondir = File.join(curcondir,env)
-      envconbugdir = File.join(envcondir,'bugs')
-
-      puts "      Creating consoles dir '#{envcondir}'"
-      FileUtils.mkdir_p(envcondir)
-
       run_id="#{$name}-#{i}-#{env}"
-
-      puts '      Init conman monitoring'
-      system(
-        "#{CONLOG_SCRIPT} start #{run_id} #{$nodefile} #{envcondir} &>/dev/null"
-      )
-
-      sleep 1
-
-      puts "      Creating consoles bugs dir '#{envconbugdir}'"
-      FileUtils.mkdir_p(envconbugdir)
-
-      puts '      Running bbt'
-      system(
-        "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
-	      "-f #{$nodefile} -k #{SSH_KEY} "\
-        "--env-list #{env} --max-simult 1 "\
-        "-a #{automata_file.path} 1> #{envlogfile} 2> #{envdebugfile}"
-      )
-
-      puts '      Stop conman monitoring'
-      system(
-        "#{CONLOG_SCRIPT} stop #{run_id} #{$nodefile} #{envcondir} &>/dev/null"
-      )
-
-      puts '      Linking bugs'
-      File.open(envdebugfile) do |file|
-        dirls = nil
-        file.each_line do |line|
-          if line =~ /^\s*### KO\[(\S+)\]\s*$/ \
-          or line =~ /^\s*### CantConnect\[(\S+)\]\s*$/
-            nodename = Regexp.last_match(1).split('.')[0].strip
-            dirls = Dir.entries(envcondir) unless dirls
-            dirls.each do |filename|
-              if filename =~ /^#{nodename}\..*\.gz$/
-                FileUtils.ln_sf(
-                  File.expand_path(File.join(envcondir,filename)),
-                  envconbugdir
-                )
-              end
-            end
+      if exp['simult']
+        exp['simult'].each do |simult|
+          if simult > $nodes.size
+            puts "    !!! Not enough nodes for simult #{simult}, ignoring"
+            next
           end
+          run_id += "-simult-#{simult}"
+          test_env(curcondir,curlogdir,automata_file.path,run_id,env,simult)
         end
+      else
+        test_env(curcondir,curlogdir,automata_file.path,run_id,env,nil)
       end
-
     end
   end
   automata_file.unlink
