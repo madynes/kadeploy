@@ -24,6 +24,7 @@ require 'macrostep'
         [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
+        [ :sync ],
       ]
     end
   end
@@ -39,6 +40,7 @@ require 'macrostep'
         [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
+        [ :sync ],
       ]
     end
   end
@@ -53,6 +55,7 @@ require 'macrostep'
         [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
+        [ :sync ],
       ]
     end
   end
@@ -68,6 +71,7 @@ require 'macrostep'
         [ :check_kernel_files ],
         [ :send_key, :tree ],
         [ :install_bootloader ],
+        [ :sync ],
       ]
     end
   end
