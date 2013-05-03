@@ -77,3 +77,15 @@
     - squeeze-x64-min
     - squeeze-x64-xen
     - squeeze-x64-nfs
+- name: simult
+  times: 4
+  simult:
+    - 1
+    - 2
+    - 4
+  environments:
+    - squeeze-x64-big
+    - squeeze-x64-base
+    - squeeze-x64-min
+    - squeeze-x64-xen
+    - squeeze-x64-nfs

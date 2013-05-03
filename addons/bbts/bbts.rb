@@ -108,6 +108,13 @@ def check_exp(exps)
   exps.each do |exp|
     check_field('name',exp['name'])
     check_field('times',exp['times'],Fixnum)
+    if exp['simult']
+      check_field('simult',exp['simult'],Array)
+      exp['simult'].each_index do |i|
+        check_field("simult/#{i}",exp['simult'][i],Fixnum)
+      end
+      exp.delete('simult') if exp['simult'].empty?
+    end
     if exp['times'] <= 0
       yaml_error("'times' field should be > 0")
     end
@@ -207,7 +214,15 @@ $exps.each do |exp|
     "BroadcastEnvDummy:0:10|"\
     "BootNewEnvDummy:0:10\n"
   )
-  automata_val = "simple #{automata_name}"
+  automata_val = nil
+  max_simult = nil
+  if exp['simult']
+    automata_val = "simult #{automata_name}"
+    max_simult = exp['simult'].join(',')
+  else
+    automata_val = "simple #{automata_name}"
+    max_simult = '1'
+  end
   tmp = gen_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])
   automata_val += (tmp.empty? ? '' : " #{tmp}|")
   tmp = gen_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])
@@ -218,6 +233,7 @@ $exps.each do |exp|
   automata_file.write(automata_val)
 
   automata_file.close
+
 
   puts "  Start to iterate"
   exp['times'].times do |i|
@@ -233,8 +249,12 @@ $exps.each do |exp|
       puts "    Testing environment '#{env}'"
 
       envtestname = "#{testname}-#{env}"
-      envlogfile = File.join(logsdir,"#{envtestname}.log")
-      envdebugfile = File.join(logsdir,"#{envtestname}.debug")
+      envlogdir = File.join(logsdir,"#{envtestname}")
+      puts "    Creating logs dir '#{envlogdir}'"
+      FileUtils.mkdir_p(envlogdir)
+      envresultfile = File.join(envlogdir,'results')
+      envdebugfile = File.join(envlogdir,'debug')
+
       envcondir = File.join(curcondir,env)
       envconbugdir = File.join(envcondir,'bugs')
 
@@ -254,11 +274,17 @@ $exps.each do |exp|
       FileUtils.mkdir_p(envconbugdir)
 
       puts '      Running bbt'
+puts(
+  "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
+  "-f #{$nodefile} -k #{SSH_KEY} "\
+  "--env-list #{env} --max-simult #{max_simult} "\
+  "-a #{automata_file.path} 1> #{envresultfile} 2> #{envdebugfile}"
+)
       system(
         "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
 	      "-f #{$nodefile} -k #{SSH_KEY} "\
-        "--env-list #{env} --max-simult 1 "\
-        "-a #{automata_file.path} 1> #{envlogfile} 2> #{envdebugfile}"
+        "--env-list #{env} --max-simult #{max_simult} "\
+        "-a #{automata_file.path} 1> #{envresultfile} 2> #{envdebugfile}"
       )
 
       puts '      Stop conman monitoring'
