@@ -104,6 +104,13 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
+	<term><option>-w</option></term>
+	<term><option>--workflow-id <replaceable>ID</replaceable></option></term>
+	<listitem>
+	  <para>Get the stats of a specific deployment.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
 	<term><option>-x</option></term>
 	<term><option>--date-min <replaceable>DATE</replaceable></option></term>
 	<listitem>

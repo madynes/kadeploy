@@ -1310,6 +1310,8 @@ class KadeployServer
       res = nil
       tid = Thread.new {
         case exec_specific.operation
+        when "print_workflow"
+          res = kastat_print_workflow(exec_specific, client, db)
         when "list_all"
           res = kastat_list_all(exec_specific, client, db)
         when "list_last"
@@ -1599,6 +1601,38 @@ class KadeployServer
       res = nil
       GC.start
     end
+    true
+  end
+
+  def kastat_print_workflow(exec_specific, client, db)
+    args, generic_where_clause = generic_where_nodelist(exec_specific,'l1.hostname')
+    query = "SELECT * FROM log WHERE deploy_id = ?"
+    args << exec_specific.workflow_id
+
+    res = db.run_query(query,*args)
+
+    if res.num_rows == 0
+      Debug::distant_client_print("No information is available", client)
+      return false
+    end
+
+    fields = db_generate_fields(res.fields,exec_specific.fields,
+      [
+        "user","hostname","step1","step2","step3",
+        "timeout_step1","timeout_step2","timeout_step3",
+        "retry_step1","retry_step2","retry_step3",
+        "start",
+        "step1_duration","step2_duration","step3_duration",
+        "env","anonymous_env","md5",
+        "success","error"
+      ]
+    )
+    db_print_results(res,fields) do |str|
+      Debug::distant_client_print(str,client)
+    end
+
+    res = nil
+    GC.start
     true
   end
 
