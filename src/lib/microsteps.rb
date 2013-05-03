@@ -1801,6 +1801,10 @@ class Microstep < Automata::QueueTask
     )
   end
 
+  def ms_sync()
+    return parallel_exec("sync")
+  end
+
   # Dummy method to put all the nodes in the node_ko set
   #
   # Arguments
