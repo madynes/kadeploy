@@ -2473,6 +2473,7 @@ module ConfigInformation
       exec_specific.servers = Config.load_client_config_file
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
+      exec_specific.workflow_id = String.new
 
       if Config.load_kastat_cmdline_options(exec_specific) then
         return exec_specific
@@ -2533,6 +2534,10 @@ module ConfigInformation
         }
         opt.on("-v", "--version", "Get the version") {
           exec_specific.get_version = true
+        }
+        opt.on("-w", "--workflow-id ID", "Get the stats of a specific deployment") { |w|
+          exec_specific.operation = "print_workflow"
+          exec_specific.workflow_id = w
         }
         opt.on("-x", "--date-min DATE", "Get the stats from this date (yyyy:mm:dd:hh:mm:ss)") { |d|
           exec_specific.date_min = d
