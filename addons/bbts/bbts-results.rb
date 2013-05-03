@@ -67,42 +67,52 @@ ARGV.each do |file|
   end
 end
 
+$results = {}
 $stats.each_pair do |automata,kinds|
-  puts "#{automata}:"
+  $results[automata] = {}
   kinds.each_pair do |kind,envs|
-    puts "  #{kind}:"
-    envs.each_pair do |nodes,tots|
-      puts "    #{nodes}:"
+    $results[automata][kind] = {}
+    envs.each_pair do |env,tots|
+      $results[automata][kind][env] = {}
       tots.each_pair do |tot,stats|
         nozero = stats.select { |node| node[:ok] > 0 }
-        puts "      #{tot} nodes:"
+        $results[automata][kind][env][tot] = {}
+
         times = nozero.collect { |node| node[:time] }
         avg = average(times)
         std = stddev(times,avg)
         conf = confint(times,1.96,avg,std)
-        puts "        times:"
-        puts "          min: #{times.min}"
-        puts "          max: #{times.max}"
-        puts "          average: #{sprintf('%.2f',avg)}"
-        puts "          std dev: #{sprintf('%.2f',std)}"
-        puts "          95% conf. int.: [#{sprintf('%.1f',conf.first)};#{sprintf('%.1f',conf.last)}]"
-        puts "          nb val: #{times.size}"
-        puts "          values: {#{times.join(', ')}}"
+        $results[automata][kind][env][tot]['timings'] = {
+          'min' => times.min,
+          'max' => times.max,
+          'average' => sprintf('%.2f',avg).to_f,
+          'std_dev' => sprintf('%.2f',std).to_f,
+          '95_conf_int' => {
+            'binf' => sprintf('%.1f',conf.first).to_f,
+            'bsup' => sprintf('%.1f',conf.last).to_f,
+          },
+          'values' => times.clone,
+        }
 
         oks = nozero.collect { |node| node[:ok] }
         avg = average(oks)
         std = stddev(oks,avg)
         conf = confint(oks,1.96,avg,std)
-        puts "        oks:"
-        puts "          min: #{oks.min}"
-        puts "          max: #{oks.max}"
-        puts "          average: #{sprintf('%.1f',average(oks))}"
-        puts "          std dev: #{sprintf('%.2f',std)}"
-        puts "          95% conf. int.: [#{sprintf('%.1f',conf.first)};#{sprintf('%.1f',conf.last)}]"
-        puts "          nb val: #{oks.size}"
-        puts "          values: {#{oks.join(', ')}}"
-        puts "        total fails: #{stats.size - nozero.size}"
+        $results[automata][kind][env][tot]['success'] = {
+          'min' => oks.min,
+          'max' => oks.max,
+          'average' => sprintf('%.1f',average(oks)).to_f,
+          'std_dev' => sprintf('%.2f',std).to_f,
+          '95_conf_int' => {
+            'binf' => sprintf('%.1f',conf.first).to_f,
+            'bsup' => sprintf('%.1f',conf.last).to_f,
+          },
+          'values' => oks.clone,
+        }
+
+        $results[automata][kind][env][tot]['complete_failure'] = (stats.size - nozero.size)
       end
     end
   end
 end
+puts $results.to_yaml
