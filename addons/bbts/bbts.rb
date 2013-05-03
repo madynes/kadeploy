@@ -169,6 +169,8 @@ def test_env(condir,logdir,automata_file,run_id,env,simult=nil)
   FileUtils.mkdir_p(envlogdir)
   envresultfile = File.join(envlogdir,'results')
   envdebugfile = File.join(envlogdir,'debug')
+  envworkflowfile = File.join(envlogdir,'workflow_id')
+  envdatefile = File.join(envlogdir,'time')
 
   envcondir = File.join(condir,testdir)
   puts "      Creating consoles dir '#{envcondir}'"
@@ -185,11 +187,14 @@ def test_env(condir,logdir,automata_file,run_id,env,simult=nil)
 
   sleep 1
 
+  system("date > #{envdatefile}")
+
   puts '      Running bbt'
   system(
     "#{BBT_SCRIPT} --kadeploy-cmd '#{kadeploy_cmd()}' "\
     "-f #{$nodefile} -k #{SSH_KEY} "\
     "--env-list #{env} --simult #{simult||1} "\
+    "--workflow-id-file #{envworkflowfile} "\
     "-a #{automata_file} 1> #{envresultfile} 2> #{envdebugfile}"
   )
 

@@ -41,6 +41,7 @@ def load_cmdline_options
   kadeploy = "kadeploy3"
   simult_list = "1"
   env_list = "squeeze-x64-base"
+  widf = nil
   progname = File::basename($PROGRAM_NAME)
   opts = OptionParser::new do |opts|
     opts.summary_indent = "  "
@@ -81,13 +82,16 @@ def load_cmdline_options
     opts.on("--kadeploy-cmd CMD", "Kadeploy command") { |cmd|
       kadeploy = cmd
     }
+    opts.on("--workflow-id-file FILE", "A file to save workflow IDs") { |f|
+      widf = File.expand_path(f)
+    }
   end
   opts.parse!(ARGV)
-  return nodes, key, automata_file, kadeploy, env_list, simult_list
+  return nodes, key, automata_file, kadeploy, env_list, simult_list, widf
 end
   
 
-def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, checks = true, simultid = nil)
+def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, widf = nil, checks = true, simultid = nil)
   $stderr.puts("\n### Launch[#{test_name}/#{env}#{(simultid ? "(#{simultid})" : '')}]")
   ok_file = Tempfile.new("blackboxtests-ok")
   ok = ok_file.path
@@ -107,11 +111,23 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, chec
     "\""
   end
 
-  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" #{(key ? "-k #{key}" : '')} -o #{ok} -n #{ko} #{automata_opt}"
+  wid_file = nil
+  wid_file = Tempfile.new("widfile") if widf
+
+  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" -o #{ok} -n #{ko}"
+  cmd += " #{automata_opt}" if automata_opt and !automata_opt.empty?
+  cmd += " -k #{key}" if key
+  cmd += " --write-workflow-id #{wid_file.path}" if widf
+
   cmd += " | sed 's/.*/(#{simultid}) &/'" if simultid
   cmd += " 1>&2"
 
   system(cmd)
+
+  if widf
+    system("cat #{wid_file.path} >> #{widf}")
+    wid_file.unlink
+  end
 
   return (count_lines(ko) > 0), count_lines(ok), count_lines(ko) unless checks
   if (count_lines(ko) > 0) then
@@ -143,9 +159,9 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, chec
   end
 end
 
-def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list)
+def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, widf=nil)
   start = Time.now.to_i
-  res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, nil, env_list.split(",")[0], kadeploy, false)
+  res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, nil, env_list.split(",")[0], kadeploy, widf, false)
   time = Time.now.to_i - start
   if res then
     add_result("seq", "dummy", test_name, nodes, "ok", time, nok, nko)
@@ -154,10 +170,10 @@ def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list)
   end
 end
 
-def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list)
+def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, widf=nil)
   env_list.split(",").each { |env|
     start = Time.now.to_i
-    res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy)
+    res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, widf)
     time = Time.now.to_i - start
     if res then
       add_result("seq", env, test_name, nodes, "ok", time, nok, nko)
@@ -167,7 +183,7 @@ def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list)
   }
 end
 
-def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, simult_list)
+def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, simult_list, widf=nil)
   env = env_list.split(",")[0]
   simult_list.split(',').collect!{|v| v.to_i}.each do |simult|
     start = Time.now.to_i
@@ -182,7 +198,7 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
     tid_hash_result = Hash.new
     (0...simult).to_a.each { |n|
       tid = Thread.new {
-        r, o, k = _test_deploy(nodes_hash[n], step1, step2, step3, test_name, key, env, kadeploy, true, "#{simult}:#{n}")
+        r, o, k = _test_deploy(nodes_hash[n], step1, step2, step3, test_name, key, env, kadeploy, widf, true, "#{simult}:#{n}")
         tid_hash_result[tid] = [r, o, k]
       }
       tid_array << tid
@@ -207,7 +223,7 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
   end
 end
 
-nodes, key, automata_file, kadeploy, env_list, simult_list = load_cmdline_options
+nodes, key, automata_file, kadeploy, env_list, simult_list, widf = load_cmdline_options
 if nodes.empty? then
   $stderr.puts "You must specify at least on node, use --help option for correct use"
   exit(1)
@@ -234,9 +250,9 @@ IO.readlines(automata_file).each { |line|
       when "dummy"
         test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list)
       when "simple"
-        test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list)
+        test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, widf)
       when "simult"
-        test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, simult_list)
+        test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, simult_list, widf)
       end
     end
   end
