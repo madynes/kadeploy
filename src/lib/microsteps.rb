@@ -56,22 +56,27 @@ class Microstep < Automata::QueueTask
       )
     end
 
-    if ret
-      @timestart = Time.now.to_i
-      if @name.to_s =~ /^custom_sub_.*$/
-        debug(3,"#{@name.to_s.sub(/^custom_sub_/,'')}",false)
-        ret = ret && send(:custom,*@params)
-      elsif @name.to_s =~ /^custom_pre_.*$/
-        debug(3,"#{@name.to_s.sub(/^custom_pre_/,'')}",false)
-        ret = ret && send(:custom,*@params)
-      elsif @name.to_s =~ /^custom_post_.*$/
-        debug(3,"#{@name.to_s.sub(/^custom_post_/,'')}",false)
-        ret = ret && send(:custom,*@params)
-      else
-        debug(3,"#{@name.to_s}",false)
-        ret = ret && send("ms_#{@name.to_s}".to_sym,*@params)
+    begin
+      if ret
+        @timestart = Time.now.to_i
+        if @name.to_s =~ /^custom_sub_.*$/
+          debug(3,"#{@name.to_s.sub(/^custom_sub_/,'')}",false)
+          ret = ret && send(:custom,*@params)
+        elsif @name.to_s =~ /^custom_pre_.*$/
+          debug(3,"#{@name.to_s.sub(/^custom_pre_/,'')}",false)
+          ret = ret && send(:custom,*@params)
+        elsif @name.to_s =~ /^custom_post_.*$/
+          debug(3,"#{@name.to_s.sub(/^custom_post_/,'')}",false)
+          ret = ret && send(:custom,*@params)
+        else
+          debug(3,"#{@name.to_s}",false)
+          ret = ret && send("ms_#{@name.to_s}".to_sym,*@params)
+        end
+        debug(4, " ~ Time in #{@name.to_s}: #{Time.now.to_i - @timestart}s",false)
       end
-      debug(4, " ~ Time in #{@name.to_s}: #{Time.now.to_i - @timestart}s",false)
+    rescue KadeployError => ke
+      ke.context = context() unless ke.context
+      raise ke
     end
 
     if ret
