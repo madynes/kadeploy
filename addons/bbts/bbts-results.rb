@@ -51,9 +51,9 @@ ARGV.each do |file|
     res = YAML.load(res.join("\n"))
 =end
     env = res['env']
-    automata = res['name']
+    automata = res['testname']
     kind = res['kind']
-    nodes_tot = res['nodes']['total']
+    nodes_tot = res['nodes']['list'].size
     if nodes_tot > 0
       $stats[automata] = {} unless $stats[automata]
       $stats[automata][kind] = {} unless $stats[automata][kind]
