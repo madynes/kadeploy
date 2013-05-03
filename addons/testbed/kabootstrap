@@ -3319,6 +3319,9 @@ sshgw.ssh(servername,'root') do |session|
     end
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_SSHKEY_PATH}")
 
+    msg('Set the shell for the deploy user',MSG_INFO)
+    sexec(session,"chsh -s /bin/bash #{CFG_KADEPLOY_USER}")
+
 #=begin
     msg('Creating PXE directories',MSG_INFO)
     #sexec(session,"rm -Rf #{cfg_pxe_path()}")
