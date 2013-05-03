@@ -547,6 +547,7 @@ class KadeployServer
       + exec_specific.node_set.to_s
     )
     kadeploy_create_workflow_info(workflow_id)
+    @workflow_info_hash[workflow_id][:exec_specific] = exec_specific
     context[:deploy_id] = workflow_id
 
     tmpoutput = nil
@@ -616,7 +617,6 @@ class KadeployServer
       begin
         yield(workflow_id,workflows)
       ensure
-        ConfigInformation::Config.free_kadeploy_exec_specific(exec_specific)
         #let's free memory at the end of the workflow
         @workflow_info_hash_lock.synchronize {
           # Unlock the cached files
@@ -669,7 +669,6 @@ class KadeployServer
                 workflow.output.disable_client_output()
               end
               workflows.first.output.verbosel(3, "Client disconnection")
-              ConfigInformation::Config.free_kadeploy_exec_specific(exec_specific)
               kadeploy_sync_kill_workflow(wid)
               drb_server.stop_service()
               db.disconnect()
@@ -769,6 +768,7 @@ class KadeployServer
     @workflow_info_hash[workflow_id][:grabthread] = nil
     @workflow_info_hash[workflow_id][:workflows] = []
     @workflow_info_hash[workflow_id][:cached_files] = []
+    @workflow_info_hash[workflow_id][:exec_specific] = nil
   end
 
   # Record a Managers::WorkflowManager pointer
@@ -795,6 +795,11 @@ class KadeployServer
           workflow.free
           workflow = nil
         end
+      end
+      if @workflow_info_hash[workflow_id][:exec_specific]
+        ConfigInformation::Config.free_kadeploy_exec_specific(
+          @workflow_info_hash[workflow_id][:exec_specific]
+        )
       end
       @workflow_info_hash.delete(workflow_id)
       begin
@@ -836,7 +841,6 @@ class KadeployServer
         return wid, ke.errno
       end
     end
-    ConfigInformation::Config.free_kadeploy_exec_specific(exec_specific)
 
     return wid, KadeployAsyncError::NO_ERROR
   end
