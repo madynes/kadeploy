@@ -39,8 +39,8 @@ def load_cmdline_options
   key = String.new
   automata_file = String.new
   kadeploy = "kadeploy3"
-  env_list = "lenny-x64-base"
-  max_simult = 4
+  simult_list = "1"
+  env_list = "squeeze-x64-base"
   progname = File::basename($PROGRAM_NAME)
   opts = OptionParser::new do |opts|
     opts.summary_indent = "  "
@@ -72,8 +72,8 @@ def load_cmdline_options
       end
       key = File.expand_path(f)
     }
-    opts.on("--max-simult NB", "Maximum number of simultaneous deployments") { |n|
-      max_simult = n.to_i
+    opts.on("--max-simult LIST", "A list of simult deployment values (eg. 2,4,8)") { |l|
+      simult_list = l
     }
     opts.on("--env-list LIST", "Environment list (eg. lenny-x64-base,lenny-x64-big,sid-x64-base)") { |l|
       env_list = l
@@ -83,11 +83,11 @@ def load_cmdline_options
     }
   end
   opts.parse!(ARGV)
-  return nodes, key, automata_file, kadeploy, env_list, max_simult
+  return nodes, key, automata_file, kadeploy, env_list, simult_list
 end
   
 
-def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_simult)
+def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, checks = true)
   $stderr.puts("\n### Launch[#{test_name}/#{env}]")
   ok_file = Tempfile.new("blackboxtests-ok")
   ok = ok_file.path
@@ -107,8 +107,9 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_
     "\""
   end
 
-  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" -k #{key} -o #{ok} -n #{ko} #{automata_opt} 1>&2"
+  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" #{(key ? "-k #{key}" : '')} -o #{ok} -n #{ko} #{automata_opt} 1>&2"
   system(cmd)
+  return (count_lines(ko) > 0), count_lines(ok), count_lines(ko) unless checks
   if (count_lines(ko) > 0) then
     IO.readlines(ko).each { |node|
       $stderr.puts "### KO[#{node.chomp}]"
@@ -138,10 +139,21 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_
   end
 end
 
-def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, max_simult)
+def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list)
+  start = Time.now.to_i
+  res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, nil, env_list.split(",")[0], kadeploy, false)
+  time = Time.now.to_i - start
+  if res then
+    add_result("seq", "dummy", test_name, "ok", time, nok, nko)
+  else
+    add_result("seq", "dummy", test_name, "ko", time, nok, nko)
+  end
+end
+
+def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list)
   env_list.split(",").each { |env|
     start = Time.now.to_i
-    res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_simult)
+    res, nok, nko = _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy)
     time = Time.now.to_i - start
     if res then
       add_result("seq", env, test_name, "ok", time, nok, nko)
@@ -151,10 +163,9 @@ def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, 
   }
 end
 
-def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, max_simult)
-  simult = 2
+def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, simult_list)
   env = env_list.split(",")[0]
-  while ((simult <= nodes.length()) && (simult <= max_simult)) do
+  simult_list.split(',').collect!{|v| v.to_i}.each do |simult|
     start = Time.now.to_i
     nodes_hash = Hash.new
     (0...simult).to_a.each { |n|
@@ -167,7 +178,7 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
     tid_hash_result = Hash.new
     (0...simult).to_a.each { |n|
       tid = Thread.new {
-        r, o, k = _test_deploy(nodes_hash[n], step1, step2, step3, test_name, key, env, kadeploy, max_simult)
+        r, o, k = _test_deploy(nodes_hash[n], step1, step2, step3, test_name, key, env, kadeploy)
         tid_hash_result[tid] = [r, o, k]
       }
       tid_array << tid
@@ -189,32 +200,10 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
     else
       add_result("simult/#{simult}", env, test_name, "ko", time, nodes_ok, nodes_ko)
     end
-    simult += 2
   end
 end
 
-def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_simult)
-  $stderr.puts("\n### Launch[#{test_name}/#{env_list.split(",")[0]}]")
-  ok_file = Tempfile.new("blackboxtests-ok")
-  ok = ok_file.path
-  ko_file = Tempfile.new("blackboxtests-ko")
-  ko = ko_file.path
-  node_list = String.new
-  nodes.each { |node|
-    node_list += " -m #{node}"
-  }
-  cmd = "#{kadeploy} #{node_list} -e \"#{env_list.split(",")[0]}\" --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko} 1>&2"
-  start = Time.now.to_i
-  system(cmd)
-  time = Time.now.to_i - start
-  if (count_lines(ko) > 0) then
-    add_result("seq", "dummy", test_name, "ko", time, count_lines(ok), count_lines(ko))
-  else
-    add_result("seq", "dummy", test_name, "ok", time, count_lines(ok), count_lines(ko))
-  end
-end
-
-nodes, key, automata_file, kadeploy, env_list, max_simult = load_cmdline_options
+nodes, key, automata_file, kadeploy, env_list, simult_list = load_cmdline_options
 if nodes.empty? then
   $stderr.puts "You must specify at least on node, use --help option for correct use"
   exit(1)
@@ -239,11 +228,11 @@ IO.readlines(automata_file).each { |line|
       step3 = content[5]
       case kind
       when "dummy"
-        test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_simult)
+        test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list)
       when "simple"
-        test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, max_simult)
+        test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list)
       when "simult"
-        test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, max_simult)
+        test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, simult_list)
       end
     end
   end
