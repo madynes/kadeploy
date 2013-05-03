@@ -2,7 +2,7 @@
 
 #CONMAN_DETACH_STR="&."
 CONSOLE_BIN=/usr/local/conman/bin/conman
-CONSOLE_CMD="$CONSOLE_BIN -d conman"
+CONSOLE_CMD="$CONSOLE_BIN -f -d conman"
 SCRIPT_BIN=/usr/bin/script
 
 

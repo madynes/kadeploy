@@ -9,7 +9,7 @@ require 'optparse'
 require 'yaml'
 require 'tempfile'
 
-RESULTS=Array.new
+$results=Array.new
 
 def count_lines(filename)
   count = `(wc -l #{filename} 2>/dev/null || echo 0) | cut -f 1 -d" "`
@@ -21,23 +21,17 @@ def add_result(kind, env, testname, result, time, ok, ko)
   h["kind"] = kind
   h["env"] = env
   h["testname"] = testname
-  h["result"] = result
   h["time"] = time
-  h["ok"] = ok.to_i
-  h["ko"] = ko.to_i
-  RESULTS.push(h)
+  h["status"] = result
+  h["nodes"] = {}
+  h["nodes"]["total"] = (ok.to_i + ko.to_i)
+  h["nodes"]["ok"] = ok.to_i
+  h["nodes"]["ko"] = ko.to_i
+  $results.push(h)
 end
 
 def show_results
-  puts "--- Summary ---"
-  RESULTS.each { |h|
-    puts "---"
-    puts " - kind: #{h["kind"]}"
-    puts " - name: #{h["testname"]}"
-    puts " - environment: #{h["env"]}"
-    puts " - time: #{h["time"]}"
-    puts " - result: #{h["result"]} - #{h["ok"]}/#{(h["ok"] + h["ko"])}"
-  }
+  puts $results.to_yaml
 end
 
 def load_cmdline_options
@@ -58,7 +52,7 @@ def load_cmdline_options
     opts.separator "General options:"
     opts.on("-a", "--automata-file FILE", "Automata file") { |f|
       if not File.exist?(f) then
-        puts "The file #{f} does not exist"
+        $stderr.puts "The file #{f} does not exist"
         return []
       end
       automata_file = File.expand_path(f)
@@ -73,7 +67,7 @@ def load_cmdline_options
     }
     opts.on("-k", "--key FILE", "Public key to copy in the root's authorized_keys") { |f|
       if not File.exist?(f) then
-        puts "The file #{f} does not exist"
+        $stderr.puts "The file #{f} does not exist"
         return []
       end
       key = File.expand_path(f)
@@ -94,8 +88,7 @@ end
   
 
 def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_simult)
-  puts "# Launching test #{test_name} with #{env} env"
-  
+  $stderr.puts("\n### Launch[#{test_name}/#{env}]")
   ok_file = Tempfile.new("blackboxtests-ok")
   ok = ok_file.path
   ko_file = Tempfile.new("blackboxtests-ko")
@@ -114,11 +107,11 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_
     "\""
   end
 
-  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" --verbose-level 0 -k #{key} -o #{ok} -n #{ko} #{automata_opt}"
+  cmd = "#{kadeploy} #{node_list} -e \"#{env}\" -k #{key} -o #{ok} -n #{ko} #{automata_opt} 1>&2"
   system(cmd)
   if (count_lines(ko) > 0) then
     IO.readlines(ko).each { |node|
-      puts "The node #{node.chomp} has not been correctly deployed"
+      $stderr.puts "### KO[#{node.chomp}]"
     }
   end
   if (count_lines(ok) > 0) then
@@ -128,14 +121,14 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, max_
     }
     results = Hash.new
     deployed_nodes.each { |node|
-      cmd = "ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 root@#{node} \"true\""
+      cmd = "ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 root@#{node} \"true\" 1>&2"
       res = system(cmd)
       results[node] = res
     }
     no_errors = true
     results.each_pair { |node,res|
       if not res then
-        puts "Connection error on the node #{node}"
+        $stderr.puts "### CantConnect[#{node}]"
         no_errors = false
       end
     }
@@ -152,10 +145,8 @@ def test_deploy(nodes, step1, step2, step3, test_name, key, kadeploy, env_list, 
     time = Time.now.to_i - start
     if res then
       add_result("seq", env, test_name, "ok", time, nok, nko)
-      puts "[ PASSED ] (#{time}s)"
     else
       add_result("seq", env, test_name, "ko", time, nok, nko)
-      puts "[ ERROR ] (#{time}s)"
     end
   }
 end
@@ -165,7 +156,6 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
   env = env_list.split(",")[0]
   while ((simult <= nodes.length()) && (simult <= max_simult)) do
     start = Time.now.to_i
-    puts "*** Performing #{simult} simultaneous deployments"
     nodes_hash = Hash.new
     (0...simult).to_a.each { |n|
       nodes_hash[n] = Array.new
@@ -195,18 +185,16 @@ def test_simultaneous_deployments(nodes, step1, step2, step3, test_name, key, ka
     }
     time = Time.now.to_i - start
     if result then
-      add_result("simult #{simult}", env, test_name, "ok", time, nodes_ok, nodes_ko)
-      puts "[ PASSED ] (#{time}s)"
+      add_result("simult/#{simult}", env, test_name, "ok", time, nodes_ok, nodes_ko)
     else
-      add_result("simult #{simult}", env, test_name, "ko", time, nodes_ok, nodes_ko)
-      puts "[ ERROR ] (#{time}s)"
+      add_result("simult/#{simult}", env, test_name, "ko", time, nodes_ok, nodes_ko)
     end
     simult += 2
   end
 end
 
 def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_simult)
-  puts "# Launching test #{test_name}"
+  $stderr.puts("\n### Launch[#{test_name}/#{env_list.split(",")[0]}]")
   ok_file = Tempfile.new("blackboxtests-ok")
   ok = ok_file.path
   ko_file = Tempfile.new("blackboxtests-ko")
@@ -215,30 +203,28 @@ def test_dummy(nodes, step1, step2, step3, test_name, kadeploy, env_list, max_si
   nodes.each { |node|
     node_list += " -m #{node}"
   }
-  cmd = "#{kadeploy} #{node_list} -e \"#{env_list.split(",")[0]}\" --verbose-level 0 --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko}"
+  cmd = "#{kadeploy} #{node_list} -e \"#{env_list.split(",")[0]}\" --force-steps \"SetDeploymentEnv|#{step1}&BroadcastEnv|#{step2}&BootNewEnv|#{step3}\" -o #{ok} -n #{ko} 1>&2"
   start = Time.now.to_i
   system(cmd)
   time = Time.now.to_i - start
   if (count_lines(ko) > 0) then
     add_result("seq", "dummy", test_name, "ko", time, count_lines(ok), count_lines(ko))
-    puts "[ ERROR ] (#{time}s)"
   else
     add_result("seq", "dummy", test_name, "ok", time, count_lines(ok), count_lines(ko))
-    puts "[ PASSED ] (#{time}s)"
   end
 end
 
 nodes, key, automata_file, kadeploy, env_list, max_simult = load_cmdline_options
 if nodes.empty? then
-  puts "You must specify at least on node, use --help option for correct use"
+  $stderr.puts "You must specify at least on node, use --help option for correct use"
   exit(1)
 end
 if (key == "") || (not File.readable?(key)) then
-  puts "You must specify an SSH public key (a readable file), use --help option for correct use"
+  $stderr.puts "You must specify an SSH public key (a readable file), use --help option for correct use"
   exit(1)
 end
 if (automata_file == "") || (not File.readable?(automata_file)) then
-  puts "You must specify an automata file (a readable file), use --help option for correct use"
+  $stderr.puts "You must specify an automata file (a readable file), use --help option for correct use"
   exit(1)
 end
 
