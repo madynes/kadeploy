@@ -59,7 +59,7 @@ module KaTestCase
   end
 
   def run_ka_async(binary,*options)
-    out = run_ka(binary,*options)
+    out = run_ka(binary,'--async',*options)
     out = YAML.load(out)
 
     assert(out['nodes_ko'].empty?,"NODES_KO not empty\n#{out.inspect}") if out['nodes_ko']

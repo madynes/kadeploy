@@ -40,18 +40,7 @@ class TestKareboot  < Test::Unit::TestCase
 
   def test_async
     @async = true
-    name = 'kareboot'
-    binary = Tempfile.new("#{name}-async_")
-    binary.write(`cat $(which #{@binary}) | sed s/#{name}.rb/#{name}_async.rb/g`)
-    binary.close
-    `chmod +x #{binary.path}`
-
-    begin
-      @binary = binary.path
-      run_kareboot()
-    ensure
-      binary.unlink
-    end
+    run_kareboot()
   end
 
   def test_set_pxe

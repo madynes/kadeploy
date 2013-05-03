@@ -163,19 +163,7 @@ class TestKadeploy < Test::Unit::TestCase
     @async = true
     @key = false
     @connect = false
-
-    name = 'kadeploy_client'
-    binary = Tempfile.new("#{name}-async_")
-    binary.write(`cat $(which #{@binary}) | sed s/#{name}.rb/#{name}_async.rb/g`)
-    binary.close
-    `chmod +x #{binary.path}`
-
-    begin
-      @binary = binary.path
-      run_kadeploy()
-    ensure
-      binary.unlink
-    end
+    run_kadeploy()
   end
 
   def test_env_version
