@@ -32,6 +32,7 @@ module EnvironmentManagement
   IMAGE_COMPRESSION = [
     'gzip',
     'bzip2',
+    'xz',
   ]
 
   def self.image_type_short(kind,compression)
@@ -42,6 +43,8 @@ module EnvironmentManagement
         'tgz'
       when 'bzip2'
         'tbz2'
+      when 'xz'
+        'txz'
       end
     when 'dd'
       case compression
@@ -49,6 +52,8 @@ module EnvironmentManagement
         'ddgz'
       when 'bzip2'
         'ddbz2'
+      when 'xz'
+        'ddxz'
       end
     when 'fsa'
       "fsa#{compression}"
@@ -61,10 +66,14 @@ module EnvironmentManagement
       [ 'tar', 'gzip' ]
     when 'tbz2'
       [ 'tar', 'bzip2' ]
+    when 'txz'
+      [ 'tar', 'xz' ]
     when 'ddgz'
       [ 'dd', 'gzip' ]
     when 'ddbz2'
       [ 'dd', 'bzip2' ]
+    when 'ddxz'
+      [ 'dd', 'xz' ]
     when /^fsa(\d+)$/
       [ 'fsa', $1 ]
     end

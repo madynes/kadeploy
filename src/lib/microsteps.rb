@@ -670,6 +670,8 @@ class Microstep < Automata::QueueTask
           cmd = "tar -C #{dest_dir} -xzf #{archive} #{file}"          
         when "tbz2"
           cmd = "tar -C #{dest_dir} -xjf #{archive} #{file}"
+        when "txz"
+          cmd = "tar -C #{dest_dir} -xJf #{archive} #{file}"          
         else
           raise "The kind #{archive_kind} of archive is not supported"
         end
@@ -850,10 +852,14 @@ class Microstep < Automata::QueueTask
       cmd = "tar xz -C #{deploy_mount_point}"
     when "tbz2"
       cmd = "tar xj -C #{deploy_mount_point}"
+    when "txz"
+      cmd = "tar xJ -C #{deploy_mount_point}"
     when "ddgz"
       cmd = "gzip -cd > #{deploy_part}"
     when "ddbz2"
       cmd = "bzip2 -cd > #{deploy_part}"
+    when "ddxz"
+      cmd = "xz -cd > #{deploy_part}"
     when /^fsa\d+$/
       cmd = "cat - > #{fsarchive()}"
     else
@@ -925,10 +931,14 @@ class Microstep < Automata::QueueTask
       cmd = "tar xz -C #{deploy_mount_point}"
     when "tbz2"
       cmd = "tar xj -C #{deploy_mount_point}"
+    when "txz"
+      cmd = "tar xJ -C #{deploy_mount_point}"
     when "ddgz"
       cmd = "gzip -cd > #{deploy_part}"
     when "ddbz2"
       cmd = "bzip2 -cd > #{deploy_part}"
+    when "ddxz"
+      cmd = "xz -cd > #{deploy_part}"
     when /^fsa\d+$/
       cmd = "cat - > #{fsarchive()}"
     else
@@ -1017,10 +1027,14 @@ class Microstep < Automata::QueueTask
       cmd = "tar xzf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
     when "tbz2"
       cmd = "tar xjf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
+    when "txz"
+      cmd = "tar xJf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
     when "ddgz"
       cmd = "gzip -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
     when "ddbz2"
       cmd = "bzip2 -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
+    when "ddxz"
+      cmd = "xz -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
     when /^fsa\d+$/
       cmd = "cat - > #{fsarchive()}"
     else
