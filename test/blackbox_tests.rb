@@ -5,6 +5,11 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+Signal.trap("INT") do
+  puts "\nSIGINT, killing everything"
+  exit!(1)
+end
+
 require 'optparse'
 require 'yaml'
 require 'tempfile'
@@ -123,6 +128,12 @@ def _test_deploy(nodes, step1, step2, step3, test_name, key, env, kadeploy, widf
   cmd += " 1>&2"
 
   system(cmd)
+
+  unless $?.success?
+    $stderr.puts 'Kadeploy command failed, exiting'
+    $stderr.puts cmd
+    exit!(1)
+  end
 
   if widf
     system("cat #{wid_file.path} >> #{widf}")
