@@ -915,15 +915,15 @@ automata:
   \item \ypath{/preinstall/[files]} list of pre-install to execute at the pre-install of a deployment. This fields are not mandatory. 
   \begin{itemize}
     \item \yfield{file}{String} the absolute path to the archive containing the scripts
-    \item \yfield{format}{String} the kind of file (expected values are \emph{tgz} or \emph{tbz2})
-    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
+    \item \yfield{format}{String} the kind of file (expected values are \emph{tgz}, \emph{tbz2} or \emph{txz})
+    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug.
   \end{itemize}
 
   \item \ypath{/postinstall/[files]} list of post-install to execute at the post-install of a deployment. This fields are not mandatory. 
   \begin{itemize}
     \item \yfield{file}{String} the absolute path to the archive containing the scripts
-    \item \yfield{format}{String} the kind of file (expected values are \emph{tgz} or \emph{tbz2})
-    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug. 
+    \item \yfield{format}{String} the kind of file (expected values are \emph{tgz}, \emph{tbz2} or \emph{txz})
+    \item \yfield{script}{String} the relative path (inside of the archive) to the script to be executed. The \textit{none} value can be if no script must be launched. For debug purpose, you can use the keyword \texttt{breakpoint} instead of a script. Thus, the file will be transferred, the deployment workflow will be stopped and you will be able to connect in the deployment environment to debug.
   \end{itemize}
 
   \item \ypath{/pxe/headers} PXE headers to be used for the different kind of reboots
