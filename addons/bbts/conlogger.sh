@@ -4,6 +4,17 @@
 CONSOLE_BIN=/usr/local/conman/bin/conman
 CONSOLE_CMD="$CONSOLE_BIN -f -d conman"
 SCRIPT_BIN=/usr/bin/script
+PIDS=
+
+trap kill_handler INT
+trap kill_handler TERM
+trap kill_handler KILL
+
+function kill_handler()
+{
+  echo "SIGINT, killing $0"
+  kill $PIDS
+}
 
 
 function get_nodename()
@@ -99,7 +110,9 @@ function init_monitor()
   echo -e "\t init $1"
   $SCRIPT_BIN -f -c "$CONSOLE_CMD $1" \
     -t 2>$(get_timefile $2 $1) -a $(get_typefile $2 $1) 1>/dev/null &
-  echo "$1 $!" >> $3
+  pid=$!
+  PIDS="$PIDS $pid"
+  echo "$1 $pid" >> $3
 }
 
 function kill_monitor()
