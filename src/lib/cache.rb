@@ -9,7 +9,9 @@ require 'thread'
 require 'fileutils'
 require 'digest'
 require 'base64'
+require 'sha1'
 require 'uri'
+require 'yaml'
 #require 'ftools'
 
 #Kadeploy3 libs
@@ -34,9 +36,13 @@ class CacheIndexPVHash
 end
 
 class CacheFile
+  @@id = 0
+
   MODE=0640
   FSEP_VALUE='%'
   FSEP_AFFECT='='
+  EXT_META = '.meta'
+  EXT_FILE = '.file'
 
   attr_reader :file, :user, :priority, :path , :version, :tag, :md5, :size, :atime, :mtime, :lock, :refs, :filename
 
@@ -45,7 +51,9 @@ class CacheFile
 
     self.class.readable?(file)
 
+    @uuid = self.class.gen_uuid()
     @file = file.clone # The file in the filesystem
+    @meta = nil
     @path = path.clone # The path where the file is coming from (URL,...)
     @version = version.clone # The version of the file
     @prefix = prefix.clone
@@ -117,17 +125,30 @@ class CacheFile
 
   # !!! Be careful, use lock
   def save!(directory,opts={})
-    if !opts[:norename] and @filename != File.basename(@file)
+    if !opts[:norename] and @filename != File.basename(@file,EXT_FILE)
       directory = CacheFile.absolute_path(directory)
       raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,
         "Cant save cache file '#{@filename}'") unless File.directory?(directory)
 
-      filename = File.join(directory,@filename)
-      Execute["mv #{@file} #{filename}"].run!.wait
-      @file = filename
+      newfile = File.join(directory,@filename) + EXT_FILE
+      Execute["mv #{@file} #{newfile}"].run!.wait
+      @file = newfile
+
+      newmeta = File.join(directory,@filename) + EXT_META
+      Execute["mv #{@meta} #{newmeta}"].run!.wait if @meta
+      @meta = newmeta
     end
+
     update_mtime() if @mtime.nil? #and local_path?()
     update_atime() if @atime.nil?
+
+    @meta = File.join(directory,File.basename(@file,EXT_FILE)) + EXT_META unless @meta
+    content = to_hash!()
+    content.delete(:lock)
+    File.open(@meta,"w") do |f|
+      f.write(content.to_yaml)
+    end
+
     Execute["chmod #{opts[:mode]} #{@file}"].run!.wait if opts[:mode]
     self
   end
@@ -140,12 +161,18 @@ class CacheFile
   def remove!()
     #FileUtils.rm_f(@file)
     Execute["rm -f #{@file}"].run!.wait
+    Execute["rm -f #{@meta}"].run!.wait if @meta
     @mtime = nil
     @atime = nil
     @md5 = nil
     @filename = nil
 
     self
+  end
+
+  def self.gen_uuid()
+    @@id += 1
+    SHA1.new("#{Time.now.to_i}-#{@@id}").hexdigest
   end
 
   # The file is accessible in the filesystem
@@ -166,18 +193,21 @@ class CacheFile
     raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,"File '#{file}' is not readable") if !File.file?(file) or !File.readable?(file) or !File.readable_real?(file)
   end
 
-  def self.load(file,prefix)
+  def self.load(file,meta,prefix)
     file = absolute_path(file)
     readable?(file)
+    meta = absolute_path(meta)
+    readable?(meta)
+    meta = YAML.load_file(meta)
 
     self.new(
       file,
-      parse_path(file,prefix),
-      parse_version(file,prefix),
+      meta[:path],
+      meta[:version],
       prefix,
-      parse_user(file,prefix),
-      parse_priority(file,prefix),
-      parse_tag(file,prefix)
+      meta[:user],
+      meta[:priority],
+      meta[:tag]
     )
   end
 
@@ -185,12 +215,12 @@ class CacheFile
     "#{FSEP_VALUE}#{key}#{FSEP_AFFECT}#{(val.is_a?(Regexp) ? val.source : val.to_s)}"
   end
 
-  def self.filename(prefix,path,version,user,md5,priority,tag)
-    "#{prefix}#{genval('u',user)}#{genval('t',tag)}#{genval('b',File.basename(path))}#{genval('f',Base64.strict_encode64(path))}#{genval('v',Base64.strict_encode64(version))}#{genval('m',md5)}#{genval('p',priority)}"
+  def self.filename(prefix,path,version,user,md5,priority,tag,uuid)
+    "#{prefix}#{genval('u',user)}#{genval('t',tag)}#{genval('p',priority)}#{genval('i',uuid)}"
   end
 
-  def self.regexp_filename(prefix_base)
-    /^#{prefix_base}#{genval('u',/(.+)/)}#{genval('t',/(.*)/)}#{genval('b',/(.+)/)}#{genval('f',Base64.regexp)}#{genval('v',Base64.regexp)}#{genval('m',/([0-9a-fA-F]*)/)}#{genval('p',/(\d+)/)}$/
+  def self.regexp_filename(prefix_base,suffix)
+    /^#{prefix_base}#{genval('u',/(.+)/)}#{genval('t',/(.*)/)}#{genval('p',/(\d+)/)}#{genval('i',/([0-9a-fA-F]*)/)}#{suffix}$/
   end
 
   # Not used in Kadeploy atm
@@ -199,23 +229,21 @@ class CacheFile
     @priority = changes[:priority] if changes[:priority] and changes[:priority] != @priority
     @user = changes[:user] if changes[:user] and changes[:user] != @user
     @tag = changes[:tag] if changes[:tag] and changes[:tag] != @tag
-    @filename = self.class.filename(@prefix,@path,@version,@user,@md5,@priority,@tag)
+    @filename = self.class.filename(@prefix,@path,@version,@user,@md5,@priority,@tag,@uuid)
     (filename != @filename)
   end
 
-  # Not used in Kadeploy atm
   def refresh()
     @lock.synchronize{ refresh!() }
   end
 
-  # Not used in Kadeploy atm
   # !!! Be careful, use lock
   def refresh!()
     @mtime = File.mtime(@file) #if local_path?()
     @atime = Time.now
     @md5 = MD5::get_md5_sum(@file) if @priority != 0
     @size = File.size(@file)
-    @filename = self.class.filename(@prefix,@path,@version,@user,@md5,@priority,@tag)
+    @filename = self.class.filename(@prefix,@path,@version,@user,@md5,@priority,@tag,@uuid)
   end
 
   # Not used in Kadeploy atm
@@ -233,53 +261,6 @@ class CacheFile
       @mtime = nil
     end
     self
-  end
-
-  protected
-
-  def self.parse_priority(file,prefix)
-    filename = File.basename(file)
-    if filename =~ regexp_filename(prefix)
-      Regexp.last_match(7).to_i
-    else
-      nil
-    end
-  end
-
-  def self.parse_user(file,prefix)
-    filename = File.basename(file)
-    if filename =~ regexp_filename(prefix)
-      Regexp.last_match(1)
-    else
-      nil
-    end
-  end
-
-  def self.parse_tag(file,prefix)
-    filename = File.basename(file)
-    if filename =~ regexp_filename(prefix)
-      Regexp.last_match(2)
-    else
-      nil
-    end
-  end
-
-  def self.parse_path(file,prefix)
-    filename = File.basename(file)
-    if filename =~ regexp_filename(prefix)
-      Base64.decode64(Regexp.last_match(4))
-    else
-      nil
-    end
-  end
-
-  def self.parse_version(file,prefix)
-    filename = File.basename(file)
-    if filename =~ regexp_filename(prefix)
-      Base64.decode64(Regexp.last_match(5))
-    else
-      nil
-    end
   end
 end
 
@@ -497,9 +478,19 @@ class Cache
       if !exclude.include?(file)
         if @tagfiles
           if File.file?(rfile) \
-            and file =~ CacheFile.regexp_filename(@prefix_base) \
+            and file =~ CacheFile.regexp_filename(@prefix_base,CacheFile::EXT_FILE) \
           then
-            files << CacheFile.load(rfile,@prefix_base)
+            meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
+            if File.file?(meta)
+              files << CacheFile.load(rfile,meta,@prefix_base)
+              debug("Delete old meta file #{meta} from cache")
+              #FileUtils.rm_f(rfile)
+              Execute["rm -f #{meta}"].run!.wait
+            else
+              debug("Delete file #{rfile} from cache (no meta)")
+              #FileUtils.rm_f(rfile)
+              Execute["rm -f #{rfile}"].run!.wait
+            end
           end
         else
           # Remove every files from directory if file not tagged
