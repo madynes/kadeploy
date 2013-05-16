@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e 
 
 # Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
@@ -9,18 +9,27 @@
 PID=0
 Exit_handler_int()
 {
+  if [ -n "$SSH_AGENT_PID" ]
+  then
     ssh-agent -k 1>/dev/null
+  fi
 }
 Exit_handler_kill()
 {
+  if [ -n "$SSH_AGENT_PID" ]
+  then
     ssh-agent -k 1>/dev/null
-    kill -9 $PID
+  fi
+  kill -9 $PID
 }
 
 Exit_handler_term()
 {
+  if [ -n "$SSH_AGENT_PID" ]
+  then
     ssh-agent -k 1>/dev/null
-    kill -15 $PID
+  fi
+  kill -15 $PID
 }
 
 if [ -x /etc/kadeploy3/load_kadeploy_env ] && [ -z "${KADEPLOY_CONFIG_DIR}" ]
@@ -37,11 +46,11 @@ unset http_proxy
 source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
 
 # Launch an ssh agent (useful when deploying from production environment)
-tmp=`tempfile`
-ssh-agent 1> $tmp
-source $tmp 1>/dev/null
-ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
-rm $tmp
+if [ -e $KADEPLOY_CONFIG_DIR/keys/id_deploy ]
+then
+  eval $(ssh-agent) &>/dev/null
+  ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
+fi
 
 if [ -e `which logger` ]
 then
@@ -57,7 +66,10 @@ trap Exit_handler_kill KILL
 wait
 
 # Clean the ssh agent stuff
-ssh-agent -k 1>/dev/null
-rm -rf `dirname $SSH_AUTH_SOCK`
+if [ -n "$SSH_AGENT_PID" ]
+then
+  ssh-agent -k 1>/dev/null
+  rm -rf `dirname $SSH_AUTH_SOCK`
+fi
 
 exit 0
