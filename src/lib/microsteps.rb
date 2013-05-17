@@ -32,6 +32,7 @@ class Microstep < Automata::QueueTask
     @current_operation = nil
     @waitreboot_threads = ThreadGroup.new
     @timestart = Time.now
+    @done = false
   end
 
   def debug(level,msg,info=true,opts={})
@@ -85,6 +86,8 @@ class Microstep < Automata::QueueTask
       @nodes.linked_copy(@nodes_ko)
     end
 
+    @done = true
+
     ret
   end
 
@@ -99,6 +102,10 @@ class Microstep < Automata::QueueTask
     }
   end
 
+  def done?()
+    (@done.nil? ? true : @done)
+  end
+
   def kill(dofree=true)
     # Be carefull to kill @runthread before killing @current_operation, in order to avoid the res condition: @runthread create the Operation object but do not set @current_operation because it was killed
     unless @runthread.nil?
@@ -110,6 +117,7 @@ class Microstep < Automata::QueueTask
       thr.join
     end
     @current_operation.kill unless @current_operation.nil?
+    @done = true
     free() if dofree
   end
 
@@ -121,6 +129,7 @@ class Microstep < Automata::QueueTask
     @current_operation = nil
     @waitreboot_threads = nil
     @timestart = nil
+    @done = nil
   end
 
   private
