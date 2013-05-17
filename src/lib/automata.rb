@@ -69,6 +69,10 @@ module Automata
       raise 'Should be reimplemented'
     end
 
+    def done?()
+      raise 'Should be reimplemented'
+    end
+
     def raise_nodes(nodeset,status,nodesetid=nil)
       # Nodes of this nodeset are not threated by this task anymore
       nodeset.set.each do |node|
@@ -301,7 +305,7 @@ module Automata
 
     def status()
       ret = {}
-      @threads.each_key{ |task| ret[task.name] = task.status }
+      @threads.each_key{ |task| ret[task.name] = task.status unless task.done? }
       ret[:OK] = @nodes_ok unless @nodes_ok.empty?
       ret[:KO] = @nodes_ko unless @nodes_ko.empty?
       ret
@@ -672,6 +676,7 @@ module Automata
     alias_method :__free__, :free
     alias_method :__kill__, :kill
     alias_method :__status__, :status
+    alias_method :__done__, :done?
     include Task
 
     attr_reader :name, :nodes, :nsid, :idx, :subidx, :nodes_brk, :nodes_ok, :nodes_ko, :mqueue, :mutex, :cleaner
@@ -791,6 +796,10 @@ module Automata
 
     def status()
       __status__()
+    end
+
+    def done?()
+      __done__()
     end
   end
 end
