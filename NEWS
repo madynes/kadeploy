@@ -6,6 +6,7 @@
 * It is now possible to deploy multi-partitioned FSArchiver images
   (see doc sec/4.7)
 * Kastat now have an option only to display statistics of the last deployment
+* It is now possible to deploy XZ-compressed images
 
 == Internals ==
 * Partitioning operation is now performed with an administrator-providen script
