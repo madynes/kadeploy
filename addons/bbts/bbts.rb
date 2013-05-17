@@ -1,5 +1,15 @@
 #!/usr/bin/ruby
 
+$cur_run = {}
+
+Signal.trap("INT") do
+  puts "\nSIGINT, killing #{$0}"
+  system(
+    "#{CONLOG_SCRIPT} stop #{$cur_run[:run_id]} #{$cur_run[:nodefile]} #{$cur_run[:envcondir]}"
+  ) if $cur_run and !$cur_run.empty?
+  exit!(1)
+end
+
 require 'yaml'
 require 'tempfile'
 require 'fileutils'
@@ -176,6 +186,10 @@ def test_env(condir,logdir,automata_file,run_id,env,simult=nil)
   puts "      Creating consoles dir '#{envcondir}'"
   FileUtils.mkdir_p(envcondir)
 
+  $cur_run[:run_id] = run_id
+  $cur_run[:nodefile] = $nodefile
+  $cur_run[:envcondir] = envcondir
+
   puts '      Init conman monitoring'
   system(
     "#{CONLOG_SCRIPT} start #{run_id} #{$nodefile} #{envcondir} &>/dev/null"
@@ -198,10 +212,15 @@ def test_env(condir,logdir,automata_file,run_id,env,simult=nil)
     "-a #{automata_file} 1> #{envresultfile} 2> #{envdebugfile}"
   )
 
+  quit = !$?.success?
+  $stderr.puts "\n#{File.basename(BBT_SCRIPT)} error, killing everything" if quit
+
   puts '      Stop conman monitoring'
   system(
     "#{CONLOG_SCRIPT} stop #{run_id} #{$nodefile} #{envcondir} &>/dev/null"
   )
+
+  exit(1) if quit
 
   puts '      Linking bugs'
   File.open(envdebugfile) do |file|
