@@ -6,7 +6,6 @@
 #Kadeploy libs
 require 'debug'
 require 'nodes'
-require 'config'
 require 'cache'
 require 'md5'
 require 'http'
@@ -172,7 +171,7 @@ module Managers
 
     def grab(dest,dir=nil)
       begin
-        resp, etag = HTTP.fetch_file(@path,dest,dir,nil)
+        resp, _ = HTTP.fetch_file(@path,dest,dir,nil)
         case resp
         when -1
           error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,
