@@ -1604,9 +1604,11 @@ class KadeployServer
   end
 
   def kastat_print_workflow(exec_specific, client, db)
-    args, generic_where_clause = generic_where_nodelist(exec_specific,'l1.hostname')
+    tmpargs, generic_where_clause = generic_where_nodelist(exec_specific,'hostname')
     query = "SELECT * FROM log WHERE deploy_id = ?"
-    args << exec_specific.workflow_id
+    args = [ exec_specific.workflow_id ]
+    query += " AND #{generic_where_clause}" unless generic_where_clause.empty?
+    args += tmpargs
 
     res = db.run_query(query,*args)
 
