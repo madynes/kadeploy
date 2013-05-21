@@ -274,7 +274,7 @@ class KadeployServer
         break if res
       end
 
-      unless info[:grabthread].alive?
+      if info[:grabthread] and !info[:grabthread].alive?
         begin
           info[:grabthread].join
         rescue KadeployError => ke
@@ -663,7 +663,7 @@ class KadeployServer
         end
 
         # Wait that every files are cached
-        @workflow_info_hash[wid][:grabthread].join
+        @workflow_info_hash[wid][:grabthread].join if @workflow_info_hash[wid][:grabthread]
 
         # Run workflows
         threads = {}
@@ -723,7 +723,8 @@ class KadeployServer
           if @workflow_info_hash[workflow_id][:runthread].alive? and killrun
         #@workflow_info_hash[workflow_id][:runthread].join
         @workflow_info_hash[workflow_id][:grabthread].kill \
-          if @workflow_info_hash[workflow_id][:grabthread].alive? and killrun
+          if @workflow_info_hash[workflow_id][:grabthread] \
+          and @workflow_info_hash[workflow_id][:grabthread].alive? and killrun
         #@workflow_info_hash[workflow_id][:grabthread].join
 
         @workflow_info_hash[workflow_id][:workflows].each do |workflow|
@@ -783,13 +784,14 @@ class KadeployServer
       return nil, ke.errno
     end
 
+    info = @workflow_info_hash[wid]
     workflows.each do |workflow|
-      workflow.run!{ @workflow_info_hash[wid][:grabthread].join }
+      workflow.run!{ info[:grabthread].join if info[:grabthread] }
     end
 
-    unless @workflow_info_hash[wid][:grabthread].alive?
+    if info[:grabthread] and !info[:grabthread].alive?
       begin
-        @workflow_info_hash[wid][:grabthread].join
+        info[:grabthread].join
       rescue KadeployError => ke
         return wid, ke.errno
       end
