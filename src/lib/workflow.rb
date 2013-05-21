@@ -163,6 +163,60 @@ class Workflow < Automata::TaskManager
     end
   end
 
+  def check_file(path)
+    if path and !path.empty?
+      kind = nil
+      begin
+        kind = URI.parse(path).scheme || 'local'
+      rescue URI::InvalidURIError
+        kind = 'local'
+      end
+
+      if kind == 'local'
+        unless File.readable?(path)
+          debug(0,"The file '#{path}' is not readable on the server")
+          error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE)
+        end
+      else
+        debug(0,"The file '#{path}' should have been cached")
+        error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE)
+      end
+    end
+  end
+
+  def check_files()
+    cexec = context[:execution]
+    if cexec.env
+      check_file(cexec.env.tarball['file']) if cexec.env.tarball
+      check_file(cexec.env.preinstall['file']) if cexec.env.preinstall
+      if cexec.env.postinstall and !cexec.env.postinstall.empty?
+        cexec.env.postinstall.each do |postinstall|
+          check_file(cexec.env.postinstall['file'])
+        end
+      end
+    end
+
+    check_file(cexec.key) if cexec.key
+
+    if cexec.custom_operations
+      cexec.custom_operations[:operations].each_pair do |macro,micros|
+        micros.each_pair do |micro,entries|
+          entries.each do |entry|
+            if entry[:action] == :send or entry[:action] == :run
+              check_file(entry[:file])
+            end
+          end
+        end
+      end
+    end
+
+    if cexec.pxe_upload_files and !cexec.pxe_upload_files.empty?
+      cexec.pxe_upload_files.each do |pxefile|
+        check_file(pxefile)
+      end
+    end
+  end
+
   def check_config()
     cexec = context[:execution]
     # Deploy on block device
@@ -283,6 +337,8 @@ class Workflow < Automata::TaskManager
   end
 
   def start!
+    check_files()
+
     @start_time = Time.now.to_i
     debug(0, "Launching a deployment on #{@nodes.to_s_fold}")
     context[:dblock].lock
