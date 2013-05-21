@@ -8,8 +8,6 @@ require 'pathname'
 require 'thread'
 require 'fileutils'
 require 'digest'
-require 'base64'
-require 'sha1'
 require 'uri'
 require 'yaml'
 #require 'ftools'
@@ -18,16 +16,6 @@ require 'yaml'
 require 'error'
 require 'md5'
 require 'execute'
-
-module Base64
-  def self.regexp
-    /((?:[A-Za-z0-9+\/]{4})*(?:[A-Za-z0-9+\/]{2}==|[A-Za-z0-9+\/]{3}=)?)/
-  end
-
-  def self.strict_encode64(bin)
-    encode64(bin).gsub!("\n",'')
-  end
-end
 
 class CacheIndexPVHash
   def self.idx(params)
@@ -172,7 +160,7 @@ class CacheFile
 
   def self.gen_uuid()
     @@id += 1
-    SHA1.new("#{Time.now.to_i}-#{@@id}").hexdigest
+    Digest::SHA1.hexdigest("#{Time.now.to_i}-#{@@id}")
   end
 
   # The file is accessible in the filesystem
