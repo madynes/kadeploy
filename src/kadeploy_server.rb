@@ -289,7 +289,7 @@ class KadeployServer
         break if res
       end
 
-      unless info[:grabthread].alive?
+      if info[:grabthread] and !info[:grabthread].alive?
         begin
           info[:grabthread].join
         rescue KadeployError => ke
@@ -352,7 +352,7 @@ class KadeployServer
       end
 
       # Clean cache
-      @config.common.cache[:global].clean
+      @config.common.cache[:global].clean  if @config.common.cache[:global]
       @config.common.cache[:netboot].clean
 
       context[:database].disconnect
@@ -469,7 +469,7 @@ class KadeployServer
       end
     }
     # Clean cache
-    @config.common.cache[:global].clean
+    @config.common.cache[:global].clean  if @config.common.cache[:global]
     @config.common.cache[:netboot].clean
   end
 
@@ -628,7 +628,7 @@ class KadeployServer
           kadeploy_delete_workflow_info(workflow_id)
         }
         # Clean cache
-        @config.common.cache[:global].clean
+        @config.common.cache[:global].clean if @config.common.cache[:global]
         @config.common.cache[:netboot].clean
         config = nil
       end
@@ -678,7 +678,7 @@ class KadeployServer
         end
 
         # Wait that every files are cached
-        @workflow_info_hash[wid][:grabthread].join
+        @workflow_info_hash[wid][:grabthread].join if @workflow_info_hash[wid][:grabthread]
 
         # Run workflows
         threads = {}
@@ -743,7 +743,8 @@ class KadeployServer
           if @workflow_info_hash[workflow_id][:runthread].alive? and killrun
         #@workflow_info_hash[workflow_id][:runthread].join
         @workflow_info_hash[workflow_id][:grabthread].kill \
-          if @workflow_info_hash[workflow_id][:grabthread].alive? and killrun
+          if @workflow_info_hash[workflow_id][:grabthread] \
+          and @workflow_info_hash[workflow_id][:grabthread].alive? and killrun
         #@workflow_info_hash[workflow_id][:grabthread].join
 
         @workflow_info_hash[workflow_id][:workflows].each do |workflow|
@@ -754,7 +755,7 @@ class KadeployServer
             file.release
           end
         end
-        @config.common.cache[:global].clean
+        @config.common.cache[:global].clean if @config.common.cache[:global]
         @config.common.cache[:netboot].clean
         kadeploy_delete_workflow_info(workflow_id)
       end
@@ -829,13 +830,14 @@ class KadeployServer
       return nil, ke.errno
     end
 
+    info = @workflow_info_hash[wid]
     workflows.each do |workflow|
-      workflow.run!{ @workflow_info_hash[wid][:grabthread].join }
+      workflow.run!{ info[:grabthread].join if info[:grabthread] }
     end
 
-    unless @workflow_info_hash[wid][:grabthread].alive?
+    if info[:grabthread] and !info[:grabthread].alive?
       begin
-        @workflow_info_hash[wid][:grabthread].join
+        info[:grabthread].join
       rescue KadeployError => ke
         return wid, ke.errno
       end
@@ -1087,7 +1089,7 @@ class KadeployServer
           kareboot_delete_reboot_info(reboot_id)
         }
         # Clean cache
-        @config.common.cache[:global].clean
+        @config.common.cache[:global].clean  if @config.common.cache[:global]
         @config.common.cache[:netboot].clean
         config = nil
       end
@@ -1194,7 +1196,7 @@ class KadeployServer
         kareboot_delete_reboot_info(ke.context[:rid])
       }
       # Clean cache
-      @config.common.cache[:global].clean
+      @config.common.cache[:global].clean  if @config.common.cache[:global]
       @config.common.cache[:netboot].clean
       ret = (ke.context[:status].nil? ? -1 : ke.context[:status])
     end
@@ -1256,7 +1258,7 @@ class KadeployServer
         kareboot_delete_reboot_info(ke.context[:rid])
       }
       # Clean cache
-      @config.common.cache[:global].clean
+      @config.common.cache[:global].clean  if @config.common.cache[:global]
       @config.common.cache[:netboot].clean
       begin
         GC.start
