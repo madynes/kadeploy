@@ -458,9 +458,9 @@ external:
 
   \item \ypath{/cache}
   \begin{itemize}
-    \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment
+    \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment.
     \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
-    \item \yfieldd{disable}{boolean}{false} disable the use of a cache
+    \item \yfieldd{disable}{boolean}{false} disable the use of a cache. Be careful, if you disable the cache, it will not be possible to use HTTP hosted files in environments.
   \end{itemize}
 
   \item \ypath{/network}
