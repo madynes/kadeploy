@@ -794,7 +794,7 @@ class Microstep < Automata::QueueTask
   end
 
   def get_block_device_num
-    get_block_device_str().strip[-1] - 'a'[0]
+    get_block_device_str().strip[-1].ord - 'a'[0].ord
   end
 
   # Get the name of the deployment partition
