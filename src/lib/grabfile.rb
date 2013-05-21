@@ -330,7 +330,7 @@ module Managers
 
       # Env tarball
       envprio = (env.recorded? ? :db : :anon)
-      if tmp = env.tarball
+      if env and tmp = env.tarball
         grab(gfm,context,tmp['file'],envprio,'tarball',
           FetchFileError::INVALID_ENVIRONMENT_TARBALL,
           :md5=>tmp['md5'], :env => env

@@ -342,7 +342,7 @@ class KadeployServer
   # * return true if the deployment has been freed and nil if workflow id does no exist
   def async_deploy_free(workflow_id)
     return async_deploy_lock_wid(workflow_id) { |info|
-      context = info[:workflows].first.context
+      context = info[:workflows].first.context if info[:workflows].first
 
       # Unlock the cached files
       if info[:cached_files]
@@ -355,7 +355,7 @@ class KadeployServer
       @config.common.cache[:global].clean  if @config.common.cache[:global]
       @config.common.cache[:netboot].clean
 
-      context[:database].disconnect
+      context[:database].disconnect if context
       kadeploy_delete_workflow_info(workflow_id)
       true
     }
@@ -372,7 +372,7 @@ class KadeployServer
       info[:workflows].each do |workflow|
         workflow.kill()
       end
-      info[:workflows][0].context[:db].disconnect
+      info[:workflows].first.context[:db].disconnect if info[:workflows].first and info[:workflows].first.context
       kadeploy_delete_workflow_info(workflow_id)
       begin
         GC.start
