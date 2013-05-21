@@ -368,7 +368,6 @@ class Cache
   # The greater the priority is, the later the file will be deleted (TODO: translate this sentence in english :))
   # If a block is given it will be used to grab 'file' before add it to the cache
   def cache(path,version,user,priority,tag='',size=nil,file=nil,md5=nil,mtime=nil,&block)
-    tmp = nil
     if ret = read({
       :path => path,
       :version => version,
@@ -471,7 +470,7 @@ class Cache
             meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
             if File.file?(meta)
               files << CacheFile.load(rfile,meta,@prefix_base)
-              debug("Delete old meta file #{meta} from cache")
+              debug("Delete old meta file #{File.basename(meta)} from cache")
               #FileUtils.rm_f(rfile)
               Execute["rm -f #{meta}"].run!.wait
             else

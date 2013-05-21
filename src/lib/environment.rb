@@ -283,8 +283,8 @@ module EnvironmentManagement
             #filename|tgz|script,filename|tgz|script...
             if val =~ /\A.+\|(tgz|tbz2)\|.+(,.+\|(tgz|tbz2)\|.+)*\Z/ then
               @postinstall = Array.new
-              val.split(",").each { |tmp|
-                tmp2 = tmp.split("|")
+              val.split(",").each { |tmpp|
+                tmp2 = tmpp.split("|")
                 entry = Hash.new
                 entry["file"] = tmp2[0]
                 entry["kind"] = tmp2[1]
