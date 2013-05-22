@@ -84,7 +84,7 @@ require 'thread'
     # Kill every running process
     def kill
       @threads.list.each do |thr|
-        thr.kill! if thr.alive?
+        thr.kill if thr.alive?
         thr.join
       end
       @execs.each_value do |exec|

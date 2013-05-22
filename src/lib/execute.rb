@@ -89,9 +89,21 @@ class Execute
     result = [@exec_pid, *@parent_io]
     if block_given?
       begin
-        return yield(*result)
-      ensure
+        ret = yield(*result)
         wait(opts)
+        return ret
+      ensure
+        if @parent_io
+          @parent_io.each do |io|
+            begin
+              io.close if io and !io.closed?
+            rescue IOError
+            end
+          end
+        end
+        @child_io = nil
+        @parent_io = nil
+        @exec_pid = nil
       end
     end
     result
@@ -132,10 +144,12 @@ class Execute
       rescue Errno::ECHILD
         @status = nil
       ensure
-        @parent_io.each do |io|
-          begin
-            io.close if io and !io.closed?
-          rescue IOError
+        if @parent_io
+          @parent_io.each do |io|
+            begin
+              io.close if io and !io.closed?
+            rescue IOError
+            end
           end
         end
         @child_io = nil
@@ -192,31 +206,11 @@ class Execute
   end
 
   def self.do(*cmd,&block)
-    child_io, parent_io = init_ios()
-
-    pid = fork {
-      parent_io.each { |io| io.close }
-      std = [STDIN, STDOUT, STDERR]
-      std.each_index do |i|
-        std[i].reopen(child_io[i])
-        child_io[i].close
-      end
-      exec(*cmd)
-    }
-
-    child_io.each { |io| io.close }
-    result = [pid, *parent_io]
+    exec = Execute[*cmd]
     if block_given?
-      begin
-        return yield(*result)
-      ensure
-        parent_io.each { |io| io.close unless io.closed? }
-        begin
-          Process.wait(pid)
-        rescue Errno::ECHILD
-        end
-      end
+      exec.run(nil,Proc.new)
+    else
+      exec.run()
     end
-    result
   end
 end
