@@ -15,8 +15,6 @@ echo "(hd0) ${KADEPLOY_BLOCK_DEVICE}" > $DEVICEMAP
 ### Install grub on the deployment partition ###
 grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR \
   --grub-mkdevicemap=$DEVICEMAP --force $KADEPLOY_DEPLOY_PART
-#grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR \
-#  --grub-mkdevicemap=$DEVICEMAP --force --recheck $KADEPLOY_DEPLOY_PART
 
 
 ### Generation of the menu file grub.cfg ###

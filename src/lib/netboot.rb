@@ -335,6 +335,10 @@ module NetBoot
     end
 
     def boot_local(env, diskname, device_id, partition_id, default_params='')
+      # The search command should be used to find the device, several options:
+      #   --fs-uuid + one microstep to gather the uuid on each machine
+      #   --label + write a label on the disk when partitioning
+      #   --file + create a unique file (deploy ID# ?) on the deployed filesystem
       profile = [ "set root=(hd#{device_id},#{partition_id})" ]
 
       partname = "#{diskname}#{partition_id}"
