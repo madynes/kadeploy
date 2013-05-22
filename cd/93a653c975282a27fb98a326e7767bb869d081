@@ -1,0 +1,8 @@
+Change-Id: Icd93a653c975282a27fb98a326e7767bb869d081
+Code-Review+2: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Verified+1: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-by: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-at: Wed, 22 May 2013 11:51:48 +0200
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1010
+Project: kadeploy3
+Branch: refs/heads/master
