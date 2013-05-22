@@ -1,23 +1,26 @@
 #!/bin/bash -e
 
+[ -e "${KADEPLOY_BLOCK_DEVICE}" ] || ( echo "device not found '${KADEPLOY_BLOCK_DEVICE}'" 1>&2; exit 1 )
+
+### Create GRUB directory ###
+GRUBDIR=$KADEPLOY_ENV_EXTRACTION_DIR/boot/grub
+mkdir -p $GRUBDIR
+
+
+### Generation of the device map ###
+DEVICEMAP=${GRUBDIR}/device.map
+echo "(hd0) ${KADEPLOY_BLOCK_DEVICE}" > $DEVICEMAP
+
 
 ### Install grub on the deployment partition ###
-grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR --force \
-  $KADEPLOY_DEPLOY_PART
-grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR --force \
-  --recheck $KADEPLOY_DEPLOY_PART
+grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR \
+  --grub-mkdevicemap=$DEVICEMAP --force $KADEPLOY_DEPLOY_PART
+#grub-install --no-floppy --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR \
+#  --grub-mkdevicemap=$DEVICEMAP --force --recheck $KADEPLOY_DEPLOY_PART
 
 
 ### Generation of the menu file grub.cfg ###
-MENUFILE=/boot/grub/grub.cfg
-
-## Guess the Grub's disk number from the name of the block device ##
-# Get the last character of the block device name ("/dev/sdb" -> 'b')
-grubdisk=${KADEPLOY_BLOCK_DEVICE#${KADEPLOY_BLOCK_DEVICE%?}}
-# Get a number based on this value, numbering starts at 'a'
-let grubdisk=$(printf "%d" "'$grubdisk")-$(printf "%d" "'a") || test $grubdisk -eq 0
-# Get the Grub's disk identifier (so "/dev/sdb" -> "hd1")
-grubdisk="hd${grubdisk}"
+MENUFILE=${GRUBDIR}/grub.cfg
 
 ## Generate the options considering on the operating system ##
 case $KADEPLOY_OS_KIND in
@@ -51,12 +54,12 @@ esac
 
 ## Write the menu file ##
 IFS=''
-cat <<EOF > $KADEPLOY_ENV_EXTRACTION_DIR/$MENUFILE
+cat <<EOF > $MENUFILE
 set default=1
 set timeout=0
 
 menuentry "${KADEPLOY_OS_KIND}" {
-  set root=(${grubdisk},${KADEPLOY_DEPLOY_PART_NUM})
+  set root=(hd0,${KADEPLOY_DEPLOY_PART_NUM})
 ${opts}}
 EOF
 
