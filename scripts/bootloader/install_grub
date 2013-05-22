@@ -1,22 +1,23 @@
 #!/bin/bash -e
 
+[ -e "${KADEPLOY_BLOCK_DEVICE}" ] || ( echo "device not found '${KADEPLOY_BLOCK_DEVICE}'" 1>&2; exit 1 )
+
+### Create GRUB directory ###
+GRUBDIR=$KADEPLOY_ENV_EXTRACTION_DIR/boot/grub
+mkdir -p $GRUBDIR
+
+
+### Generation of the device map ###
+DEVICEMAP=${GRUBDIR}/device.map
+echo "(hd0) ${KADEPLOY_BLOCK_DEVICE}" > $DEVICEMAP
+
 
 ### Install grub on the deployment partition ###
 grub-install --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR $KADEPLOY_DEPLOY_PART
-grub-install --root-directory=$KADEPLOY_ENV_EXTRACTION_DIR --recheck \
-  $KADEPLOY_DEPLOY_PART
 
 
 ### Generation of the menu file grub.cfg ###
-MENUFILE=/boot/grub/menu.lst
-
-## Guess the Grub's disk number from the name of the block device ##
-# Get the last character of the block device name ("/dev/sdb" -> 'b')
-grubdisknum=${KADEPLOY_BLOCK_DEVICE#${KADEPLOY_BLOCK_DEVICE%?}}
-# Get a number based on this value, numbering starts at 'a'
-let grubdisknum=$(printf "%d" "'$grubdisknum" )-$(printf "%d" "'a") || test $grubdisk -eq 0
-# Get the Grub's disk identifier (so "/dev/sdb" -> "hd1")
-grubdisk="hd${grubdisknum}"
+MENUFILE=${GRUBDIR}/menu.lst
 
 ## Get grub partition number ##
 let grubpart=${KADEPLOY_DEPLOY_PART_NUM}-1
@@ -35,25 +36,13 @@ case $KADEPLOY_OS_KIND in
     ;;
 
   "bsd")
-    opts=''
-    if [ $grubdisknum -ne 0 ]
-    then
-      opts+="map (hd0) (hd${grubdisknum})"$'\n'
-      opts+="map (hd${grubdisknum}) (hd0)"$'\n'
-    fi
-    opts+="rootnoverify (hd0,${grubpart})"$'\n'
+    opts="rootnoverify (hd0,${grubpart})"$'\n'
     opts+="makeactive"$'\n'
     opts+="chainloader +1"$'\n'
     ;;
 
   "windows")
-    opts=''
-    if [ $grubdisknum -ne 0 ]
-    then
-      opts+="map (hd0) (hd${grubdisknum})"$'\n'
-      opts+="map (hd${grubdisknum}) (hd0)"$'\n'
-    fi
-    opts+="rootnoverify (hd0,${grubpart})"$'\n'
+    opts="rootnoverify (hd0,${grubpart})"$'\n'
     opts+="makeactive"$'\n'
     opts+="chainloader +1"$'\n'
     ;;
@@ -65,11 +54,11 @@ esac
 
 ## Write the menu file ##
 IFS=''
-cat <<EOF > $KADEPLOY_ENV_EXTRACTION_DIR/$MENUFILE
+cat <<EOF > $MENUFILE
 default 0
 
 title ${KADEPLOY_OS_KIND}
-root (${grubdisk},${grubpart})
+root (hd0,${grubpart})
 $opts
 EOF
 
