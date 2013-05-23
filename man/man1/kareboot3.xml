@@ -49,9 +49,9 @@
       </varlistentry>
       <varlistentry>
 	<term><option>-c</option></term>
-	<term><option>--check-prod-env</option></term>
+	<term><option>--check-destructive-tag</option></term>
 	<listitem>
-	  <para>Check if the production environment has been destroyed.</para>
+	  <para>Check if some nodes was deployed with an environment that have the destructive tag.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
