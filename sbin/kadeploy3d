@@ -1,11 +1,81 @@
-#!/bin/bash -e 
+#!/usr/bin/ruby -w
 
 # Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
+$kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 
+$:.unshift($kadeploy_libs)
+
+
+Signal.trap("INT") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  $kadeploy.kill()
+  $httpd.shutdown
+  exit!(1)
+end
+
+Signal.trap("TERM") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  $kadeploy.kill()
+  $httpd.shutdown
+  exit!(1)
+end
+
+
+require 'webrick'
+require 'webrick/https'
+require 'socket'
+require 'json'
+
+require 'server'
+require 'config'
+
+include WEBrick
+
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket.do_not_reverse_lookup = true
+
+$kadeploy = KadeployServer.new()
+
+$httpd = HTTPServer.new(
+  :Port=>$kadeploy.port,
+  #:DocumentRoot=>'/tmp/',
+  :SSLEnable => true,
+  :SSLCertName => [['CN',$kadeploy.host]]
+)
+
+$httpd.mount_proc('/version') do |request,response|
+  response.status = 200
+  resp = { :version => $kadeploy.get_version }.to_json
+  response.content_length=resp.size
+  response['Content-Type'] = 'application/json'
+  response.body = resp
+end
+
+$httpd.mount_proc('/info') do |request,response|
+  response.status = 200
+  resp = $kadeploy.get_users_info.to_json
+  response.content_length=resp.size
+  response['Content-Type'] = 'application/json'
+  response.body = resp
+end
+
+$httpd.mount_proc('/nodes') do |request,response|
+  response.status = 200
+  resp = $kadeploy.get_nodes.to_json
+  response.content_length=resp.size
+  response['Content-Type'] = 'application/json'
+  response.body = resp
+end
+
+$httpd.start
+
+### SSH-AGENT and SYSLOG ????? ###
+=begin
 PID=0
 Exit_handler_int()
 {
@@ -73,3 +143,4 @@ then
 fi
 
 exit 0
+=end
