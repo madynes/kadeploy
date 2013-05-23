@@ -42,9 +42,16 @@
     <variablelist>
       <varlistentry>
 	<term><option>-d</option></term>
-	<term><option>--get-deploy-state</option></term>
+	<term><option>--get-nodes-state</option></term>
 	<listitem>
 	  <para>Get the deploy state of the nodes.</para>
+	</listitem>
+      </varlistentry>
+      <varlistentry>
+	<term><option>-s</option></term>
+	<term><option>--get-deployments-status</option></term>
+	<listitem>
+	  <para>Get the status of running deployments.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -72,14 +79,7 @@
 	<term><option>-w</option></term>
 	<term><option>--workflow-id <replaceable>WID</replaceable></option></term>
 	<listitem>
-	  <para>Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped.</para>
-	</listitem>
-      </varlistentry>
-      <varlistentry>
-	<term><option>-y</option></term>
-	<term><option>--get-yaml-dump</option></term>
-	<listitem>
-	  <para>Get the yaml dump.</para>
+	  <para>Specify a workflow id (to be used with the get_status option). If no wid is specified, the information of all the running deployments will be returned.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
