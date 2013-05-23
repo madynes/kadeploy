@@ -388,6 +388,7 @@ module Automata
     end
 
     def clean_threads
+      return unless @threads
       @threads.each_pair do |task,threads|
         threads.each_pair do |key,thread|
           unless thread.alive?

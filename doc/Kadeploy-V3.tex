@@ -2255,8 +2255,14 @@ options:
 %\section{Boot non-supported systems}
 % Create a GRUB PXE disk, boot with custom PXE ...
 
-\section{Kadeploy tools error numbers}\label{sec:fsa}
-\subsection{File fetching errors}
+
+\chapter{Remote Network API}
+\section{Introduction}
+\subsection{REST}
+\subsection{Error management}
+\subsubsection{Specifications}
+\subsubsection{Error numbers}
+\paragraph{File fetching errors}
 \begin{itemize}
   \item \texttt{100}: No error
   \item \texttt{101}: Invalid environment image archive
@@ -2275,7 +2281,7 @@ options:
   \item \texttt{114}: The cache is full
   \item \texttt{115}: Unknown protocol
 \end{itemize}
-\subsection{Kadeploy}
+\paragraph{Kadeploy}
 \begin{itemize}
   \item \texttt{200}: No error
   \item \texttt{201}: All the nodes have been discarded
@@ -2290,7 +2296,7 @@ options:
   \item \texttt{210}: Database issue
   \item \texttt{211}: The execution of a command failed
 \end{itemize}
-\subsection{Kareboot}
+\paragraph{Kareboot}
 \begin{itemize}
   \item \texttt{300}: No error
   \item \texttt{301}: Reboot failed on some nodes
@@ -2302,10 +2308,17 @@ options:
   \item \texttt{307}: The VLAN management has been disabled on the site
   \item \texttt{308}: The environment does not exist
 \end{itemize}
-\subsection{Kapower}
+\paragraph{Kapower}
 \begin{itemize}
   \item \texttt{400}: No error
 \end{itemize}
+\section{Specification}
+\subsection{Deploiement}
+\subsection{Reboot operations}
+\subsection{Power operations}
+\subsection{Statistics}
+\subsection{Nodes status}
+
 
 
 \end{document}
