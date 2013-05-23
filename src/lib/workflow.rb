@@ -30,33 +30,12 @@ class Workflow < Automata::TaskManager
   def initialize(nodeset,context={})
     @tasks = []
     @errno = nil
-    @output = Debug::OutputControl.new(
-      context[:execution].verbose_level || context[:common].verbose_level,
-      context[:execution].debug,
-      context[:client],
-      context[:execution].true_user,
-      context[:deploy_id],
-      context[:common].dbg_to_syslog,
-      context[:common].dbg_to_syslog_level,
-      context[:syslock],
-      context[:cluster].prefix
-    )
+    @output = context[:output]
     super(nodeset,context)
     @nodes_brk = Nodes::NodeSet.new
     @nodes_ok = Nodes::NodeSet.new
     @nodes_ko = Nodes::NodeSet.new
-
-    @logger = Debug::Logger.new(
-      nodeset,
-      context[:config],
-      context[:database],
-      context[:execution].true_user,
-      context[:deploy_id],
-      Time.now,
-      "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}",
-      context[:execution].load_env_kind == "file",
-      context[:syslock]
-    )
+    @logger = context[:logger]
     @start_time = nil
   end
 
@@ -226,18 +205,18 @@ class Workflow < Automata::TaskManager
       # Without a dd image
       unless cexec.environment.image[:kind] == 'dd'
         debug(0,"You can only deploy directly on block device when using a dd image")
-        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+        error(KadeployError::CONFLICTING_OPTIONS)
       end
       # Without specifying the partition to chainload on
       if cexec.boot_part.nil?
         debug(0,"You must specify the partition to boot on when deploying directly on block device")
-        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+        error(KadeployError::CONFLICTING_OPTIONS)
       end
     end
 
     if cexec.reformat_tmp and !context[:cluster].deploy_supported_fs.include?(cexec.reformat_tmp_fstype)
       debug(0,"The filesystem '#{cexec.reformat_tmp_fstype}' is not supported by the deployment environment")
-      error(KadeployAsyncError::CONFLICTING_OPTIONS)
+      error(KadeployError::CONFLICTING_OPTIONS)
     end
 
 =begin
@@ -247,7 +226,7 @@ class Workflow < Automata::TaskManager
       # FSA archives unless the boot method is a GRUB PXE boot
       if !context[:common].pxe[:local].is_a?(NetBoot::GrubPXE) and cexec.pxe_profile_msg.empty?
         debug(0,"FSA archives can only be booted if GRUB is used to boot on the hard disk or you define a custom PXE boot method")
-        error(KadeployAsyncError::CONFLICTING_OPTIONS)
+        error(KadeployError::CONFLICTING_OPTIONS)
       end
     end
 =end
@@ -272,8 +251,8 @@ class Workflow < Automata::TaskManager
       end
     end
 
-    if context[:execution].breakpoint_on_microstep != ''
-      macro,micro = context[:execution].breakpoint_on_microstep.split(':')
+    if context[:execution].breakpoint
+      macro,micro = context[:execution].breakpoint.split(':')
       @config[macro.to_sym][:config] = {} unless @config[macro.to_sym][:config]
       @config[macro.to_sym][:config][micro.to_sym] = {} unless @config[macro.to_sym][:config][micro.to_sym]
       @config[macro.to_sym][:config][micro.to_sym][:breakpoint] = true
@@ -341,7 +320,6 @@ class Workflow < Automata::TaskManager
 
     @start_time = Time.now.to_i
     debug(0, "Launching a deployment on #{@nodes.to_s_fold}")
-    context[:dblock].lock
 
     # Check nodes deploying
     unless context[:execution].ignore_nodes_deploying
@@ -355,7 +333,7 @@ class Workflow < Automata::TaskManager
           "deployment, let's discard them"
         )
         to_discard.set.each do |node|
-          context[:config].set_node_state(node.hostname, '', '', 'discarded')
+          context[:states].set(node.hostname, '', '', 'discarded')
           @nodes.remove(node)
         end
       end
@@ -363,8 +341,7 @@ class Workflow < Automata::TaskManager
 
     if @nodes.empty?
       debug(0, 'All the nodes have been discarded ...')
-      context[:dblock].unlock
-      error(KadeployAsyncError::NODES_DISCARDED,false)
+      error(KadeployError::NODES_DISCARDED,false)
     else
       @nodes.set_deployment_state(
         'deploying',
@@ -373,24 +350,20 @@ class Workflow < Automata::TaskManager
         context[:database],
         context[:user]
       )
-      context[:dblock].unlock
     end
 
     load_custom_operations()
   end
 
   def break!(task,nodeset)
-    context[:dblock].synchronize do
-      @nodes_brk.set_deployment_state('deployed',nil,context[:database],context[:user])
-    end
+    @nodes_brk.set_deployment_state('deployed',nil,context[:database],context[:user])
+    log('success', true, nodeset)
     debug(1,"Breakpoint reached for #{nodeset.to_s_fold}",task.nsid)
   end
 
   def success!(task,nodeset)
-    context[:dblock].synchronize do
-      @nodes_ok.set_deployment_state('deployed',nil,context[:database],context[:user])
-    end
-    @logger.set('success', true, nodeset)
+    @nodes_ok.set_deployment_state('deployed',nil,context[:database],context[:user])
+    log('success', true, nodeset)
     debug(1,
       "End of deployment for #{nodeset.to_s_fold} "\
       "after #{Time.now.to_i - @start_time}s",
@@ -399,11 +372,9 @@ class Workflow < Automata::TaskManager
   end
 
   def fail!(task,nodeset)
-    context[:dblock].synchronize do
-      @nodes_ko.set_deployment_state('deploy_failed',nil,context[:database],context[:user])
-    end
-    @logger.set('success', false, nodeset)
-    @logger.error(nodeset)
+    @nodes_ko.set_deployment_state('deploy_failed',nil,context[:database],context[:user])
+    log('success', false, nodeset)
+    @logger.error(nodeset,context[:states])
     debug(1,
       "Deployment failed for #{nodeset.to_s_fold} "\
       "after #{Time.now.to_i - @start_time}s",
