@@ -14,27 +14,49 @@ class KadeployError < Exception
 
   def self.to_msg(errno)
     case errno
-    when KadeployAsyncError::NODES_DISCARDED
+    when APIError::INVALID_CONTENT_TYPE
+      "Invalid Content-Type in HTTP request"
+    when APIError::HTTP_METHOD_NOT_SUPPORTED
+      "HTTP method not supported on this path"
+    when APIError::INVALID_WORKFLOW_ID
+      "Invalid workflow ID"
+    when APIError::NO_USER
+      "No user specified"
+    when APIError::INVALID_NODELIST
+      "Invalid node list"
+    when APIError::INVALID_ENVIRONMENT
+      "Invalid environment specification"
+    when APIError::INVALID_CLIENT
+      "Invalid client"
+    when APIError::INVALID_CONTENT
+      "Invalid Content in HTTP request"
+    when APIError::EXISTING_ELEMENT
+      "Element already exists"
+    when APIError::CONFLICTING_ELEMENTS
+      "Some elements already exists and are conflicting"
+    when APIError::NOTHING_MODIFIED
+      "Unexpected error, no element was modified"
+    when KadeployError::NODES_DISCARDED
       "All the nodes have been discarded"
-    when KadeployAsyncError::NO_RIGHT_TO_DEPLOY
+    when KadeployError::NO_RIGHT_TO_DEPLOY
       "Invalid options or invalid rights on nodes"
-    when KadeployAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+    when KadeployError::UNKNOWN_NODE_IN_SINGULARITY_FILE
       "Unknown node in singularity file"
-    when KadeployAsyncError::NODE_NOT_EXIST
+    when KadeployError::NODE_NOT_EXIST
       "At least one node in your node list does not exist"
-    when KadeployAsyncError::VLAN_MGMT_DISABLED
+    when KadeployError::VLAN_MGMT_DISABLED
       "The VLAN management has been disabled on the site"
-    when KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
-      "The environment cannot be loaded from the file you specified"
-    when KadeployAsyncError::LOAD_ENV_FROM_DB_ERROR
+    when KadeployError::LOAD_ENV_FROM_DESC_ERROR
+      "The environment cannot be loaded from the description you specified"
+    when KadeployError::LOAD_ENV_FROM_DB_ERROR
       "The environment does not exist"
-    when KadeployAsyncError::NO_ENV_CHOSEN
+    when KadeployError::NO_ENV_CHOSEN
       "You must choose an environment"
-    when KadeployAsyncError::CONFLICTING_OPTIONS
+    when KadeployError::CONFLICTING_OPTIONS
       "Some options are conflicting"
-    when KadeployAsyncError::DB_ERROR
+    when KadeployError::DB_ERROR
       "Database issue"
-    when KadeployAsyncError::EXECUTE_ERROR
+    when KadeployError::EXECUTE_ERROR
       "The execution of a command failed"
     when FetchFileError::INVALID_ENVIRONMENT_TARBALL
       "Invalid environment image archive"
@@ -66,21 +88,21 @@ class KadeployError < Exception
       "The cache is full"
     when FetchFileError::UNKNOWN_PROTOCOL
       "Unknown protocol"
-    when KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
+    when KarebootError::REBOOT_FAILED_ON_SOME_NODES
       "Reboot failed on some nodes"
-    when KarebootAsyncError::DEMOLISHING_ENV
+    when KarebootError::DEMOLISHING_ENV
       "Cannot reboot since the nodes have been previously deployed with a demolishinf environment"
-    when KarebootAsyncError::PXE_FILE_FETCH_ERROR
+    when KarebootError::PXE_FILE_FETCH_ERROR
       "Some PXE files cannot be fetched"
-    when KarebootAsyncError::NO_RIGHT_TO_DEPLOY
+    when KarebootError::NO_RIGHT_TO_DEPLOY
       "You do not have the right to deploy on all the nodes"
-    when KarebootAsyncError::UNKNOWN_NODE_IN_SINGULARITY_FILE
+    when KarebootError::UNKNOWN_NODE_IN_SINGULARITY_FILE
       "Unknown node in singularity file"
-    when KarebootAsyncError::NODE_NOT_EXIST
+    when KarebootError::NODE_NOT_EXIST
       "At least one node in your node list does not exist"
-    when KarebootAsyncError::VLAN_MGMT_DISABLED
+    when KarebootError::VLAN_MGMT_DISABLED
       "The VLAN management has been disabled on the site"
-    when KarebootAsyncError::LOAD_ENV_FROM_DB_ERROR
+    when KarebootError::LOAD_ENV_FROM_DB_ERROR
       "The environment does not exist"
     else
       ""
@@ -96,7 +118,7 @@ end
 
 class KadeployExecuteError < KadeployError
   def initialize(msg)
-    super(KadeployAsyncError::EXECUTE_ERROR,nil,msg)
+    super(KadeployError::EXECUTE_ERROR,nil,msg)
   end
 end
 
@@ -104,6 +126,23 @@ class TempfileException < RuntimeError
 end
 
 class MoveException < RuntimeError
+end
+
+class APIError
+  NO_ERROR = 0
+  INVALID_CONTENT_TYPE = 1 # 415
+  HTTP_METHOD_NOT_SUPPORTED = 2 # 405
+  INVALID_WORKFLOW_ID = 3 # 400
+  NO_USER = 4 # 400, 401
+  INVALID_NODELIST = 5 # 400
+  INVALID_ENVIRONMENT = 6 # 400
+  INVALID_CLIENT = 7 # 400
+  INVALID_OPTION = 8 # 400
+  INVALID_CONTENT = 9 # 400
+  EXISTING_ELEMENT = 10 # 409
+  CONFLICTING_ELEMENTS = 11
+  NOTHING_MODIFIED = 12
+  DATABASE_ERROR = 13
 end
 
 class FetchFileError
@@ -125,14 +164,14 @@ class FetchFileError
   UNKNOWN_PROTOCOL = 115
 end
 
-class KadeployAsyncError
+class KadeployError
   NO_ERROR = 200
   NODES_DISCARDED = 201
   NO_RIGHT_TO_DEPLOY = 202
   UNKNOWN_NODE_IN_SINGULARITY_FILE = 203
   NODE_NOT_EXIST = 204
   VLAN_MGMT_DISABLED = 205
-  LOAD_ENV_FROM_FILE_ERROR = 206
+  LOAD_ENV_FROM_DESC_ERROR = 206
   LOAD_ENV_FROM_DB_ERROR = 207
   NO_ENV_CHOSEN = 208
   CONFLICTING_OPTIONS = 209
@@ -140,7 +179,7 @@ class KadeployAsyncError
   EXECUTE_ERROR = 211
 end
 
-class KarebootAsyncError
+class KarebootError
   NO_ERROR = 300
   REBOOT_FAILED_ON_SOME_NODES = 301
   DEMOLISHING_ENV = 302
@@ -152,6 +191,6 @@ class KarebootAsyncError
   LOAD_ENV_FROM_DB_ERROR = 308
 end
 
-class KapowerAsyncError
+class KapowerError
   NO_ERROR = 400
 end
