@@ -266,7 +266,7 @@ class Macrostep < Automata::TaskedTaskManager
     task.nodes.set_error_msg("Timeout in the #{task.name} step")
     nodes.set.each do |node|
       node.state = "KO"
-      context[:config].set_node_state(node.hostname, "", "", "ko")
+      context[:states].set(node.hostname, "", "", "ko")
     end
   end
 
