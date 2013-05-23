@@ -122,7 +122,7 @@ require 'thread'
         nodeset = Nodes::NodeSet.new
         nodeset.id = @nodesetid
         nodeset.push(node)
-        @output.debug(exec.command, nodeset)
+        @output.push(exec.command, nodeset) if @output
         nodeset = nil
       end
 

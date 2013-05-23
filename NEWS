@@ -1,3 +1,28 @@
+## New in 3.1.8 ##
+== User interface ==
+* It's now possible to export files for the server in a secured way
+  (see doc sec/4.2.2)
+
+== REST API ==
+* It's now possible to interact with the server using a REST API (see doc sec/5)
+
+== Internals ==
+* Client/Server interactions are now performed using a REST API instead of DRb
+  (see doc sec/5)
+* The kadeploy service now run an HTTP server: ruby/Webrik (see doc sec/5.1.4)
+* kadeploy3d launcher has be rewritten in ruby, new options available
+  (see doc sec/4.2.1)
+* Clients has been rewritten in single-file ruby scripts
+
+!! Changes in configuration files !!
+* General configuration (doc sec/2.1)
+  - An authentication method for administrators has to be providden
+  - You can now specify a log file and a debug file, no more syslog
+  - You can force clients to export files in secure mode
+* Client configuration file (doc sec/3)
+  - The connection to a specific server can be secure or not
+
+
 ## New in 3.1.7 ##
 == User interface ==
 * Environments description files are now written in YAML
