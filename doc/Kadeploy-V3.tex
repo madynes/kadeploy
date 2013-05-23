@@ -451,9 +451,36 @@ rights:
   kind: db
   almighty_users: root,superuser
   purge_deployment_timer: 900
+authentication:
+  certificate:
+    #ca_public_key:
+    #  algorithm: RSA
+    #  file: /etc/kadeploy/ca_key.pub
+    ca_cert: ca_cert.pem
+    whitelist:
+    - 192.168.0.0/24
+    - kadeploy.mydomain.tld
+  #secret_key:
+  #  key: mysecretkey
+  #  whitelist:
+  #  - frontend.mydomain.tld
+  #  - 192.168.0.4
+  #  - 192.168.0.8
+  ident:
+    whitelist:
+    - /^.*\.mydomain\.tld$/
+    - 192.168.0.0/24
+    - kadeploy.mydomain.tld
+security:
+  secure_server: true
+  #certificate: cert.pem
+  #private_key:
+  #  algorithm: RSA
+  #  file: /home/deploy/key.pem
+  force_secure_client: false
 logs:
-  file: /tmp/kadeploy.log
-  syslog: true
+  logfile: /var/log/kadeploy/kadeploy.log
+  debugfile: /var/log/kadeploy/kadeploy.debug
   database: true
   debug: true
 verbosity:
@@ -554,12 +581,40 @@ external:
     \item \yfieldd{purge\_deployment\_timer}{Integer}{900} limeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
   \end{itemize}
 
+  \item \ypath{/authentication/certificate} authentication the certificate of a Certification Authority, at least a public key or a x509 certificate as to be specified.
+  \begin{itemize}
+    \item \yfield{ca\_cert}{String} the path to a file containing the x509 certificate of the Certification Authority.
+  \end{itemize}
+  \item \ypath{/authentication/certificate/ca\_public\_key}
+  \begin{itemize}
+    \item \yfield{algorithm}{String} the algorithm that was used to generate the public key (expected values are \emph{RSA}, \emph{DSA} or \emph{DH}).
+    \item \yfield{file}{String} the path to a file containing the public key of the Certification Authority.
+  \end{itemize}
+
+  \item \ypath{/authentication/secret\_key} authentication using a secret key.
+  \begin{itemize}
+    \item \yfield{key}{String} The secret key that has to be specified by the user to be identified.
+  \end{itemize}
+  \item \ypath{/authentication/ident} authentication using the Ident protocol (see RFC 1413) on the client machine. When using Ident authentication, specifying a whitelist is mandatory.
+  \item \ypath{/authentication/*/[whitelist]} For each authentication method, a whitelist can be specified. Authentication atempts will only be allowed from the specified hosts. The whitelist is an array of hosts (Strings). Hosts can be specified by IP address, IP address with CIDR notation, hostname and Regular Expression (using the char \texttt{/} as prefix and suffix of the expression).
+
+  \item \ypath{/security}
+  \begin{itemize}
+    \item \yfieldd{secure\_server}{Boolean}{true} launch the server in secure (SSL) mode
+    \item \yfieldd{certificate}{String}{''} path to an x509 certificate that will be used to launch secure connections. If none is specified and the secure mode is enabled, a self-signed certificate will be generated.
+    \item \yfieldd{force\_secure\_client}{Boolean}{false} specify if files have to be exported to the server using a secured connection (see section \ref{sec:api_files_export}).
+  \end{itemize}
+  \item \ypath{/security/private\_key} the private key associated with the certificate of the server. If none is specified and the secure mode is enabled, a new one will be generated.
+  \begin{itemize}
+    \item \yfield{algorithm}{String} the algorithm that was used to generate the public key (expected values are \emph{RSA}, \emph{DSA} or \emph{DH}).
+    \item \yfield{file}{String} the path to a file containing the private key.
+  \end{itemize}
+
   \item \ypath{/logs}
   \begin{itemize}
-    \item \yfieldd{file}{String}{/var/log/kadeploy.log} absolute path of a file that will contain the log information. If you do not wish to use a log file, leave this field empty.
-    \item \yfieldd{syslog}{Boolean}{true} use Syslog to export the log information (expected values are true or false). The Syslog tag is ``Kadeploy-log''.
-    \item \yfieldd{database}{Boolean}{true} use the Kadeploy database to export the log information
-    \item \yfieldd{debug}{Boolean}{false} use Syslog to export the debug information (expected values are true or false). The Syslog tag is ``Kadeploy-dbg''.
+    \item \yfieldd{logfile}{String}{''} path of a file that will contain the log information. If you do not wish to use a log file, do not set this field.
+    \item \yfieldd{database}{Boolean}{true} use the Kadeploy database to export the log information.
+    \item \yfieldd{debugfile}{String}{''} path of a file that will contain the log information. If you do not wish to use a debug file, do not set this field.
   \end{itemize}
 
   \item \ypath{/verbosity}
@@ -1415,6 +1470,7 @@ servers:
   - name: nancy
     hostname: nancy.lille.grid5000.fr
     port: 25300
+    secure: true
 \end{verbatim}
 
 \paragraph{Explanation of the fields\\}
@@ -1425,6 +1481,7 @@ servers:
     \item \yfield{name}{String} the Kadeploy server name
     \item \yfield{hostname}{String} the Kadeploy server hostname
     \item \yfield{port}{Integer} the port the Kadeploy server is listening on
+    \item \yfieldd{secure}{Boolean}{true} specify if the server use a secure connection
   \end{itemize}
 \end{itemize}
 
@@ -1511,6 +1568,7 @@ Advanced options:
       --set-custom-operations FILE Add some custom operations defined in a file
       --reboot-classical-timeout V Overload the default timeout for classical reboots
       --reboot-kexec-timeout V     Overload the default timeout for kexec reboots
+      --secure                     Use a secure connection to export files to the server
       --force-steps STRING         Undocumented, for administration purpose only
 
 \end{verbatim}
@@ -2368,8 +2426,15 @@ options:
 %\section{Boot non-supported systems}
 % Create a GRUB PXE disk, boot with custom PXE ...
 
-\section{Kadeploy tools error numbers}\label{sec:fsa}
-\subsection{File fetching errors}
+
+\chapter{Remote Network API}
+\section{Introduction}
+\subsection{REST}
+\subsection{Error management}
+\subsubsection{Specifications}
+X-Application-Error-Code, ...
+\subsubsection{Error numbers}
+\paragraph{File fetching errors}
 \begin{itemize}
   \item \texttt{100}: No error
   \item \texttt{101}: Invalid environment image archive
@@ -2388,7 +2453,7 @@ options:
   \item \texttt{114}: The cache is full
   \item \texttt{115}: Unknown protocol
 \end{itemize}
-\subsection{Kadeploy}
+\paragraph{Kadeploy}
 \begin{itemize}
   \item \texttt{200}: No error
   \item \texttt{201}: All the nodes have been discarded
@@ -2403,7 +2468,7 @@ options:
   \item \texttt{210}: Database issue
   \item \texttt{211}: The execution of a command failed
 \end{itemize}
-\subsection{Kareboot}
+\paragraph{Kareboot}
 \begin{itemize}
   \item \texttt{300}: No error
   \item \texttt{301}: Reboot failed on some nodes
@@ -2415,10 +2480,39 @@ options:
   \item \texttt{307}: The VLAN management has been disabled on the site
   \item \texttt{308}: The environment does not exist
 \end{itemize}
-\subsection{Kapower}
+\paragraph{Kapower}
 \begin{itemize}
   \item \texttt{400}: No error
 \end{itemize}
+\subsection{Exporting files for the server\label{sec:api_files_export}}
+'client' field specification, ...
+\subsection{On the server-side}
+
+\section{Specifications}
+\subsection{Authentication}
+admin/user: ident,secret\_key,ca\_cert, ...
+\subsection{Global}
+\begin{itemize}
+  \item GET /version
+  \item GET /info
+  \item GET /clusters
+  \item GET /nodes
+\end{itemize}
+\subsection{Deployments}
+\begin{itemize}
+  \item POST /deploy (wid/resources)
+  \item GET /deploy/\#dpl\#
+  \item GET /deploy/\#dpl\#/state
+  \item GET /deploy/\#dpl\#/outputs
+  \item GET /deploy/\#dpl\#/outputs/\#cluster\#
+  \item GET /deploy/\#dpl\#/debugs
+  \item GET /deploy/\#dpl\#/debugs/\#node\#
+\end{itemize}
+\subsection{Reboot operations}
+\subsection{Power operations}
+\subsection{Statistics}
+\subsection{Nodes status}
+
 
 
 \end{document}
