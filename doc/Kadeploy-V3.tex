@@ -1415,6 +1415,7 @@ servers:
   - name: nancy
     hostname: nancy.lille.grid5000.fr
     port: 25300
+    secure: true
 \end{verbatim}
 
 \paragraph{Explanation of the fields\\}
@@ -1425,6 +1426,7 @@ servers:
     \item \yfield{name}{String} the Kadeploy server name
     \item \yfield{hostname}{String} the Kadeploy server hostname
     \item \yfield{port}{Integer} the port the Kadeploy server is listening on
+    \item \yfieldd{secure}{Boolean}{true} specify if the server use a secure connection
   \end{itemize}
 \end{itemize}
 
@@ -2368,8 +2370,14 @@ options:
 %\section{Boot non-supported systems}
 % Create a GRUB PXE disk, boot with custom PXE ...
 
-\section{Kadeploy tools error numbers}\label{sec:fsa}
-\subsection{File fetching errors}
+
+\chapter{Remote Network API}
+\section{Introduction}
+\subsection{REST}
+\subsection{Error management}
+\subsubsection{Specifications}
+\subsubsection{Error numbers}
+\paragraph{File fetching errors}
 \begin{itemize}
   \item \texttt{100}: No error
   \item \texttt{101}: Invalid environment image archive
@@ -2388,7 +2396,7 @@ options:
   \item \texttt{114}: The cache is full
   \item \texttt{115}: Unknown protocol
 \end{itemize}
-\subsection{Kadeploy}
+\paragraph{Kadeploy}
 \begin{itemize}
   \item \texttt{200}: No error
   \item \texttt{201}: All the nodes have been discarded
@@ -2403,7 +2411,7 @@ options:
   \item \texttt{210}: Database issue
   \item \texttt{211}: The execution of a command failed
 \end{itemize}
-\subsection{Kareboot}
+\paragraph{Kareboot}
 \begin{itemize}
   \item \texttt{300}: No error
   \item \texttt{301}: Reboot failed on some nodes
@@ -2415,10 +2423,33 @@ options:
   \item \texttt{307}: The VLAN management has been disabled on the site
   \item \texttt{308}: The environment does not exist
 \end{itemize}
-\subsection{Kapower}
+\paragraph{Kapower}
 \begin{itemize}
   \item \texttt{400}: No error
 \end{itemize}
+\section{Specification}
+\subsection{Global}
+\begin{itemize}
+  \item GET /version
+  \item GET /info
+  \item GET /clusters
+  \item GET /nodes
+\end{itemize}
+\subsection{Deploiement}
+\begin{itemize}
+  \item POST /deploy (wid/resources)
+  \item GET /deploy/\#dpl\#
+  \item GET /deploy/\#dpl\#/state
+  \item GET /deploy/\#dpl\#/outputs
+  \item GET /deploy/\#dpl\#/outputs/\#cluster\#
+  \item GET /deploy/\#dpl\#/debugs
+  \item GET /deploy/\#dpl\#/debugs/\#node\#
+\end{itemize}
+\subsection{Reboot operations}
+\subsection{Power operations}
+\subsection{Statistics}
+\subsection{Nodes status}
+
 
 
 \end{document}
