@@ -256,6 +256,12 @@
 	</listitem>
       </varlistentry>
      <varlistentry>
+	<term><option>--secure</option></term>
+	<listitem>
+	  <para>Use a secure connection to export files to the server.</para>
+	</listitem>
+      </varlistentry>
+     <varlistentry>
 	<term><option>--force-steps <replaceable>STRING</replaceable></option></term>
 	<listitem>
 	  <para>Undocumented, for administration purpose only.</para>
