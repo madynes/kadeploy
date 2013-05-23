@@ -976,4 +976,22 @@ module Nodes
       return [ ret, nodelist ]
     end
   end
+
+  class NodeState
+    attr_accessor :states
+    def initialize()
+      @states = {}
+    end
+
+    def set(hostname, macro='', micro='', state='')
+      @states[hostname] = {} unless @states[hostname]
+      @states[hostname][:macro] = macro if !macro.empty?
+      @states[hostname][:micro] = micro if !micro.empty?
+      @states[hostname][:state] = state if !state.empty?
+    end
+
+    def get(hostname)
+      @states[hostname]
+    end
+  end
 end
