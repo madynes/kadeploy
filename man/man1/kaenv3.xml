@@ -65,7 +65,7 @@
 	<term><option>-m</option></term>
 	<term><option>--files-to-move <replaceable>FILES</replaceable></option></term>
 	<listitem>
-	  <para>Files to move (src1:dst1,src2:dst2,...).</para>
+	  <para>Files to move (src1::dst1,src2::dst2,...).</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -121,9 +121,9 @@
 
     <variablelist>
       <varlistentry>
-	<term><option>--remove-demolishing-tag <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--toggle-destructive-tag <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
-	  <para>Remove demolishing tag on an environment.</para>
+	  <para>Toggle the destructive tag on an environment.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -133,21 +133,21 @@
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--update-image-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--update-image-checksum <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
-	  <para>Update the MD5 of the environment image.</para>
+	  <para>Update the checksum of the environment image.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--update-preinstall-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--update-preinstall-checksum <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
-	  <para>Update the MD5 of the environment preinstall.</para>
+	  <para>Update the checksum of the environment preinstall.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
-	<term><option>--update-postinstalls-md5 <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--update-postinstalls-checksum <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
-	  <para>Update the MD5 of the environment postinstalls.</para>
+	  <para>Update the checksum of the environment postinstalls.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
