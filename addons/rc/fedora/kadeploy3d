@@ -20,19 +20,20 @@
 prog="Kadeploy 3"
 kadeploy3d=/usr/sbin/kadeploy3d
 pidfile=/var/run/kadeploy3d.pid
+args="--pidfile $pidfile"
 lockfile=/var/lock/subsys/kadeploy3d
+user=deploy
 RETVAL=0
 
 start() {
 	echo -n "Starting $prog: "
 	[ -e $pidfile ] && [ -e /proc/`cat $pidfile` ] && echo "Daemon already running" && return 1
-        daemon --pidfile=${pidfile} --user=deploy "nohup $kadeploy3d 2>/dev/null &"
+        [ -e $pidfile ] || ( touch $pidfile && chown $user:$user $pidfile )
+        daemon --pidfile=${pidfile} --user=$user "$kadeploy3d $args"
 	RETVAL=$?
-	sleep 5        
-	PID=`pidof -x $kadeploy3d`
-	echo ${PID} > ${pidfile}
+	PID=`cat $pidfile`
         echo
-	( [ -n "$PID" ] && [ -x /proc/${PID} ] ) || (echo ""; echo "An error occured, probably a configuration issue, please check your syslog file." ; rm ${pidfile} ; return 1)
+	( [ -n "$PID" ] && [ -x /proc/${PID} ] ) || (rm ${pidfile} ; return 1)
 	[ $RETVAL = 0 ] && touch ${lockfile}
         return $RETVAL
 }
