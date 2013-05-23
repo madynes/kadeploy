@@ -13,7 +13,7 @@ logs:
   syslog: true
   database: true
   debug: true
-  file: /tmp/kadeploy.log
+  file: /var/log/kadeploy3/kadeploy.log
 verbosity: 
   logs: 3
   clients: 3
