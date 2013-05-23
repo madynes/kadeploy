@@ -203,16 +203,18 @@ module ConfigInformation
           raise ParserError.new("The file '#{val}' is not a regular file")
         end
       else
-        if args[:create]
-          begin
-            puts "The file '#{val}' does not exists, let's create it"
-            tmp = FileUtils.touch(val)
-            raise if tmp.is_a?(FalseClass)
-          rescue
-            raise ParserError.new("Cannot create the file '#{val}'")
+        unless val.empty?
+          if args[:create]
+            begin
+              puts "The file '#{val}' does not exists, let's create it"
+              tmp = FileUtils.touch(val)
+              raise if tmp.is_a?(FalseClass)
+            rescue
+              raise ParserError.new("Cannot create the file '#{val}'")
+            end
+          else
+            raise ParserError.new("The file '#{val}' does not exists")
           end
-        else
-          raise ParserError.new("The file '#{val}' does not exists")
         end
       end
     end

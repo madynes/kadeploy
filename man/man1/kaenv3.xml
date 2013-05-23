@@ -121,9 +121,9 @@
 
     <variablelist>
       <varlistentry>
-	<term><option>--remove-demolishing-tag <replaceable>ENVNAME</replaceable></option></term>
+	<term><option>--toggle-destructive-tag <replaceable>ENVNAME</replaceable></option></term>
 	<listitem>
-	  <para>Remove demolishing tag on an environment.</para>
+	  <para>Toggle the destructive tag on an environment.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
