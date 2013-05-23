@@ -16,7 +16,9 @@ require 'http'
 require 'debug'
 require 'configparser'
 require 'grabfile'
+require 'fetchfile'
 require 'error'
+
 
 module EnvironmentManagement
   OS_KIND = [
@@ -147,12 +149,12 @@ module EnvironmentManagement
       @recorded = nil
     end
 
-    def debug(client,msg)
-      Debug::distant_client_print(msg,client)
+    def debug(msg)
+      #Debug::distant_client_error(msg,client)
     end
 
-    def error(client,msg)
-      Debug::distant_client_error(msg,client)
+    def error(errno,msg)
+      raise KadeployError.new(errno,nil,msg)
     end
 
     def check_os_values()
@@ -187,11 +189,9 @@ module EnvironmentManagement
     # * description: environment description
     # * almighty_env_users: array that contains almighty users
     # * user: true user
-    # * client: DRb handler to client
-    # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(description, almighty_env_users, user, client, setmd5, filename=nil,migration=false)
+    def load_from_desc(description, almighty_env_users, user, client=nil, get_checksum=true)
       @recorded = false
       @user = user
       @preinstall = nil
@@ -199,7 +199,6 @@ module EnvironmentManagement
       @id = description['id'] || -1
 
       filemd5 = Proc.new do |f,kind|
-        ret = nil
         except = nil
         case kind
         when 'tarball'
@@ -209,19 +208,7 @@ module EnvironmentManagement
         when 'postinstall'
           except = FetchFileError::INVALID_POSTINSTALL
         end
-        begin
-          ret = Managers::Fetch[f,except,client].checksum()
-        rescue KadeployError => ke
-          msg = KadeployError.to_msg(ke.errno)
-          error(client,"#{msg} (error ##{ke.errno})") if msg and !msg.empty?
-          if ke.message and !ke.message.empty?
-            debug(client,ke.message)
-          else
-            error(client,"Unable to get the file #{f}")
-          end
-          return false
-        end
-        ret
+        FetchFile[f,except,client].checksum()
       end
 
       begin
@@ -231,10 +218,6 @@ module EnvironmentManagement
         @description = cp.value('description',String,'')
         @author = cp.value('author',String,'')
         @visibility = cp.value('visibility',String,'private',['public','private','shared'])
-        if @visibility == 'public' and !almighty_env_users.include?(@user)
-          error(client,'Only the environment administrators can set the "public" tag')
-          return false
-        end
         @demolishing_env = cp.value('destructive',[TrueClass,FalseClass],false)
         @environment_kind = cp.value('os',String,nil,OS_KIND)
 
@@ -247,7 +230,13 @@ module EnvironmentManagement
           else
             compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
           end
-          md5 = filemd5.call(file,'tarball')
+
+          md5 = nil
+          if get_checksum
+            md5 = filemd5.call(file,'tarball')
+          else
+            md5 = ''
+          end
           shortkind = EnvironmentManagement.image_type_short(kind,compress)
           @tarball = {
             'kind' => shortkind,
@@ -266,13 +255,19 @@ module EnvironmentManagement
         cp.parse('preinstall') do |info|
           unless info[:empty]
             file = cp.value('archive',String)
+            md5 = nil
+            if get_checksum
+              md5 = filemd5.call(file,'preinstall')
+            else
+              md5 = ''
+            end
             @preinstall = {
-              'file' => file,
+              'archive' => file,
               'kind' => EnvironmentManagement.image_type_short(
                 'tar',
                 cp.value('compression',String,nil,IMAGE_COMPRESSION)
               ),
-              'md5' => filemd5.call(file,'preinstall'),
+              'md5' => md5,
               'script' => cp.value('script',String,'none'),
             }
           end
@@ -281,13 +276,19 @@ module EnvironmentManagement
         cp.parse('postinstalls',false,Array) do |info|
           unless info[:empty]
             file = cp.value('archive',String)
+            md5 = nil
+            if get_checksum
+              md5 = filemd5.call(file,'postinstall')
+            else
+              md5 = ''
+            end
             @postinstall << {
               'kind' => EnvironmentManagement.image_type_short(
                 'tar',
                 cp.value('compression',String,nil,IMAGE_COMPRESSION)
               ),
               'file' => file,
-              'md5' => filemd5.call(file,'postinstall'),
+              'md5' => md5,
               'script' => cp.value('script',String,'none'),
             }
           end
@@ -329,8 +330,8 @@ module EnvironmentManagement
               end
             end
             if !@multipart and @options['partitions'].size > 1
-              debug(client,
-                "Warning(#{(filename ? filename : 'env_desc')}) "\
+              warning(
+                "Warning[environment description] "\
                 "Multiple partitions defined with non-multipart "\
                 "environment, by default, the partition #0 will be installed "\
                 "on the deployment partition"
@@ -353,16 +354,16 @@ module EnvironmentManagement
 
 
       rescue ArgumentError => ae
-        debug(client,"Error(#{(filename ? filename : 'env_desc')}) #{ae.message}")
-        return false
+        error(KadeployError::LOAD_ENV_FROM_DESC_ERROR,
+          "Error[environment description] #{ae.message}")
       end
 
       cp.unused().each do |path|
-        debug(client,"Warning(#{(filename ? filename : 'env_desc')}) Unused field '#{path}'")
+        debug("Warning[environment description]: Unused field '#{path}'")
       end
 
       ret = check_os_values()
-      error(client,ret[1]) unless ret[0]
+      error(KadeployError::LOAD_ENV_FROM_DESC_ERROR,ret[1]) unless ret[0]
       return ret[0]
     end
 
@@ -646,11 +647,9 @@ module EnvironmentManagement
     # * nothing
     # Output
     # * nothing
-    def short_view_header(client)
-      out = String.new
-      out += "Name                Version     User            Description\n"
-      out += "####                #######     ####            ###########\n"
-      Debug::distant_client_print(out, client)
+    def short_view_header()
+      "Name                Version     User            Description\n"\
+      "####                #######     ####            ###########\n"
     end
 
     # Print the short view
@@ -659,8 +658,8 @@ module EnvironmentManagement
     # * nothing
     # Output
     # * nothing
-    def short_view(client)
-      Debug::distant_client_print(sprintf("%-21s %-7s %-10s %-40s\n", @name, @version, @user, @description), client)
+    def short_view()
+      sprintf("%-21s %-7s %-10s %-40s\n", @name, @version, @user, @description)
     end
 
     def to_hash
@@ -734,10 +733,10 @@ module EnvironmentManagement
     # * nothing
     # Output
     # * nothing
-    def full_view(client)
+    def full_view()
       # Ugly hack to write YAML attribute following a specific order
       content_hash = to_hash()
-      yaml = YAML::quick_emit(content_hash) do |out|
+      YAML::quick_emit(content_hash) do |out|
         out.map(content_hash.taguri(), content_hash.to_yaml_style()) do |map|
           content_hash.keys.sort do |x,y|
             tmpx = YAML_SORT.index(x)
@@ -749,7 +748,6 @@ module EnvironmentManagement
           #content_hash.keys.sort.each { |k| map.add(k, content_hash[k]) }
         end
       end
-      Debug::distant_client_print(yaml, client)
     end
 
     def self.flatten_image(img,md5=false)
