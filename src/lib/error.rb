@@ -14,6 +14,14 @@ class KadeployError < Exception
 
   def self.to_msg(errno)
     case errno
+    when APIError::INVALID_CONTENT_TYPE
+      "Invalid Content-Type in HTTP request"
+    when APIError::HTTP_METHOD_NOT_SUPPORTED
+      "HTTP method not supported on this path"
+    when APIError::INVALID_WORKFLOW_ID
+      "Invalid workflow ID"
+    when APIError::INVALID_NODELIST
+      "Invalid node list"
     when KadeployAsyncError::NODES_DISCARDED
       "All the nodes have been discarded"
     when KadeployAsyncError::NO_RIGHT_TO_DEPLOY
@@ -104,6 +112,14 @@ class TempfileException < RuntimeError
 end
 
 class MoveException < RuntimeError
+end
+
+class APIError
+  NO_ERROR = 0
+  INVALID_CONTENT_TYPE = 1
+  HTTP_METHOD_NOT_SUPPORTED = 2
+  INVALID_WORKFLOW_ID = 3
+  INVALID_NODELIST = 4
 end
 
 class FetchFileError

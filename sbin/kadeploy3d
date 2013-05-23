@@ -1,75 +1,212 @@
-#!/bin/bash -e 
+#!/usr/bin/ruby -w
 
 # Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
+$kadeploy_logdir=ENV['KADEPLOY3_LOGDIR']||'/var/log/kadeploy'
+$kadeploy_logfiles = {}
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
+$kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 
-PID=0
-Exit_handler_int()
-{
-  if [ -n "$SSH_AGENT_PID" ]
-  then
-    ssh-agent -k 1>/dev/null
-  fi
-}
-Exit_handler_kill()
-{
-  if [ -n "$SSH_AGENT_PID" ]
-  then
-    ssh-agent -k 1>/dev/null
-  fi
-  kill -9 $PID
-}
+SSH_KEY=File.join($kadeploy_config_directory,'keys/id_deploy')
 
-Exit_handler_term()
-{
-  if [ -n "$SSH_AGENT_PID" ]
-  then
-    ssh-agent -k 1>/dev/null
-  fi
-  kill -15 $PID
-}
+LOGFILE_DEBUG='debug.log'
+LOGFILE_ERROR='error.log'
 
-if [ -x /etc/kadeploy3/load_kadeploy_env ] && [ -z "${KADEPLOY_CONFIG_DIR}" ]
-then
-    KADEPLOY_CONFIG_DIR=/etc/kadeploy3
-    export KADEPLOY_CONFIG_DIR
-elif [ ! -x $KADEPLOY_CONFIG_DIR/load_kadeploy_env ]
-then
-    echo "The Kadeploy environment cannot be loaded, please check your configuration"
-    exit 1
-fi
+AUTOCLEAN_PITCH = 1200
 
-unset http_proxy
-source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
+$:.unshift($kadeploy_libs)
 
-# Launch an ssh agent (useful when deploying from production environment)
-if [ -e $KADEPLOY_CONFIG_DIR/keys/id_deploy ]
-then
-  eval $(ssh-agent) &>/dev/null
-  ssh-add $KADEPLOY_CONFIG_DIR/keys/id_deploy
-fi
 
-if [ -e `which logger` ]
-then
-  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" 2> >(logger -s -t "$(basename ${0})-error") &
+Signal::trap("INT") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  $autoclean.kill()
+  $kadeploy.kill()
+  $httpd.kill()
+  clean()
+  exit!(1)
+end
+
+Signal::trap("TERM") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  $autoclean.kill()
+  $kadeploy.kill()
+  $httpd.kill()
+  clean()
+  exit!(1)
+end
+
+# Reload the service & logfiles rotation (syslogd)
+Signal::trap("HUP") do
+  $kadeploy_logfiles.each_value do |io|
+    if io
+      filename = File.readlink(File.join("/proc/self/fd/#{io.fileno}"))
+      io.reopen(filename,'a+')
+    end
+  end
+end
+
+
+require 'thread'
+require 'fileutils'
+require 'json'
+require 'optparse'
+
+require 'server'
+require 'httpd'
+require 'config'
+
+
+def clean()
+  $kadeploy_logfiles.each_value do |io|
+    io.close if io and !io.closed?
+  end
+  if $ssh_key
+    ENV['SSH_AGENT_PID'] = $ssh_agent_pid
+    ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
+    `ssh-agent -k`
+  end
+end
+
+def error(msg='',abrt = true)
+  $stderr.puts msg if msg and !msg.empty?
+  clean() if abrt
+  exit 1 if abrt
+end
+
+
+$ssh_key = nil
+$pidfile = nil
+$detach = false
+$redirect_stdin = true
+$redirect_stdout = true
+$redirect_stderr = true
+
+
+# Parse options
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{$0} [options]\n!!! Be careful, the daemon is not launched as root !!!"
+
+  opts.on("-p", "--pidfile FILE", "Write the pid of the daemon process in a file") do |p|
+    $pidfile = p
+  end
+
+  opts.on("-k", "--agent-key SSH_KEY_FILE", "The ssh key file to be add to the SSH agent") do |a|
+    $ssh_key = a
+  end
+
+  opts.on("-d", "--detach", "Run the application in background") do
+    $detach = true
+  end
+
+  opts.on("-I", "--no-stdin-pipe", "Do not pipe /dev/null to stdin") do
+    $redirect_stdin = false
+  end
+
+  opts.on("-O", "--no-stdout-redirect", "Do not redirect stdout to a logfile") do
+    $redirect_stdout = false
+  end
+
+  opts.on("-E", "--no-stderr-redirect", "Do not redirect stderr to a logfile") do
+    $redirect_stderr = false
+  end
+end.parse!
+
+
+# Check logs directory
+if !File.directory?($kadeploy_logdir)
+  error("Log directory '#{$kadeploy_logdir}' does not exists")
+end
+
+if !File.writable?($kadeploy_logdir)
+  error("Log directory '#{$kadeploy_logdir}' not writable")
+end
+
+# Loading SSH agent
+if $ssh_key
+  error("Unable to read the SSH key file '#{$ssh_key}'") unless File.readable?($ssh_key)
 else
-  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_server.rb "$@" &
-fi
-PID=$!
-trap Exit_handler_int INT
-trap Exit_handler_term TERM
-trap Exit_handler_kill KILL
+  $ssh_key = SSH_KEY if File.readable?(SSH_KEY)
+end
 
-wait
+if $ssh_key
+  tmp=`eval $(ssh-agent) >/dev/null && echo $SSH_AGENT_PID $SSH_AUTH_SOCK`.strip.split(' ')
+  error('Unable to run ssh-agent') unless $?.success?
+  $ssh_agent_pid = tmp[0]
+  ENV['SSH_AGENT_PID'] = $ssh_agent_pid
+  $ssh_agent_sock = tmp[1]
+  ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
+  `ssh-add #{$ssh_key} 2>/dev/null`
+  error('Unable to add the key to the ssh-agent') unless $?.success?
+  $stdout.puts "SSH-agent #{$ssh_agent_pid} loaded"
+end
 
-# Clean the ssh agent stuff
-if [ -n "$SSH_AGENT_PID" ]
-then
-  ssh-agent -k 1>/dev/null
-  rm -rf `dirname $SSH_AUTH_SOCK`
-fi
 
-exit 0
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket::do_not_reverse_lookup = true
+
+# Load the configuration
+$kadeploy = KadeployServer.new()
+$stdout.puts 'Configuration files loaded'
+
+# Prepare to launch HTTPd
+begin
+  $stderr = $stdout
+  $httpd = HTTPd.new($kadeploy.host,$kadeploy.port)
+  $stderr = STDERR
+
+  $kadeploy_logfiles[:httpd] = $httpd.logs[:httpd]
+  $kadeploy_logfiles[:access] = $httpd.logs[:access]
+
+rescue Errno::EADDRINUSE
+  error("Another service is listening on the port #{$kadeploy.port}")
+  exit 1
+end
+
+
+# Configure HTTPd bindings
+$kadeploy.config_http_bindings($httpd)
+
+
+# Demonize the process
+if $detach
+  exit 0 if fork
+  Process::setsid
+end
+
+# Pipe /dev/null to stdin
+STDIN::reopen('/dev/null') if $redirect_stdin
+
+# Redirecting outputs to logfiles
+if $redirect_stdout
+  STDOUT::reopen(File.join($kadeploy_logdir,LOGFILE_DEBUG), 'a+')
+  STDOUT::sync = true
+  $kadeploy_logfiles[:debug] = STDOUT
+end
+$stdout = STDOUT
+
+if $redirect_stderr
+  STDERR::reopen(File.join($kadeploy_logdir,LOGFILE_ERROR), 'a+')
+  #STDOUT::sync = true
+  $kadeploy_logfiles[:error] = STDERR
+end
+$stderr = STDERR
+
+File.open($pidfile,'w'){|f| f.puts Process::pid} if $pidfile
+
+$stdout.puts "[#{Time.now.to_s}] Launching service"
+
+# Launch autoclean thread
+$autoclean = Thread.new do
+  begin
+    sleep AUTOCLEAN_PITCH
+    $kadeploy.clean_workflows()
+  end while true
+end
+
+# Launch HTTPd
+$httpd.run()
+clean()
+
