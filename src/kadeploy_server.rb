@@ -1042,8 +1042,6 @@ class KadeployServer
           end
         end
         micro.debug(0,"Done rebooting the nodes #{nodeset.to_s_fold}",nil)
-        micro.free
-        micro = nil
         ret
       end
     end
@@ -1137,7 +1135,9 @@ class KadeployServer
             client.print("Nodes not correctly rebooted on cluster #{clname}")
             client.print(micro.nodes_ko.to_s(false, true, "\n"))
           end
+          micro.free
         end
+        micros = nil
         finished = true
         finthr.join
 
@@ -2641,8 +2641,6 @@ class KadeployServer
           }
         end
         micro.debug(0,"Done power operation on the nodes #{set.to_s_fold}",nil)
-        micro.free
-        micro = nil
       end
     end
 
@@ -2738,7 +2736,9 @@ class KadeployServer
             client.print("Operation not correctly performed on cluster #{clname}")
             client.print(micro.nodes_ko.to_s(false, true, "\n"))
           end
+          micro.free
         end
+        micros = nil
         finished = true
         finthr.join
 
