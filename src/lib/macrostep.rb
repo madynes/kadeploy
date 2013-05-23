@@ -1,7 +1,3 @@
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
 #Kadelpoy libs
 require 'automata'
@@ -266,7 +262,7 @@ class Macrostep < Automata::TaskedTaskManager
     task.nodes.set_error_msg("Timeout in the #{task.name} step")
     nodes.set.each do |node|
       node.state = "KO"
-      context[:config].set_node_state(node.hostname, "", "", "ko")
+      context[:states].set(node.hostname, "", "", "ko")
     end
   end
 

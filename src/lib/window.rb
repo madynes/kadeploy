@@ -1,7 +1,3 @@
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
 #Kadeploy libs
 require 'debug'

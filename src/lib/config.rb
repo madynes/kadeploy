@@ -1,13 +1,8 @@
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2012
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
 #Kadeploy libs
 require 'environment'
 require 'nodes'
 require 'debug'
-require 'checkrights'
 require 'error'
 require 'configparser'
 require 'macrostep'
@@ -17,22 +12,23 @@ require 'stepbootnewenv'
 require 'microsteps'
 require 'netboot'
 require 'grabfile'
+require 'authentication'
 
 #Ruby libs
 require 'optparse'
 require 'ostruct'
 require 'fileutils'
 require 'resolv'
+require 'ipaddr'
 require 'yaml'
 
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 R_HTTP = /^http[s]?:\/\//
 
 module ConfigInformation
-  CONFIGURATION_FOLDER = ENV['KADEPLOY_CONFIG_DIR']
+  CONFIGURATION_FOLDER = $kadeploy_config_directory
   VERSION_FILE = File.join(CONFIGURATION_FOLDER, "version")
   SERVER_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "server_conf.yml")
-  CLIENT_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "client_conf.yml")
   CLUSTERS_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "clusters.yml")
   COMMANDS_FILE = File.join(CONFIGURATION_FOLDER, "cmd.yml")
   USER = `id -nu`.chomp
@@ -62,9 +58,9 @@ module ConfigInformation
           res = res && load_clusters_config_file
           res = res && load_commands
           res = res && load_version
-          raise "Problem in configuration" if not res
+          raise KadeployError.new(APIError::BAD_CONFIGURATION,nil,"Problem in configuration") if not res
         else
-          raise "Unsane configuration"
+          raise KadeployError.new(APIError::BAD_CONFIGURATION,nil,"Unsane configuration")
         end
       end
     end
@@ -83,133 +79,6 @@ module ConfigInformation
     def check_client_config(kind, exec_specific_config, db, client)
       method = "check_#{kind.split("_")[0]}_config".to_sym
       return send(method, exec_specific_config, db, client)
-    end
-
-    def check_kadeploy_config(exec_specific_config, db, client)
-      #Nodes check
-      exec_specific_config.node_array.each { |hostname|
-        if not add_to_node_set(hostname, exec_specific_config) then
-          Debug::distant_client_error("The node #{hostname} does not exist", client)
-          return KadeployAsyncError::NODE_NOT_EXIST
-        end
-      }
-
-      #VLAN
-      if (exec_specific_config.vlan != nil) then
-        if ((@common.vlan_hostname_suffix == "") || (@common.set_vlan_cmd == "")) then
-          Debug::distant_client_error("No VLAN can be used on this site (some configuration is missing)", client)
-          return KadeployAsyncError::VLAN_MGMT_DISABLED
-        else
-          dns = Resolv::DNS.new
-          exec_specific_config.ip_in_vlan = Hash.new
-          exec_specific_config.node_set.make_array_of_hostname.each { |hostname|
-            hostname_a = hostname.split(".")
-            hostname_in_vlan = "#{hostname_a[0]}#{@common.vlan_hostname_suffix}.#{hostname_a[1..-1].join(".")}".gsub("VLAN_ID", exec_specific_config.vlan)
-            begin
-              exec_specific_config.ip_in_vlan[hostname] = dns.getaddress(hostname_in_vlan).to_s
-            rescue Resolv::ResolvError
-              Debug::distant_client_error("The node #{hostname_in_vlan} does not exist in DNS", client)
-              return KadeployAsyncError::NODE_NOT_EXIST
-            end
-          }
-          dns.close
-          dns = nil
-        end
-      end
-
-
-      #Environment load
-      case exec_specific_config.load_env_kind
-      when "file"
-        if (
-          exec_specific_config.environment.load_from_file(
-            exec_specific_config.load_env_desc,
-              @common.almighty_env_users,
-              exec_specific_config.true_user,
-              client,
-              false,
-              exec_specific_config.load_env_file
-            ) == false
-        ) then
-          return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
-        end
-      when "db"
-        private_envs = exec_specific_config.user.nil? \
-          || exec_specific_config.user == exec_specific_config.true_user
-        unless exec_specific_config.environment.load_from_db(
-          db,
-          exec_specific_config.load_env_desc,
-          exec_specific_config.env_version,
-          exec_specific_config.user || exec_specific_config.true_user,
-          private_envs,
-          exec_specific_config.user.nil?
-        )
-          client.print(
-            "The environment #{exec_specific_config.load_env_desc} cannot be loaded. "\
-            "Maybe the version number does not exist "\
-            "or it belongs to another user"
-          )
-          return KadeployAsyncError::LOAD_ENV_FROM_DB_ERROR
-        end
-      else
-        Debug::distant_client_error("You must choose an environment", client)
-        return KadeployAsyncError::NO_ENV_CHOSEN
-      end
-
-      # Multi-partitioned archives hack
-      if exec_specific_config.environment.multipart
-        exec_specific_config.block_device =
-          exec_specific_config.environment.options['block_device']
-        exec_specific_config.deploy_part =
-          exec_specific_config.environment.options['deploy_part']
-      end
-
-      #Rights check
-      #The rights must be checked for each cluster if the node_list contains nodes from several clusters
-      exec_specific_config.node_set.group_by_cluster.each_pair { |cluster, set|
-        b=nil
-        if exec_specific_config.block_device != ""
-          b = exec_specific_config.block_device
-        else
-          b = @cluster_specific[cluster].block_device
-        end
-        p=nil
-        if exec_specific_config.deploy_part.nil?
-          p = ''
-        elsif exec_specific_config.deploy_part != ""
-          p = exec_specific_config.deploy_part
-        else
-          p = @cluster_specific[cluster].deploy_part
-        end
-
-        part = b + p
-        unless CheckRights::CheckRightsFactory.create(
-          @common.rights_kind, exec_specific_config.true_user,
-          client, set, db, part
-        ).granted?
-          Debug::distant_client_error(
-            "You do not have the right to deploy on all the nodes", client
-          )
-          return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
-        end
-      }
-
-      # Check rights on multipart environement
-      if exec_specific_config.environment.multipart
-        exec_specific_config.environment.options['partitions'].each do |part|
-          unless CheckRights::CheckRightsFactory.create(
-            @common.rights_kind, exec_specific_config.true_user, client,
-            exec_specific_config.node_set, db, part['device']
-          ).granted?
-            Debug::distant_client_error(
-              "You do not have the right to deploy on all the nodes", client
-            )
-            return KadeployAsyncError::NO_RIGHT_TO_DEPLOY
-          end
-        end
-      end
-
-      return KadeployAsyncError::NO_ERROR
     end
 
     def check_kareboot_config(exec_specific_config, db, client)
@@ -280,43 +149,6 @@ module ConfigInformation
       return KarebootAsyncError::NO_ERROR
     end
 
-    def check_kaenv_config(exec_specific_config, db, client)
-      #Environment load
-      if exec_specific_config.operation == "add" or exec_specific_config.operation == "migrate"
-        # almighty users can add environments for other users
-        user = nil
-        if exec_specific_config.user \
-        and @common.almighty_env_users.include?(
-          exec_specific_config.true_user
-        )
-          user = exec_specific_config.user
-        else
-          user = exec_specific_config.true_user
-        end
-
-        unless (exec_specific_config.environment.load_from_file(
-          exec_specific_config.load_env_desc,
-          @common.almighty_env_users,
-          user,
-          client,
-          true,
-          exec_specific_config.load_env_file,
-          exec_specific_config.operation == "migrate"
-        ))
-          return KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR
-        end
-      end
-      return KarebootAsyncError::NO_ERROR
-    end
-
-    def check_karights_config(exec_specific_config, db, client)
-      if not @common.almighty_env_users.include?(exec_specific_config.true_user) then
-        Debug::distant_client_error("Only administrators are allowed to set rights", client)
-        return 1
-      end
-      return 0
-    end
-
     def check_kastat_config(exec_specific_config, db, client)
       return 0
     end
@@ -329,10 +161,6 @@ module ConfigInformation
       else
         exec_specific_config.node = node
       end
-      return 0
-    end
-
-    def check_kanodes_config(exec_specific_config, db, client)
       return 0
     end
 
@@ -361,138 +189,6 @@ module ConfigInformation
       end
 
       return 0
-    end
-
-    # Load the kadeploy specific stuffs
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * exec_specific: return an open struct that contains the execution specific information
-    #                  or nil if the command line is not correct
-    def Config.load_kadeploy_exec_specific()
-      exec_specific = OpenStruct.new
-      exec_specific.environment = EnvironmentManagement::Environment.new
-      exec_specific.nodesetid = 0
-      exec_specific.node_set = Nodes::NodeSet.new(exec_specific.nodesetid)
-      exec_specific.node_array = Array.new
-      exec_specific.load_env_kind = String.new
-      exec_specific.load_env_desc = String.new
-      exec_specific.load_env_file = String.new
-      exec_specific.env_version = nil #By default we load the latest version
-      exec_specific.user = nil
-      exec_specific.true_user = USER
-      exec_specific.block_device = String.new
-      exec_specific.deploy_part = String.new
-      exec_specific.boot_part = nil
-      exec_specific.verbose_level = nil
-      exec_specific.debug = false
-      exec_specific.script = String.new
-      exec_specific.key = String.new
-      exec_specific.reformat_tmp = false
-      exec_specific.pxe_profile_msg = String.new
-      exec_specific.pxe_upload_files = Array.new
-      exec_specific.pxe_profile_singularities = nil
-      exec_specific.steps = Array.new
-      exec_specific.ignore_nodes_deploying = false
-      exec_specific.breakpoint_on_microstep = String.new
-      exec_specific.breakpointed = false
-      exec_specific.custom_operations_file = String.new
-      exec_specific.custom_operations = nil
-      exec_specific.disable_bootloader_install = false
-      exec_specific.disable_disk_partitioning = false
-      exec_specific.nodes_ok_file = String.new
-      exec_specific.nodes_ko_file = String.new
-      exec_specific.nodes_state = Hash.new
-      exec_specific.write_workflow_id = String.new
-      exec_specific.get_version = false
-      exec_specific.get_users_info = false
-      exec_specific.chosen_server = String.new
-      exec_specific.servers = Config.load_client_config_file
-      exec_specific.multi_server = false
-      exec_specific.kadeploy_server = String.new
-      exec_specific.kadeploy_server_port = String.new
-      exec_specific.reboot_classical_timeout = nil
-      exec_specific.reboot_kexec_timeout = nil
-      exec_specific.vlan = nil
-      exec_specific.ip_in_vlan = nil
-      
-      if Config.load_kadeploy_cmdline_options(exec_specific) then
-        return exec_specific
-      else
-        return nil
-      end
-    end
-
-    def Config.free_kadeploy_exec_specific(exec_specific)
-      exec_specific.environment.free if exec_specific.environment
-      exec_specific.environment = nil
-      exec_specific.nodesetid = nil
-      exec_specific.node_set.free(false) if exec_specific.node_set
-      exec_specific.node_set = nil
-      exec_specific.node_array = nil
-      exec_specific.load_env_kind = nil
-      exec_specific.load_env_desc = nil
-      exec_specific.load_env_file = nil
-      exec_specific.env_version = nil
-      exec_specific.user = nil
-      exec_specific.true_user = nil
-      exec_specific.block_device = nil
-      exec_specific.deploy_part = nil
-      exec_specific.boot_part = nil
-      exec_specific.verbose_level = nil
-      exec_specific.debug = false
-      #exec_specific.script = nil
-      exec_specific.key = nil
-      exec_specific.reformat_tmp = nil
-      exec_specific.pxe_profile_msg = nil
-      exec_specific.pxe_upload_files = nil
-      exec_specific.pxe_profile_singularities = nil
-      exec_specific.steps = nil
-      exec_specific.ignore_nodes_deploying = nil
-      exec_specific.breakpoint_on_microstep = nil
-      exec_specific.breakpointed = nil
-      exec_specific.custom_operations_file = nil
-      exec_specific.custom_operations = nil
-      exec_specific.disable_bootloader_install = nil
-      exec_specific.disable_disk_partitioning = nil
-      #exec_specific.nodes_ok_file = nil
-      #exec_specific.nodes_ko_file = nil
-      exec_specific.nodes_state = nil
-      exec_specific.write_workflow_id = nil
-      exec_specific.get_version = nil
-      exec_specific.get_users_info = nil
-      exec_specific.chosen_server = nil
-      #exec_specific.servers = nil
-      exec_specific.multi_server = false
-      exec_specific.kadeploy_server = nil
-      exec_specific.kadeploy_server_port = nil
-      exec_specific.reboot_classical_timeout = nil
-      exec_specific.reboot_kexec_timeout = nil
-      exec_specific.vlan = nil
-      exec_specific.ip_in_vlan = nil
-      exec_specific = nil
-    end
-
-    # Set the state of the node from the deployment workflow point of view
-    #
-    # Arguments
-    # * hostname: hostname concerned by the update
-    # * macro_step: name of the macro step
-    # * micro_step: name of the micro step
-    # * state: state of the node (ok/ko)
-    # Output
-    # * nothing
-    def set_node_state(hostname, macro_step, micro_step, state)
-      #This is not performed when nodes_state is unitialized (when called from Kareboot for instance)
-      if (@exec_specific.nodes_state != nil) then
-        if not @exec_specific.nodes_state.has_key?(hostname) then
-          @exec_specific.nodes_state[hostname] = Array.new
-        end
-        @exec_specific.nodes_state[hostname][0] = { "macro-step" => macro_step } if macro_step != ""
-        @exec_specific.nodes_state[hostname][1] = { "micro-step" => micro_step } if micro_step != ""
-        @exec_specific.nodes_state[hostname][2] = { "state" => state } if state != ""
-      end
     end
 
     private
@@ -528,15 +224,15 @@ module ConfigInformation
     # * return true if the installation is correct, false otherwise
     def sanity_check()
       if not File.readable?(SERVER_CONFIGURATION_FILE) then
-        puts "The #{SERVER_CONFIGURATION_FILE} file cannot be read"
+        $stderr.puts "The #{SERVER_CONFIGURATION_FILE} file cannot be read"
         return false
       end
       if not File.readable?(CLUSTERS_CONFIGURATION_FILE) then
-        puts "The #{CLUSTERS_CONFIGURATION_FILE} file cannot be read"
+        $stderr.puts "The #{CLUSTERS_CONFIGURATION_FILE} file cannot be read"
         return false
       end
       if not File.readable?(VERSION_FILE) then
-        puts "The #{VERSION_FILE} file cannot be read"
+        $stderr.puts "The #{VERSION_FILE} file cannot be read"
         return false
       end
       return true
@@ -553,10 +249,10 @@ module ConfigInformation
       begin
         begin
           config = YAML.load_file(configfile)
-        rescue ArgumentError
-          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
         rescue Errno::ENOENT
           raise ArgumentError.new("File not found '#{configfile}'")
+        rescue Exception
+          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
         end
 
         conf = @common
@@ -580,18 +276,174 @@ module ConfigInformation
           )
         end
 
+        cp.parse('authentication') do |nfo|
+          # 192.168.0.42
+          # 192.168.0.0/24
+          # domain.tld
+          # /^.*\.domain.tld$/
+          parse_hostname = Proc.new do |hostname,path|
+            addr = nil
+            begin
+              # Check if IP address
+              addr = IPAddr.new(hostname)
+            rescue ArgumentError
+              # Check if Regexp
+              if /\A\/(.*)\/\Z/ =~ hostname
+                begin
+                  addr = Regexp.new(Regexp.last_match(1))
+                rescue
+                  raise ArgumentError.new(ConfigParser.errmsg(path,"Invalid regexp #{hostname}"))
+                end
+              end
+            end
+            # Resolv hostname
+            if addr.nil?
+              begin
+                addr = IPAddr.new(Resolv.getaddress(hostname))
+              rescue Resolv::ResolvError
+                raise ArgumentError.new(ConfigParser.errmsg(path,"Cannot resolv hostname #{hostname}"))
+              rescue Exception => e
+                raise ArgumentError.new(ConfigParser.errmsg(path,"Invalid hostname #{hostname.inspect} (#{e.message})"))
+              end
+            end
+            addr
+          end
+
+          cp.parse('certificate',false) do |inf|
+            next if inf[:empty]
+            public_key = nil
+            cp.parse('ca_public_key',false) do |info|
+              next if info[:empty]
+              file = cp.value('file',String,'',
+                { :type => 'file', :readable => true, :prefix => Config.dir()})
+              next if file.empty?
+              kind = cp.value('algorithm',String,nil,['RSA','DSA','EC'])
+              begin
+                case kind
+                when 'RSA'
+                  public_key = OpenSSL::PKey::RSA.new(File.read(file))
+                when 'DSA'
+                  public_key = OpenSSL::PKey::DSA.new(File.read(file))
+                when 'EC'
+                  public_key = OpenSSL::PKey::EC.new(File.read(file))
+                else
+                  raise
+                end
+              rescue Exception => e
+                raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"Unable to load #{kind} public key: #{e.message}"))
+              end
+            end
+
+            unless public_key
+              # TODO: Load from relative directory after the patch is applied
+              cert = cp.value('ca_cert',String,'',
+                { :type => 'file', :readable => true, :prefix => Config.dir()})
+              if cert.empty?
+                raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"At least a certificate or a public key have to be specified"))
+              else
+                begin
+                  cert = OpenSSL::X509::Certificate.new(File.read(cert))
+                  public_key = cert.public_key
+                rescue Exception => e
+                  raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"Unable to load x509 cert file: #{e.message}"))
+                end
+              end
+            end
+
+            conf.auth[:cert] = CertificateAuthentication.new(public_key)
+            cp.parse('whitelist',false,Array) do |info|
+              next if info[:empty]
+              conf.auth[:cert].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            end
+          end
+
+          cp.parse('secret_key',false) do |inf|
+            next if inf[:empty]
+            conf.auth[:secret_key] = SecretKeyAuthentication.new(
+              cp.value('key',String))
+            cp.parse('whitelist',false,Array) do |info|
+              next if info[:empty]
+              conf.auth[:secret_key].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            end
+          end
+
+          cp.parse('ident',false) do |inf|
+            next if inf[:empty]
+            conf.auth[:ident] = IdentAuthentication.new
+            cp.parse('whitelist',true,Array) do |info|
+              next if info[:empty]
+              conf.auth[:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            end
+          end
+          if conf.auth.empty?
+            raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"You must set at least one authentication method"))
+          end
+        end
+
+        cp.parse('security') do |info|
+          conf.secure_server = cp.value('secure_server',
+            [TrueClass,FalseClass],true)
+
+          cp.parse('private_key',false) do |inf|
+            next if inf[:empty]
+            file = cp.value('file',String,'',
+              { :type => 'file', :readable => true, :prefix => Config.dir()})
+            kind = cp.value('algorithm',String,nil,['RSA','DSA','EC'])
+            next if file.empty?
+            begin
+              case kind
+              when 'RSA'
+                conf.private_key = OpenSSL::PKey::RSA.new(File.read(file))
+              when 'DSA'
+                conf.private_key = OpenSSL::PKey::DSA.new(File.read(file))
+              when 'EC'
+                conf.private_key = OpenSSL::PKey::EC.new(File.read(file))
+              else
+                raise
+              end
+            rescue Exception => e
+              raise ArgumentError.new(ConfigParser.errmsg(inf[:path],"Unable to load #{kind} private key: #{e.message}"))
+            end
+          end
+          cert = cp.value('certificate',String,'',
+            { :type => 'file', :readable => true, :prefix => Config.dir()})
+          if cert and !cert.empty?
+            begin
+              conf.cert = OpenSSL::X509::Certificate.new(File.read(cert))
+            rescue Exception => e
+              raise ArgumentError.new(ConfigParser.errmsg(info[:path],"Unable to load x509 cert file: #{e.message}"))
+            end
+          end
+
+          if conf.cert
+            unless conf.private_key
+              raise ArgumentError.new(ConfigParser.errmsg(info[:path],"You have to specify the private key associated with the x509 certificate"))
+            end
+            unless conf.cert.check_private_key(conf.private_key)
+              raise ArgumentError.new(ConfigParser.errmsg(info[:path],"The private key does not match with the x509 certificate"))
+            end
+          end
+
+          conf.secure_client = cp.value('force_secure_client',
+            [TrueClass,FalseClass],false)
+        end
+
         cp.parse('logs') do
           conf.log_to_file = cp.value(
-            'file',String,'/var/log/kadeploy.log',
+            'logfile',String,'',
             { :type => 'file', :writable => true, :create => true }
           )
-          conf.log_to_syslog = cp.value('syslog',[TrueClass,FalseClass],true)
+          conf.log_to_file = nil if conf.log_to_file.empty?
           conf.log_to_db = cp.value('database',[TrueClass,FalseClass],true)
-          conf.dbg_to_syslog = cp.value('debug',[TrueClass,FalseClass],false)
+          conf.dbg_to_file = cp.value(
+            'debugfile',String,'',
+            { :type => 'file', :writable => true, :create => true }
+          )
+          conf.dbg_to_file = nil if conf.dbg_to_file.empty?
         end
 
         cp.parse('verbosity') do
-          conf.dbg_to_syslog_level = cp.value('logs',Fixnum,3,(0..4))
+          conf.dbg_to_file_level = cp.value('logs',Fixnum,3,(0..4))
           conf.verbose_level = cp.value('clients',Fixnum,3,(0..4))
         end
 
@@ -745,13 +597,11 @@ module ConfigInformation
         end
 
         cp.parse('hooks') do
-          cp.parse('async') do
-            conf.async_end_of_deployment_hook = cp.value(
-              'end_of_deployment',String,''
-            )
-            conf.async_end_of_reboot_hook = cp.value('end_of_reboot',String,'')
-            conf.async_end_of_power_hook = cp.value('end_of_power',String,'')
-          end
+          conf.async_end_of_deployment_hook = cp.value(
+            'end_of_deployment',String,''
+          )
+          conf.async_end_of_reboot_hook = cp.value('end_of_reboot',String,'')
+          conf.async_end_of_power_hook = cp.value('end_of_power',String,'')
         end
 
         cp.parse('external',true) do
@@ -787,6 +637,7 @@ module ConfigInformation
         end
 
       rescue ArgumentError => ae
+        $stderr.puts ''
         $stderr.puts "Error(#{configfile}) #{ae.message}"
         return false
       end
@@ -796,46 +647,6 @@ module ConfigInformation
       end
 
       return true
-    end
-
-    # Load the client configuration file
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return an Hash that contains the servers info
-    def Config.load_client_config_file
-      configfile = CLIENT_CONFIGURATION_FILE
-      begin
-        begin
-          config = YAML.load_file(configfile)
-        rescue ArgumentError
-          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
-        rescue Errno::ENOENT
-          raise ArgumentError.new("File not found '#{configfile}'")
-        end
-
-        servers = {}
-        cp = ConfigParser.new(config)
-
-        cp.parse('servers',true,Array) do
-          servers[cp.value('name',String)] = [
-            cp.value('hostname',String),
-            cp.value('port',Fixnum)
-          ]
-        end
-        servers['default'] = cp.value('default',String,nil,servers.keys)
-      rescue ArgumentError => ae
-        puts "Error(#{configfile}) #{ae.message}"
-        raise "Problem in configuration"
-      end
-
-      if servers.empty?
-        puts "No server specified"
-        raise "Problem in configuration"
-      end
-
-      return servers
     end
 
     # Specify that a command involves a group of node
@@ -869,10 +680,10 @@ module ConfigInformation
       begin
         begin
           config = YAML.load_file(configfile)
-        rescue ArgumentError
-          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
         rescue Errno::ENOENT
           raise ArgumentError.new("File not found '#{configfile}'")
+        rescue Exception
+          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
         end
 
         unless config.is_a?(Hash)
@@ -935,7 +746,8 @@ module ConfigInformation
           end
         end
       rescue ArgumentError => ae
-        puts "Error(#{configfile}) #{ae.message}"
+        $stderr.puts ''
+        $stderr.puts "Error(#{configfile}) #{ae.message}"
         return false
       end
 
@@ -949,19 +761,19 @@ module ConfigInformation
 
     def load_cluster_specific_config_file(cluster, configfile)
       unless @cluster_specific[cluster]
-        puts "Internal error, cluster '' not declared"
+        $stderr.puts "Internal error, cluster '' not declared"
         return false
       end
 
       begin
         begin
           config = YAML.load_file(configfile)
-        rescue ArgumentError
-          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
         rescue Errno::ENOENT
           raise ArgumentError.new(
             "Cluster configuration file not found '#{configfile}'"
           )
+        rescue Exception
+          raise ArgumentError.new("Invalid YAML file '#{configfile}'")
         end
 
         unless config.is_a?(Hash)
@@ -1362,13 +1174,14 @@ module ConfigInformation
         end
 
       rescue ArgumentError => ae
-        puts "Error(#{configfile}) #{ae.message}"
+        $stderr.puts ''
+        $stderr.puts "Error(#{configfile}) #{ae.message}"
         return false
       end
 
 
       cp.unused().each do |path|
-        puts "Warning(#{configfile}) Unused field '#{path}'"
+        $stderr.puts "Warning(#{configfile}) Unused field '#{path}'"
       end
 
       return true
@@ -1384,17 +1197,17 @@ module ConfigInformation
       configfile = COMMANDS_FILE
       begin
         config = YAML.load_file(configfile)
-      rescue ArgumentError
-        puts "Invalid YAML file '#{configfile}'"
-        return false
       rescue Errno::ENOENT
         return true
+      rescue Exception
+        $stderr.puts "Invalid YAML file '#{configfile}'"
+        return false
       end
 
       return true unless config
 
       unless config.is_a?(Hash)
-        puts "Invalid file format '#{configfile}'"
+        $stderr.puts "Invalid file format '#{configfile}'"
         return false
       end
 
@@ -1406,12 +1219,12 @@ module ConfigInformation
             if (node.cmd.instance_variable_defined?("@#{kind}")) then
               node.cmd.instance_variable_set("@#{kind}", val)
             else
-              puts "Unknown command kind: #{kind}"
+              $stderr.puts "Unknown command kind: #{kind}"
               return false
             end
           end
         else
-          puts "The node #{nodename} does not exist"
+          $stderr.puts "The node #{nodename} does not exist"
           return false
         end
       end
@@ -1475,7 +1288,7 @@ module ConfigInformation
         cmd.power_status = replace_hostname(@cluster_specific[cluster].cmd_power_status, hostname)
         return cmd
       else
-        puts "Missing specific config file for the cluster #{cluster}"
+        $stderr.puts "Missing specific config file for the cluster #{cluster}"
         raise
       end
     end
@@ -1525,547 +1338,10 @@ module ConfigInformation
       return true
     end
 
-    # Load an environment description file
-    #
-    # Arguments
-    # * srcfile: the path to the file (URI, unix path)
-    # Output
-    # * return String in case of success, false otherwise
-    def self.load_envfile(srcfile)
-      tmpfile = Tempfile.new("env_file")
-      begin
-        Managers::Fetch[srcfile,KadeployAsyncError::LOAD_ENV_FROM_FILE_ERROR].grab(tmpfile.path)
-        tmpfile.close
-      rescue KadeployError => ke
-        msg = KadeployError.to_msg(ke.errno) || ''
-        msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
-        msg += ke.message if ke.message and !ke.message.empty?
-        error(msg)
-        tmpfile.unlink
-        return false
-      end
-
-      unless `file --mime-type --brief #{tmpfile.path}`.chomp == "text/plain"
-        error("The file #{srcfile} should be in plain text format")
-        tmpfile.unlink
-        return false
-      end
-
-      begin
-        ret = YAML.load_file(tmpfile.path)
-      rescue ArgumentError
-        error("Invalid YAML file '#{srcfile}'")
-        tmpfile.unlink
-        ret = nil
-      rescue Errno::ENOENT
-        error("File not found '#{srcfile}'")
-        tmpfile.unlink
-        ret = nil
-      end
-
-      tmpfile.unlink
-      return ret
-    end
-
-
 
 ##################################
-#       Kadeploy specific        #
 ##################################
 
-    def Config.check_macrostep_interface(name)
-      macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-        klass.superclass == Macrostep
-      }
-      return macrointerfaces.include?(name)
-    end
-
-    def Config.check_macrostep_instance(name)
-      # Gathering a list of availables macrosteps
-      macrosteps = ObjectSpace.each_object(Class).select { |klass|
-        klass.ancestors.include?(Macrostep)
-      }
-
-      # Do not consider rought step names as valid
-      macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-        klass.superclass == Macrostep
-      }
-      macrointerfaces.each { |interface| macrosteps.delete(interface) }
-
-      macrosteps.collect!{ |klass| klass.name }
-
-      return macrosteps.include?(name)
-    end
-
-    def Config.check_microstep(name)
-      # Gathering a list of availables microsteps
-      microsteps = Microstep.instance_methods.select{
-        |microname| microname =~ /^ms_/
-      }
-      microsteps.collect!{ |microname| microname.to_s.sub(/^ms_/,'') }
-
-      return microsteps.include?(name)
-    end
-
-    def Config.load_custom_ops_file(exec_specific,file)
-      if not File.readable?(file) then
-        error("The file #{file} cannot be read")
-        return false
-      end
-      exec_specific.custom_operations_file = file
-
-      begin
-        config = YAML.load_file(file)
-      rescue ArgumentError
-        puts "Invalid YAML file '#{file}'"
-        return false
-      rescue Errno::ENOENT
-        return true
-      end
-
-      unless config.is_a?(Hash)
-        puts "Invalid file format '#{file}'"
-        return false
-      end
-      #example of line: macro_step,microstep@cmd1%arg%dir,cmd2%arg%dir,...,cmdN%arg%dir
-      exec_specific.custom_operations = { :operations => {}, :overrides => {}}
-      customops = exec_specific.custom_operations[:operations]
-      customover = exec_specific.custom_operations[:overrides]
-
-      config.each_pair do |macro,micros|
-        unless micros.is_a?(Hash)
-          puts "Invalid file format '#{file}'"
-          return false
-        end
-        unless check_macrostep_instance(macro)
-          error("[#{file}] Invalid macrostep '#{macro}'")
-          return false
-        end
-        customops[macro.to_sym] = {} unless customops[macro.to_sym]
-        micros.each_pair do |micro,operations|
-          unless operations.is_a?(Hash)
-            puts "Invalid file format '#{file}'"
-            return false
-          end
-          unless check_microstep(micro)
-            error("[#{file}] Invalid microstep '#{micro}'")
-            return false
-          end
-          customops[macro.to_sym][micro.to_sym] = [] unless customops[macro.to_sym][micro.to_sym]
-          operations.each_pair do |operation,ops|
-            unless ['pre-ops','post-ops','substitute','override'].include?(operation)
-              error("[#{file}] Invalid operation '#{operation}'")
-              return false
-            end
-
-            if operation == 'override'
-              customover[macro.to_sym] = {} unless customover[macro.to_sym]
-              customover[macro.to_sym][micro.to_sym] = true
-              next
-            end
-
-            ops.each do |op|
-              unless op['name']
-                error("[#{file}] Operation #{operation}: 'name' field missing")
-                return false
-              end
-              unless op['action']
-                error("[#{file}] Operation #{operation}: 'action' field missing")
-                return false
-              end
-              unless ['exec','send','run'].include?(op['action'])
-                error("[#{file}] Invalid action '#{op['action']}'")
-                return false
-              end
-
-              scattering = op['scattering'] || 'tree'
-              timeout = op['timeout'] || 0
-              begin
-                timeout = Integer(timeout)
-              rescue ArgumentError
-                error("[#{file}] The field 'timeout' shoud be an integer")
-                return false
-              end
-              retries = op['retries'] || 0
-              begin
-                retries = Integer(retries)
-              rescue ArgumentError
-                error("[#{file}] The field 'retries' shoud be an integer")
-                return false
-              end
-
-              case op['action']
-              when 'send'
-                unless op['file']
-                  error("[#{file}] Operation #{operation}: 'file' field missing")
-                  return false
-                end
-                unless op['destination']
-                  error("[#{file}] Operation #{operation}: 'destination' field missing")
-                  return false
-                end
-                customops[macro.to_sym][micro.to_sym] << {
-                  :action => op['action'].to_sym,
-                  :name => "#{micro}-#{op['name']}",
-                  :file => op['file'],
-                  :destination => op['destination'],
-                  :timeout => timeout,
-                  :retries => retries,
-                  :scattering => scattering.to_sym,
-                  :target => operation.to_sym
-                }
-              when 'run'
-                unless op['file']
-                  error("[#{file}] Operation #{operation}: 'file' field missing")
-                  return false
-                end
-                op['params'] = '' unless op['params']
-                customops[macro.to_sym][micro.to_sym] << {
-                  :action => op['action'].to_sym,
-                  :name => "#{micro}-#{op['name']}",
-                  :file => op['file'],
-                  :params => op['params'],
-                  :timeout => timeout,
-                  :retries => retries,
-                  :scattering => scattering.to_sym,
-                  :target => operation.to_sym
-                }
-              when 'exec'
-                unless op['command']
-                  error("[#{file}] Operation #{operation}: 'command' field missing")
-                  return false
-                end
-                customops[macro.to_sym][micro.to_sym] << {
-                  :action => op['action'].to_sym,
-                  :name => "#{micro}-#{op['name']}",
-                  :command => op['command'],
-                  :timeout => timeout,
-                  :retries => retries,
-                  :scattering => scattering.to_sym,
-                  :target => operation.to_sym
-                }
-              end
-            end
-          end
-        end
-      end
-      return true
-    end
-
-    # Load the command-line options of kadeploy
-    #
-    # Arguments
-    # * exec_specific: open struct that contains some execution specific stuffs (modified)
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_kadeploy_cmdline_options(exec_specific)
-      opts = OptionParser::new do |opt|
-        opt.summary_indent = "  "
-        opt.summary_width = 32
-        opt.banner = "Usage: kadeploy3 [options]"
-        opt.separator "Contact: #{CONTACT_EMAIL}"
-        opt.separator ""
-        opt.separator "General options:"
-        opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
-          if tmp = load_envfile(f)
-            exec_specific.load_env_file = f
-            exec_specific.load_env_desc = tmp
-            exec_specific.load_env_kind = "file"
-          else
-            return false
-          end
-        }
-        opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
-          if /\A[\w\/]+\Z/ =~ b then
-            exec_specific.block_device = b
-            exec_specific.deploy_part = nil if exec_specific.deploy_part.empty?
-          else
-            error("Invalid block device")
-            return false
-          end
-        }
-        opt.on("-c", "--boot-partition NUMBER", "Specify the number of the partition to boot on (use 0 to boot on the MBR)") { |c|
-          if /\A\d+\Z/ =~ c then
-            exec_specific.boot_part = c.to_i
-          else
-            error("Invalid chainload partition number")
-            return false
-          end
-        }
-        opt.on("-d", "--debug-mode", "Activate the debug mode") {
-          exec_specific.debug = true
-        }
-        opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment to deploy") { |n|
-          exec_specific.load_env_kind = "db"
-          exec_specific.load_env_desc = n
-        }
-        opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-          return false unless load_machinelist(exec_specific.node_array, f)
-        }
-        opt.on("-i", "--server-info", "Get information about the server's configuration") {
-          exec_specific.get_users_info = true
-        }
-        opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
-          if (f != nil) then
-            if (f =~ R_HTTP) then
-              exec_specific.key = f
-            else
-              if not File.readable?(f) then
-                error("The file #{f} cannot be read")
-                return false
-              else
-                exec_specific.key = File.expand_path(f)
-              end
-            end
-          else
-            authorized_keys = File.expand_path("~/.ssh/authorized_keys")
-            if File.readable?(authorized_keys) then
-              exec_specific.key = authorized_keys
-            else
-              error("The authorized_keys file #{authorized_keys} cannot be read")
-              return false
-            end
-          end
-        }
-        opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
-          return false unless load_machine(exec_specific.node_array, hostname)
-        }
-        opt.on("--multi-server", "Activate the multi-server mode") {
-          exec_specific.multi_server = true
-        }
-        opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
-          exec_specific.nodes_ko_file = f
-        }
-        opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly deployed")  { |f|
-          exec_specific.nodes_ok_file = f
-        }
-        opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
-          if /\A\d+\Z/ =~ p then
-            exec_specific.deploy_part = p
-          else
-            error("Invalid partition number")
-            return false
-          end
-        }
-        opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (this filesystem need to be supported by the deployment environment)") { |t|
-          exec_specific.reformat_tmp = true
-          exec_specific.reformat_tmp_fstype = t
-        }
-        opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            if not File.stat(f).executable? then
-              error("The file #{f} must be executable to be run at the end of the deployment")
-              return false
-            else
-              exec_specific.script = File.expand_path(f)
-            end
-          end
-        }
-        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A\w+\Z/ =~ u then
-            exec_specific.user = u
-          else
-            error("Invalid user name")
-            return false
-          end
-        }
-        opt.on("-v", "--version", "Get the version") {
-          exec_specific.get_version = true
-        }
-        opt.on("--vlan VLANID", "Set the VLAN") { |id|
-          exec_specific.vlan = id
-        }
-        opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            IO.readlines(f).each { |l|
-              exec_specific.pxe_profile_msg.concat(l)
-            }
-          end
-        }
-        opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
-          if not File.readable?(f) then
-            error("The file #{f} cannot be read")
-            return false
-          else
-            exec_specific.pxe_profile_singularities = Hash.new
-            IO.readlines(f).each { |l|
-              if !(/^#/ =~ l) and !(/^$/ =~ l) then #we ignore commented and empty lines
-                content = l.split(",")
-                exec_specific.pxe_profile_singularities[content[0]] = content[1].strip
-              end
-            }
-          end
-        }
-        opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |l|
-          l.split(",").each { |file|
-            if (file =~ R_HTTP) then
-              exec_specific.pxe_upload_files.push(file) 
-            else
-              f = File.expand_path(file)
-              if not File.readable?(f) then
-                error("The file #{f} cannot be read")
-                return false
-              else
-                exec_specific.pxe_upload_files.push(f) 
-              end
-            end
-          }
-        }
-        opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
-          if /\A\d+\Z/ =~ n then
-            exec_specific.env_version = n
-          else
-            error("Invalid version number")
-            return false
-          end
-        }
-        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
-          exec_specific.chosen_server = s
-        } 
-        opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
-          if d =~ /\A\d+\Z/ then
-            exec_specific.verbose_level = d.to_i
-          else
-            error("Invalid verbose level")
-            return false
-          end
-        }
-        opt.separator "Advanced options:"
-        opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |file|
-          exec_specific.write_workflow_id = file
-        }
-        opt.on("--ignore-nodes-deploying", "Allow to deploy even on the nodes tagged as \"currently deploying\" (use this only if you know what you do)") {
-          exec_specific.ignore_nodes_deploying = true
-        }        
-        opt.on("--disable-bootloader-install", "Disable the automatic installation of a bootloader for a Linux based environnment") {
-          exec_specific.disable_bootloader_install = true
-        }
-        opt.on("--disable-disk-partitioning", "Disable the disk partitioning") {
-          exec_specific.disable_disk_partitioning = true
-        }
-        opt.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
-          tmp = m.split(':',2)
-          if check_macrostep_instance(tmp[0])
-            if check_microstep(tmp[1])
-              exec_specific.breakpoint_on_microstep = m
-            else
-              error("The microstep #{tmp[1]} for the breakpoint entry is invalid")
-              return false
-            end
-          else
-            error("The macrostep #{tmp[0]} for the breakpoint entry is invalid")
-            return false
-          end
-        }
-        opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
-          return false unless Config.load_custom_ops_file(exec_specific,file)
-        }
-        opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
-          if (t =~ /\A\d+\Z/) then
-            exec_specific.reboot_classical_timeout = t
-          else
-            error("A number is required for the reboot classical timeout")
-          end
-        }
-        opt.on("--reboot-kexec-timeout V", "Overload the default timeout for kexec reboots") { |t|
-          if (t =~ /\A\d+\Z/) then
-            exec_specific.reboot_kexec_timeout = t
-          else
-            error("A number is required for the reboot kexec timeout")
-          end
-        }
-        opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
-          # Gathering a list of availables microsteps
-          microsteps = Microstep.instance_methods.select{
-            |name| name =~ /^ms_/
-          }
-          microsteps.collect!{ |name| name.to_s.sub(/^ms_/,'') }
-
-          # Gathering a list of availables macrosteps
-          macrosteps = ObjectSpace.each_object(Class).select { |klass|
-            klass.ancestors.include?(Macrostep)
-          }
-          macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-            klass.superclass == Macrostep
-          }
-          # Do not consider rought step names as valid
-          macrointerfaces.each { |interface| macrosteps.delete(interface) }
-          macrointerfaces.collect! { |klass| klass.name }
-          macrosteps.collect!{ |klass| klass.name }
-
-          s.split("&").each { |macrostep|
-            macroname = macrostep.split("|")[0]
-            unless macrointerfaces.include?(macroname)
-              error("Invalid macrostep kind '#{macroname}'")
-              return false
-            end
-            instances = macrostep.split("|")[1]
-            insts = []
-
-            instances.split(",").each { |instance|
-              inst_name = instance.split(":")[0]
-              unless macrosteps.include?(inst_name)
-                error("Invalid macrostep instance '#{inst_name}'")
-                return false
-              end
-              inst_retries = instance.split(":")[1]
-              begin
-                inst_retries = Integer(inst_retries)
-              rescue ArgumentError
-                error("The number of retries '#{inst_retries}' is not an integer")
-                return false
-              end
-              inst_timeout = instance.split(":")[2]
-              begin
-                inst_timeout = Integer(inst_timeout)
-              rescue ArgumentError
-                error("The timeout '#{inst_timeout}' is not an integer")
-                return false
-              end
-
-              insts << [inst_name, inst_retries, inst_timeout]
-            }
-            exec_specific.steps.push(MacroStep.new(macroname, insts))
-          }
-        }
-      end
-      @opts = opts
-      begin
-        opts.parse!(ARGV)
-      rescue
-        error("Option parsing error: #{$!}")
-        return false
-      end
-
-      if (exec_specific.chosen_server != "") then
-        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
-          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
-          return false
-        end
-      else
-        exec_specific.chosen_server = exec_specific.servers["default"]
-      end
-      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
-
-      if not exec_specific.get_version and not exec_specific.get_users_info then
-        if exec_specific.node_array.empty? then
-          error("You must specify some nodes to deploy")
-          return false
-        end
-        if (exec_specific.nodes_ok_file != "") && (exec_specific.nodes_ok_file == exec_specific.nodes_ko_file) then
-          error("The files used for the output of the OK and the KO nodes must not be the same")
-          return false
-        end
-      end
-      return true
-    end
 
     # Add a node involved in the deployment to the exec_specific.node_set
     #
@@ -2089,372 +1365,6 @@ module ConfigInformation
           return false
         end
       }
-      return true
-    end
-    
- 
-##################################
-#         Kaenv specific         #
-##################################
-
-    # Load the kaenv specific stuffs
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_kaenv_exec_specific()
-      exec_specific = OpenStruct.new
-      exec_specific.environment = EnvironmentManagement::Environment.new
-      exec_specific.operation = String.new
-      exec_specific.env_desc = String.new
-      exec_specific.env_name = String.new
-      exec_specific.user = nil
-      exec_specific.true_user = USER #By default, we use the current user
-      exec_specific.visibility_tag = String.new
-      exec_specific.show_all_version = false
-      exec_specific.version = nil
-      exec_specific.files_to_move = Array.new
-      exec_specific.get_version = false
-      exec_specific.chosen_server = String.new
-      exec_specific.servers = Config.load_client_config_file
-      exec_specific.kadeploy_server = String.new
-      exec_specific.kadeploy_server_port = String.new
-
-      if Config.load_kaenv_cmdline_options(exec_specific) then
-        return exec_specific
-      else
-        return nil
-      end
-    end
-
-    # Load the command-line options of kaenv
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_kaenv_cmdline_options(exec_specific)
-      opts = OptionParser::new do |opt|
-        opt.summary_indent = "  "
-        opt.summary_width = 38
-        opt.banner = "Usage: kaenv3 [options]"
-        opt.separator "Contact: #{CONTACT_EMAIL}"
-        opt.separator ""
-        opt.separator "General options:"
-        opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
-          if tmp = load_envfile(f)
-            exec_specific.load_env_desc = tmp
-            exec_specific.load_env_file = f
-            exec_specific.operation = "add"
-          else
-            return false
-          end
-        }
-        opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "delete"
-        }  
-        opt.on("-l", "--list", "List environments") {
-          exec_specific.operation = "list"
-        }
-        opt.on("-m", "--files-to-move FILES", "Files to move (src1:dst1,src2:dst2,...)") { |f|
-          if /\A.+:.+(,.+:.+)*\Z/ =~f then
-            f.split(",").each { |src_dst|
-              exec_specific.files_to_move.push({"src"=>src_dst.split(":")[0],"dest"=>src_dst.split(":")[1]})
-            }
-          else
-            error("Invalid synthax for files to move")
-            return false
-          end
-        }
-        opt.on("-p", "--print ENVNAME", "Print an environment") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "print"
-        }        
-        opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
-          exec_specific.show_all_version = true
-        }
-        opt.on("-t", "--visibility-tag TAG", "Set the visibility tag (private, shared, public)") { |v|
-          if /\A(private|shared|public)\Z/ =~ v then
-            exec_specific.visibility_tag = v
-          else
-            error("Invalid visibility tag")
-          end
-        }
-        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A(\w+|\*)\Z/ =~ u then
-            exec_specific.user = u
-          else
-            error("Invalid user name")
-            return false
-          end
-        }
-        opt.on("-v", "--version", "Get the version") {
-          exec_specific.get_version = true
-        }
-        opt.on("--env-version NUMBER", "Specify the version") { |v|
-          if /\A\d+\Z/ =~ v then
-            exec_specific.version = v
-          else
-            error("Invalid version number")
-            return false
-          end
-        }
-        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
-          exec_specific.chosen_server = s
-        } 
-        opt.separator "Advanced options:"
-        opt.on("--remove-demolishing-tag ENVNAME", "Remove demolishing tag on an environment") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "remove-demolishing-tag"
-        }
-        opt.on("--set-visibility-tag ENVNAME", "Set the visibility tag on an environment") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "set-visibility-tag"
-        }
-        opt.on("--update-image-md5 ENVNAME", "Update the MD5 of the environment image") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "update-tarball-md5"
-        }
-        opt.on("--update-preinstall-md5 ENVNAME", "Update the MD5 of the environment preinstall") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "update-preinstall-md5"
-        }
-        opt.on("--update-postinstalls-md5 ENVNAME", "Update the MD5 of the environment postinstalls") { |n|
-          exec_specific.env_name = n
-          exec_specific.operation = "update-postinstalls-md5"
-        }
-        opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
-          exec_specific.operation = "move-files"
-        }
-=begin
-        opt.on("", "--migrate ENVFILE", "Convert an old environment description file to the new format (3.1.7)") { |f|
-          if tmp = load_envfile(f)
-            exec_specific.load_env_desc = tmp
-            exec_specific.load_env_file = f
-            exec_specific.operation = "migrate"
-          else
-            return false
-          end
-        }
-=end
-      end
-      @opts = opts
-      begin
-        opts.parse!(ARGV)
-      rescue
-        error("Option parsing error: #{$!}")
-        return false
-      end
-
-      if (exec_specific.chosen_server != "") then
-        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
-          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
-          return false
-        end
-      else
-        exec_specific.chosen_server = exec_specific.servers["default"]
-      end
-      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
-
-      return true if exec_specific.get_version
-      case exec_specific.operation 
-      when "add"
-        if (exec_specific.load_env_desc == "") then
-          error("You must choose a file that contains the environment description")
-          return false
-        end
-      when "delete"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-      when "list"
-      when "print"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-      when "update-tarball-md5"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-      when "update-preinstall-md5"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-      when "update-postinstalls-md5"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-      when "remove-demolishing-tag"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-      when "set-visibility-tag"
-        if (exec_specific.env_name == "") then
-          error("You must choose an environment")
-          return false
-        end
-        if (exec_specific.version == "") then
-          error("You must choose a version")
-          return false
-        end
-        if (exec_specific.visibility_tag == "") then
-          error("You must define the visibility value")
-          return false          
-        end
-      when "move-files"
-        if (exec_specific.files_to_move.empty?) then
-          error("You must define some files to move")
-          return false          
-        end
-      when "migrate"
-        if (exec_specific.load_env_desc == "") then
-          error("You must choose a file that contains the environment description")
-          return false
-        end
-      else
-        error("You must choose an operation")
-        return false
-      end
-
-      return true
-    end
-
-
-##################################
-#       Karights specific        #
-##################################
-
-    # Load the karights specific stuffs
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_karights_exec_specific()
-      exec_specific = OpenStruct.new
-      exec_specific.operation = String.new
-      exec_specific.user = String.new
-      exec_specific.part_list = Array.new
-      exec_specific.node_list = Array.new
-      exec_specific.true_user = USER
-      exec_specific.overwrite_existing_rights = false
-      exec_specific.get_version = false
-      exec_specific.chosen_server = String.new
-      exec_specific.servers = Config.load_client_config_file
-      exec_specific.kadeploy_server = String.new
-      exec_specific.kadeploy_server_port = String.new
-
-      if Config.load_karights_cmdline_options(exec_specific) then
-        return exec_specific
-      else
-        return nil
-      end
-    end
-
-    # Load the command-line options of karights
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_karights_cmdline_options(exec_specific)
-      opts = OptionParser::new do |opt|
-        opt.summary_indent = "  "
-        opt.summary_width = 28
-        opt.banner = "Usage: karights3 [options]"
-        opt.separator "Contact: #{CONTACT_EMAIL}"
-        opt.separator ""
-        opt.separator "General options:"
-        opt.on("-a", "--add", "Add some rights to a user") {
-          exec_specific.operation = "add"
-        }
-        opt.on("-d", "--delete", "Delete some rights to a user") {
-          exec_specific.operation = "delete"
-        }
-        opt.on("-f", "--file FILE", "Machine file (- means stdin)")  { |f|
-          return false unless load_machinelist(exec_specific.node_list, f)
-        }
-        opt.on("-m", "--machine MACHINE", "Include the machine in the operation") { |hostname|
-          hostname.strip!
-          if hostname == "*"
-            exec_specific.node_list.push(hostname)
-          else
-            return false unless load_machine(exec_specific.node_list, hostname)
-          end
-        }
-        opt.on("-o", "--overwrite-rights", "Overwrite existing rights") {
-          exec_specific.overwrite_existing_rights = true
-        }        
-        opt.on("-p", "--part PARTNAME", "Include the partition in the operation") { |p|
-          exec_specific.part_list.push(p)
-        }        
-        opt.on("-s", "--show-rights", "Show the rights for a given user") {
-          exec_specific.operation = "show"
-        }
-        opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-          if /\A\w+\Z/ =~ u then
-            exec_specific.user = u
-          else
-            error("Invalid user name")
-            return false
-          end
-        }
-        opt.on("-v", "--version", "Get the version") {
-          exec_specific.get_version = true
-        }
-        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
-          exec_specific.chosen_server = s
-        }
-      end
-      @opts = opts
-      begin
-        opts.parse!(ARGV)
-      rescue 
-        error("Option parsing error: #{$!}")
-        return false
-      end
-
-      if (exec_specific.chosen_server != "") then
-        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
-          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
-          return false
-        end
-      else
-        exec_specific.chosen_server = exec_specific.servers["default"]
-      end
-      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
-
-      return true if exec_specific.get_version
-      if (exec_specific.operation == "") then
-        error("You must choose an operation")
-        return false
-      end
-      if (exec_specific.user == "") then
-        error("You must choose a user")
-        return false
-      end
-
-      if (exec_specific.operation == "add") || (exec_specific.operation  == "delete") then
-        if (exec_specific.part_list.empty?) then
-          error("You must specify at least one partition")
-          return false
-        end
-        if (exec_specific.node_list.empty?) then
-          error("You must specify at least one node")
-          return false
-        end
-      end
-
       return true
     end
 
@@ -2627,96 +1537,6 @@ module ConfigInformation
     end
 
 ##################################
-#       Kanodes specific         #
-##################################
-
-    # Load the kanodes specific stuffs
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_kanodes_exec_specific()
-      exec_specific = OpenStruct.new
-      exec_specific.operation = String.new
-      exec_specific.node_list = Array.new
-      exec_specific.wid = String.new
-      exec_specific.get_version = false
-      exec_specific.chosen_server = String.new
-      exec_specific.servers = Config.load_client_config_file
-      exec_specific.kadeploy_server = String.new
-      exec_specific.kadeploy_server_port = String.new
-
-      if Config.load_kanodes_cmdline_options(exec_specific) then
-        return exec_specific
-      else
-        return nil
-      end
-    end
-
-    # Load the command-line options of kanodes
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true in case of success, false otherwise
-    def Config.load_kanodes_cmdline_options(exec_specific)
-      opts = OptionParser::new do |opt|
-        opt.summary_indent = "  "
-        opt.summary_width = 28
-        opt.banner = "Usage: kanodes3 [options]"
-        opt.separator "Contact: #{CONTACT_EMAIL}"
-        opt.separator ""
-        opt.separator "General options:"
-        opt.on("-d", "--get-deploy-state", "Get the deploy state of the nodes") {
-          exec_specific.operation = "get_deploy_state"
-        }
-        opt.on("-f", "--file MACHINELIST", "Only print information about the given machines (- means stdin)")  { |f|
-          return false unless load_machinelist(exec_specific.node_list, f)
-        }
-        opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |hostname|
-          return false unless load_machine(exec_specific.node_list, hostname)
-        }
-        opt.on("-v", "--version", "Get the version") {
-          exec_specific.get_version = true
-        }
-        opt.on("-w", "--workflow-id WID", "Specify a workflow id (this is use with the get_yaml_dump operation. If no wid is specified, the information of all the running worklfows will be dumped") { |w|
-          exec_specific.wid = w
-        }
-        opt.on("-y", "--get-yaml-dump", "Get the yaml dump") {
-          exec_specific.operation = "get_yaml_dump"
-        }
-        opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
-          exec_specific.chosen_server = s
-        }
-      end
-      @opts = opts
-      begin
-        opts.parse!(ARGV)
-      rescue 
-        error("Option parsing error: #{$!}")
-        return false
-      end
-
-      if (exec_specific.chosen_server != "") then
-        if not exec_specific.servers.has_key?(exec_specific.chosen_server) then
-          error("The #{exec_specific.chosen_server} server is not defined in the configuration: #{(exec_specific.servers.keys - ["default"]).join(", ")} values are allowed")
-          return false
-        end
-      else
-        exec_specific.chosen_server = exec_specific.servers["default"]
-      end
-      exec_specific.kadeploy_server = exec_specific.servers[exec_specific.chosen_server][0]
-      exec_specific.kadeploy_server_port = exec_specific.servers[exec_specific.chosen_server][1]
-
-      if ((exec_specific.operation == "") && (not exec_specific.get_version)) then
-        error("You must choose an operation")
-        return false
-      end
-      return true
-    end
-
-##################################
 #       Kareboot specific        #
 ##################################
 
@@ -2789,7 +1609,7 @@ module ConfigInformation
             return false
           end
         }
-        opt.on("-c", "--check-demolishing-tag", "Check if some nodes was deployed with an environment that have the demolishing tag") {
+        opt.on("-c", "--check-destructive-tag", "Check if some nodes was deployed with an environment that have the destructive tag") {
           exec_specific.check_demolishing = true
         }
         opt.on("-d", "--debug-mode", "Activate the debug mode") {
@@ -3234,6 +2054,7 @@ module ConfigInformation
     attr_accessor :cache
     attr_accessor :verbose_level
     attr_accessor :pxe
+    attr_accessor :auth
     attr_accessor :db_kind
     attr_accessor :deploy_db_host
     attr_accessor :deploy_db_name
@@ -3258,8 +2079,8 @@ module ConfigInformation
     attr_accessor :log_to_file
     attr_accessor :log_to_syslog
     attr_accessor :log_to_db
-    attr_accessor :dbg_to_syslog
-    attr_accessor :dbg_to_syslog_level
+    attr_accessor :dbg_to_file
+    attr_accessor :dbg_to_file_level
     attr_accessor :reboot_window
     attr_accessor :reboot_window_sleep_time
     attr_accessor :nodes_check_window
@@ -3276,6 +2097,10 @@ module ConfigInformation
     attr_accessor :vlan_hostname_suffix
     attr_accessor :set_vlan_cmd
     attr_accessor :kastafior
+    attr_accessor :secure_client
+    attr_accessor :secure_server
+    attr_accessor :cert
+    attr_accessor :private_key
 
     # Constructor of CommonConfig
     #
@@ -3287,6 +2112,7 @@ module ConfigInformation
       @nodes_desc = Nodes::NodeSet.new
       @cache = {}
       @pxe = {}
+      @auth = {}
     end
   end
 
@@ -3337,49 +2163,17 @@ module ConfigInformation
     # Arguments
     # * nothing
     # Output
-    # * nothing        
+    # * nothing
     def initialize
-      @name = nil
       @workflow_steps = Array.new
-      @deploy_kernel = nil
       @deploy_kernel_args = ""
-      @deploy_initrd = nil
       @deploy_supported_fs = []
       @kexec_repository = '/tmp/karepository'
-      @block_device = nil
-      @deploy_part = nil
-      @prod_part = nil
-      @tmp_part = nil
-      @swap_part = nil
-      @timeout_reboot_classical = nil
-      @timeout_reboot_kexec = nil
-      @cmd_soft_reboot = nil
-      @cmd_hard_reboot = nil
-      @cmd_very_hard_reboot = nil
-      @cmd_console = nil
-      @cmd_soft_power_on = nil
-      @cmd_hard_power_on = nil
-      @cmd_very_hard_power_on = nil
-      @cmd_soft_power_off = nil
-      @cmd_hard_power_off = nil
-      @cmd_very_hard_power_off = nil
-      @cmd_power_status = nil
-      @cmd_sendenv = nil
-      @decompress_environment = false
       @group_of_nodes = Hash.new
-      @drivers = nil
       @pxe_header = {}
-      @kernel_params = nil
-      @nfsroot_kernel = nil
-      @nfsroot_params = nil
-      @admin_pre_install = nil
-      @admin_post_install = nil
-      @partitioning_script = nil
-      @bootloader_script = nil
-      @prefix = nil
       @use_ip_to_deploy = false
     end
-    
+
 
     # Duplicate a ClusterSpecificConfig instance but the workflow steps
     #

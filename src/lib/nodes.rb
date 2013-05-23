@@ -1,7 +1,3 @@
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
 require 'drb/drb'
 require 'thread'
@@ -10,6 +6,42 @@ module Nodes
   REGEXP_LIST = /(?:(?:(?:\d+\-\d+|\d+),)*)(?:\d+\-\d+|\d+)/
   REGEXP_NODELIST = /\A([A-Za-z0-9\.\-]+\[#{REGEXP_LIST.source}\][A-Za-z0-9\.\-]*)\Z/
   REGEXP_IPLIST = /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[#{REGEXP_LIST.source}\])\Z/
+
+  def self.get_states(db,nodes)
+    where = nil
+    args = nil
+    if nodes
+      where = "(#{(["(hostname = ?)"] * nodes.size).join(' OR ')})"
+      args = nodes
+    else
+      where = ''
+      args = []
+    end
+
+    query = "SELECT nodes.hostname, nodes.state, nodes.user, environments.name as env_name, environments.version as env_version, environments.user as env_user \
+     FROM nodes \
+     LEFT JOIN environments ON nodes.env_id = environments.id"
+    #If no node list is given, we print everything
+    query += " WHERE #{where}" unless where.empty?
+    query += " ORDER BY nodes.hostname"
+
+    res = db.run_query(query,*args).to_hash
+    ret = {}
+    res.each do |node|
+      hostname = node['hostname']
+      node.delete('hostname')
+      node['environment'] = {}
+      node.each_pair do |k,v|
+        if k =~ /^env_(.*)$/
+          node['environment'][Regexp.last_match(1)] = v
+          node.delete(k)
+        end
+      end
+      ret[hostname] = node
+    end
+    ret
+  end
+
   class NodeCmd
     attr_accessor :reboot_soft
     attr_accessor :reboot_hard
@@ -974,6 +1006,29 @@ module Nodes
       end
       nodelist = "(#{(["#{field} = ?"] * ret.size).join(sep)})"
       return [ ret, nodelist ]
+    end
+  end
+
+  class NodeState
+    attr_accessor :states
+    def initialize()
+      @states = {}
+    end
+
+    def free()
+      @states.clear if @states
+      @states = nil
+    end
+
+    def set(hostname, macro='', micro='', state='')
+      @states[hostname] = {} unless @states[hostname]
+      @states[hostname][:macro] = macro if !macro.empty?
+      @states[hostname][:micro] = micro if !micro.empty?
+      @states[hostname][:state] = state if !state.empty?
+    end
+
+    def get(hostname)
+      @states[hostname]
     end
   end
 end
