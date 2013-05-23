@@ -1,26 +1,447 @@
-#!/bin/bash
+#!/usr/bin/ruby -w
 
 # Kadeploy 3.1
 # Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
-if [ -x /etc/kadeploy3/load_kadeploy_env ] && [ -z "${KADEPLOY_CONFIG_DIR}" ]
-then
-    KADEPLOY_CONFIG_DIR=/etc/kadeploy3
-    export KADEPLOY_CONFIG_DIR
-elif [ ! -x $KADEPLOY_CONFIG_DIR/load_kadeploy_env ]
-then
-    echo "The Kadeploy environment cannot be loaded, please check your configuration"
-    exit 1
-fi
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
 
-source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
+$:.unshift($kadeploy_libs)
 
-# Load the normal or async client
-if [[ " $@" == *" --async "* ]] || [[ "$@" == *" --async" ]]
-then
-  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_client_async.rb "${@//--async}"
-else
-  ruby $KADEPLOY_INSTALL_DIR/src/kadeploy_client.rb "$@"
-fi
+require 'optparse'
+require 'client'
+require 'nodes'
+
+API_DIR = '/deploy'
+SLEEP_PITCH = 1
+
+Signal.trap("INT") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  KadeployClient.kill() rescue nil
+  exit!(1)
+end
+
+class KadeployClient < Client
+  def self.operation()
+    'Deployment'
+  end
+
+  def self.load_options()
+    {
+      :environment => {},
+      :nodes => Array.new,
+      :env_kind => String.new,
+      :env_desc => String.new,
+      :env_name => String.new,
+      :env_version => nil, #By default we load the latest version
+      :user => nil,
+      :true_user => USER,
+      :block_device => nil,
+      :deploy_part => nil,
+      :boot_part => nil,
+      :verbose_level => nil,
+      :debug => false,
+      :script => String.new,
+      :key => String.new,
+      :reformat_tmp => false,
+      :pxe_profile_msg => String.new,
+      :pxe_upload_files => Array.new,
+      :pxe_profile_singularities => nil,
+      :steps => Array.new,
+      :ignore_nodes_deploying => false,
+      :breakpoint_on_microstep => String.new,
+      :custom_operations_file => String.new,
+      :custom_operations => nil,
+      :disable_bootloader_install => false,
+      :disable_disk_partitioning => false,
+      :nodes_ok_file => String.new,
+      :nodes_ko_file => String.new,
+      :write_workflow_id => String.new,
+      :get_version => false,
+      :get_users_info => false,
+      :chosen_server => String.new,
+      :servers => load_configfile(),
+      :multi_server => false,
+      :kadeploy_server => String.new,
+      :kadeploy_server_port => String.new,
+      :reboot_classical_timeout => nil,
+      :reboot_kexec_timeout => nil,
+      :vlan => nil,
+      :secure => false,
+    }
+  end
+
+  def self.parse_options()
+    options = load_options()
+    opts = OptionParser::new do |opt|
+      opt.summary_indent = "  "
+      opt.summary_width = 32
+      opt.banner = "Usage: kadeploy3 [options]"
+      opt.separator "Contact: #{CONTACT_EMAIL}"
+      opt.separator ""
+      opt.separator "General options:"
+      opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
+        if tmp = load_envfile(f)
+          options[:env_desc] = tmp
+          options[:env_kind] = :anonymous
+        else
+          return false
+        end
+      }
+      opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
+        if /\A[\w\/]+\Z/ =~ b then
+          options[:block_device] = b
+          options[:deploy_part] = '' unless options[:deploy_part]
+        else
+          error("Invalid block device")
+          return false
+        end
+      }
+      opt.on("-c", "--boot-partition NUMBER", "Specify the number of the partition to boot on (use 0 to boot on the MBR)") { |c|
+        if /\A\d+\Z/ =~ c then
+          options[:boot_part] = c.to_i
+        else
+          error("Invalid chainload partition number")
+          return false
+        end
+      }
+      opt.on("-d", "--debug-mode", "Activate the debug mode") {
+        options[:debug] = true
+      }
+      opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment to deploy") { |n|
+        options[:env_kind] = :database
+        options[:env_name] = n
+      }
+      opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
+        load_machinefile(options[:nodes], f)
+      }
+      opt.on("-i", "--server-info", "Get information about the server's configuration") {
+        options[:get_users_info] = true
+      }
+      opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
+        if (f != nil) then
+          if (f =~ R_HTTP) then
+            options[:key] = f
+          else
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              options[:key] = File.expand_path(f)
+            end
+          end
+        else
+          authorized_keys = File.expand_path("~/.ssh/authorized_keys")
+          if File.readable?(authorized_keys) then
+            options[:key] = authorized_keys
+          else
+            error("The authorized_keys file #{authorized_keys} cannot be read")
+            return false
+          end
+        end
+      }
+      opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
+        load_machine(options[:nodes], hostname)
+      }
+      opt.on("--multi-server", "Activate the multi-server mode") {
+        options[:multi_server] = true
+      }
+      opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
+        options[:nodes_ko_file] = f
+      }
+      opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly deployed")  { |f|
+        options[:nodes_ok_file] = f
+      }
+      opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
+        if /\A\d+\Z/ =~ p then
+          options[:deploy_part] = p
+        else
+          error("Invalid partition number")
+          return false
+        end
+      }
+      opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (this filesystem need to be supported by the deployment environment)") { |t|
+        options[:reformat_tmp] = true
+        options[:reformat_tmp_fstype] = t
+      }
+      opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
+        if not File.readable?(f) then
+          error("The file #{f} cannot be read")
+          return false
+        else
+          if not File.stat(f).executable? then
+            error("The file #{f} must be executable to be run at the end of the deployment")
+            return false
+          else
+            options[:script] = File.expand_path(f)
+          end
+        end
+      }
+      opt.on("-u", "--user USERNAME", "Specify the user") { |u|
+        if /\A\w+\Z/ =~ u then
+          options[:user] = u
+        else
+          error("Invalid user name")
+          return false
+        end
+      }
+      opt.on("-v", "--version", "Get the version") {
+        options[:get_version] = true
+      }
+      opt.on("--vlan VLANID", "Set the VLAN") { |id|
+        options[:vlan] = id
+      }
+      opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+        if not File.readable?(f) then
+          error("The file #{f} cannot be read")
+          return false
+        else
+          IO.readlines(f).each { |l|
+            options[:pxe_profile_msg].concat(l)
+          }
+        end
+      }
+      opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
+        if not File.readable?(f) then
+          error("The file #{f} cannot be read")
+          return false
+        else
+          options[:pxe_profile_singularities] = Hash.new
+          IO.readlines(f).each { |l|
+            if !(/^#/ =~ l) and !(/^$/ =~ l) then #we ignore commented and empty lines
+              content = l.split(",")
+              options[:pxe_profile_singularities][content[0]] = content[1].strip
+            end
+          }
+        end
+      }
+      opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |l|
+        l.split(",").each { |file|
+          if (file =~ R_HTTP) then
+            options[:pxe_upload_files].push(file)
+          else
+            f = File.expand_path(file)
+            if not File.readable?(f) then
+              error("The file #{f} cannot be read")
+              return false
+            else
+              options[:pxe_upload_files].push(f)
+            end
+          end
+        }
+      }
+      opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
+        if /\A\d+\Z/ =~ n then
+          options[:env_version] = n
+        else
+          error("Invalid version number")
+          return false
+        end
+      }
+      opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
+        options[:chosen_server] = s
+      }
+      opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
+        if d =~ /\A\d+\Z/ then
+          options[:verbose_level] = d.to_i
+        else
+          error("Invalid verbose level")
+          return false
+        end
+      }
+      opt.separator "Advanced options:"
+      opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |file|
+        options[:write_workflow_id] = file
+      }
+      opt.on("--ignore-nodes-deploying", "Allow to deploy even on the nodes tagged as \"currently deploying\" (use this only if you know what you do)") {
+        options[:ignore_nodes_deploying] = true
+      }
+      opt.on("--disable-bootloader-install", "Disable the automatic installation of a bootloader for a Linux based environnment") {
+        options[:disable_bootloader_install] = true
+      }
+      opt.on("--disable-disk-partitioning", "Disable the disk partitioning") {
+        options[:disable_disk_partitioning] = true
+      }
+      opt.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
+        tmp = m.split(':',2)
+        if check_macrostep_instance(tmp[0])
+          if check_microstep(tmp[1])
+            options[:breakpoint_on_microstep] = m
+          else
+            error("The microstep #{tmp[1]} for the breakpoint entry is invalid")
+            return false
+          end
+        else
+          error("The macrostep #{tmp[0]} for the breakpoint entry is invalid")
+          return false
+        end
+      }
+      opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
+        options[:custom_operations_file] = file
+        options[:custom_operations] = load_custom_ops_file(file)
+        return false unless options[:custom_operations]
+      }
+      opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
+        if (t =~ /\A\d+\Z/) then
+          options[:reboot_classical_timeout] = t
+        else
+          error("A number is required for the reboot classical timeout")
+        end
+      }
+      opt.on("--reboot-kexec-timeout V", "Overload the default timeout for kexec reboots") { |t|
+        if (t =~ /\A\d+\Z/) then
+          options[:reboot_kexec_timeout] = t
+        else
+          error("A number is required for the reboot kexec timeout")
+        end
+      }
+      opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
+        s.split("&").each do |macrostep|
+          macroname = macrostep.split("|")[0]
+          unless check_macrostep_interface(macroname)
+            error("Invalid macrostep kind '#{macroname}'")
+            return false
+          end
+          instances = macrostep.split("|")[1]
+          insts = []
+
+          instances.split(",").each do |instance|
+            inst_name = instance.split(":")[0]
+            unless check_macrostep_instance(inst_name)
+              error("Invalid macrostep instance '#{inst_name}'")
+              return false
+            end
+            inst_retries = instance.split(":")[1]
+            begin
+              inst_retries = Integer(inst_retries)
+            rescue ArgumentError
+              error("The number of retries '#{inst_retries}' is not an integer")
+              return false
+            end
+            inst_timeout = instance.split(":")[2]
+            begin
+              inst_timeout = Integer(inst_timeout)
+            rescue ArgumentError
+              error("The timeout '#{inst_timeout}' is not an integer")
+              return false
+            end
+
+            insts << [inst_name, inst_retries, inst_timeout]
+          end
+          options[:steps].push(MacroStep.new(macroname, insts))
+        end
+      }
+      opt.on("--secure", "Use a secure connection to export files to the server") {
+        options[:secure] = true
+      }
+    end
+
+    begin
+      opts.parse!(ARGV)
+    rescue
+      error("Option parsing error: #{$!}")
+      return false
+    end
+
+    options[:chosen_server] = options[:servers]['default'] if options[:chosen_server].empty?
+    options[:kadeploy_server] = options[:servers][options[:chosen_server]][0]
+    options[:kadeploy_server_port] = options[:servers][options[:chosen_server]][1]
+
+    return options
+  end
+
+  def self.check_options(options)
+    if !options[:get_version] and !options[:get_users_info] then
+      error('You must choose an environment') if options[:env_kind].empty?
+      if options[:nodes].empty? then
+        error("You must specify some nodes to deploy")
+        return false
+      end
+      if (options[:nodes_ok_file] != "") && (options[:nodes_ok_file] == options[:nodes_ko_file]) then
+        error("The files used for the output of the OK and the KO nodes must not be the same")
+        return false
+      end
+    end
+
+    return true
+  end
+
+  def run(options)
+    params = {
+      :user => USER,
+      :nodes => options[:nodes],
+      :environment => {
+        :kind => options[:env_kind],
+      },
+      :vlan => options[:vlan],
+      :debug => options[:debug],
+    }
+
+    params[:deploy_part] = options[:deploy_part] if options[:deploy_part]
+    params[:block_device] = options[:block_device] if options[:block_device]
+
+    case options[:env_kind]
+    when :database
+      params[:environment][:name] = options[:env_name]
+      params[:environment][:version] = options[:env_version] if options[:env_version]
+      if options[:user]
+        params[:environment][:user] = options[:user]
+      else
+        params[:environment][:user] = USER
+      end
+    when :anonymous
+      params[:environment].merge!(options[:env_desc])
+    else
+      raise
+    end
+
+
+    # TODO: Fetch environment description if kind is database
+    # options[:env_desc] = ...
+    env = options[:env_desc]
+
+
+    # Check if the environment contains local files
+    localfiles = get_localfiles(env)
+    # Serve local files throught HTTP(s)
+    params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
+
+    params[:force] = options[:ignore_nodes_deploying] if options[:ignore_nodes_deploying]
+
+require 'pp'
+pp params
+    ret = post(api_path(),params.to_json)
+pp ret
+
+    @resources = ret['resources']
+    @wid = ret['wid']
+    debug = nil
+    start!
+    params = {:user=>USER}
+    begin
+      res = get(api_path(),params)
+      output = get(api_path('output'),params)
+      debug = get(api_path('debug'),params) if options[:debug]
+      unless output.empty?
+        out = output.split("\n")
+        if debug and !debug.empty?
+          debug = debug.split("\n")
+          debug.delete_if{|line| line.empty?}
+          debug.collect!{|line| "#{line.split('|')[0]}|[dbg] #{line.split('|')[1]}" rescue "[dbg] #{line}"}
+          out += debug
+        end
+        out.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
+        out.collect!{|line| line.split("|")[1] rescue line }
+        puts out.join("\n")
+      end
+      sleep SLEEP_PITCH
+    end until res['done']
+    delete(api_path(),params) if @wid
+    done!
+  end
+end
+
+if __FILE__ == $0
+  KadeployClient.launch()
+end
