@@ -3,9 +3,6 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
-#Kadeploy libs
-require 'debug'
-
 module CheckRights 
   class CheckRightsFactory
     # Factory for the methods to check the rights
@@ -114,7 +111,6 @@ module CheckRights
           end
         end
         if (node_found == false) then
-          Debug::distant_client_print("You do not have the rights to deploy on the node #{host}:#{@part}", @client)
           return false
         end
       }

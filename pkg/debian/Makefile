@@ -55,6 +55,8 @@ build:
 build-clean:
 	@rm -rf $(BUILD_DIR)
 
+install_log:
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 -d $(DEB_ROOT_COMMON)/var/log/kadeploy
 install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src/lib
@@ -175,7 +177,7 @@ endif
 	@dpkg-deb --build $(DEB_ROOT_CLIENT) $(PKG_DIR)/kadeploy-client$(SUFFIX)-$(VERSION).deb
 	@$(MAKE) build-clean
 
-package_server: build-clean build tree_server install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version install_scripts
+package_server: build-clean build tree_server install_log install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version install_scripts
 	@mkdir -p $(DEB_ROOT_SERVER)
 	@cp -r $(DEB_TEMPLATE_SERVER)/* $(DEB_ROOT_SERVER)
 ifdef DEV

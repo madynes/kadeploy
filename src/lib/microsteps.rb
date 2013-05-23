@@ -28,6 +28,7 @@ class Microstep < Automata::QueueTask
   def initialize(name, idx, subidx, nodes, nsid, manager_queue, output, context = {}, params = [])
     @output = output
     super(name, idx, subidx, nodes, nsid, manager_queue, context, params)
+    @debugger = context[:debugger]
     @runthread = nil
     @current_operation = nil
     @waitreboot_threads = ThreadGroup.new
@@ -49,7 +50,7 @@ class Microstep < Automata::QueueTask
     ret = true
 
     @nodes.set.each do |node|
-      context[:config].set_node_state(
+      context[:states].set(
         node.hostname,
         context[:local][:parent].name.to_s,
         @name.to_s,
@@ -127,6 +128,7 @@ class Microstep < Automata::QueueTask
   def free
     super()
     @output = nil
+    @debugger = nil
     @runthread = nil
     @current_operation.free if @current_operation
     @current_operation = nil
@@ -140,7 +142,7 @@ class Microstep < Automata::QueueTask
   # Get the identifier that allow to contact a node (hostname|ip)
   def get_nodeid(node,vlan=false)
     if vlan and !context[:execution].vlan.nil?
-      ret = context[:execution].ip_in_vlan[node.hostname]
+      ret = context[:execution].vlan_addr[node.hostname]
     else
       if context[:cluster].use_ip_to_deploy
         ret = node.ip
@@ -162,7 +164,7 @@ class Microstep < Automata::QueueTask
     node.last_cmd_stderr = opts[:stderr] unless opts[:stderr].nil?
     node.last_cmd_exit_status = opts[:status] unless opts[:status].nil?
     node.state = opts[:state] unless opts[:state].nil?
-    context[:config].set_node_state(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
+    context[:states].set(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
   end
 
   def failed_microstep(msg)
@@ -263,7 +265,7 @@ class Microstep < Automata::QueueTask
         ParallelOperation.new(
           nodeset,
           context,
-          @output
+          @debugger
         )
       ) do |op|
         res = op.taktuk_exec(cmd,opts,expects)
@@ -303,7 +305,7 @@ class Microstep < Automata::QueueTask
       ParallelOperation.new(
         nodeset,
         context,
-        @output
+        @debugger
       )
     ) do |op|
       res = op.taktuk_sendfile(src_file,dest_dir,opts)
@@ -315,7 +317,7 @@ class Microstep < Automata::QueueTask
 
   def parallel_run(nodeset_id)
     raise unless block_given?
-    parallel_op(ParallelRunner.new(@output,nodeset_id)) do |op|
+    parallel_op(ParallelRunner.new(@debugger,nodeset_id)) do |op|
       yield(op)
     end
   end
@@ -975,7 +977,7 @@ class Microstep < Automata::QueueTask
       err = stderr
     end
 
-    @output.debug_command(cmd, out, err, status, @nodes)
+    @debugger.push(cmd,@nodes,out,err,status) if @debugger
     if (status != 0) then
       failed_microstep("Error while processing to the file broadcast with Kastafior (exited with status #{status})")
       return false
@@ -1266,7 +1268,7 @@ class Microstep < Automata::QueueTask
       @nodes.set.collect do |node|
         n = { :hostname => node.hostname }
         if check_vlan && (context[:execution].vlan != nil)
-          n[:ip] = context[:execution].ip_in_vlan[node.hostname]
+          n[:ip] = context[:execution].vlan_addr[node.hostname]
         else
           n[:ip] = node.ip
         end
@@ -1721,10 +1723,10 @@ class Microstep < Automata::QueueTask
   def ms_wait_reboot(kind='classical', env='deploy', vlan=false, timeout=nil,ports_up=nil, ports_down=nil)
     unless timeout
       if kind == 'kexec'
-        timeout = context[:execution].reboot_kexec_timeout \
+        timeout = context[:execution].timeout_reboot_kexec \
           || context[:cluster].timeout_reboot_kexec
       else
-        timeout = context[:execution].reboot_classical_timeout \
+        timeout = context[:execution].timeout_reboot_classical \
           || context[:cluster].timeout_reboot_classical
       end
     end
@@ -2035,17 +2037,7 @@ end
 
 class CustomMicrostep < Microstep
   def initialize(nodes, context = {})
-    output = Debug::OutputControl.new(
-      context[:execution].verbose_level || context[:common].verbose_level,
-      context[:execution].debug,
-      context[:client],
-      context[:execution].true_user,
-      context[:deploy_id]||context[:reboot_id],
-      context[:common].dbg_to_syslog,
-      context[:common].dbg_to_syslog_level,
-      context[:syslock],
-      context[:cluster].prefix
-    )
+    output = context[:output]
     super('CUSTOM', 0, 0, nodes, 0, nil, output, context, [])
     @basenodes = Nodes::NodeSet.new
     nodes.linked_copy(@basenodes)

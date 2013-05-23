@@ -3,248 +3,178 @@
 # CECILL License V2 - http://www.cecill.info
 # For details on use and redistribution please refer to License.txt
 
-#Ruby libs
-require 'syslog'
+require 'thread'
 
 module Debug
-  # Print an error message on a local client
-  #
-  # Arguments
-  # * msg: error message
-  # * usage_handler(opt): usage handler
-  # Output
-  # * nothing
-  def Debug::local_client_error(msg, usage_handler = nil)
-    puts "ERROR: #{msg}."
-    puts "---"
-    if (usage_handler == nil) then
-      puts "Use the -h or --help option for correct use."
+  def self.prefix(clid,nsid=nil)
+    ns = nsid if !nsid.nil? and nsid > 0
+
+    if !clid.nil? and !clid.empty?
+      "[#{clid}#{(ns.nil? ? '' : ".#{ns}")}] "
+    elsif !ns.nil?
+      "[#{ns}] "
     else
-      usage_handler.call
+      ''
     end
   end
 
-  # Print an error message on a distant client
-  #
-  # Arguments
-  # * msg: error message
-  # * client: DRb client handler
-  # Output
-  # * nothing
-  def Debug::distant_client_error(msg, client)
-    client.print("ERROR: #{msg}") if client != nil
+  def self.format(msg)
+    "#{'%.5f' % Time.now.to_f}|#{msg}"
   end
 
-  # Print a message
-  #
-  # Arguments
-  # * msg: message
-  # * client: DRb client handler
-  # Output
-  # * nothing
-  def Debug::distant_client_print(msg, client)
-    client.print(msg) if client != nil
+  class FileOutput
+    attr_accessor :prefix
+    def initialize(file,verbose_level=0,prefix='')
+      @file = file
+      @verbose_level = verbose_level
+      @prefix = prefix
+      @lock = Mutex.new
+    end
+
+    def free()
+      @file = nil
+      @verbose_level = nil
+      @prefix = nil
+      @lock = nil
+    end
+
+    def write(msg,lvl=-1)
+      if lvl <= @verbose_level
+        @lock.synchronize do
+          f = File.new(@file, File::CREAT | File::APPEND | File::WRONLY, 0644)
+          f.flock(File::LOCK_EX)
+          if msg.is_a?(Array)
+            msg.each{|m| f.write("#{prefix}#{m}\n") }
+          elsif msg.is_a?(String)
+            f.write("#{prefix}#{msg}\n")
+          else
+            raise
+          end
+          f.flock(File::LOCK_UN)
+          f.close
+        end
+      end
+    end
   end
 
   class OutputControl
-    @verbose_level = 0
-    @debug = nil
-    @client = nil
-    @user = nil
-    @deploy_id = nil
-    @syslog = nil
-    @syslog_dbg_level = nil
-    @syslog_lock = nil
-    @client_output = nil
-    @cluster_id = nil
-
     # Constructor of OutputControl
     #
     # Arguments
     # * verbose_level: verbose level at the runtime
-    # * debug: boolean user to know if the extra debug must be used or not 
-    # * client: Drb handler of the client
-    # * user: username
-    # * deploy_id: id of the deployment
-    # * syslog: boolean used to know if syslog must be used or not
-    # * syslog_dbg_level: level of debug required in syslog
-    # * syslog_lock: mutex on Syslog
+    # * debug: boolean user to know if the extra debug must be used or not
     # Output
     # * nothing
-    def initialize(verbose_level, debug, client, user, deploy_id, syslog, syslog_dbg_level, syslog_lock, cluster_id=nil)
+    def initialize(verbose_level, file = nil, cluster_id=nil)
       @verbose_level = verbose_level
-      @debug = debug
-      @client = client
-      @user = user
-      @deploy_id = deploy_id
-      @syslog = syslog
-      @syslog_dbg_level = syslog_dbg_level
-      @syslog_lock = syslog_lock
-      @client_output = (client != nil)
+      @output = ''
+      @file = file
       @cluster_id = cluster_id
+      @lock = Mutex.new
     end
 
     def free()
       @verbose_level = nil
-      @debug = nil
-      @client = nil
-      @user = nil
-      @deploy_id = nil
-      @syslog = nil
-      @syslog_dbg_level = nil
-      @syslog_lock = nil
-      @client_output = nil
+      @output = nil
+      @file.free if @file
+      @file = nil
       @cluster_id = nil
-    end
-
-    # Disable the output redirection on the client
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def disable_client_output
-      @client_output = false
-    end
-
-    def Debug.prefix(clid,nsid=nil)
-      ns = nsid if !nsid.nil? and nsid > 0
-
-      if !clid.nil? and !clid.empty?
-        "[#{clid}#{(ns.nil? ? '' : ".#{ns}")}] "
-      elsif !ns.nil?
-        "[#{ns}] "
-      else
-        ''
-      end
+      @lock = nil
     end
 
     # Print a message according to a specified debug level
     #
     # Arguments
-    # * l: debug level of the message
+    # * lvl: debug level of the message
     # * msg: message
     # * nodeset: print with this NodeSet id
     # Output
     # * prints the message on the server and on the client
-    def verbosel(l, msg, nsid=nil, print_prefix = true)
-      msg = "#{Debug.prefix(@cluster_id,nsid)}#{msg}" if print_prefix
-
-      if ((l <= @verbose_level) && @client_output)
-        begin
-          @client.print(msg)
-        rescue DRb::DRbConnError
-        end
-      end
-      server_str = "#{@deploy_id}|#{@user} -> #{msg}"
-      puts server_str
-      if (@syslog && (l <= @syslog_dbg_level)) then
-        @syslog_lock.lock
-        while Syslog.opened?
-          sleep 0.2
-        end
-        sl = Syslog.open("Kadeploy-dbg")
-        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-        sl.close
-        @syslog_lock.unlock
+    def push(lvl, msg, nsid=nil, print_prefix = true)
+      @lock.synchronize do
+        msg = "#{Debug.prefix(@cluster_id,nsid)}#{msg}" if print_prefix
+        @output << Debug.format("#{msg}\n") if lvl <= @verbose_level
+        @file.write(msg,lvl) if @file
       end
     end
 
-    # Print the debug output of a command
-    #
-    # Arguments
-    # * cmd: command
-    # * nodeset: NodeSet containing the Nodes on which the command has been launched
-    # Output
-    # * nothing
-    def debug(cmd, nodeset)
-      if @debug then
-        procprint = Proc.new do |str|
-          str = "(#{nodeset.id}) #{str}" if nodeset.id > 0
-          @client.print(str)
-        end
+    def pop()
+      @lock.synchronize do
+        ret = @output
+        @output = ''
+        ret
+      end
+    end
+  end
 
-        procprint.call("-------------------------")
-        procprint.call("CMD: #{cmd}")
-        if (nodeset != nil) then
-          nodeset.set.each { |node|
-            node.last_cmd_stdout.split("\n").each { |line|
-              procprint.call("#{node.hostname} -- STDOUT: #{line}")
-            }
-            node.last_cmd_stderr.split("\n").each { |line|
-              procprint.call("#{node.hostname} -- STDERR: #{line}")
-            }
-            node.last_cmd_exit_status.split("\n").each { |line|
-              procprint.call("#{node.hostname} -- EXIT STATUS: #{line}")
-            }
-          }
+  class DebugControl
+    def initialize()
+      @debug = {}
+      @lock = Mutex.new
+    end
+
+    def free()
+      @debug = nil
+      @lock = nil
+    end
+
+    def push(cmd, nodeset, stdout=nil, stderr=nil, status=nil)
+      return unless nodeset
+
+      out = nil
+      err = nil
+      stat = nil
+
+      if stdout or stderr or status
+        out = stdout || ''
+        err = stderr || ''
+        stat = status || ''
+      end
+
+      @lock.synchronize do
+        nodeset.set.each do |node|
+          if !stdout and !stderr and !status
+            out = node.last_cmd_stdout || ''
+            err = node.last_cmd_stderr || ''
+            stat = node.last_cmd_exit_status || ''
+          end
+          @debug[node.hostname] = '' unless @debug[node.hostname]
+          @debug[node.hostname] << Debug.format("-------------------------\n")
+          @debug[node.hostname] << Debug.format("NODE: #{node.hostname}\n")
+          @debug[node.hostname] << Debug.format("-------------------------\n")
+          @debug[node.hostname] << Debug.format("COMMAND: #{cmd}\n")
+          out.each_line do |line|
+            @debug[node.hostname] << Debug.format("STDOUT: #{line}\n")
+          end
+          err.each_line do |line|
+            @debug[node.hostname] << Debug.format("STDERR: #{line}\n")
+          end
+          stat.each_line do |line|
+            @debug[node.hostname] << Debug.format("STATUS: #{line}\n")
+          end
         end
-        procprint.call("-------------------------")
       end
     end
 
-    # Print a message on the server side
-    #
-    # Arguments
-    # * msg: message
-    # Output
-    # * prints the message on the server and on the client
-    def debug_server(msg)
-      server_str = "#{@deploy_id}|#{@user} -> #{msg}"
-      puts server_str
-      if @syslog then
-        @syslog_lock.lock
-        while Syslog.opened?
-          sleep 0.2
+    def pop(node=nil)
+      @lock.synchronize do
+        if node
+          ret = @debug[node]
+          @debug[node] = nil
+          ret
+        else
+          ret = ''
+          @debug.each_key do |n|
+            ret << @debug[n] if @debug[n]
+            @debug[n] = nil
+          end
+          (ret.empty? ? nil : ret)
         end
-        sl = Syslog.open("Kadeploy-dbg")
-        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-        sl.close
-        @syslog_lock.unlock
-      end
-    end
-
-    # Print the debug output of a command
-    #
-    # Arguments
-    # * cmd: command
-    # * stdout: standard output
-    # * stderr: standard error output
-    # * exit_status: exit status
-    # * nodeset: the nodesed the command was applied on (used for the display template)
-    # Output
-    # * nothing
-    def debug_command(cmd, stdout, stderr, exit_status, nodeset)
-      if @debug then
-        procprint = Proc.new do |str|
-          str = "(#{nodeset.id}) #{str}" if nodeset.id > 0
-          @client.print(str)
-        end
-
-        procprint.call("-------------------------")
-        procprint.call("CMD: #{cmd}")
-        if stdout != nil then
-          stdout.split("\n").each { |line|
-            procprint.call("-- STDOUT: #{line}")
-          }
-        end
-        if stderr != nil then
-          stderr.split("\n").each { |line|
-            procprint.call("-- STDERR: #{line}")
-          }
-        end
-        procprint.call("-- EXIT STATUS: #{exit_status}")
-        procprint.call("-------------------------")
       end
     end
   end
 
   class Logger
-    @nodes = nil
-    @config = nil
-    @db = nil
-    @syslog_lock = nil
-
     # Constructor of Logger
     #
     # Arguments
@@ -256,24 +186,21 @@ module Debug
     # * start: start time
     # * env: environment name
     # * anonymous_env: anonymous environment or not
-    # * syslog_lock: mutex on Syslog
     # Output
     # * nothing
-    def initialize(node_set, config, db, user, deploy_id, start, env, anonymous_env, syslog_lock)
-      @nodes = Hash.new
-      node_set.make_array_of_hostname.each { |n|
-        @nodes[n] = create_node_infos(user, deploy_id, start, env, anonymous_env)
-      }
-      @config = config
-      @db = db
-      @syslog_lock = syslog_lock
+    def initialize(nodes, user, wid, start, env, anonymous_env, file=nil, db=nil)
+      @nodes = {}
+      nodes.each do |node|
+        @nodes[node] = create_node_infos(user, wid, start, env, anonymous_env)
+      end
+      @file = file
+      @database = db
     end
 
     def free()
       @nodes = nil
-      @config = nil
-      @db = nil
-      @syslog_lock = nil
+      @file = nil
+      @database = nil
     end
 
     # Create an hashtable that contains all the information to log
@@ -287,28 +214,28 @@ module Debug
     # Output
     # * returns an Hash instance
     def create_node_infos(user, deploy_id, start, env, anonymous_env)
-      node_infos = Hash.new
-      node_infos["deploy_id"] = deploy_id
-      node_infos["user"] = user
-      node_infos["step1"] = String.new
-      node_infos["step2"] = String.new
-      node_infos["step3"] = String.new
-      node_infos["timeout_step1"] = 0
-      node_infos["timeout_step2"] = 0
-      node_infos["timeout_step3"] = 0
-      node_infos["retry_step1"] = -1
-      node_infos["retry_step2"] = -1
-      node_infos["retry_step3"] = -1
-      node_infos["start"] = start
-      node_infos["step1_duration"] = 0
-      node_infos["step2_duration"] = 0
-      node_infos["step3_duration"] = 0
-      node_infos["env"] = env
-      node_infos["anonymous_env"] = anonymous_env
-      node_infos["md5"] = String.new
-      node_infos["success"] = false
-      node_infos["error"] = String.new
-      return node_infos
+      {
+        "deploy_id" => deploy_id,
+        "user" => user,
+        "step1" => String.new,
+        "step2" => String.new,
+        "step3" => String.new,
+        "timeout_step1" => 0,
+        "timeout_step2" => 0,
+        "timeout_step3" => 0,
+        "retry_step1" => -1,
+        "retry_step2" => -1,
+        "retry_step3" => -1,
+        "start" => start,
+        "step1_duration" => 0,
+        "step2_duration" => 0,
+        "step3_duration" => 0,
+        "env" => env,
+        "anonymous_env" => anonymous_env,
+        "md5" => String.new,
+        "success" => false,
+        "error" => String.new,
+      }
     end
 
     # Set a value for some nodes in the Logger
@@ -336,12 +263,13 @@ module Debug
     # Arguments
     # * node_set: Array of nodes
     # Output
-    # * nothing      
-    def error(node_set)
-      node_set.make_array_of_hostname.each { |n|
-        node_set.get_node_by_host(n).last_cmd_stderr = "#{@config.exec_specific.nodes_state[n][0]["macro-step"]}-#{@config.exec_specific.nodes_state[n][1]["micro-step"]}: #{node_set.get_node_by_host(n).last_cmd_stderr}"
-        @nodes[n]["error"] = node_set.get_node_by_host(n).last_cmd_stderr
-      }
+    # * nothing
+    def error(nodeset,states)
+      nodeset.set.each do |node|
+        state = states.get(node.hostname)
+        node.last_cmd_stderr = "state[:macro]}-#{state[:micro]}: #{node.last_cmd_stderr}"
+        @nodes[node.hostname]["error"] = node.last_cmd_stderr
+      end
     end
 
     # Increment an information for a set of nodes
@@ -350,7 +278,7 @@ module Debug
     # * op: information to increment
     # * node_set(opt): Array of nodes
     # Output
-    # * nothing 
+    # * nothing
     def increment(op, node_set = nil)
       if (node_set != nil)
         node_set.make_array_of_hostname.each { |n|
@@ -368,39 +296,12 @@ module Debug
     # Arguments
     # * nothing
     # Output
-    # * nothing     
+    # * nothing
     def dump
-      dump_to_file if (@config.common.log_to_file != "")
-      dump_to_syslog if (@config.common.log_to_syslog)
-      dump_to_db if (@config.common.log_to_db)
+      dump_to_file if @file
+      dump_to_db if @database
     end
 
-    # Dump the logged information to syslog
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def dump_to_syslog
-      @syslog_lock.lock
-      while Syslog.opened?
-        sleep 0.2
-      end
-      sl = Syslog.open("Kadeploy-log")
-      @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
-        str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
-        str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
-        str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
-        str += node_infos["start"].to_i.to_s + ","
-        str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
-        str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"]
-        str += node_infos["success"].to_s + "," + node_infos["error"].to_s
-        sl.log(Syslog::LOG_NOTICE, "#{str}")
-      }
-      sl.close
-      @syslog_lock.unlock
-    end
 
     # Dump the logged information to the database
     #
@@ -410,7 +311,7 @@ module Debug
     # * nothing
     def dump_to_db
       @nodes.each_pair { |hostname, node_infos|
-        @db.run_query(
+        @database.run_query(
          "INSERT INTO log ( \
           deploy_id, \
           user, \
@@ -466,25 +367,19 @@ module Debug
     # Output
     # * nothing
     def dump_to_file
-      begin
-        fd = File.new(@config.common.log_to_file, File::CREAT | File::APPEND | File::WRONLY, 0644)
-        fd.flock(File::LOCK_EX)
-        @nodes.each_pair { |hostname, node_infos|
-          str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
-          str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
-          str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
-          str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
-          str += node_infos["start"].to_i.to_s + ","
-          str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
-          str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"] + ","
-          str += node_infos["success"].to_s + "," + node_infos["error"].to_s
-          fd.write("#{Time.now.to_i}: #{str}\n")
-        }
-        fd.flock(File::LOCK_UN)
-        fd.close
-      rescue
-        puts "Cannot write in the log file #{@config.common.log_to_file}"
+      out = []
+      @nodes.each_pair do |hostname, node_infos|
+        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
+        str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
+        str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
+        str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
+        str += node_infos["start"].to_i.to_s + ","
+        str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
+        str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"] + ","
+        str += node_infos["success"].to_s + "," + node_infos["error"].to_s
+        out << str
       end
+      @file.write(out)
     end
   end
 end
@@ -493,7 +388,7 @@ end
 module Printer
   def debug(level,msg,nodesetid=nil,opts={})
     return unless output()
-    output().verbosel(level,msg,nodesetid)
+    output().push(level,msg,nodesetid)
   end
 
   def log(operation,value=nil,nodeset=nil,opts={})
