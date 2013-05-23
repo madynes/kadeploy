@@ -87,7 +87,7 @@ require 'socket'
         ret = [[],@nodes.set.dup]
       end
       res = nil
-      @output.debug("#{takbin} #{takargs.join(' ')}", @nodes)
+      @output.push("#{takbin} #{takargs.join(' ')}", @nodes) if @output
       ret
     end
 
@@ -129,7 +129,7 @@ require 'socket'
         ret = [[],@nodes.set.dup]
       end
       res = nil
-      @output.debug("#{takbin} #{takargs.join(' ')}", @nodes)
+      @output.push("#{takbin} #{takargs.join(' ')}", @nodes) if @output
       ret
     end
 
@@ -168,7 +168,7 @@ require 'socket'
       node.last_cmd_stderr = opts[:stderr] unless opts[:stderr].nil?
       node.last_cmd_exit_status = opts[:status] unless opts[:status].nil?
       node.state = opts[:state] unless opts[:state].nil?
-      @context[:config].set_node_state(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
+      @context[:states].set(node.hostname,'','',opts[:node_state]) unless opts[:node_state].nil?
     end
 
     # Set information about a Taktuk command execution

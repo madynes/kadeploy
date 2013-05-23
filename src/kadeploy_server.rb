@@ -3117,30 +3117,3 @@ class KadeployServer
     @power_info_hash.delete(power_id)
   end
 end
-
-# Disable reverse lookup to prevent lag in case of DNS failure
-Socket.do_not_reverse_lookup = true
-
-begin
-  config = ConfigInformation::Config.new(false)
-rescue
-  puts "Bad configuration: #{$!}"
-  exit(1)
-end
-db = Database::DbFactory.create(config.common.db_kind)
-if not db.connect(config.common.deploy_db_host,
-                  config.common.deploy_db_login,
-                  config.common.deploy_db_passwd,
-                  config.common.deploy_db_name)
-  puts "Cannot connect to the database"
-  exit(1)
-else
-  db.disconnect
-  kadeployServer = KadeployServer.new(config, 
-                                      Managers::WindowManager.new(config.common.reboot_window, config.common.reboot_window_sleep_time),
-                                      Managers::WindowManager.new(config.common.nodes_check_window, 1))
-  puts "Launching the Kadeploy RPC server"
-  uri = "druby://#{config.common.kadeploy_server}:#{config.common.kadeploy_server_port}"
-  server = DRb.start_service(uri, kadeployServer)
-  server.thread.join
-end
