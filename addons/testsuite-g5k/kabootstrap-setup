@@ -1,0 +1,41 @@
+#!/usr/bin/ruby
+
+require 'common-g5k'
+
+unless ENV['OAR_JOB_ID']
+  error('You have to make a reservation first')
+end
+
+unless ARGV.size >= 2
+  error("usage: #{$0} [git:|gerrit:]<commit/branch> <kadeploy_version> [<frontend file>] [<sources dir>]\ncustomizable env vars:\n  #{KADEPLOY_ENV_VARS.join("\n  ")}\nsamples:\n  #{$0} master 3.1.8 (git is used by default)\n  #{$0} git:3.1.7 3.1.7 /tmp/frontendfile kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 3.1.7")
+end
+_,$commit,$repo_kind = get_repo_commit(ARGV[0])
+$version=ARGV[1]
+if ARGV[3]
+  unless File.directory?(ARGV[3])
+    error("file not found #{ARGV[3]}")
+  end
+  $sources=ARGV[3]
+end
+
+
+puts 'Enable VLAN DHCP'
+cmd('kavlan -e')
+
+$vlan=get_vlan()
+$nodefile=ENV['OAR_NODE_FILE']
+$nodes=get_nodes($nodefile)
+unless ENV['NO_KADEPLOY']
+  puts 'Running Kadeploy'
+  kadeploy($nodefile,ENVIRONMENT,$vlan)
+  puts '... done'
+end
+puts 'Running kabootstrap'
+$frontend=kabootstrap($nodefile,$nodes[0],$repo_kind,$commit,$version,$sources)
+puts "... done"
+
+if ARGV[2]
+  File.open(ARGV[2],'w'){ |f| f.puts $frontend }
+end
+
+puts "Frontend: #{$frontend}"
