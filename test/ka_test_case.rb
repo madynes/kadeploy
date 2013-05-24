@@ -1,4 +1,5 @@
-$:.unshift File.join(File.dirname(__FILE__), '..', 'src','lib')
+KADEPLOY_LIBS=ENV['KADEPLOY_LIBS']||File.join(File.dirname(__FILE__), '..','src','lib')
+$:.unshift KADEPLOY_LIBS
 require 'execute'
 require 'error'
 require 'yaml'
