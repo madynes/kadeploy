@@ -1,0 +1,37 @@
+#!/usr/bin/ruby
+
+require 'common-g5k'
+
+JENKINS_DIR='/home/lsarzyniec/jenkins'
+LOGS_DIR=File.join(JENKINS_DIR,'logs')
+
+unless ARGV.size >= 2
+  error("usage: #{$0} <commit/branch> <version>")
+end
+$commit=ARGV[0]
+$version=ARGV[1]
+
+cmd("mkdir -p #{LOGS_DIR}")
+
+puts "Make the reservation"
+ret=cmd("oarsub -t deploy -n jenkins -l {\"type='kavlan-local'\"}/vlan=1+cluster=2/nodes=2,walltime=3 \"#{File.join(JENKINS_DIR,'run-testsuite')} #{$commit} #{$version}\"")
+
+$jobid=ret.split("\n").grep(/OAR_JOB_ID/).to_s.split("=")[1]
+
+cmd("echo \"#{$jobid}\" > #{LOGS_DIR}/#{$commit}.jobid")
+
+trap('INT') {
+  puts "Deleting OAR JOB"
+  cmd("oardel #{$jobid}")
+  exit 1
+}
+
+puts "Job ID: #{$jobid}"
+puts "Wait for the job to terminate"
+begin
+  sleep 20
+end until cmd("oarstat -s -j #{$jobid}").grep(/Terminated/).size > 0
+
+puts "Job done"
+cmd("mv OAR.#{$jobid}.stdout #{LOGS_DIR}/#{$commit}.stdout")
+cmd("mv OAR.#{$jobid}.stderr #{LOGS_DIR}/#{$commit}.stderr")
