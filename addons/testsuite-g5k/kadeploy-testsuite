@@ -1,0 +1,94 @@
+#!/usr/bin/ruby
+
+require 'common-g5k'
+
+def test_cmd(script)
+  "cd #{TEST_DIR} && ruby #{script} --verbose=verbose -- #{TEST_CONFIG} ~/NODEFILE"
+end
+
+unless ARGV.size >= 2
+  error("usage: #{$0} <commit/branch> <frontend user@host> [<test_config>] [<sources dir>]")
+end
+
+$commit=ARGV[0]
+tmp=ARGV[1].split('@')
+$user=tmp[0]
+$host=tmp[1]
+
+if ARGV[2] and !File.readable?(ARGV[2])
+  error("file not found '#{ARGV[2]}'")
+end
+
+if ARGV[3] and !File.readable?(ARGV[3])
+  error("file not found '#{ARGV[3]}'")
+end
+
+if ARGV[3]
+  puts "Copying testsuite"
+  scp($user,$host,ARGV[3],TMP_DIR)
+  puts '... done'
+else
+  begin
+    puts 'Fetching git repo'
+    $git_repo=fetch_git_repo($commit)
+    puts "... done"
+
+    puts "Cleaning testsuite"
+    ssh($user,$host,"rm -rf #{TMP_DIR}")
+    puts '... done'
+
+    puts "Copying testsuite"
+    scp($user,$host,$git_repo,TMP_DIR)
+    puts '... done'
+  ensure
+    cmd("rm -Rf #{$git_repo}",false) if $git_repo
+  end
+end
+
+if ARGV[2]
+  puts "Copying testsuite"
+  scp($user,$host,ARGV[2],TEST_DIR)
+  puts '... done'
+end
+
+success = true
+
+puts "Running kadeploy test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KADEPLOY),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+puts "Running kareboot test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KAREBOOT),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+puts "Running kapower test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KAPOWER),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+puts "Running kaenv  test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KAENV),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+if success
+  puts 'Global: Success'
+  exit 0
+else
+  puts 'Global: Fail'
+  exit 1
+end
