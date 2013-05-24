@@ -1,0 +1,6 @@
+#!/bin/bash -e
+
+frontend=`mktemp`
+/home/lsarzyniec/jenkins/kabootstrap-setup $1 $2 $frontend
+/home/lsarzyniec/jenkins/kadeploy-testsuite $1 $(cat $frontend)
+rm -f $frontend

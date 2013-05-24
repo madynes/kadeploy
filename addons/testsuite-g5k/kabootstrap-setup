@@ -1,0 +1,37 @@
+#!/usr/bin/ruby
+
+require 'common-g5k'
+
+unless ENV['OAR_JOB_ID']
+  error('You have to make a reservation first')
+end
+
+unless ARGV.size >= 2
+  error("usage: #{$0} <commit/branch> <kadeploy_version>")
+end
+$commit=ARGV[0]
+$version=ARGV[1]
+
+puts 'Enable VLAN DHCP'
+cmd('kavlan -e')
+
+$vlan=get_vlan()
+$nodefile=ENV['OAR_NODE_FILE']
+$nodes=get_nodes($nodefile)
+unless ENV['NO_KADEPLOY']
+  puts 'Running Kadeploy'
+  kadeploy($nodefile,ENVIRONMENT,$vlan)
+  puts '... done'
+end
+puts 'Running kabootstrap'
+$frontend=kabootstrap($nodefile,$nodes[0],$commit,$version)
+puts "... done"
+
+if ARGV[1]
+  File.open(ARGV[1],'w'){ |f| f.puts $frontend }
+end
+if ARGV[2]
+  File.open(ARGV[2],'w'){ |f| f.puts $git_repo }
+end
+
+puts "Frontend: #{$frontend}"
