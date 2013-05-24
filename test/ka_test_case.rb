@@ -1,4 +1,5 @@
-$:.unshift File.join(File.dirname(__FILE__), '..', 'src','lib')
+KADEPLOY_LIBS=ENV['KADEPLOY_LIBS']||File.join(File.dirname(__FILE__), '..','src','lib')
+$:.unshift KADEPLOY_LIBS
 require 'execute'
 require 'error'
 require 'yaml'
@@ -151,10 +152,10 @@ module KaTestCase
   def connect_test(node)
     hostname = ''
     begin
-      Net::SSH.start(node,'root') do |ssh|
+      Net::SSH.start(node,'root',:password => 'grid5000',:keys => "#{ENV['HOME']}/.ssh/id_rsa") do |ssh|
         hostname = ssh.exec!('hostname').strip
       end
-    rescue Net::SSH::AuthenticationFailed, SocketError
+    rescue Net::SSH::AuthenticationFailed, SocketError,Errno::ECONNRESET
       assert(false,'Unable to contact nodes')
     end
     assert(hostname == node,'Hostname not set correctly')
