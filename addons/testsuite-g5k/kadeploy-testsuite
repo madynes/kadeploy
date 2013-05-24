@@ -1,0 +1,58 @@
+#!/usr/bin/ruby
+
+require 'common-g5k'
+
+def test_cmd(script)
+  "cd #{TEST_DIR} && ruby #{script} --verbose=verbose -- #{TEST_CONFIG} ~/NODEFILE"
+end
+
+unless ARGV.size >= 2
+  error("usage: #{$0} <commit/branch> <frontend user@host> [<test_config>]")
+end
+
+$commit=ARGV[0]
+tmp=ARGV[1].split('@')
+$user=tmp[0]
+$host=tmp[1]
+
+if ARGV[2] and !File.readable?(ARGV[2])
+  error("file not found '#{ARGV[2]}'")
+end
+
+begin
+  puts 'Fetching git repo'
+  $git_repo=fetch_git_repo($commit)
+  puts "... done"
+
+  puts "Cleaning testsuite"
+  ssh($user,$host,"rm -rf #{TMP_DIR}")
+  puts '... done'
+
+  puts "Copying testsuite"
+  scp($user,$host,$git_repo,TMP_DIR)
+  puts '... done'
+ensure
+  cmd("rm -Rf #{$git_repo}",false) if $git_repo
+end
+
+if ARGV[2]
+  puts "Copying testsuite"
+  scp($user,$host,ARGV[2],TEST_DIR)
+  puts '... done'
+end
+
+puts "Running kadeploy test"
+puts ssh($user,$host,test_cmd(TEST_KADEPLOY))
+puts '... done'
+
+puts "Running kareboot test"
+puts ssh($user,$host,test_cmd(TEST_KAREBOOT))
+puts '... done'
+
+puts "Running kapower test"
+puts ssh($user,$host,test_cmd(TEST_KAPOWER))
+puts '... done'
+
+puts "Running kaenv  test"
+puts ssh($user,$host,test_cmd(TEST_KAENV))
+puts '... done'
