@@ -1775,7 +1775,7 @@ def kadeploy_update(session,mountpath)
 end
 
 def tempfile(content)
-  tmp = Tempfile.new(__FILE__)
+  tmp = Tempfile.new(File.basename(__FILE__))
   tmp.write(content)
   tmp.close
 
