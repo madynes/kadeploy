@@ -78,12 +78,12 @@ CFG_KADEPLOY_SOFT_REBOOT = false
 
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
-  :retries => 0,
+  :retries => 1,
   :timeout => 200
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
-  :retries => 0,
+  :retries => 1,
   :timeout => 200
 }
 CFG_KADEPLOY_MACROSTEP3 = [
@@ -94,17 +94,17 @@ CFG_KADEPLOY_MACROSTEP3 = [
   },
   {
     :name => 'BootNewEnv|BootNewEnvHardReboot',
-    :retries => 0,
+    :retries => 1,
     :timeout => 200
   }
 ]
 
 CFG_KADEPLOY_PARTITION_SWAP_ID = 1
-CFG_KADEPLOY_PARTITION_SWAP_SIZE = '256M'
+CFG_KADEPLOY_PARTITION_SWAP_SIZE = '4000M'
 CFG_KADEPLOY_PARTITION_PROD_ID = 2
-CFG_KADEPLOY_PARTITION_PROD_SIZE = '4000M'
+CFG_KADEPLOY_PARTITION_PROD_SIZE = '6000M'
 CFG_KADEPLOY_PARTITION_DEPLOY_ID = 3
-CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '4000M'
+CFG_KADEPLOY_PARTITION_DEPLOY_SIZE = '6000M'
 CFG_KADEPLOY_PARTITION_TMP_ID = 5
 CFG_KADEPLOY_DISK_DEVICE = '/dev/sda'
 
@@ -129,26 +129,32 @@ CFG_KADEPLOY_PARTITIONING_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'parted-samp
 CFG_KADEPLOY_BOOTLOADER_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'install_grub2')
 
 
-def cfg_environment_desc(env)
+def cfg_environment_desc(env,http=false)
+  basepath = nil
   postinstall = ''
+  basepath = "http://#{$kanodes[:kadeploy][:fqdn]}/" if http
+  name = env[:name]
+  name += '-http' if http
   if $version >= 7
     desc = env[:desc].dup
     if env[:postinstall]
+      basepath = CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH unless http
       postinstall = {
-        'archive' => File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file])),
+        'archive' => File.join(basepath,File.basename(env[:postinstall][:file])),
         'compression' => env[:postinstall][:filetype],
         'script' => env[:postinstall][:args],
       }
       desc['postinstalls'] = [ postinstall ]
     end
-
-    desc['name'] = env[:name]
-    desc['image']['file'] = File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))
+    basepath = CFG_KADEPLOY_ENVS_IMAGES_PATH unless http
+    desc['name'] = name
+    desc['image']['file'] = File.join(basepath,File.basename(env[:tarball]))
 
     desc.to_yaml
   else
     if env[:postinstall]
-      postinstall = "postinstall : #{File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))}|#{env[:postinstall][:filetype]}|#{env[:postinstall][:args]}\n"
+      basepath = CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH unless http
+      postinstall = "postinstall : #{File.join(basepath,File.basename(env[:postinstall][:file]))}|#{env[:postinstall][:filetype]}|#{env[:postinstall][:args]}\n"
     end
 
     if $version <= 5
@@ -157,13 +163,21 @@ def cfg_environment_desc(env)
       demolishing = env[:demolishing].to_s
     end
 
+    basepath = CFG_KADEPLOY_ENVS_IMAGES_PATH unless http
+
     "###\n"\
-    "name : #{env[:name]}\n"\
+    "name : #{name}\n"\
     "#{env[:desc]}\n"\
-    "tarball : #{File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))}|tgz\n"\
+    "tarball : #{File.join(basepath,File.basename(env[:tarball]))}|tgz\n"\
     + "demolishing_env : #{demolishing}\n"\
     + postinstall
   end
+end
+
+def cfg_environment_http_filename(env)
+  ext = File.extname(env[:dscfile])
+  filename = "#{File.basename(env[:dscfile],ext)}-http#{ext}"
+  File.join(File.dirname(env[:dscfile]),filename)
 end
 
 def cfg_kadeploy_client_filename()
@@ -1775,7 +1789,7 @@ def kadeploy_update(session,mountpath)
 end
 
 def tempfile(content)
-  tmp = Tempfile.new(__FILE__)
+  tmp = Tempfile.new(File.basename(__FILE__))
   tmp.write(content)
   tmp.close
 
@@ -3333,6 +3347,21 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} -R #{cfg_pxe_path()}")
 #=end
 
+    msg('Installing HTTP server',MSG_INFO)
+    apt_install(session,['apache2','apache2-mpm-worker'],server)
+
+    sexec(session,"rm -Rf #{CFG_APACHE_SERVER_PATH}")
+    sexec(session,"mkdir -p #{CFG_APACHE_SERVER_PATH}")
+    sexec(session,"chmod 755 #{CFG_APACHE_SERVER_PATH}")
+
+    msg('Configuring HTTP server',MSG_INFO)
+    sexec(session,"rm -f #{File.join(CFG_APACHE_MODS_CONF_PATH,'*')}")
+    sexec(session,"rm -f #{File.join(CFG_APACHE_SITES_CONF_PATH,'*')}")
+
+    tempfile(cfg_apache()) {|path| scp(getnode(server[:basename]),path,CFG_APACHE_CONF_FILE)}
+    tempfile(cfg_apache_site()) {|path| scp(getnode(server[:basename]),path,CFG_APACHE_SITES_CONF_FILE)}
+    sexec(session,'service apache2 restart')
+
     msg('Copying clusters postinstall files',MSG_INFO)
     $clusters.values.each do |cluster|
       postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
@@ -3345,10 +3374,20 @@ sshgw.ssh(servername,'root') do |session|
     msg('Copying and configuring environments',MSG_INFO)
     $kaenvs.values.each do |env|
       msg("  #{env[:name]} config",MSG_INFO)
-      scp(servername,env[:tarball],File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball])))
-      scp(servername,env[:postinstall][:file],File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))) if env[:postinstall]
+      path = File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))
+      scp(servername,env[:tarball],path)
+      sexec(session,"ln -sf #{path} #{CFG_APACHE_SERVER_PATH}")
+
+      if env[:postinstall]
+        path = File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))
+        scp(servername,env[:postinstall][:file],path)
+        sexec(session,"ln -sf #{path} #{CFG_APACHE_SERVER_PATH}")
+      end
       tempfile(cfg_environment_desc(env)) do |path|
         scp(servername,path,env[:dscfile])
+      end
+      tempfile(cfg_environment_desc(env,true)) do |path|
+        scp(servername,path,cfg_environment_http_filename(env))
       end
     end
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_ENVS_IMAGES_PATH}")
@@ -3445,10 +3484,10 @@ sshgw.ssh(servername,'root') do |session|
     msg('Installing ruby',MSG_INFO)
     apt_install(session,'ruby',server)
 
-
     msg('Adding environments',MSG_INFO)
     $kaenvs.values.each do |env|
       sexec(session,"kaenv3 -u #{CFG_KADEPLOY_USER} -a #{env[:dscfile]}")
+      sexec(session,"kaenv3 -u #{CFG_KADEPLOY_USER} -a #{cfg_environment_http_filename(env)}")
       msg("  #{env[:name]} ok",MSG_INFO)
     end
 

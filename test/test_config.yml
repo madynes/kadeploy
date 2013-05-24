@@ -3,9 +3,9 @@ binaries:
   kadeploy: kadeploy3
   kaenv: kaenv3
 environments:
-  base: squeeze-x64-min
-  xen: squeeze-x64-xen
-  grub: ubuntu
-  http: debian-http
-  nfs: squeeze-x64-min
+  base: debian-min
+  xen: debian-xen
+  grub: debian-min-dd
+  http: debian-min-http
+  nfs: debian-min
 deployuser: deploy
