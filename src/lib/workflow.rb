@@ -337,7 +337,7 @@ class Workflow < Automata::TaskManager
   end
 
   def start!
-    check_files()
+    #check_files()
 
     @start_time = Time.now.to_i
     debug(0, "Launching a deployment on #{@nodes.to_s_fold}")

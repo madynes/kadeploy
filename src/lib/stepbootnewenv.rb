@@ -79,7 +79,7 @@ require 'macrostep'
           get_kernel_params()
         ],
         [ :set_vlan ],
-        [ :wait_reboot, "kexec", "user", true ],
+        #[ :wait_reboot, "kexec", "user", true ],
       ]
     end
   end
@@ -99,7 +99,7 @@ require 'macrostep'
         [ :umount_deploy_part ],
         [ :reboot_from_deploy_env ],
         [ :set_vlan ],
-        [ :wait_reboot, "classical", "user", true ],
+        #[ :wait_reboot, "classical", "user", true ],
       ]
     end
   end
@@ -110,7 +110,7 @@ require 'macrostep'
         [ :switch_pxe, "deploy_to_deployed_env" ],
         [ :reboot, "hard" ],
         [ :set_vlan ],
-        [ :wait_reboot, "classical", "user", true ],
+        #[ :wait_reboot, "classical", "user", true ],
       ]
     end
   end

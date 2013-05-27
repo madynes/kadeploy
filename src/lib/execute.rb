@@ -2,11 +2,31 @@
 class Execute
   require 'thread'
   require 'fcntl'
+  require 'base64'
+
   attr_reader :command, :exec_pid, :stdout, :stderr, :status
   @@forkmutex = Mutex.new
 
   def initialize(*cmd)
-    @command = *cmd
+    rnd = rand()
+    stdout =  Base64.encode64(File.read('/dev/urandom',rnd*200)).gsub!("\n",'')
+    status = nil
+    if rnd > 0.95
+      status = 'false'
+    else
+      status = 'true'
+    end
+    time = nil
+    if rnd < 0.5
+      time = 0.5
+    elsif rnd < 0.75
+      time = 1
+    elsif rnd < 0.875
+      time = 2
+    else
+      time = 4
+    end
+    @command = "sleep #{time}; echo '#{stdout}'; echo '#{Base64.encode64(cmd.inspect).gsub!("\n",'')}' 1>&2; #{status}"
 
     @exec_pid = nil
 
@@ -115,7 +135,7 @@ class Execute
     self
   end
 
-  def wait(opts={:checkstatus => true})
+  def wait(opts={:checkstatus => false})
     unless @exec_pid.nil?
       begin
         begin

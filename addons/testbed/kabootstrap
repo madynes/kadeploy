@@ -123,7 +123,7 @@ CFG_KADEPLOY_ENVS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'envs')
 CFG_KADEPLOY_ENVS_IMAGES_PATH = File.join(CFG_KADEPLOY_ENVS_PATH,'images')
 CFG_KADEPLOY_ENVS_DESC_PATH = File.join(CFG_KADEPLOY_ENVS_PATH,'descriptions')
 CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH = File.join(CFG_KADEPLOY_ENVS_PATH,'install_scripts')
-CFG_KADEPLOY_CACHE_PATH = '/var/cache/kadeploy/cache'
+CFG_KADEPLOY_CACHE_PATH = '/tmp/kacache'
 CFG_KADEPLOY_PREINSTALLS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'preinstalls')
 CFG_KADEPLOY_PARTITIONING_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'parted-sample')
 CFG_KADEPLOY_BOOTLOADER_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'install_grub2')
@@ -136,14 +136,14 @@ def cfg_environment_desc(env)
     if env[:postinstall]
       postinstall = {
         'archive' => File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file])),
-        'compression' => env[:postinstall][:filetype],
+        'compression' => env[:postinstall][:compression],
         'script' => env[:postinstall][:args],
       }
       desc['postinstalls'] = [ postinstall ]
     end
 
     desc['name'] = env[:name]
-    desc['image']['file'] = File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))
+    desc['image']['file'] = File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball][:file]))
 
     desc.to_yaml
   else
@@ -160,7 +160,7 @@ def cfg_environment_desc(env)
     "###\n"\
     "name : #{env[:name]}\n"\
     "#{env[:desc]}\n"\
-    "tarball : #{File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball]))}|tgz\n"\
+    "tarball : #{File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball][:file]))}|#{env[:tarball][:filetype]}\n"\
     + "demolishing_env : #{demolishing}\n"\
     + postinstall
   end
@@ -1775,7 +1775,7 @@ def kadeploy_update(session,mountpath)
 end
 
 def tempfile(content)
-  tmp = Tempfile.new(__FILE__)
+  tmp = Tempfile.new(File.basename(__FILE__))
   tmp.write(content)
   tmp.close
 
@@ -2263,11 +2263,14 @@ envfiles.each do |env|
   if $version >= 7
     desc = YAML.load(tmp)
     $kaenvs[env][:name] = desc['name']
-    $kaenvs[env][:tarball] = desc['image']['file']
+    $kaenvs[env][:tarball] = {}
+    $kaenvs[env][:tarball][:file] = desc['image']['file']
+    $kaenvs[env][:tarball][:kind] = desc['image']['kind']
+    $kaenvs[env][:tarball][:compression] = desc['image']['compression']
     if desc['postinstalls'] and !desc['postinstalls'].empty?
       $kaenvs[env][:postinstall] = {}
       $kaenvs[env][:postinstall][:file] = desc['postinstalls'].first['archive']
-      $kaenvs[env][:postinstall][:filetype] = 'gzip'
+      $kaenvs[env][:postinstall][:compression] = desc['postinstalls'].first['compression']
       $kaenvs[env][:postinstall][:args] = desc['postinstalls'].first['script']
     end
     $kaenvs[env][:desc] = desc
@@ -2275,8 +2278,10 @@ envfiles.each do |env|
     tmp.each do |line|
       if line =~ /^\s*name\s*:\s*([^ ]+)\s*$/
         $kaenvs[env][:name] = Regexp.last_match(1).strip
-      elsif line =~ /^\s*tarball\s*:\s*([^ |]+)\|\S+\s*$/
-        $kaenvs[env][:tarball] = Regexp.last_match(1).strip
+      elsif line =~ /^\s*tarball\s*:\s*([^ |]+)\|(\S+)\s*$/
+        $kaenvs[env][:tarball] = {}
+        $kaenvs[env][:tarball][:file] = Regexp.last_match(1).strip
+        $kaenvs[env][:tarball][:filetype] = Regexp.last_match(2).strip
       elsif line =~ /^\s*postinstall\s*:\s*([^ |]+)\|([^ |]+)\|(.*)$/
         $kaenvs[env][:postinstall] = {}
         $kaenvs[env][:postinstall][:file] = Regexp.last_match(1).strip
@@ -2296,10 +2301,10 @@ envfiles.each do |env|
   end
 
   msg("#{$kaenvs[env][:name]}:",MSG_INFO)
-  if $kaenvs[env][:tarball] and File.exist?($kaenvs[env][:tarball])
-    msg("  tarball: #{$kaenvs[env][:tarball]}",MSG_INFO)
+  if $kaenvs[env][:tarball][:file] and File.exist?($kaenvs[env][:tarball][:file])
+    msg("  tarball: #{$kaenvs[env][:tarball][:file]}",MSG_INFO)
   else
-    msg("can't find env #{env} tarball '#{$kaenvs[env][:tarball]}'",MSG_WARNING)
+    msg("can't find env #{env} tarball '#{$kaenvs[env][:tarball][:file]}'",MSG_WARNING)
     $kaenvs.delete(env)
   end
   if $kaenvs[env] and $kaenvs[env][:postinstall]
@@ -3345,7 +3350,7 @@ sshgw.ssh(servername,'root') do |session|
     msg('Copying and configuring environments',MSG_INFO)
     $kaenvs.values.each do |env|
       msg("  #{env[:name]} config",MSG_INFO)
-      scp(servername,env[:tarball],File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball])))
+      scp(servername,env[:tarball][:file],File.join(CFG_KADEPLOY_ENVS_IMAGES_PATH,File.basename(env[:tarball][:file])))
       scp(servername,env[:postinstall][:file],File.join(CFG_KADEPLOY_ENVS_INSTALLSCRIPTS_PATH,File.basename(env[:postinstall][:file]))) if env[:postinstall]
       tempfile(cfg_environment_desc(env)) do |path|
         scp(servername,path,env[:dscfile])
@@ -3616,9 +3621,9 @@ sshgw.ssh(servername,'root') do |session|
     msg("Generating frontend user ssh key pair",MSG_INFO)
     sexec(session,"mkdir -p #{File.join("~#{CFG_FRONTEND_USER}",'.ssh')}")
     sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh')}")
-    sexec(session,"ssh-keygen -f #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity')} -N '' -C '#{CFG_FRONTEND_USER}@#{server[:fqdn]}'")
-    sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity')}")
-    sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity.pub')}")
+    sexec(session,"ssh-keygen -f #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','id_rsa')} -N '' -C '#{CFG_FRONTEND_USER}@#{server[:fqdn]}'")
+    sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','id_rsa')}")
+    sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','id_rsa.pub')}")
 
     msg("Copying user public key",MSG_INFO)
     begin
@@ -3631,7 +3636,7 @@ sshgw.ssh(servername,'root') do |session|
       tmp = sexec(session,"grep '#{pubkey}' #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','authorized_keys')}; true;")[0]
       sexec(session,"echo '#{pubkey}' >> #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','authorized_keys')}") if !tmp or tmp.empty?
     end
-    sexec(session,"cat #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','identity.pub')} >> #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','authorized_keys')}")
+    sexec(session,"cat #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','id_rsa.pub')} >> #{File.join("~#{CFG_FRONTEND_USER}",'.ssh','authorized_keys')}")
 
     if options[:debpackages] and !options[:debpackages].empty?
       msg("Installing additional packages '#{options[:debpackages].join(',')}'",MSG_INFO)
