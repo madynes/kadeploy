@@ -106,8 +106,11 @@ class Execute
     self
   end
 
+  # When :stdout_size or :stderr_size is given, if after have read the specified
+  # amount of data, the pipe is not empty, the 4th return value is set to false
   def wait(opts={})
     unless @exec_pid.nil?
+      emptypipes = true
       begin
         begin
           @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
@@ -116,14 +119,26 @@ class Execute
 
         if opts[:stdout_size]
           @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
-          @parent_io[1].read unless @parent_io[1].closed?
+          unless @parent_io[1].closed?
+            emptypipes &= false
+            begin
+              @parent_io[1].readpartial(4096) while true
+            rescue EOFError
+            end
+          end
         else
           @stdout = @parent_io[1].read unless @parent_io[1].closed?
         end
 
         if opts[:stderr_size]
           @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
-          @parent_io[2].read unless @parent_io[2].closed?
+          unless @parent_io[2].closed?
+            emptypipes &= false
+            begin
+              @parent_io[2].readpartial(4096) while true
+            rescue EOFError
+            end
+          end
         else
           @stderr = @parent_io[2].read unless @parent_io[2].closed?
         end
@@ -142,7 +157,7 @@ class Execute
         @parent_io = nil
         @exec_pid = nil
       end
-      [ @status, @stdout, @stderr ]
+      [ @status, @stdout, @stderr, emptypipes ]
     end
   end
 
