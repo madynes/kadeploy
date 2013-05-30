@@ -1,8 +1,8 @@
 require 'execute'
 
 module TakTuk
-  HOST_STDOUT_MAX_SIZE = 1000
-  HOST_STDERR_MAX_SIZE = 1000
+  HOST_STDOUT_MAX_SIZE = 10000
+  HOST_STDERR_MAX_SIZE = 10000
 
   class Aggregator
     def initialize(criteria)
@@ -424,10 +424,19 @@ module TakTuk
 
       @exec = Execute[@binary,*@args].run!
       hosts = @hostlist.to_a
-      @status, @stdout, @stderr, emptypipes = @exec.wait()
+      @status, @stdout, @stderr, emptypipes = @exec.wait(
+        :stdout_size => HOST_STDOUT_MAX_SIZE * hosts.size,
+        :stderr_size => HOST_STDERR_MAX_SIZE * hosts.size
+      )
 
       unless @status.success?
         @curthread = nil
+        return false
+      end
+
+      unless emptypipes
+        @curthread = nil
+        @stderr = "Too much data on the TakTuk command's stdout/stderr"
         return false
       end
 
