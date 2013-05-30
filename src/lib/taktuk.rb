@@ -1,6 +1,9 @@
 require 'execute'
 
 module TakTuk
+  HOST_STDOUT_MAX_SIZE = 1000
+  HOST_STDERR_MAX_SIZE = 1000
+
   class Aggregator
     def initialize(criteria)
       @criteria = criteria
@@ -13,28 +16,17 @@ module TakTuk
 
     def visit(results)
       ret = {}
-      results = results.compact!()
-      results.each do |result|
-        curval = result.dup
-        @criteria.each do |criterion|
-          curval.delete(criterion)
-        end
-
-        curkey = []
-        @criteria.each do |criterion|
-          curkey << result[criterion]
-        end
-
-        ok = false
-        ret.each_pair do |critkeys,v|
-          if curval == v
-            critkeys << curkey
-            ok = true
-            break
+      results.each_pair do |host,pids|
+        pids.each_pair do |pid,values|
+          affected = false
+          ret.each_pair do |k,v|
+            if values.eql?(v)
+              k << [ host, pid ]
+              affected = true
+              break
+            end
           end
-        end
-        unless ok
-        ret[[curkey]] = curval
+          ret[[[host,pid]]] = values unless affected
         end
       end
       ret
@@ -47,6 +39,7 @@ module TakTuk
     end
   end
 
+  # A Hash where the keyring is based on the host/pid
   class Result < Hash
     attr_reader :content
 
@@ -54,38 +47,30 @@ module TakTuk
       @content = content
     end
 
-    def push(key,val)
-      self.store(key,[]) unless self[key]
-      self[key] << val
+    def free()
+      self.each_pair do |host,pids|
+        pids.each_value do |val|
+          val.clear if val.is_a?(Array) or val.is_a?(Hash)
+        end
+        pids.clear
+      end
+      self.clear
     end
 
-    def compact!(excludelist=[:line])
-      ret = []
-      self.each_pair do |key,values|
-        equals = true
-        tmp = {}
-        keys = values.first.keys
-        values.each do |value|
-          if value.keys == keys
-            value.each_pair do |field,val|
-              tmp[field] = [] unless tmp[field]
-              tmp[field] << val if !tmp[field].include?(val) or excludelist.include?(field)
-            end
-          else
-            equals = false
-            break
-          end
-        end
-        if equals
-          # Clean 1 elem arrays
-          tmp.each_pair do |k,v|
-            tmp[k] = tmp[k][0] if tmp[k].size == 1
-          end
-          #self[key] = tmp
-          ret << tmp
+    def add(host,pid,val,concatval=false)
+      raise unless val.is_a?(Hash)
+      self.store(host,{}) unless self[host]
+      self[host].store(pid,{}) unless self[host][pid]
+      val.each_key do |k|
+        if concatval
+          self[host][pid][k] = '' unless self[host][pid][k]
+          self[host][pid][k] << val[k]
+          self[host][pid][k] << concatval
+        else
+          self[host][pid][k] = [] unless self[host][pid][k]
+          self[host][pid][k] << val[k]
         end
       end
-      ret
     end
 
     def aggregate(aggregator)
@@ -104,9 +89,10 @@ module TakTuk
                 "(?:[A-Za-z]|[A-Za-z][A-Za-z0-9\-]*[A-Za-z0-9])"
     HOSTNAME_REGEXP = "#{IP_REGEXP}|#{DOMAIN_REGEXP}"
 
-    def initialize(type,template=nil)
+    def initialize(type,template=nil,concat=false)
       @type = type
       @template = template
+      @concat = concat
     end
 
     def free
@@ -117,12 +103,15 @@ module TakTuk
     def parse(string)
       ret = Result.new
       if @template
+        regexp = /^#{@type.to_s}#{SEPESCAPED}(\d+)#{SEPESCAPED}(#{HOSTNAME_REGEXP})#{SEPESCAPED}(.+)$/
         string.each_line do |line|
-          if /^#{@type.to_s}#{SEPESCAPED}(\d+)#{SEPESCAPED}(#{HOSTNAME_REGEXP})#{SEPESCAPED}(.+)$/ =~ line
-            tmp = @template.parse(Regexp.last_match(3))
-            tmp[:host] = Regexp.last_match(2)
-            tmp[:pid] = Regexp.last_match(1)
-            ret.push([tmp[:host],tmp[:pid]],tmp)
+          if regexp =~ line
+            ret.add(
+              Regexp.last_match(2),
+              Regexp.last_match(1),
+              @template.parse(Regexp.last_match(3)),
+              (@concat ? $/ : false)
+            )
           end
         end
       end
@@ -144,7 +133,7 @@ module TakTuk
 
   class OutputStream < Stream
     def initialize(template)
-      super(:output,template)
+      super(:output,template,true)
     end
   end
 
@@ -329,6 +318,14 @@ module TakTuk
       end
       ret
     end
+
+    def to_a
+      if @hostlist.is_a?(Array)
+        @hostlist
+      elsif @hostlist.is_a?(String)
+        File.read(@hostlist).split("\n").uniq
+      end
+    end
   end
 
   class Commands < Array
@@ -426,7 +423,8 @@ module TakTuk
       @args += @commands.to_cmd
 
       @exec = Execute[@binary,*@args].run!
-      @status, @stdout, @stderr = @exec.wait
+      hosts = @hostlist.to_a
+      @status, @stdout, @stderr, emptypipes = @exec.wait()
 
       unless @status.success?
         @curthread = nil
