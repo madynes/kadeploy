@@ -55,6 +55,9 @@ class Microstep < Automata::QueueTask
         @name.to_s,
         "ok"
       )
+      node.last_cmd_stdout = ''
+      node.last_cmd_stderr = ''
+      node.last_cmd_exit_status = -1
     end
 
     begin
