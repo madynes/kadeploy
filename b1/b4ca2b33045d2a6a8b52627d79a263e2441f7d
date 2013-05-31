@@ -1,0 +1,8 @@
+Change-Id: Ib1b4ca2b33045d2a6a8b52627d79a263e2441f7d
+Code-Review+2: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Verified+1: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-by: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-at: Fri, 31 May 2013 16:29:51 +0200
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1034
+Project: kadeploy3
+Branch: refs/heads/3.1.7
