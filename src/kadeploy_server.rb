@@ -1035,7 +1035,9 @@ class KadeployServer
           end
           if (exec_specific.reboot_kind == "deploy_env") then
             micro.wait_reboot("classical","deploy",true,timeout)
-            micro.send_key_in_deploy_env("tree")
+            if exec_specific.key and !exec_specific.key.empty?
+              micro.send_key_in_deploy_env("tree")
+            end
             nodeset.set_deployment_state("deploy_env", nil, db, exec_specific.true_user)
           else
             micro.wait_reboot(
