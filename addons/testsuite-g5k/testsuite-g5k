@@ -36,10 +36,18 @@ trap('INT') {
 
 puts "Job ID: #{$jobid}"
 puts "Wait for the job to terminate"
+out = ''
 begin
   sleep 20
-end until cmd("oarstat -s -j #{$jobid}").grep(/Terminated/).size > 0
+  out = cmd("oarstat -s -j #{$jobid}")
+end until out.grep(/Terminated|Error/).size > 0
 
 puts "Job done"
 cmd("mv OAR.#{TAG}.#{$jobid}.stdout #{LOGS_DIR}/#{$commitfile}.stdout")
 cmd("mv OAR.#{TAG}.#{$jobid}.stderr #{LOGS_DIR}/#{$commitfile}.stderr")
+
+if out.grep(/Error/).size > 0
+  exit 1
+else
+  exit 0
+end
