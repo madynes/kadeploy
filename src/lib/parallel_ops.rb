@@ -282,7 +282,9 @@ require 'socket'
       taktuk_opts[:self_propagate] = nil if @context[:common].taktuk_auto_propagate
 
       tree_arity = @context[:common].taktuk_tree_arity
-      unless opts[:scattering].nil?
+      if opts[:scattering].nil?
+        taktuk_opts[:dynamic] = tree_arity
+      else
         case opts[:scattering]
         when :chain
           taktuk_opts[:dynamic] = 1
