@@ -1,0 +1,94 @@
+#!/usr/bin/ruby
+
+require 'common-g5k'
+
+def test_cmd(script)
+  "cd #{TEST_DIR} && ruby #{script} --verbose=verbose -- #{TEST_CONFIG} ~/NODEFILE"
+end
+
+unless ARGV.size >= 2
+  error("usage: #{$0} [git:|gerrit:]<commit/branch> <frontend user@host> [<test_config>] [<sources dir>]\ncustomizable env vars:\n  #{KADEPLOY_ENV_VARS.join("\n  ")}\nsamples:\n  #{$0} master 8 (git is used by default)\n  #{$0} git:3.1.7 7 test_config.yml kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 7")
+end
+
+$repo,$commit,$repo_kind = get_repo_commit(ARGV[0])
+tmp=ARGV[1].split('@')
+$user=tmp[0]
+$host=tmp[1]
+
+if ARGV[2] and !File.readable?(ARGV[2])
+  error("file not found '#{ARGV[2]}'")
+end
+
+if ARGV[3] and !File.readable?(ARGV[3])
+  error("file not found '#{ARGV[3]}'")
+end
+
+puts "Cleaning testsuite"
+ssh($user,$host,"rm -rf #{TMP_DIR}")
+puts '... done'
+
+if ARGV[3]
+  puts "Copying testsuite"
+  scp($user,$host,ARGV[3],TMP_DIR)
+  puts '... done'
+else
+  begin
+    puts 'Fetching git repo'
+    $git_repo=fetch_git_repo($repo_kind,$repo,$commit)
+    puts "... done"
+
+    puts "Copying testsuite"
+    scp($user,$host,$git_repo,TMP_DIR)
+    puts '... done'
+  ensure
+    cmd("rm -Rf #{$git_repo}",false) if $git_repo
+  end
+end
+
+if ARGV[2]
+  puts "Copying testsuite"
+  scp($user,$host,ARGV[2],TEST_DIR)
+  puts '... done'
+end
+
+success = true
+
+puts "Running kadeploy test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KADEPLOY),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+puts "Running kareboot test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KAREBOOT),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+puts "Running kapower test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KAPOWER),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+puts "Running kaenv  test"
+stdout,stderr,tmp = ssh($user,$host,test_cmd(TEST_KAENV),false)
+success = success & tmp
+puts '... done'
+puts 'Failed !' unless tmp
+puts stdout unless stdout.empty?
+puts stderr unless stderr.empty?
+
+if success
+  puts 'Global: Success'
+  exit 0
+else
+  puts 'Global: Fail'
+  exit 1
+end
