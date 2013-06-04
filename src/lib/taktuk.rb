@@ -102,7 +102,7 @@ module TakTuk
 
     def parse(string)
       ret = Result.new
-      if @template
+      if @template and string and !string.empty?
         regexp = /^#{@type.to_s}#{SEPESCAPED}(\d+)#{SEPESCAPED}(#{HOSTNAME_REGEXP})#{SEPESCAPED}(.+)$/
         string.each_line do |line|
           if regexp =~ line
@@ -286,7 +286,13 @@ module TakTuk
     def to_cmd
       self.keys.inject([]) do |ret,opt|
         ret << "--#{check(opt)}"
-        ret << self[opt] if self[opt] and self[opt].is_a?(String) and !self[opt].empty?
+        if self[opt]
+          if self[opt].is_a?(String)
+            ret << self[opt] unless self[opt].empty?
+          else
+            ret << self[opt].to_s
+          end
+        end
         ret
       end
     end
