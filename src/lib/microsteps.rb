@@ -1470,9 +1470,7 @@ class Microstep < Automata::QueueTask
     "&& /sbin/kexec "\
       "-l $kernel "\
       "--initrd=$initrd "\
-      "--append=\"#{kernel_params}\" "\
-    "&& sleep 1 "\
-    "&& echo \"u\" > /proc/sysrq-trigger"
+      "--append=\"#{kernel_params}\" "
   end
 
   # Get the shell command used to follow a symbolic link until reaching the real file
