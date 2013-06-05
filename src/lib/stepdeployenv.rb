@@ -36,6 +36,7 @@ require 'macrostep'
       [
         [ :set_vlan, "DEFAULT" ],
         [ :send_deployment_kernel, :tree ],
+        [ :sync ],
         [ :kexec,
           'linux',
           context[:cluster].kexec_repository,
