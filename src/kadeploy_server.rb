@@ -355,7 +355,7 @@ class KadeployServer
       @config.common.cache[:global].clean  if @config.common.cache[:global]
       @config.common.cache[:netboot].clean
 
-      context[:database].disconnect if context
+      info[:database].disconnect if info[:database]
       kadeploy_delete_workflow_info(workflow_id)
       true
     }
@@ -368,18 +368,15 @@ class KadeployServer
   # Output
   # * return true if the deployment has been killed and nil if workflow id does no exist
   def async_deploy_kill(workflow_id)
-    return async_deploy_lock_wid(workflow_id) { |info|
+    ret = async_deploy_lock_wid(workflow_id) { |info|
       info[:workflows].each do |workflow|
         workflow.kill()
       end
-      info[:workflows].first.context[:db].disconnect if info[:workflows].first and info[:workflows].first.context
-      kadeploy_delete_workflow_info(workflow_id)
-      begin
-        GC.start
-      rescue TypeError
-      end
+      info[:exec_specific].node_set.set_deployment_state('aborted', nil, info[:database], info[:user])
       true
     }
+    async_deploy_free(workflow_id)
+    return ret
   end
 
   # Test if the power operation has reached the end (RPC: only for async execution)
@@ -524,6 +521,7 @@ class KadeployServer
 
     context = {
       :deploy_id => nil,
+      :user => exec_specific.true_user,
       :database => db,
       :client => client,
       :syslock => @syslog_lock,
@@ -547,7 +545,17 @@ class KadeployServer
     )
     kadeploy_create_workflow_info(workflow_id)
     @workflow_info_hash[workflow_id][:exec_specific] = exec_specific
+    @workflow_info_hash[workflow_id][:database] = db
+    @workflow_info_hash[workflow_id][:user] = exec_specific.true_user
     context[:deploy_id] = workflow_id
+
+    exec_specific.node_set.set_deployment_state(
+      'deploying',
+      (exec_specific.load_env_kind == 'file' ?
+        -1 : exec_specific.environment.id),
+      db,
+      exec_specific.true_user
+    )
 
     tmpoutput = nil
     unless context[:common].kadeploy_disable_cache
@@ -568,7 +576,7 @@ class KadeployServer
           @workflow_info_hash[workflow_id][:cached_files] =
             Managers::GrabFileManager.grab_user_files(context,tmpoutput)
         rescue KadeployError => ke
-          exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],'')
+          exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],context[:user])
           raise KadeployError.new(ke.errno,{ :wid => workflow_id },ke.message)
         end
       end
@@ -757,6 +765,15 @@ class KadeployServer
         end
         @config.common.cache[:global].clean if @config.common.cache[:global]
         @config.common.cache[:netboot].clean
+        if @workflow_info_hash[workflow_id][:exec_specific]
+          @workflow_info_hash[workflow_id][:exec_specific].node_set.set_deployment_state(
+            'aborted',
+            nil,
+            @workflow_info_hash[workflow_id][:database],
+            @workflow_info_hash[workflow_id][:user]
+          )
+        end
+        @workflow_info_hash[workflow_id][:database].disconnect if @workflow_info_hash[workflow_id][:database]
         kadeploy_delete_workflow_info(workflow_id)
       end
     }
@@ -769,6 +786,8 @@ class KadeployServer
     @workflow_info_hash[workflow_id][:workflows] = []
     @workflow_info_hash[workflow_id][:cached_files] = []
     @workflow_info_hash[workflow_id][:exec_specific] = nil
+    @workflow_info_hash[workflow_id][:database] = nil
+    @workflow_info_hash[workflow_id][:user] = nil
   end
 
   # Record a Managers::WorkflowManager pointer

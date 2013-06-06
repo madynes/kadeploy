@@ -28,6 +28,7 @@ if (exec_specific_config != nil) then
   workflow_id = -1
   Signal.trap("INT") do
     puts "SIGINT trapped, let's clean everything ..."
+    kadeploy_server.async_deploy_kill(workflow_id) if kadeploy_server and workflow_id.is_a?(String)
     exit(1)
   end
 
