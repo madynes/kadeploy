@@ -65,8 +65,17 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 
 # Update path for devel
 UPDATE_PATH_CHECK = {
-  'src' => 'kadeploy_server.rb',
-  'lib' => 'environment.rb',
+  'common' => {
+    'src' => 'kadeploy_server.rb',
+    'lib' => 'environment.rb',
+  },
+  'client' => {
+    'bin' => '/usr/bin/kadeploy3',
+  },
+  'server' => {
+    'sbin' => '/usr/sbin/kadeploy3d',
+    'init' => '/etc/init.d/kadeploy3d',
+  }
 }
 UPDATE_FORWARD_PORT = 2222
 UPDATE_DIR_VAR = 'WORKINGDIR'
@@ -1753,37 +1762,41 @@ end
 
 def kadeploy_update(session,mountpath)
   # Check if debian package is installed
-  tmp = sexec(session,'dpkg -s kadeploy-common')
-  msg('dpkg error',MSG_ERROR,true) if !tmp or tmp.empty?
-  tmp.each do |line|
-    if line =~ /^Status: .* ([^ ]+)$/
-      unless Regexp.last_match(1) == 'installed'
-        msg("debian package 'kadeploy-common' is not installed",MSG_ERROR,true)
+  ['common','server','client'].each do |pkg|
+    tmp = sexec(session,"dpkg -s kadeploy-#{pkg}")
+    msg('dpkg error',MSG_ERROR,true) if !tmp or tmp.empty?
+    tmp.each do |line|
+      if line =~ /^Status: .* ([^ ]+)$/
+        unless Regexp.last_match(1) == 'installed'
+          msg("debian package 'kadeploy-#{pkg}' is not installed",MSG_ERROR,true)
+        end
       end
     end
   end
 
-  $update_paths.each do |key,localpath|
-    next if key == UPDATE_DIR_VAR
-    rlocalpath = File.join(mountpath,localpath)
-    msg("Updating '#{key}' files",MSG_INFO)
-    remotepaths = sexec(session,"dpkg -L kadeploy-common | grep '#{UPDATE_PATH_CHECK[key]}$'")
-    remotepaths = [remotepaths] if remotepaths.is_a?(String)
-    msg("file '#{UPDATE_PATH_CHECK[key]}' not found in kadeploy-common package",MSG_ERROR,true) if !tmp or tmp.empty?
-    remotepaths.each do |remotepath|
-      remotepath=remotepath.split(UPDATE_PATH_CHECK[key])[0]
-      # Check nfs paths
-      tmpcheck = sexec(session,"ls -a #{rlocalpath}",nil,false,false)
-      msg("file '#{rlocalpath}' not found",MSG_ERROR,true) if !tmpcheck or tmpcheck.empty?
+  $update_paths.each_pair do |pkg,keys|
+    next if pkg == UPDATE_DIR_VAR
+    keys.each do |key,localpath|
+      rlocalpath = File.join(mountpath,localpath)
+      msg("Updating '#{key}' files",MSG_INFO)
+      remotepaths = sexec(session,"dpkg -L kadeploy-#{pkg} | grep '#{UPDATE_PATH_CHECK[pkg][key]}$'")
+      msg("file '#{UPDATE_PATH_CHECK[pkg][key]}' not found in kadeploy-#{pkg} package",MSG_ERROR,true) if !remotepaths or remotepaths.empty?
+      remotepaths = [remotepaths] if remotepaths.is_a?(String)
+      remotepaths.each do |remotepath|
+        remotepath=File.dirname(remotepath)
+        # Check nfs paths
+        tmpcheck = sexec(session,"ls -a #{rlocalpath}",nil,false,false)
+        msg("file '#{rlocalpath}' not found",MSG_ERROR,true) if !tmpcheck or tmpcheck.empty?
 
-      localentries = Dir.entries(File.join($update_paths[UPDATE_DIR_VAR],localpath))
-      localentries.delete('.')
-      localentries.delete('..')
-      localentries.each do |localentry|
-        unless $update_paths.values.include?(File.join(localpath,localentry))
-          sexec(session,"rm -Rf #{File.join(remotepath,localentry)}",nil,true)
-          sexec(session,"ln -s #{File.join(rlocalpath,localentry)} #{remotepath}",nil,true)
-          sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{File.join(remotepath,localentry)}")
+        localentries = Dir.entries(File.join($update_paths[UPDATE_DIR_VAR],localpath))
+        localentries.delete('.')
+        localentries.delete('..')
+        localentries.each do |localentry|
+          unless $update_paths[pkg].values.include?(File.join(localpath,localentry))
+            sexec(session,"rm -Rf #{File.join(remotepath,localentry)}",nil,true)
+            sexec(session,"ln -s #{File.join(rlocalpath,localentry)} #{remotepath}",nil,true)
+            sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{File.join(remotepath,localentry)}")
+          end
         end
       end
     end
@@ -2206,26 +2219,31 @@ if options[:update_file]
 
     nb = 0
     updatepath = $update_paths[UPDATE_DIR_VAR]
-    $update_paths.each do |key,path|
-      $update_paths[key] = path
-      #$update_paths[key] = File.expand_path(path)
-      next if key == UPDATE_DIR_VAR
-      begin
-        msg("#{options[:update_file]}: file not found '#{path}'",MSG_ERROR,true) \
-          unless File.exist?(File.join(updatepath,$update_paths[key]))
+    $update_paths.each do |pkg,keys|
+      next if pkg == UPDATE_DIR_VAR
+      msg("#{options[:update_file]}: invalid package '#{pkg}'",MSG_ERROR,true) unless UPDATE_PATH_CHECK[pkg]
+      $update_paths[pkg] = {} unless $update_paths[pkg]
+      keys.each do |key,path|
+        $update_paths[pkg][key] = path
+        #$update_paths[key] = File.expand_path(path)
+        next if key == UPDATE_DIR_VAR
+        begin
+          msg("#{options[:update_file]}: file not found '#{path}'",MSG_ERROR,true) \
+            unless File.exist?(File.join(updatepath,$update_paths[pkg][key]))
 
-        if UPDATE_PATH_CHECK[key]
-           nb +=1
-        else
-          $update_paths.delete(key)
-          msg("#{options[:update_file]}: invalid key '#{key}'",MSG_WARNING)
+          if UPDATE_PATH_CHECK[pkg][key]
+             nb +=1
+          else
+            $update_paths[pkg].delete(key)
+            msg("#{options[:update_file]}: invalid key '#{key}'",MSG_WARNING)
+          end
+        rescue ArgumentError
+          msg("#{options[:update_file]}: file not found '#{path}'",MSG_ERROR,true)
         end
-      rescue ArgumentError
-        msg("#{options[:update_file]}: file not found '#{path}'",MSG_ERROR,true)
       end
     end
-    msg("#{options[:update_file]}: missing key(s) [needed: {#{UPDATE_PATH_CHECK.keys * ','}}]",MSG_WARNING) \
-      if nb != UPDATE_PATH_CHECK.keys.size
+    msg("#{options[:update_file]}: missing key(s) [needed: \n#{UPDATE_PATH_CHECK.keys.inject(''){|ret,pkg| ret + "#{pkg} (#{UPDATE_PATH_CHECK[pkg].keys * ','}) " }}]",MSG_WARNING) \
+      if nb != UPDATE_PATH_CHECK.keys.inject(0){|sum,pkg| sum + UPDATE_PATH_CHECK[pkg].size }
   else
     msg("update file '#{options[:update_file]}' not found",MSG_ERROR,true)
   end
