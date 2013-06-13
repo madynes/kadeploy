@@ -91,7 +91,7 @@ class Workflow < Automata::TaskManager
 
   def error(errno,abrt=true)
     @errno = errno
-    @nodes.set_deployment_state('aborted',nil,context[:database],'') if abrt
+    @nodes.set_deployment_state('aborted',nil,context[:database],context[:user]) if abrt
     raise KadeployError.new(@errno,context)
   end
 
@@ -371,7 +371,7 @@ class Workflow < Automata::TaskManager
         (context[:execution].load_env_kind == 'file' ?
           -1 : context[:execution].environment.id),
         context[:database],
-        context[:execution].true_user
+        context[:user]
       )
       context[:dblock].unlock
     end
@@ -381,14 +381,14 @@ class Workflow < Automata::TaskManager
 
   def break!(task,nodeset)
     context[:dblock].synchronize do
-      @nodes_brk.set_deployment_state('deployed',nil,context[:database],'')
+      @nodes_brk.set_deployment_state('deployed',nil,context[:database],context[:user])
     end
     debug(1,"Breakpoint reached for #{nodeset.to_s_fold}",task.nsid)
   end
 
   def success!(task,nodeset)
     context[:dblock].synchronize do
-      @nodes_ok.set_deployment_state('deployed',nil,context[:database],'')
+      @nodes_ok.set_deployment_state('deployed',nil,context[:database],context[:user])
     end
     @logger.set('success', true, nodeset)
     debug(1,
@@ -400,7 +400,7 @@ class Workflow < Automata::TaskManager
 
   def fail!(task,nodeset)
     context[:dblock].synchronize do
-      @nodes_ko.set_deployment_state('deploy_failed',nil,context[:database],'')
+      @nodes_ko.set_deployment_state('deploy_failed',nil,context[:database],context[:user])
     end
     @logger.set('success', false, nodeset)
     @logger.error(nodeset)
@@ -447,7 +447,7 @@ class Workflow < Automata::TaskManager
   def kill!()
     log('success', false)
     @logger.dump
-    @nodes.set_deployment_state('aborted', nil, context[:database], '')
+    @nodes.set_deployment_state('aborted', nil, context[:database], context[:user])
     debug(2," * Kill a #{self.class.name} instance")
     debug(0,'Deployment aborted by user')
   end
