@@ -549,14 +549,6 @@ class KadeployServer
     @workflow_info_hash[workflow_id][:user] = exec_specific.true_user
     context[:deploy_id] = workflow_id
 
-    exec_specific.node_set.set_deployment_state(
-      'deploying',
-      (exec_specific.load_env_kind == 'file' ?
-        -1 : exec_specific.environment.id),
-      db,
-      exec_specific.true_user
-    )
-
     tmpoutput = nil
     unless context[:common].kadeploy_disable_cache
       tmpoutput = Debug::OutputControl.new(

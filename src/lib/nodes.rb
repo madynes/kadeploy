@@ -906,6 +906,7 @@ module Nodes
     def set_deployment_state(state, env_id, db, user)
       args,nodelist = generic_where_nodelist()
       date = Time.now.to_i
+      env_id = env_id || -1
       case state
       when "deploying"
         db.run_query("DELETE FROM nodes WHERE #{nodelist}",*args)
@@ -926,7 +927,15 @@ module Nodes
         args = [ user, date ] + args
         db.run_query("UPDATE nodes SET state='deploy_env', user=?, env_id=\"-1\", date=? WHERE #{nodelist}",*args)
       when "aborted"
-        db.run_query("UPDATE nodes SET state='aborted' WHERE #{nodelist}",*args) unless args.empty?
+        db.run_query("DELETE FROM nodes WHERE #{nodelist}",*args)
+
+        @set.each { |node|
+          db.run_query(
+            "INSERT INTO nodes (hostname, state, env_id, date, user) VALUES (?,'aborted',?,?,?)",
+             node.hostname,env_id,date,user
+          )
+        }
+        #db.run_query("UPDATE nodes SET state='aborted' WHERE #{nodelist}",*args) unless args.empty?
       when "deploy_failed"
         db.run_query("UPDATE nodes SET state='deploy_failed' WHERE #{nodelist}",*args)  unless args.empty?
       else
