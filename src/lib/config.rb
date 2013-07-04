@@ -756,6 +756,7 @@ module ConfigInformation
             conf.taktuk_auto_propagate = cp.value(
               'auto_propagate',[TrueClass,FalseClass],true
             )
+            conf.taktuk_outputs_size = cp.value('outputs_size',Fixnum,20000)
           end
 
           cp.parse('bittorrent') do |info|
@@ -3230,6 +3231,7 @@ module ConfigInformation
     attr_accessor :nodes_desc     #information about all the nodes
     attr_accessor :taktuk_connector
     attr_accessor :taktuk_tree_arity
+    attr_accessor :taktuk_outputs_size
     attr_accessor :taktuk_auto_propagate
     attr_accessor :tarball_dest_dir
     attr_accessor :kadeploy_server

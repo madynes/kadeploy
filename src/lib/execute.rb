@@ -126,7 +126,7 @@ class Execute
         rescue IOError
         end
 
-        if opts[:stdout_size]
+        if opts[:stdout_size] and opts[:stdout_size] > 0
           @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
           emptypipes = false unless @parent_io[1].eof?
           unless @parent_io[1].closed?
@@ -139,7 +139,7 @@ class Execute
           @stdout = @parent_io[1].read unless @parent_io[1].closed?
         end
 
-        if opts[:stderr_size]
+        if opts[:stderr_size] and opts[:stderr_size] > 0
           @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
           emptypipes = false unless @parent_io[2].eof?
           unless @parent_io[2].closed?
