@@ -1,9 +1,6 @@
 require 'execute'
 
 module TakTuk
-  HOST_STDOUT_MAX_SIZE = 10000
-  HOST_STDERR_MAX_SIZE = 10000
-
   class Aggregator
     def initialize(criteria)
       @criteria = criteria
@@ -416,7 +413,7 @@ module TakTuk
       @options = Options[opts]
     end
 
-    def run!
+    def run!(opts = {})
       @curthread = Thread.current
       @args = []
       @args += @options.to_cmd
@@ -430,9 +427,10 @@ module TakTuk
 
       @exec = Execute[@binary,*@args].run!
       hosts = @hostlist.to_a
+      outputs_size = opts[:outputs_size] || 0
       @status, @stdout, @stderr, emptypipes = @exec.wait(
-        :stdout_size => HOST_STDOUT_MAX_SIZE * hosts.size,
-        :stderr_size => HOST_STDERR_MAX_SIZE * hosts.size
+        :stdout_size => outputs_size * hosts.size,
+        :stderr_size => outputs_size * hosts.size
       )
 
       unless @status.success?
