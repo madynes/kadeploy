@@ -157,6 +157,7 @@ module Automata
       @static_context = static_context
       @queue = Queue.new
       @threads = {}
+      @threads_lock = Mutex.new
       @nodes = nodeset #all nodes
       @nodes_done = Nodes::NodeSet.new(@nodes.id)
       @runthread = nil
@@ -172,12 +173,15 @@ module Automata
       @static_context = nil
       @queue = nil
       if @threads
+        #@threads_lock.lock if @threads_lock
         @threads.each_key do |task|
           task.free
           task = nil
         end
+        #@threads_lock.unlock if @threads_lock
       end
       @threads = nil
+      @threads_lock = nil
       @nodes = nil
       #@nodes_done.free(false) if @nodes_done
       @nodes_done = nil
@@ -305,7 +309,11 @@ module Automata
 
     def status()
       ret = {}
-      @threads.each_key{ |task| ret[task.name] = task.status unless task.done? }
+      @threads_lock.synchronize do
+        @threads.each_key do |task|
+          ret[task.name] = task.status
+        end
+      end
       ret[:OK] = @nodes_ok unless @nodes_ok.empty?
       ret[:KO] = @nodes_ko unless @nodes_ko.empty?
       ret
@@ -421,7 +429,6 @@ module Automata
         end
         @threads.delete(task) if @threads[task] and @threads[task].empty?
       end
-      @cleaner.join
     end
 
     def run_task(task)
@@ -534,7 +541,7 @@ module Automata
       @cleaner = Thread.new do
         while !done? and @runthread.alive?
           sleep(CLEAN_THREADS_PITCH)
-          clean_threads()
+          @threads_lock.synchronize { clean_threads() }
         end
         @runthread.join unless @runthread.alive?
       end
@@ -542,6 +549,7 @@ module Automata
       curtask = nil
 
       until (done?)
+        query = nil
         begin
           #sleep(QUEUE_CKECK_PITCH)
           query = @queue.pop
@@ -549,12 +557,17 @@ module Automata
           retry unless done?
         end
 
-        clean_threads()
+        @threads_lock.lock
+
+        #clean_threads()
 
         # Don't do anything if the nodes was already treated
         clean_nodeset(query[:nodes])
 
-        next if !query[:nodes] or query[:nodes].empty?
+        if !query[:nodes] or query[:nodes].empty?
+          @threads_lock.unlock
+          next
+        end
 
         curtask = query[:task]
         newtask = {
@@ -622,13 +635,21 @@ module Automata
             :treatment => Thread.new { run_task(task) }
           }
         end
+
+        clean_threads()
+
+        @threads_lock.unlock
       end
 
-      clean_threads()
-      join_threads()
+      @threads_lock.synchronize do
+        clean_threads()
+        join_threads()
+      end
       @runthread = nil
       if @cleaner.alive?
         @cleaner.kill
+        @cleaner.join
+      else
         @cleaner.join
       end
       @cleaner = nil
