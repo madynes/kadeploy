@@ -2754,30 +2754,31 @@ class KadeployServer
     set.push(exec_specific.node)
     part = @config.cluster_specific[exec_specific.node.cluster].block_device + @config.cluster_specific[exec_specific.node.cluster].deploy_part
     if (CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) then
-      pid = fork {
+      thr = Thread.new do
+        kill = true
         begin
           client.connect_console(exec_specific.node.cmd.console)
-        rescue DRb::DRbConnError
-        end
-      }
-      state = "running"
-      while ((CheckRights::CheckRightsFactory.create(@config.common.rights_kind, exec_specific.true_user, client, set, db, part).granted?) &&
-             (state == "running"))
-        20.times {
-          if (Process.waitpid(pid, Process::WNOHANG) == pid) then
-            state = "reaped"
-            break
-          else
-            sleep(1)
+          kill = false
+        ensure
+          if kill
+            client.kill_console()
+            Debug::distant_client_print("Lost rights, console killed", client)
           end
-        }
-      end
-      if (state == "running") then
-        client.kill_console()        
-        Debug::distant_client_print("Console killed", client)
-        ProcessManagement::killall(pid)
+        end
       end
       res = true
+      while thr.alive?
+        unless CheckRights::CheckRightsFactory.create(
+          @config.common.rights_kind,
+          exec_specific.true_user,
+          client, set, db, part
+        ).granted?
+          thr.kill
+          res = false
+        end
+        sleep 1
+      end
+      thr.join
     else
       res = false
     end
