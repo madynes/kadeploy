@@ -1,0 +1,244 @@
+Testbed
+=======
+
+This file is giving instructions about the usage of the scripts contains in
+this folder to set up a testbed for Kadeploy.
+
+
+Kabootstrap
+-----------
+
+The *kabootstrap* script allows to quickly set up a testbed for Kadeploy
+inside Grid'5000. Thus, you need to get a Grid'5000 account and to
+configure you SSH access (See the wiki page for this:
+<https://www.grid5000.fr/mediawiki/index.php/Getting_Started>).
+
+Perform the following steps:
+
+=======
+# connect to the platform
+ssh nancy.g5k
+
+# get the a local copy of the repository
+git clone https://gforge.inria.fr/git/kadeploy3/kadeploy3.git
+
+Install physical machines
+-------------------------
+## Change this variables to use your own environments
+
+# the environments directory must contains:
+#   - a description file
+#   - an image tarball
+ENV_DIR=/home/lsarzyniec/envs/
+
+# the kernels directory that contains the kernel and the initrd files
+KER_DIR=/home/lsarzyniec/deploy_kernels/
+
+# ask for 2 nodes for 3 hours
+oarsub -I deploy -l {"type='kavlan-local'"}/vlan=1+{"cluster='griffon'"}/nodes=2,walltime=3
+
+# deploy base environment in the right VLAN
+kadeploy3 -e squeeze-x64-base -f $OAR_NODEFILE -k --vlan `kavlan -V`
+
+# launch the bootstrap script
+kadeploy3/addons/testbed/kabootstrap --git 3.1.5 -v 5 $KER_DIR $ENV_DIR
+
+# save the last line that show you the user@fqdn
+
+# enter the vlan
+ssh kavlan-`kavlan -V`
+
+# get into the new Kadeploy frontend using the kabootstrap return
+ssh user@fqdn
+
+# then use kadeploy! The NODEFILE contains the deployables nodes
+kadeploy3 -f NODEFILE -e debian-min -k
+
+
+Install virtual machines
+------------------------
+oarsub -I -t deploy -l /slash_22=2+{"type='kavlan'"}/vlan=1+/nodes=2,walltime=2
+
+hostlist=`tempfile`
+kavlan -l > $hostlist
+
+vlanid=`kavlan -V`
+
+kadeploy3 -f $OAR_NODEFILE -u lsarzyniec -e kvm2 -k --vlan $vlanid
+
+kadeploy3/addons/testbed/configurekvm.sh $hostlist 10.0.0.0/24
+
+# Now get the kabootstrap options provided by the `configurekvm.sh` script
+# and run it like this
+
+kadeploy3/addons/testbed/kabootstrap -V -n /home/mmercier/.kabootstrap/network.yml -g fnancy.nancy.grid5000.fr -s /home/mmercier/.kabootstrap/service.yml -c dns.nancy.grid5000.fr -f /home/mmercier/.kabootstrap/nodefile -F /home/mmercier/.kabootstrap/hostfile -u /home/lsarzyniec/kadeployfiles.yml -j /home/lsarzyniec/kaconfig_migration --no-tunnels /home/lsarzyniec/kernels-kvm /home/lsarzyniec/envs-kvm
+
+
+
+### Trace sample ###
+[0] === Globals
+[0]   mode: KAVLAN
+[0]   sshkeyfile: /home/mmercier/.ssh/id_rsa
+[0] === Gathering kernels information
+[0] -production:
+[0]   vmlinuz: /home/lsarzyniec/deploy_kernels/vmlinuz-production
+[0]   initrd: /home/lsarzyniec/deploy_kernels/initrd-production
+[0] === Gathering environments information
+[0] debian-min-dd:
+[0]   tarball: /home/lsarzyniec/envs/images/debian-min.dd.gz
+[0] debian-base:
+[0]   tarball: /home/lsarzyniec/envs/images/squeeze-x64-base-1.6.tgz
+[0]   postinstall:
+/home/lsarzyniec/envs/postinstalls/debian-x64-base-2.4-post.tgz
+[0] debian-xen:
+[0]   tarball: /home/lsarzyniec/envs/images/squeeze-x64-xen-1.4.tgz
+[0]   postinstall:
+/home/lsarzyniec/envs/postinstalls/debian-x64-xen-2.5-post.tgz
+[0] debian-min:
+[0]   tarball: /home/lsarzyniec/envs/images/squeeze-x64-min-1.4.tgz
+[0]   postinstall:
+/home/lsarzyniec/envs/postinstalls/debian-x64-min-1.1-post.tgz
+[0] === Services
+[0]   sql: griffon-5
+[0]   dhcp: griffon-5
+[0]   kadeploy: griffon-5
+[0]   dns: griffon-5
+[0]   frontend: griffon-5
+[0]   www: griffon-5
+[0]   tftp: griffon-5
+[1] === Gathering cluster information
+[1] griffon:
+[1]   kernel: -production
+[1]   net driver: e1000e
+[1]   disk driver: ahci
+[2] === Gathering network information
+[2] Connected to griffon-5
+[2] Getting network information
+[2] Network config:
+[2]   addresses: 192.168.208.0/255.255.240.0
+[2]   gateway: 192.168.223.254
+[2]   broadcast: 192.168.223.255
+[2]   dns: 192.168.223.254
+[2]   subnetworks:
+[2] Gathering DNS server IPv4/MAC addresses
+[2] Updating nodes IPv4/MAC addresses
+[2] Creating HTTP proxy SSH tunnel
+[3] Updating debian packages list
+[9] Getting nodes IPv4/MAC addresses
+[10] Removing configuration related packages
+[12] Destroying HTTP proxy SSH tunnel
+[12] Disconnected from griffon-5
+[12] 
+[12] === Setting up DNS server(s)
+[12] Connected to griffon-5
+[12] Tuning ARP cache size
+[12] Creating HTTP proxy SSH tunnel
+[12] Updating debian packages list
+[14] Installing DNS server
+[20] Configuring DNS server
+[23] Destroying HTTP proxy SSH tunnel
+[23] Disconnected from griffon-5
+[23] 
+[23] === Updating resolv.conf files
+[23] Connected to griffon-5
+[23] Generating resolv.conf file
+[24] Copying resolv.conf file:
+[24] Disconnected from griffon-5
+[24] 
+[24] === Setting up DHCP server(s)
+[24] Connected to griffon-5
+[24] Tuning ARP cache size
+[25] Creating HTTP proxy SSH tunnel
+[25] Updating debian packages list
+[26] Installing DHCP server
+[29] Gathering network informations
+[29] Configuring DHCP server
+[34] Destroying HTTP proxy SSH tunnel
+[34] Disconnected from griffon-5
+[34] 
+[34] === Setting up SQL server
+[34] Connected to griffon-5
+[34] Creating HTTP proxy SSH tunnel
+[34] Updating debian packages list
+[35] Installing mySQL server
+[72] Configuring mySQL server
+[78] Creating Kadeploy database
+[79] Removing configuration related packages
+[80] Destroying HTTP proxy SSH tunnel
+[80] Disconnected from griffon-5
+[80] 
+[80] === Setting up PXE system
+[80] Connected to griffon-5
+[80] Creating HTTP proxy SSH tunnel
+[80] Updating debian packages list
+[83] Installing TFTP server
+[86] Configuring TFTP server
+[88] Removing configuration related packages
+[89] Installing PXE bootfiles
+[92] Sending deployment kernels
+[92]  -production
+[95] Creating pxelinux configs
+[95] Destroying HTTP proxy SSH tunnel
+[95] Disconnected from griffon-5
+[95] 
+[95] === Setting up Kadeploy server
+[96] Connected to griffon-5
+[96] Tuning ARP cache size
+[96] Creating HTTP proxy SSH tunnel
+[96] Updating debian packages list
+[96] Cleaning previous Kadeploy install
+[97] Installing Kadeploy dependancies
+[98] Installing scm and build packages
+[112] Create a temporary directory
+[112] Cloning Kadeploy git repository
+[135] Checkout git revision 3.1.5
+[135] Creating the deploy user
+[135] Building Kadeploy packages
+[137] Installing Kadeploy server/client
+[137] Remove the temporary directory
+[138] Remove scm and build packages
+[147] Creating Kadeploy directories
+[148] Set the shell for the deploy user
+[148] Creating PXE directories
+[148] Installing HTTP server
+[152] Configuring HTTP server
+[155] Copying clusters postinstall files
+[156] Copying and configuring environments
+[156]   debian-min config
+[163]   debian-min-dd config
+[205]   debian-base config
+[216]   debian-xen config
+[237] Setting up hostnames hack
+[238] Configuring Kadeploy server
+[242] Configuring Kadeploy client
+[254] Installing ruby
+[255] Adding environments
+[256]   debian-min ok
+[261]   debian-min-dd ok
+[263]   debian-base ok
+[265]   debian-xen ok
+[265] Set rights for frontend user
+[266] Removing configuration related packages
+[266] Destroying HTTP proxy SSH tunnel
+[266] Destroying tunnel to kadeploy repository
+[266] Disconnected from griffon-5
+[266] 
+[266] === Setting up frontend
+[266] Connected to griffon-5
+[266] Creating HTTP proxy SSH tunnel
+[266] Updating debian packages list
+[267] Installing Kadeploy client
+[267] Configuring Kadeploy client
+[268] Destroying HTTP proxy SSH tunnel
+[268] Destroying tunnel to kadeploy repository
+[268] Creating HTTP proxy SSH tunnel
+[268] Installing additional packages
+[268] Creating frontend user 'frontend'
+[268] Generating frontend user ssh key pair
+[269] Copying user public key
+[269] Destroying HTTP proxy SSH tunnel
+[269] Creating node list in /home/frontend/NODELIST
+[270] Creating node file in /home/frontend/NODEFILE
+[270] Disconnected from griffon-5
+[270] 
+[270] Installation done

@@ -4,11 +4,13 @@
 \usepackage[T1]{fontenc}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\hypersetup{pdftex,colorlinks=true,allcolors=blue}
+\usepackage{hypcap}
 \usepackage{fancyvrb}
 \usepackage{alltt}
 \renewcommand{\ttdefault}{txtt}
 
-\newcommand{\version}{3.1.5}
+\newcommand{\version}{3.1.7}
 
 \newcommand{\ypath}[1]{\texttt{#1}}
 \newcommand{\yfield}[2]{\texttt{#1} {\small\{{\emph{#2}}\}}:}
@@ -19,15 +21,73 @@
 \sloppy
 \title{Kadeploy 3: Installation, configuration and use}
 \begin{document}
+\setcounter{chapter}{-1}
 \maketitle
 
 \vspace*{18cm}
-\noindent Copyright \copyright by Inria, 2008-2012\\
+\noindent Copyright \copyright by Inria, 2008-\the\year\\
 KADEPLOY \version, CECILL 2.0 license, All rights reserved.
 
 \tableofcontents
 
-\chapter{Installation}
+\section*{About this document}
+This is the Kadeploy \version{} documentation file.
+\\
+
+It contains a short \nameref{chap:Overview} of Kadeploy, followed by the \nameref{chap:Installation} instructions, a description of the \nameref{chap:Server_side_conf} and the \nameref{chap:Client_side_conf} , to finish with the \nameref{chap:User_guide}.
+\\
+
+For a better understanding of how Kadeploy3 works see this publication:\\
+\url{http://hal.inria.fr/docs/00/71/06/38/PDF/RR-8002.pdf}
+\\
+
+More informations, souce code and bug tracker available here:\\
+\url{http://kadeploy3.gforge.inria.fr}
+
+
+\chapter{Overview}\label{chap:Overview}
+\section{What is it?}
+
+Kadeploy is a scalable, efficient and reliable deployment system (cluster
+provisioning solution) for cluster and grid computing. It provides a set of
+tools for cloning, configuring (post installation) and managing cluster
+nodes. It can deploy a 300-nodes cluster in a few minutes, without
+intervention from the system administrator. It can deploy Linux, *BSD,
+Windows, Solaris.
+
+It plays a key role on the Grid'5000 testbed, where it allows users to
+reconfigure the software environment on the nodes.
+
+\section{How it works?}
+This is how Kadeploy works:
+\begin{enumerate}
+  \item \texttt{Minimal environment setup}
+  The nodes reboot into a trusted minimal environment that contains all the tools required for the deployment (partitioning tools, archive management,...) and the required partitioning is performed.
+  \item \texttt{Environment installation}
+  The environment is broadcast to all the nodes and extracted on the disks. Some post-installations operations can also be performed.
+  \item \texttt{Reboot on the deployed environment}
+\end{enumerate}
+
+Kadeploy3 takes as input an archive containing the operating system to
+deploy, called an \textbf{environment}, and copies it on the target nodes. As a
+consequence, Kadeploy3 does not install an operating system following a
+classical installation procedure and the user has to provide an archive of
+the operating system's filesystem (as a tarball, for Linux environments).
+
+
+\section{How does Kadeploy control the boot of the nodes ?}
+This is how Kadeploy controls the boot process of the nodes in order to be able to perform it's installation task:
+\begin{enumerate}
+  \item Kadeploy writes PXE profiles on a TFTP or HTTP server
+  \item Kadeploy triggers the reboot of compute nodes using SSH, IPMI or a manageable PDU
+  \item Nodes get their configuration using DHCP
+  \item Nodes retrieve their PXE profile using TFTP
+  \item Nodes boot on the specified system (which can either be located on the node's hard disk or on the network)
+\end{enumerate}
+
+
+
+\chapter{Installation}\label{chap:Installation}
 \section{Requirements}
 \subsection{Packages}\label{sec:required-packages}
 Kadeploy requires the following softwares (the Debian packages available in the Lenny flavor are given):
@@ -40,13 +100,65 @@ Kadeploy requires the following softwares (the Debian packages available in the 
 \end{itemize}
 
 \subsection{DHCP and TFTP}
-A DHCP server (\texttt{dhcp3-server} on Debian for instance) must be configured to provide a static IP address to the set of nodes that must be deployed. Furthermore, the DHCP response must contains the hostname of the node (see the \texttt{use-host-decl-names on;} option in \texttt{dhcpd.conf}).
+\paragraph{The DHCP service\\}
+A DHCP server (\texttt{isc-dhcp-server} on Debian for instance) must be configured to provide a static IP address to the set of nodes that must be deployed. Furthermore, the DHCP response must contains the hostname of the node (see the \texttt{use-host-decl-names on;} option in \texttt{dhcpd.conf}).
 
-A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed.
+Here is an example of a configuration for GPXELinux:
+\begin{verbatim}
+default-lease-time 28800;
+max-lease-time 86400;
+allow booting;
+allow bootp;
 
+not-authoritative;
+
+use-host-decl-names on;
+
+  subnet 192.168.208.0 netmask 255.255.240.0 {
+    option subnet-mask 255.255.240.0;
+    option broadcast-address 192.168.223.255;
+    option routers 192.168.223.254;
+    option domain-name "testbed.lan";
+    option domain-name-servers 192.168.209.5;
+    if exists user-class and option user-class = "iPXE" {
+      filename=concat("http://192.168.209.5/",host-decl-name);
+    } else {
+      filename "gpxelinux.0";
+    }
+    next-server 192.168.209.5;
+
+  host node-1.testbed.lan {
+    hardware ethernet 00:e0:81:b2:c4:a0;
+    fixed-address 192.168.209.8;
+    option host-name "node-1";
+  }
+
+  }
+\end{verbatim}
+More information about the configuration of PXElinux can be found at \url{http://www.syslinux.org/wiki/index.php/PXELINUX}.
+
+\paragraph{The TFTP service\\}
+A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed. Configuration example:
+\begin{verbatim}
+# /etc/default/tftpd-hpa
+TFTP_USERNAME="deploy"
+TFTP_DIRECTORY="/var/lib/tftpboot"
+TFTP_ADDRESS="0.0.0.0:69"
+TFTP_OPTIONS="-v -l -s -c"
+\end{verbatim}
+
+\paragraph{Booting over the network\\}
 To allow the network booting, you must specify in the DHCP configuration file the file name option that define the file retrieve by a client. This file name can be pxelinux.0 or gpxelinux.0.
 
-Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files: pxelinux.0 (or gpxelinux.0), chain.c32, and mboot.c32. These files can be found in the Syslinux software (\url{http://syslinux.zytor.com}), the 3.73 version is at least required.
+Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files and directories: 
+\begin{itemize}
+ \item pxelinux.0 (or gpxelinux.0)
+ \item chain.c32
+ \item mboot.c32
+ \item a kernels/ directory (can be changed in the server configuration file) 
+ \item a pxelinux.cfg/ directory
+\end{itemize} 
+These files can be found in the Syslinux software (\url{http://syslinux.org}) or directly downloaded on the kernel.org website (\url{https://www.kernel.org/pub/linux/utils/boot/syslinux/}), the 3.73 version is at least required.
 
 \subsection{HTTP server (optional)}
 In order to use the HTTP fetching capabilities of gpxelinux, an HTTP server must be configured and must contain the production environment kernel/initrtd and the deployment environment kernel/initrd (see~\ref{sec:specific_config} part).
@@ -231,7 +343,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \subsection{Automatic launch on a Debian and a Fedora based distribution}
 \noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
-\chapter{Server side configuration}
+\chapter{Server side configuration}\label{chap:Server_side_conf}
 \paragraph{Configuration files\\}\label{sec:confpath}
 Normally, the configuration of Kadeploy is located in \texttt{/etc/kadeploy3} but it can be located anywhere else if you set the \texttt{KADEPLOY\_CONFIG\_DIR} variable in the environment.
 
@@ -471,8 +583,8 @@ external:
 
   \item \ypath{/network/vlan}
   \begin{itemize}
-    \item \yfieldd{hostname\_suffix}{String}{''} this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
-    \item \yfieldd{set\_cmd}{String}{''} command to launch in order to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
+    \item \yfieldd{hostname\_suffix}{String}{""} this specifies the suffix to add to the hostname to define the hostname in the given VLAN. The pattern VLAN\_ID can be used in the definition, it is replaced at the runtime.
+    \item \yfieldd{set\_cmd}{String}{""} command to launch in order to put a set of nodes in a VLAN. The patterns NODES, USER and VLAN\_ID can be used.
   \end{itemize}
 
   \item \ypath{/network/ports}
@@ -518,7 +630,7 @@ external:
   \end{itemize}
   \item \ypath{/pxe/dhcp/profiles}
   \begin{itemize}
-    \item \yfieldd{directory}{String}{''} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/dhcp/repository}.
+    \item \yfieldd{directory}{String}{""} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/dhcp/repository}.
 
 For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
@@ -544,7 +656,7 @@ The information used to generate this filenames are the one specified for each n
   \end{itemize}
   \item \ypath{/pxe/networkboot/profiles}
   \begin{itemize}
-    \item \yfieldd{directory}{String}{''} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/networkboot/repository}.
+    \item \yfieldd{directory}{String}{""} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/networkboot/repository}.
 
 For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
@@ -565,7 +677,7 @@ The information used to generate this filenames are the one specified for each n
   \end{itemize}
   \item \ypath{/pxe/localboot/profiles}
   \begin{itemize}
-    \item \yfieldd{directory}{String}{''} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/localboot/repository}.
+    \item \yfieldd{directory}{String}{""} The directory where PXE profiles have to be written. This path is relative to the PXE repository path unless you specify an absolute path. If the pathname is empty it defaults to the value of \ypath{/pxe/localboot/repository}.
 
 For example, with PXElinux, this directory is \emph{pxelinux.cfg}.
     \item \yfield{filename}{String} The way to name the file of each node's profile (expected values are: \emph{hostname}, \emph{hostname\_short} (the hostname without the domain name), \emph{ip}, \emph{ip\_hex} (hexadecimal representation of the IP)).
@@ -575,9 +687,9 @@ The information used to generate this filenames are the one specified for each n
 
   \item \ypath{/hooks/async}
   \begin{itemize}
-    \item \yfieldd{end\_of\_reboot}{String}{''} command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
-    \item \yfieldd{end\_of\_power}{String}{''} command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
-    \item \yfieldd{end\_of\_deployment}{String}{''} command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_reboot}{String}{""} command to launch at the end of an asynchronous reboot. The REBOOT\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_power}{String}{""} command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
+    \item \yfieldd{end\_of\_deployment}{String}{""} command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
   \end{itemize}
 
   \item \ypath{/external/taktuk}
@@ -855,22 +967,22 @@ automata:
   \item \ypath{/boot/kernels} Options of OS kernel's that are booted by Kadeploy3
   \item \ypath{/boot/kernels/user} Default options for user kernels
   \begin{itemize}
-    \item \yfieldd{params}{String}{''} default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
+    \item \yfieldd{params}{String}{""} default kernel parameters applied to a Linux based deployed environment. This can be overloaded in the environment description.
   \end{itemize}
 
   \item \ypath{/boot/kernels/deploy} The deployment environment (see section \ref{sec:deployment})
   \begin{itemize}
     \item \yfield{vmlinuz}{String} name of the kernel file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfield{initrd}{String} name of the initrd file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
-    \item \yfieldd{params}{String}{''} boot parameters of the deployment environment kernel
+    \item \yfieldd{params}{String}{""} boot parameters of the deployment environment kernel
     \item \yfield{supported\_fs}{String} list of file systems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
-    \item \yfieldd{drivers}{String}{''} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
+    \item \yfieldd{drivers}{String}{""} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
   \end{itemize}
 
   \item \ypath{/boot/kernels/nfsroot} Used when booting with NFS-root in the \texttt{SetDeploymentEnv} macro-step.
   \begin{itemize}
-    \item \yfieldd{vmlinuz}{String}{''} kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
-    \item \yfieldd{params}{String}{''} kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+    \item \yfieldd{vmlinuz}{String}{""} kernel for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
+    \item \yfieldd{params}{String}{""} kernel parameters for the NFS-root deployment environment (only used if you use an NFS-root deployment environment)
   \end{itemize}
 
 
@@ -929,9 +1041,9 @@ automata:
 
   \item \ypath{/pxe/headers} PXE headers to be used for the different kind of reboots
   \begin{itemize}
-    \item \yfieldd{dhcp}{String}{''} PXE headers to be used for the the default method. Further information are available in the paragraph \texttt{Booting over the network}.
-    \item \yfieldd{networkboot}{String}{''} PXE headers to be used when booting operating system images sent from the network. Further information are available in the paragraph \texttt{Booting over the network}.
-    \item \yfieldd{localboot}{String}{''} PXE headers to be used when booting operating system from hard disk. Further information are available in the paragraph \texttt{Booting over the network}.
+    \item \yfieldd{dhcp}{String}{""} PXE headers to be used for the the default method. Further information are available in the paragraph \texttt{Booting over the network}.
+    \item \yfieldd{networkboot}{String}{""} PXE headers to be used when booting operating system images sent from the network. Further information are available in the paragraph \texttt{Booting over the network}.
+    \item \yfieldd{localboot}{String}{""} PXE headers to be used when booting operating system from hard disk. Further information are available in the paragraph \texttt{Booting over the network}.
   \end{itemize}
 
   \item \ypath{/kexec}
@@ -1004,7 +1116,7 @@ Here is a custom operation description:
   \item \yfield{action}{String} The action that have to be performed (expected values are \emph{send}, \emph{run} and \emph{exec})
   \item \yfield{file}{String} \small{(To be specified if the action is \emph{send} or \emph{run})} The path to the file to be send/executed (if the action is \emph{send} the file name will remains the same, if the action is \emph{run} this file need to contain a script)
   \item \yfield{destination}{String} \small{(To be specified if the action is \emph{send})} The destination directory on the nodes (Kadeploy3 environment variables are substitued in the path)
-  \item \yfield{params}{String}{''} \small{(To be specified if the action is \emph{run})} The parameters of the script.
+  \item \yfield{params}{String}{""} \small{(To be specified if the action is \emph{run})} The parameters of the script.
   \item \yfield{command}{String} \small{(To be specified if the action is \emph{exec})} The command to be executed. If you want to call a script, dont forget to add a \emph{.} (or use \emph{source}) before the script name to be able to use Kadeploy3 environment variables inside of it (example: \texttt{command: . /myscript.sh}).
   \item \yfieldd{timeout}{Integer}{0} the timeout (seconds) of this custom operation
   \item \yfieldd{retries}{Integer}{0} the number of retries for this custom operation
@@ -1238,7 +1350,7 @@ This methods consists in creating a kernel/initrd that contains all the tools re
 \end{verbatim}
 \end{small}
 
-The \texttt{kadeploy-deploy-kernel/debirf.conf} configuration file can be tuned if you want to add or remove some packages in the filesystem. To do this, you can modify the \texttt{INCLUDE} and \texttt{INCLUDE} values.
+The \texttt{kadeploy-deploy-kernel/debirf.conf} configuration file can be tuned if you want to add or remove some packages in the filesystem. To do this, you can modify the \texttt{INCLUDE} and \texttt{EXCLUDE} values.
 
 You can also add custom debirf modules in the \texttt{kadeploy-deploy-kernel/modules/} directory. You can find a module example named \texttt{blacklist\_example} in this directory. Please refer to debirf documentation for further information.
 
@@ -1253,7 +1365,7 @@ This methods consists in creating a kernel/initrd that contains all the tools re
 \end{verbatim}
 \end{small}
 
-The \texttt{make\_debootstrap.sh} script can be tuned if you want to add or remove some packages in the filesystem. To do this, you can modify the \texttt{DEBOOTSTRAP\_INCLUDE\_PACKAGES} and \texttt{DEBOOTSTRAP\_INCLUDE\_PACKAGES} values.
+The \texttt{make\_debootstrap.sh} script can be tuned if you want to add or remove some packages in the filesystem. To do this, you can modify the \texttt{DEBOOTSTRAP\_INCLUDE\_PACKAGES} and \texttt{DEBOOTSTRAP\_EXCLUDE\_PACKAGES} values.
 
 The \texttt{make\_kernel.sh} script prompts the user the following things:
 \begin{itemize}
@@ -1289,7 +1401,7 @@ It is possible to make the Kadeploy server load an SSH-agent at launch time. Thi
 
 To enable this functionnality, the SSH private key to be used with the SSH-agent must be present as \texttt{keys/id\_deploy} of the server configuration directory (see section \ref{sec:confpath}). By default (if the file \texttt{/etc/kadeploy3/keys/id\_deploy} does not exist), no agent is loaded at launch time.
 
-\chapter{Client side configuration}
+\chapter{Client side configuration}\label{chap:Client_side_conf}
 On the client side, you only have to configure the file named \texttt{client\_conf.yml}. This file defines Kadeploy servers and a default server.
 
 \paragraph{Example of a client configuration file}
@@ -1316,7 +1428,7 @@ servers:
   \end{itemize}
 \end{itemize}
 
-\chapter{User guide}
+\chapter{User guide}\label{chap:User_guide}
 
 \section{Overview of the Kadeploy tools}
 \subsection{Kadeploy}
@@ -1803,8 +1915,8 @@ Explanation of the fields used in the environment description:
 \begin{itemize}
   \item \yfield{name}{String} name of the environment. The spaces are allowed in the name but remember to use some quotes around it when you use Kadeploy or Kaenv.
   \item \yfieldd{version}{Integer}{1} the version of the environment
-  \item \yfieldd{description}{String}{''} the description of the environment
-  \item \yfieldd{author}{String}{''} the author of the environment
+  \item \yfieldd{description}{String}{""} the description of the environment
+  \item \yfieldd{author}{String}{""} the author of the environment
   \item \yfieldd{visibility}{String}{'private'} define the visibility level of an environment. Three levels are available:
   \begin{itemize}
     \item \texttt{private}: only the owner of the environment can see and use it ;
@@ -1834,16 +1946,16 @@ Explanation of the fields used in the environment description:
   \end{itemize}
   \item \ypath{/boot} information about the system that will be installed (useless if the kind of image is \texttt{dd})
   \begin{itemize}
-    \item \yfieldd{kernel}{String}{''} path of the kernel in the tarball.
-    \item \yfieldd{kernel\_params}{String}{''} set of parameters that must be applied to the kernel for a correct boot
-    \item \yfieldd{initrd}{String}{''} path of the initrd in the tarball.
-    \item \yfieldd{hypervisor}{String}{''} path of the hypervisor in the tarball. This fields is only required for the Xen based environments
-    \item \yfieldd{hypervisor\_params}{String}{''} set of parameters that must be applied to the hypervisor for a correct boot. This fields is only required for the Xen based environments
+    \item \yfieldd{kernel}{String}{""} path of the kernel in the tarball.
+    \item \yfieldd{kernel\_params}{String}{""} set of parameters that must be applied to the kernel for a correct boot
+    \item \yfieldd{initrd}{String}{""} path of the initrd in the tarball.
+    \item \yfieldd{hypervisor}{String}{""} path of the hypervisor in the tarball. This fields is only required for the Xen based environments
+    \item \yfieldd{hypervisor\_params}{String}{""} set of parameters that must be applied to the hypervisor for a correct boot. This fields is only required for the Xen based environments
     \item \yfield{block\_device}{String} \texttt{(Multi-partitioned)} specify the block\_device that contains the partition to boot
     \item \yfield{partition}{Integer} \texttt{(Multi-partitioned)} specify the partition that contains the system to be booted
   \end{itemize}
   \item \yfieldd{partition\_type}{Integer}{0} the MS-DOS partition type, you can specify hexadecimal values using the prefix \texttt{0x}. For example, \texttt{0x83} or \texttt{131} for Linux, \texttt{0xa5} for FreeBSD, ...
-  \item \yfieldd{filesystem}{String}{''} type of filesystem wished on the deployment partition. It must be known by the mkfs command (useless unless the kind of image is \texttt{tar})
+  \item \yfieldd{filesystem}{String}{""} type of filesystem wished on the deployment partition. It must be known by the mkfs command (useless unless the kind of image is \texttt{tar})
   \item \ypath{/options} Extra options
   \item \ypath{/options/[partitions]} \texttt{(Multi-partitioned)} Information about the dispatching of the partitions included inside the image file on the partitions of the hard disk.
   \begin{itemize}

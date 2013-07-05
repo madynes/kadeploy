@@ -1,0 +1,89 @@
+This is the Kadeploy3 readme file. Most of this file's content come from
+this publication:
+  <http://hal.inria.fr/docs/00/71/06/38/PDF/RR-8002.pdf>
+
+More informations available here:
+  <http://kadeploy3.gforge.inria.fr/>
+
+
+Overview
+--------
+Kadeploy is a scalable, efficient and reliable deployment system (cluster
+provisioning solution) for cluster and grid computing. It provides a set of
+tools for cloning, configuring (post installation) and managing cluster
+nodes. It can deploy a 300-nodes cluster in a few minutes, without
+intervention from the system administrator. It can deploy Linux, *BSD,
+Windows, Solaris.
+
+It plays a key role on the Grid'5000 testbed, where it allows users to
+reconfigure the software environment on the nodes.
+
+
+How it works?
+-------------
+This is how Kadeploy works:
+(1) Minimal environment setup
+  The nodes reboot into a trusted minimal environment that contains all the
+  tools required for the deployment (partitioning tools, archive management,...)
+  and the required partitioning is performed.
+(2) Environment installation
+  The environment is broadcast to all the nodes and extracted on the disks.
+  Some post-installations operations can also be performed.
+(3) Reboot on the deployed environment
+
+Kadeploy3 takes as input an archive containing the operating system to
+deploy, called an *environment*, and copies it on the target nodes. As a
+consequence, Kadeploy3 does not install an operating system following a
+classical installation procedure and the user has to provide an archive of
+the operating system's filesystem (as a tarball, for Linux environments).
+
+
+How does Kadeploy control the boot of the nodes ?
+---------------------------------------------------
+This is how Kadeploy controls the boot process of the nodes in order to be able
+to perform it's installation task:
+(1) Kadeploy writes PXE profiles on a TFTP or HTTP server
+(2) Kadeploy triggers the reboot of compute nodes using SSH, IPMI or a
+    manageable PDU
+(3) Nodes get their configuration using DHCP
+(4) Nodes retrieve their PXE profile using TFTP
+(5) Nodes boot on the specified system (which can either be located on the
+    node's hard disk or on the network)
+
+
+The Kadeploy3 software suite
+----------------------------
+Kadeploy3 is packaged with a set of complementary tools that are briefly
+described in this section.
+
+### Management of images
+The *Kaenv* tool enables users and administrators to manage a catalog of
+deployment images, either shared between users or private to one user.
+
+### Rights management
+*Karights* is used to define deployment permissions for users. It also
+provides the glue to integrate Kadeploy with a batch scheduler, making it
+possible to allow a given user to deploy a set of nodes for the duration of
+his job on the cluster.
+
+### Statistics collection
+Deployment statistics (durations, success/failures) are collected
+continuously, and available through the *Kastat* tool. This data can be
+leveraged by system administrators to identify nodes with hardware issues.
+
+### Frontends to low-level tools
+Tools such as *Kareboot*, *Kaconsole* and *Kapower* act as frontends to
+lower-level tools, such as those based on IPMI, and integrate with the
+Kadeploy rights management system, to allow users to reboot, power-off/on,
+and access the remote serial console of nodes.
+
+
+Requirements
+------------
+Required services:
+- dhcp
+- tftp
+Recommanded services:
+- sql
+- dns
+- http
