@@ -850,7 +850,8 @@ class KadeployServer
       begin
         info[:grabthread].join
       rescue KadeployError => ke
-        return wid, ke.errno
+        async_deploy_free(wid)
+        return nil, ke.errno
       end
     end
 
