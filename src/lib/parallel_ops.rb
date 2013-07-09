@@ -66,7 +66,7 @@ require 'socket'
       do_taktuk do |tak|
         tak.broadcast_exec[command]
         tak.seq!.broadcast_input_file[opts[:input_file]] if opts[:input_file]
-        res = tak.run!
+        res = tak.run!(:outputs_size => @context[:common].taktuk_outputs_size)
         takbin = tak.binary
         takargs = tak.args
         stderr = tak.stderr
@@ -108,7 +108,7 @@ require 'socket'
       takargs = nil
       stderr = nil
       do_taktuk do |tak|
-        res = tak.broadcast_put[src][dst].run!
+        res = tak.broadcast_put[src][dst].run!(:outputs_size => @context[:common].taktuk_outputs_size)
         takbin = tak.binary
         takargs = tak.args
         stderr = tak.stderr
