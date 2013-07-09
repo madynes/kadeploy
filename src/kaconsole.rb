@@ -12,7 +12,9 @@ require 'config'
 require 'drb'
 
 class KaconsoleClient
+  attr_reader :pid
   @killed = nil
+  @pid = nil
 
   # Print a message (RPC)
   #
@@ -27,16 +29,16 @@ class KaconsoleClient
   def connect_console(cmd)
     @killed = false
     ret_wait = 0
-    pid = fork {
+    @pid = fork {
       exec(cmd)
     }
     while (not @killed) 
       ret_wait = Process.waitpid(pid, Process::WNOHANG)
-      @killed = true if ret_wait == pid
+      @killed = true if ret_wait == @pid
       sleep(1)
     end
-    if (ret_wait != pid) then
-      Process.kill("SIGKILL", pid)
+    if (ret_wait != @pid) then
+      Process.kill("SIGKILL", @pid)
     end
   end
 
@@ -88,7 +90,13 @@ if exec_specific_config != nil then
     exit(1)
   end
 
-  kadeploy_server.run("kaconsole", exec_specific_config, client_host, client_port)
+  begin
+    kadeploy_server.run("kaconsole", exec_specific_config, client_host, client_port)
+  rescue DRb::DRbConnError
+    Process.kill("SIGKILL", kaconsole_client.pid)
+    puts "Disconnection from the server, console killed"
+    exit(1)
+  end
   local.stop_service()
   distant.stop_service()
   exit(0)
