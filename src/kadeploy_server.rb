@@ -674,10 +674,7 @@ class KadeployServer
             begin
               client.test()
             rescue DRb::DRbConnError
-              workflows.each do |workflow|
-                workflow.output.disable_client_output()
-              end
-              workflows.first.output.verbosel(3, "Client disconnection")
+              $stderr.puts "#{wid} -> Client disconnection"
               kadeploy_sync_kill_workflow(wid)
               drb_server.stop_service()
               db.disconnect()
@@ -727,9 +724,12 @@ class KadeployServer
       end
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno)
-      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
-      client.print(ke.message) if ke.message and !ke.message.empty?
-      #Debug::distant_client_error("Cannot run the deployment",client)
+      begin
+        Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+        client.print(ke.message) if ke.message and !ke.message.empty?
+      rescue Exception
+      end
+      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       kadeploy_sync_kill_workflow(ke.context[:wid],false)
     rescue Exception => e
       puts e.message
@@ -1207,9 +1207,12 @@ class KadeployServer
       end
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno)
-      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
-      client.print(ke.message) if ke.message and !ke.message.empty?
-      #Debug::distant_client_error("Cannot run the reboot",client)
+      begin
+        Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+        client.print(ke.message) if ke.message and !ke.message.empty?
+      rescue Exception
+      end
+      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       @reboot_info_hash_lock.synchronize {
         # Unlock the cached files
         if @reboot_info_hash[ke.context[:rid]] and @reboot_info_hash[ke.context[:rid]].size >= 4
@@ -1368,8 +1371,12 @@ class KadeployServer
       finthr.join
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno)
-      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
-      client.print(ke.message) if ke.message and !ke.message.empty?
+      begin
+        Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+        client.print(ke.message) if ke.message and !ke.message.empty?
+      rescue Exception
+      end
+      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       finished = true
       finthr.join
     end
@@ -1744,8 +1751,12 @@ class KadeployServer
       finthr.join
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno)
-      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
-      client.print(ke.message) if ke.message and !ke.message.empty?
+      begin
+        Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+        client.print(ke.message) if ke.message and !ke.message.empty?
+      rescue Exception
+      end
+      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       finished = true
       finthr.join
     end
@@ -1890,8 +1901,12 @@ class KadeployServer
       finthr.join
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno)
-      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
-      client.print(ke.message) if ke.message and !ke.message.empty?
+      begin
+        Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+        client.print(ke.message) if ke.message and !ke.message.empty?
+      rescue Exception
+      end
+      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       finished = true
       finthr.join
     end
@@ -2107,8 +2122,12 @@ class KadeployServer
       finthr.join
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno)
-      Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
-      client.print(ke.message) if ke.message and !ke.message.empty?
+      begin
+        Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) if msg and !msg.empty?
+        client.print(ke.message) if ke.message and !ke.message.empty?
+      rescue Exception
+      end
+      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       finished = true
       finthr.join
     end
@@ -2426,9 +2445,13 @@ class KadeployServer
           md5 = Managers::Fetch[tar['file'],FetchFileError::INVALID_ENVIRONMENT_TARBALL,client].checksum
         rescue KadeployError => ke
           msg = KadeployError.to_msg(ke.errno)
-          Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
-            if msg and !msg.empty?
-          client.print(ke.message) if ke.message and !ke.message.empty?
+          begin
+            Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+              if msg and !msg.empty?
+            client.print(ke.message) if ke.message and !ke.message.empty?
+          rescue Exception
+          end
+          $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
           return nil
         end
 
@@ -2471,9 +2494,13 @@ class KadeployServer
           md5 = Managers::Fetch[pre['file'],FetchFileError::INVALID_PREINSTALL,client].checksum
         rescue KadeployError => ke
           msg = KadeployError.to_msg(ke.errno)
-          Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
-            if msg and !msg.empty?
-          client.print(ke.message) if ke.message and !ke.message.empty?
+          begin
+            Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+              if msg and !msg.empty?
+            client.print(ke.message) if ke.message and !ke.message.empty?
+          rescue Exception
+          end
+          $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
           return nil
         end
 
@@ -2517,9 +2544,13 @@ class KadeployServer
             md5 = Managers::Fetch[post['file'],FetchFileError::INVALID_POSTINSTALL,client].checksum
           rescue KadeployError => ke
             msg = KadeployError.to_msg(ke.errno)
-            Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
-              if msg and !msg.empty?
-            client.print(ke.message) if ke.message and !ke.message.empty?
+            begin
+              Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+                if msg and !msg.empty?
+              client.print(ke.message) if ke.message and !ke.message.empty?
+            rescue Exception
+            end
+            $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
             return nil
           end
 
@@ -2688,9 +2719,13 @@ class KadeployServer
                 updatefile['md5'] = Managers::Fetch[updatefile['file'],except,client].checksum
               rescue KadeployError => ke
                 msg = KadeployError.to_msg(ke.errno)
-                Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
-                  if msg and !msg.empty?
-                client.print(ke.message) if ke.message and !ke.message.empty?
+                begin
+                  Debug::distant_client_error("#{msg} (error ##{ke.errno})",client) \
+                    if msg and !msg.empty?
+                  client.print(ke.message) if ke.message and !ke.message.empty?
+                rescue Exception
+                end
+                $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
                 ret = nil
               end
               ret
