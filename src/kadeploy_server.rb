@@ -146,11 +146,13 @@ class KadeployServer
     end
     port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
     Thread.new do
-      sock.listen(10)
       file = nil
+      session = nil
+      totwrite = 0
+      totrecv = 0
+
+      sock.listen(10)
       begin
-        totwrite = 0
-        totrecv = 0
         session = sock.accept
         file = File.new(dest, "w")
         while (totrecv < filesize)
@@ -168,7 +170,7 @@ class KadeployServer
         session[0].close if session and session[0] and !session[0].closed?
         sock.close if sock and !sock.closed?
         file.close if file and !file.closed?
-        File.delete(file.path) if File.exist?(file.path)
+        File.delete(file.path) if (totrecv < filesize) and File.exist?(file.path)
       end
       buf = nil
       totrecv = nil
