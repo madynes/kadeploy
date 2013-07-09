@@ -145,8 +145,9 @@ class KadeployServer
       return -1
     end
     port = Socket.unpack_sockaddr_in(sock.getsockname)[0].to_i
-    Thread.new {
+    Thread.new do
       sock.listen(10)
+      file = nil
       begin
         totwrite = 0
         totrecv = 0
@@ -154,6 +155,7 @@ class KadeployServer
         file = File.new(dest, "w")
         while (totrecv < filesize)
           buf = session[0].recv(@tcp_buffer_size)
+          raise 'EOF on Socket before the end of transmition' if buf.empty?
           totrecv += buf.size
           totwrite += file.write(buf)
         end
@@ -161,10 +163,18 @@ class KadeployServer
         session[0].send([totwrite].pack('L'),0)
         session[0].close
       rescue Exception => e
-        puts "The client has been probably disconnected... (#{e.class.name}: #{e.message})"
+        $stderr.puts "[Sendfile Socket] The client has been probably disconnected... (#{e.class.name}: #{e.message})"
+      ensure
+        session[0].close if session and session[0] and !session[0].closed?
+        sock.close if sock and !sock.closed?
+        file.close if file and !file.closed?
+        File.delete(file.path) if File.exist?(file.path)
       end
-      sock.close
-    }
+      buf = nil
+      totrecv = nil
+      totwrite = nil
+      session = nil
+    end
     return port
   end
   
