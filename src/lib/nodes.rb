@@ -904,6 +904,7 @@ module Nodes
     # Output
     # * return true if the state has been correctly modified, false otherwise
     def set_deployment_state(state, env_id, db, user)
+      return if @set.empty?
       args,nodelist = generic_where_nodelist()
       date = Time.now.to_i
       env_id = env_id || -1
