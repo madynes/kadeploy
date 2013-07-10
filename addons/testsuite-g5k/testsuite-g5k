@@ -1,13 +1,14 @@
 #!/usr/bin/ruby
 
+$:.unshift File.dirname(__FILE__)
+
 require 'common-g5k'
 
-JENKINS_DIR='/home/lsarzyniec/jenkins'
-LOGS_DIR=File.join(JENKINS_DIR,'logs')
-TAG='jenkins'
+LOGS_DIR=File.join(TESTSUITE_DIR,'logs')
 
 unless ARGV.size >= 2
-  error("usage: #{$0} [git:|gerrit:]<commit/branch> <version> [<sources dir>]\ncustomizable env vars:\n  #{KADEPLOY_ENV_VARS.join("\n  ")}\nsamples:\n  #{$0} master 3.1.8 (git is used by default)\n  #{$0} git:3.1.7 3.1.7 kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 3.1.7")
+  vars = KADEPLOY_ENV_VARS.inject(''){|tmp,var| tmp << "  #{var} (default: #{self.class.const_get(var)})\n"}
+  error("usage: #{$0} [git:|gerrit:]<commit/branch> <version> [<sources dir>]\ncustomizable env vars:\n#{vars}\nsamples:\n  #{$0} master 3.1.8 (git is used by default)\n  #{$0} git:3.1.7 3.1.7 kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 3.1.7")
 end
 $commit=ARGV[0]
 $version=ARGV[1]
@@ -21,11 +22,11 @@ KADEPLOY_ENV_VARS.each do |var|
   vars << " #{var}=\"#{ENV[var]}\"" if ENV[var]
 end
 env = (vars.empty? ? '' : "export #{vars};")
-ret=cmd("oarsub -t deploy -n #{TAG} -l {\"type='kavlan-local'\"}/vlan=1+cluster=2/nodes=2,walltime=3 '#{env} #{File.join(JENKINS_DIR,'run-testsuite')} #{$commit} #{$version} #{$sources}'")
+$commitfile = $commit.gsub('/','_').gsub(':','-')
+ret=cmd("oarsub -t deploy -n #{$commitfile} -l {\"type='kavlan-local'\"}/vlan=1+cluster=2/nodes=2,walltime=3 '#{env} #{File.join(TESTSUITE_DIR,'run-testsuite')} #{$commit} #{$version} #{$sources}'")
 
 $jobid=ret.split("\n").grep(/OAR_JOB_ID/).to_s.split("=")[1]
 
-$commitfile = $commit.gsub('/','_').gsub(':','-')
 cmd("echo \"#{$jobid}\" > #{LOGS_DIR}/#{$commitfile}.jobid")
 
 trap('INT') {
@@ -43,8 +44,18 @@ begin
 end until out.grep(/Terminated|Error/).size > 0
 
 puts "Job done"
-cmd("mv OAR.#{TAG}.#{$jobid}.stdout #{LOGS_DIR}/#{$commitfile}.stdout")
-cmd("mv OAR.#{TAG}.#{$jobid}.stderr #{LOGS_DIR}/#{$commitfile}.stderr")
+outfile = "#{LOGS_DIR}/#{$commitfile}.stdout"
+cmd("mv OAR.#{$commitfile}.#{$jobid}.stdout #{errfile}")
+errfile = "#{LOGS_DIR}/#{$commitfile}.stderr"
+cmd("mv OAR.#{$commitfile}.#{$jobid}.stderr #{errfile}")
+
+puts '=== STDOUT ==='
+puts File.read(outfile) if File.readable?(outfile)
+puts '=============='
+puts ''
+puts '=== STDERR ==='
+puts File.read(errfile) if File.readable?(errfile)
+puts '=============='
 
 if out.grep(/Error/).size > 0
   exit 1
