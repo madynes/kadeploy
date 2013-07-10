@@ -3,6 +3,7 @@ require 'rubygems'
 require 'net/ssh'
 
 KADEPLOY_ENV_VARS=[
+  'TESTSUITE_DIR',
   'KADEPLOY_BIN',
   'KABOOTSTRAP_BIN',
   'ENVIRONMENT',
@@ -15,13 +16,14 @@ KADEPLOY_ENV_VARS=[
   'SSH_OPTIONS',
   'DEBUG',
 ]
+TESTSUITE_DIR=ENV['TESTSUITE_DIR']||"#{ENV['HOME']}/katestsuite"
 KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
 KADEPLOY_RETRIES=3
-KABOOTSTRAP_BIN=ENV['KABOOTSTRAP_BIN']||'/home/lsarzyniec/kabootstrap'
+KABOOTSTRAP_BIN=ENV['KABOOTSTRAP_BIN']||File.join(TESTSUITE_DIR,'kabootstrap')
 ENVIRONMENT=ENV['KADEPLOY_ENV']||'squeeze-x64-base'
-KABOOTSTRAP_KERNELS=ENV['KABOOTSTRAP_KERNELS']||'/home/lsarzyniec/kernels'
-KABOOTSTRAP_ENVS=ENV['KABOOTSTRAP_ENVS']||'/home/lsarzyniec/envs'
-#KABOOTSTRAP_OPTS
+KABOOTSTRAP_KERNELS=ENV['KABOOTSTRAP_KERNELS']||File.join(TESTSUITE_DIR,'kernels')
+KABOOTSTRAP_ENVS=ENV['KABOOTSTRAP_ENVS']||File.join(TESTSUITE_DIR,'envs')
+KABOOTSTRAP_OPTS=''
 KABOOTSTRAP_RETRIES=4
 GIT_REPO=ENV['GIT_REPO']||'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPO=ENV['GERRIT_REPO']||'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
@@ -36,6 +38,7 @@ TEST_KADEPLOY='test_kadeploy.rb'
 TEST_KAREBOOT='test_kareboot.rb'
 TEST_KAPOWER='test_kapower.rb'
 TEST_KAENV='test_kaenv.rb'
+DEBUG=false
 
 def cmd(cmd,checkstatus=true)
   puts "=== COMMAND: #{cmd} ===" if ENV['DEBUG']
