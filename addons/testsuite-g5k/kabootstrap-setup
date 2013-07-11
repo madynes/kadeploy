@@ -1,7 +1,5 @@
 #!/usr/bin/ruby
 
-$:.unshift File.dirname(__FILE__)
-
 require 'common-g5k'
 
 unless ENV['OAR_JOB_ID']
@@ -9,8 +7,7 @@ unless ENV['OAR_JOB_ID']
 end
 
 unless ARGV.size >= 2
-  vars = KADEPLOY_ENV_VARS.inject(''){|tmp,var| tmp << "  #{var} (default: #{self.class.const_get(var)})\n"}
-  error("usage: #{$0} [git:|gerrit:]<commit/branch> <kadeploy_version> [<frontend file>] [<sources dir>]\ncustomizable env vars:\n#{vars}\nsamples:\n  #{$0} master 3.1.8 (git is used by default)\n  #{$0} git:3.1.7 3.1.7 /tmp/frontendfile kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 3.1.7")
+  error("usage: #{$0} [git:|gerrit:]<commit/branch> <kadeploy_version> [<frontend file>] [<sources dir>]\ncustomizable env vars:\n  #{KADEPLOY_ENV_VARS.join("\n  ")}\nsamples:\n  #{$0} master 3.1.8 (git is used by default)\n  #{$0} git:3.1.7 3.1.7 /tmp/frontendfile kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 3.1.7")
 end
 _,$commit,$repo_kind = get_repo_commit(ARGV[0])
 $version=ARGV[1]
