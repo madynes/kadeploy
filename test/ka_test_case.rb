@@ -152,11 +152,11 @@ module KaTestCase
   def connect_test(node)
     hostname = ''
     begin
-      Net::SSH.start(node,'root',:password => 'grid5000',:keys => "#{ENV['HOME']}/.ssh/id_rsa",:paranoid => false) do |ssh|
+      Net::SSH.start(node,'root',:password => 'grid5000',:keys => "#{ENV['HOME']}/.ssh/id_rsa",:paranoid => false,:user_known_hosts_file =>'/dev/null') do |ssh|
         hostname = ssh.exec!('hostname').strip
       end
     rescue Net::SSH::HostKeyMismatch => hkm
-      hkm..remember_host!
+      hkm.remember_host!
       retry
     rescue Net::SSH::AuthenticationFailed, SocketError,Errno::ECONNRESET
       assert(false,'Unable to contact nodes')
