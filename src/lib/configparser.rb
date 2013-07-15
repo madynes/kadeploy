@@ -5,6 +5,63 @@ module ConfigInformation
   class ParserError < StandardError
   end
 
+  ###
+  # Sample file:
+  ###
+  # database:
+  #   user: myser
+  #   password: thepassword
+  #   ip: 127.0.0.1
+  # cache:
+  #   size: 1234
+  #   # default directory: /tmp
+  #   # default strict: true
+  # # default values for environments fields
+  #
+  ###
+  # Parser
+  ###
+  # cp = ConfigParser.new(yamlstr)
+  # conf = {:db=>{}, :cache=>{}, :env=>{}, :pxe => {}}
+  # cp.parse('database',true) do
+  #   # String with default value
+  #   conf[:db][:user] = cp.value('user',String,nil,'defaultvalue')
+  #   # Mandatory String
+  #   conf[:db][:password] = cp.value('password',String)
+  #   # String with multiple possible values
+  #   conf[:db][:kind] = cp.value('kind',String,nil,['MySQL','PostGRE','Oracle'])
+  #   # Regexp
+  #   conf[:db][:ip] = cp.value('ip',String,'127.0.0.1',
+  #     /\A\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}\Z/
+  #   )
+  # end
+  # cp.parse('cache',true) do
+  #   # Integer with default value
+  #   conf[:cache][:size] = cp.value('size',Fixnum,nil,100)
+  #   # Directory that need to exist and be r/w
+  #   conf[:cache][:directory] = cp.value('directory',String,'/tmp',
+  #     {
+  #       :type => 'dir',
+  #       :readable => true,
+  #       :writable => true,
+  #       :create => true,
+  #       :mode => 0700
+  #     }
+  #   )
+  #   # Boolean
+  #   conf[:cache][:strict] = cp.value('strict',[TrueClass,FalseClass],true)
+  # end
+  #
+  # # Non-mandatory field
+  # cp.parse('environments') do
+  #   # Specification of a unix path
+  #   conf[:env][:tar_dir] = cp.value('tarball_dir',String,'/tmp',Pathname)
+  #   # Add a prefix to a value
+  #   conf[:env][:user_dir] = cp.value('user_dir',String,'/tmp',
+  #     {:type => 'dir', :prefix => '/home/'}
+  #   )
+  # end
+
   class ConfigParser
     attr_reader :basehash
     PATH_SEPARATOR = '/'
