@@ -830,6 +830,9 @@ boot:
 timeouts:
   reboot: 200 + 150 * Math.log(n)
   kexec: 60
+localops:
+  broadcastenv:
+    cmd: /usr/bin/taktuk -c 'ssh' -f NODEFILE broadcast exec [ DECOMPRESS_CMD ]; broadcast input file [ ENVFILE ]
 remoteops:
   reboot:
     - name: soft
@@ -910,6 +913,8 @@ automata:
       - type: Untrusted
         timeout: 400
     BroadcastEnv:
+      - type: Custom
+        timeout: 300
       - type: Kastafior
         retries: 1
         timeout: 900
@@ -989,7 +994,11 @@ automata:
     \item \yfield{reboot}{Integer/String} classical reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
     \item \yfieldd{kexec}{Integer/String}{60} kexec reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
   \end{itemize}
-
+  \item \ypath{/localops/broadcastenv} A custom command that will be used when sending an environment in a \texttt{BroadcastEnv} macro-step of kind \texttt{Custom}. Be careful, this command will be launched from the Kadeploy3 server.
+  \begin{itemize}
+    \item \yfield{cmd}{String} The command that will send the environment file. You can use the ENVFILE, NODEFILE and DECOMPRESS\_CMD patterns in the command-line. DECOMPRESS\_CMD is a command that can be used to decompress the file while receiving it (if not specify, the \texttt{decompress} parameter should be set to false).
+    \item \yfieldd{decompress}{Boolean}{true} If the script decompress the file while receiving it, it should be set to \emph{true}. If the script don't, an extra micro-step will be add to the deployment process in order to decompress the file after it has been sent.
+  \end{itemize}
   \item \ypath{/remoteops/[reboot]} The reboot commands, an escalation of them will be performed in the order of the List. Warning: at the moment, only the names \emph{soft}, \emph{hard} and \emph{very\_hard} can be used.
   \begin{itemize}
     \item \yfield{name}{String} the name of the command (used in the display)
@@ -1216,6 +1225,17 @@ Here is the list of the macro-step and their implementation:
       \begin{itemize}
       \item send\_environment(``bittorrent'')
       \item decompress\_environment \texttt{[only with fsa]}
+      \item mount\_deploy\_part \texttt{[only with fsa/dd and supported fs]}
+      \item manage\_admin\_post\_install \texttt{[only if supported fs]}
+      \item manage\_user\_post\_install \texttt{[only if supported fs]}
+      \item check\_kernel\_files \texttt{[only if supported fs]}
+      \item send\_key \texttt{[only if supported fs]}
+      \item install\_bootloader \texttt{[only if supported fs]}
+      \end{itemize}
+    \item \texttt{BroadcastEnvCustom}
+      \begin{itemize}
+      \item send\_environment(``custom'')
+      \item decompress\_environment \texttt{[only with fsa or if no custom decompress]}
       \item mount\_deploy\_part \texttt{[only with fsa/dd and supported fs]}
       \item manage\_admin\_post\_install \texttt{[only if supported fs]}
       \item manage\_user\_post\_install \texttt{[only if supported fs]}

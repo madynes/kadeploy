@@ -630,6 +630,7 @@ class Microstep < Automata::QueueTask
     return content[1].length / 3
   end
 
+  #
   # Remove a given number of subdirs in a dirname
   #
   # Arguments
@@ -848,6 +849,88 @@ class Microstep < Automata::QueueTask
     end
   end
 
+  def get_decompress_cmd(image_kind,deploy_part,mount_point,input_file=nil,output_file=nil)
+    if output_file
+      "cat #{(input_file ? input_file : '-')} > #{output_file}"
+    else
+      case image_kind
+      when "tgz"
+        "tar xz#{"f #{input_file}" if input_file} -C #{mount_point}"
+      when "tbz2"
+        "tar xj#{"f #{input_file}" if input_file} -C #{mount_point}"
+      when "txz"
+        "tar xJ#{"f #{input_file}" if input_file} -C #{mount_point}"
+      when "ddgz"
+        "gzip -cd #{input_file if input_file} > #{deploy_part}"
+      when "ddbz2"
+        "bzip2 -cd #{input_file if input_file} > #{deploy_part}"
+      when "ddxz"
+        "xz -cd #{input_file if input_file} > #{deploy_part}"
+      when /^fsa\d+$/
+        if input_file
+          nbcpu = "$(grep -c '^processor' /proc/cpuinfo)"
+
+          comp = (
+           context[:execution].environment.image[:compression].to_i > 0 \
+            ? "-z #{context[:execution].environment.image[:compression]}" \
+            : ''
+          )
+
+          fsmap = ''
+          if context[:execution].environment.multipart
+            context[:execution].environment.options['partitions'].each do |part|
+              fsmap += "id=#{part['id'].to_s},dest=#{part['device']} "
+            end
+          else
+            if context[:execution].environment.options['partitions']
+              part = context[:execution].environment.options['partitions'][0]
+              fsmap += "id=#{part['id'].to_s},dest=#{get_deploy_part_str()} "
+            else
+              fsmap += "id=0,dest=#{get_deploy_part_str()}"
+            end
+          end
+
+          "fsarchiver -j #{nbcpu} #{comp} restfs #{input_file} #{fsmap}"
+        else
+          false
+        end
+      else
+        false
+      end
+    end
+  end
+
+  def send_tarball_and_uncompress_with_custom(cmd, file, decompress)
+    cmd.gsub!("ENVFILE",file)
+    nodefile = Tempfile.new("kastafior-nodefile")
+    @nodes_ok.make_sorted_array_of_nodes.each do |node|
+      nodefile.puts(get_nodeid(node))
+    end
+    cmd.gsub!("NODEFILE",nodefile.path)
+    cmd.gsub!("DECOMPRESS_CMD",decompress)
+
+    @nodes_ok.clean()
+    status,out,err = nil
+puts cmd
+    command(cmd,
+      :stdout_size => 1000,
+      :stderr_size => 1000
+    ) do |st,stdout,stderr|
+      status = st.exitstatus
+      out = stdout
+      err = stderr
+    end
+    nodefile.unlink
+
+    @output.debug_command(cmd, out, err, status, @nodes)
+    if (status != 0) then
+      failed_microstep("Error while processing to the file broadcast with #{File.basename(cmd.split(' ')[0])} (exited with status #{status})")
+      return false
+    else
+      return true
+    end
+  end
+
   # Send a tarball with Taktuk and uncompress it on the nodes
   #
   # Arguments
@@ -858,29 +941,10 @@ class Microstep < Automata::QueueTask
   # * deploy_mount_part: deploy mount part
   # Output
   # * return true if the operation is correctly performed, false otherwise
-  def send_tarball_and_uncompress_with_taktuk(scattering_kind, tarball_file, tarball_kind, deploy_mount_point, deploy_part)
-    case tarball_kind
-    when "tgz"
-      cmd = "tar xz -C #{deploy_mount_point}"
-    when "tbz2"
-      cmd = "tar xj -C #{deploy_mount_point}"
-    when "txz"
-      cmd = "tar xJ -C #{deploy_mount_point}"
-    when "ddgz"
-      cmd = "gzip -cd > #{deploy_part}"
-    when "ddbz2"
-      cmd = "bzip2 -cd > #{deploy_part}"
-    when "ddxz"
-      cmd = "xz -cd > #{deploy_part}"
-    when /^fsa\d+$/
-      cmd = "cat - > #{fsarchive()}"
-    else
-      failed_microstep("The #{tarball_kind} archive kind is not supported")
-      return false
-    end
+  def send_tarball_and_uncompress_with_taktuk(scattering_kind, file, decompress)
     return parallel_exec(
-      cmd,
-      { :input_file => tarball_file, :scattering => scattering_kind },
+      decompress,
+      { :input_file => file, :scattering => scattering_kind },
       { :status => ["0"] }
     )
   end
@@ -888,13 +952,11 @@ class Microstep < Automata::QueueTask
   # Send a tarball with Kastafior and uncompress it on the nodes
   #
   # Arguments
-  # * tarball_file: path to the tarball
-  # * tarball_kind: kind of archive (tgz, tbz2, ddgz, ddbz2)
-  # * deploy_mount_point: deploy mount point
-  # * deploy_mount_part: deploy mount part
+  # * file: path to the tarball
+  # * decompress: the decompression command
   # Output
   # * return true if the operation is correctly performed, false otherwise
-  def send_tarball_and_uncompress_with_kastafior(tarball_file, tarball_kind, deploy_mount_point, deploy_part)
+  def send_tarball_and_uncompress_with_kastafior(file, decompress)
     if context[:cluster].use_ip_to_deploy then
       node_set = Nodes::NodeSet.new
       if @nodes_ok.empty?
@@ -938,30 +1000,11 @@ class Microstep < Automata::QueueTask
     end
 
     nodefile.close
-    case tarball_kind
-    when "tgz"
-      cmd = "tar xz -C #{deploy_mount_point}"
-    when "tbz2"
-      cmd = "tar xj -C #{deploy_mount_point}"
-    when "txz"
-      cmd = "tar xJ -C #{deploy_mount_point}"
-    when "ddgz"
-      cmd = "gzip -cd > #{deploy_part}"
-    when "ddbz2"
-      cmd = "bzip2 -cd > #{deploy_part}"
-    when "ddxz"
-      cmd = "xz -cd > #{deploy_part}"
-    when /^fsa\d+$/
-      cmd = "cat - > #{fsarchive()}"
-    else
-      failed_microstep("The #{tarball_kind} archive kind is not supported")
-      return false
-    end
 
     if context[:common].taktuk_auto_propagate then
-      cmd = "#{context[:common].kastafior} -s -c \\\"#{context[:common].taktuk_connector}\\\"  -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path}"
+      cmd = "#{context[:common].kastafior} -s -c \\\"#{context[:common].taktuk_connector}\\\"  -- -s \"cat #{file}\" -c \"#{decompress}\" -n #{nodefile.path}"
     else
-      cmd = "#{context[:common].kastafior} -c \\\"#{context[:common].taktuk_connector}\\\" -- -s \"cat #{tarball_file}\" -c \"#{cmd}\" -n #{nodefile.path}"
+      cmd = "#{context[:common].kastafior} -c \\\"#{context[:common].taktuk_connector}\\\" -- -s \"cat #{file}\" -c \"#{decompress}\" -n #{nodefile.path}"
     end
 
     @nodes_ok.clean()
@@ -987,26 +1030,25 @@ class Microstep < Automata::QueueTask
   # Send a tarball with Bittorrent and uncompress it on the nodes
   #
   # Arguments
-  # * tarball_file: path to the tarball
-  # * tarball_kind: kind of archive (tgz, tbz2, ddgz, ddbz2)
-  # * deploy_mount_point: deploy mount point
-  # * deploy_mount_part: deploy mount part
+  # * file: path to the tarball
+  # * decompress: the decompression command
   # Output
   # * return true if the operation is correctly performed, false otherwise
-  def send_tarball_and_uncompress_with_bittorrent(tarball_file, tarball_kind, deploy_mount_point, deploy_part)
-    if not parallel_exec("rm -f /tmp/#{File.basename(tarball_file)}*") then
+  def send_tarball_and_uncompress_with_bittorrent(file, decompress)
+    tmpfile = get_tmp_file(file)
+    if not parallel_exec("rm -f #{tmpfile}*") then
       failed_microstep("Error while cleaning the /tmp")
       return false
     end
-    torrent = "#{tarball_file}.torrent"
+    torrent = "#{file}.torrent"
     btdownload_state = "/tmp/btdownload_state#{Time.now.to_f}"
     tracker_pid, tracker_port = Bittorrent::launch_tracker(btdownload_state)
-    if not Bittorrent::make_torrent(tarball_file, context[:common].bt_tracker_ip, tracker_port) then
+    if not Bittorrent::make_torrent(file, context[:common].bt_tracker_ip, tracker_port) then
       failed_microstep("The torrent file (#{torrent}) has not been created")
       return false
     end
     if context[:common].kadeploy_disable_cache then
-      seed_pid = Bittorrent::launch_seed(torrent, File.dirname(tarball_file))
+      seed_pid = Bittorrent::launch_seed(torrent, File.dirname(file))
     else
       seed_pid = Bittorrent::launch_seed(torrent, context[:common].cache[:global].directory)
     end
@@ -1034,30 +1076,12 @@ class Microstep < Automata::QueueTask
     debug(3, "Shutdown the tracker for #{torrent}")
     ProcessManagement::killall(tracker_pid)
     command("rm -f #{btdownload_state}")
-    case tarball_kind
-    when "tgz"
-      cmd = "tar xzf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
-    when "tbz2"
-      cmd = "tar xjf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
-    when "txz"
-      cmd = "tar xJf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
-    when "ddgz"
-      cmd = "gzip -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
-    when "ddbz2"
-      cmd = "bzip2 -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
-    when "ddxz"
-      cmd = "xz -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
-    when /^fsa\d+$/
-      cmd = "cat - > #{fsarchive()}"
-    else
-      failed_microstep("The #{tarball_kind} archive kind is not supported")
-      return false
-    end
-    if not parallel_exec(cmd) then
+
+    if not parallel_exec(decompress) then
       failed_microstep("Error while uncompressing the tarball")
       return false
     end
-    if not parallel_exec("rm -f /tmp/#{File.basename(tarball_file)}*") then
+    if not parallel_exec("rm -f #{tmpfile}*") then
       failed_microstep("Error while cleaning the /tmp")
       return false
     end
@@ -1177,8 +1201,8 @@ class Microstep < Automata::QueueTask
     ret
   end
 
-  def fsarchive()
-    File.join(context[:common].rambin_path,'_FSARCHIVE.fsa')
+  def get_tmp_file(file)
+    File.join(context[:common].rambin_path,"_KATMP_#{File.basename(file)}")
   end
 
   def set_parttype(map,val,empty)
@@ -1855,38 +1879,35 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the environment has been successfully uncompressed, false otherwise
   def ms_send_environment(scattering_kind)
+    file = context[:execution].environment.image[:file]
+    output_file = nil
+    if context[:cluster].decompress_environment or context[:execution].environment.image[:shortkind] == 'fsa'
+      output_file = get_tmp_file(file)
+    end
+    unless (decompress = get_decompress_cmd(
+      context[:execution].environment.image[:shortkind],
+      context[:common].environment_extraction_dir,
+      get_deploy_part_str(),
+      nil,
+      output_file
+    )) then
+      failed_microstep("The #{tarball_kind} archive kind is not supported")
+      return false
+    end
+
     start = Time.now.to_i
     case scattering_kind
     when :bittorrent
-      res = send_tarball_and_uncompress_with_bittorrent(
-        context[:execution].environment.image[:file],
-        context[:execution].environment.image[:shortkind],
-        context[:common].environment_extraction_dir,
-        get_deploy_part_str()
-      )
+      res = send_tarball_and_uncompress_with_bittorrent(file,decompress)
     when :chain
-      res = send_tarball_and_uncompress_with_taktuk(
-        :chain,
-        context[:execution].environment.image[:file],
-        context[:execution].environment.image[:shortkind],
-        context[:common].environment_extraction_dir,
-        get_deploy_part_str()
-      )
+      res = send_tarball_and_uncompress_with_taktuk(:chain,file,decompress)
     when :tree
-      res = send_tarball_and_uncompress_with_taktuk(
-        :tree,
-        context[:execution].environment.image[:file],
-        context[:execution].environment.image[:shortkind],
-        context[:common].environment_extraction_dir,
-        get_deploy_part_str()
-      )
+      res = send_tarball_and_uncompress_with_taktuk(:tree,file,decompress)
     when :kastafior
-      res = send_tarball_and_uncompress_with_kastafior(
-       context[:execution].environment.image[:file],
-       context[:execution].environment.image[:shortkind],
-       context[:common].environment_extraction_dir,
-       get_deploy_part_str()
-      )
+      res = send_tarball_and_uncompress_with_kastafior(file,decompress)
+    when :custom
+      res = send_tarball_and_uncompress_with_custom(
+        context[:cluster].cmd_sendenv,file,decompress)
     end
     debug(3, "Broadcast time: #{Time.now.to_i - start}s") if res
     return res
@@ -1899,39 +1920,21 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the admin preinstall has been successfully uncompressed, false otherwise
   def ms_decompress_environment(scattering_kind)
-    unless context[:execution].environment.image[:kind] == 'fsa'
-      failed_microstep("Only fsa images need to be decompressed separatly")
+    unless (decompress = get_decompress_cmd(
+      context[:execution].environment.image[:shortkind],
+      context[:common].environment_extraction_dir,
+      get_deploy_part_str(),
+      get_tmp_file(context[:execution].environment.image[:file])
+    )) then
+      failed_microstep("The #{tarball_kind} archive kind is not supported")
       return false
     end
 
-    nbcpu = "$(grep -c '^processor' /proc/cpuinfo)"
-
-    comp = (
-     context[:execution].environment.image[:compression].to_i > 0 \
-      ? "-z #{context[:execution].environment.image[:compression]}" \
-      : ''
+    return parallel_exec(
+      decompress,
+      { :scattering => scattering_kind },
+      { :status => ["0"] }
     )
-
-    fsmap = ''
-    if context[:execution].environment.multipart
-      context[:execution].environment.options['partitions'].each do |part|
-        fsmap += "id=#{part['id'].to_s},dest=#{part['device']} "
-      end
-    else
-      if context[:execution].environment.options['partitions']
-        part = context[:execution].environment.options['partitions'][0]
-        fsmap += "id=#{part['id'].to_s},dest=#{get_deploy_part_str()} "
-      else
-        fsmap += "id=0,dest=#{get_deploy_part_str()}"
-      end
-    end
-
-    ret = parallel_exec(
-      "fsarchiver -j #{nbcpu} #{comp} restfs #{fsarchive()} #{fsmap}",
-      { :scattering => scattering_kind }
-    )
-
-    return ret
   end
 
 
@@ -1945,7 +1948,16 @@ class Microstep < Automata::QueueTask
     #First we check if the preinstall has been defined in the environment
     if (context[:execution].environment.preinstall != nil) then
       preinstall = context[:execution].environment.preinstall
-      if not send_tarball_and_uncompress_with_taktuk(scattering_kind, preinstall["file"], preinstall["kind"], context[:common].rambin_path, "") then
+
+      unless (decompress = get_decompress_cmd(
+        preinstall["kind"],
+        context[:common].rambin_path,
+        ''
+      )) then
+        failed_microstep("The #{tarball_kind} archive kind is not supported")
+        return false
+      end
+      if not send_tarball_and_uncompress_with_taktuk(scattering_kind, preinstall["file"], decompress) then
         return false
       end
       if (preinstall["script"] != "none")
@@ -1956,7 +1968,15 @@ class Microstep < Automata::QueueTask
       return true
     elsif (context[:cluster].admin_pre_install != nil) then
       context[:cluster].admin_pre_install.each do |preinst|
-        if not send_tarball_and_uncompress_with_taktuk(scattering_kind, preinst["file"], preinst["kind"], context[:common].rambin_path, "") then
+        unless (decompress = get_decompress_cmd(
+          preinstall["kind"],
+          context[:common].rambin_path,
+          ''
+        )) then
+          failed_microstep("The #{tarball_kind} archive kind is not supported")
+          return false
+        end
+        if not send_tarball_and_uncompress_with_taktuk(scattering_kind, preinst["file"], decompress) then
           return false
         end
         if (preinst["script"] != "none")
@@ -1978,7 +1998,15 @@ class Microstep < Automata::QueueTask
   # * return true if the admin postinstall has been successfully uncompressed, false otherwise   
   def ms_manage_admin_post_install(scattering_kind)
     context[:cluster].admin_post_install.each do |postinstall|
-      if not send_tarball_and_uncompress_with_taktuk(scattering_kind, postinstall["file"], postinstall["kind"], context[:common].rambin_path, "") then
+      unless (decompress = get_decompress_image_cmd(
+        postinstall["kind"],
+        context[:common].rambin_path,
+        ''
+      )) then
+        failed_microstep("The #{tarball_kind} archive kind is not supported")
+        return false
+      end
+      if not send_tarball_and_uncompress_with_taktuk(scattering_kind, postinstall["file"], decompress) then
         return false
       end
       if (postinstall["script"] != "none")
@@ -1998,7 +2026,15 @@ class Microstep < Automata::QueueTask
   # * return true if the user postinstall has been successfully uncompressed, false otherwise
   def ms_manage_user_post_install(scattering_kind)
     context[:execution].environment.postinstall.each do |postinstall|
-      if not send_tarball_and_uncompress_with_taktuk(scattering_kind, postinstall["file"], postinstall["kind"], context[:common].rambin_path, "") then
+      unless (decompress = get_decompress_image_cmd(
+        postinstall["kind"],
+        context[:common].rambin_path,
+        ''
+      )) then
+        failed_microstep("The #{tarball_kind} archive kind is not supported")
+        return false
+      end
+      if not send_tarball_and_uncompress_with_taktuk(scattering_kind, postinstall["file"], decompress) then
         return false
       end
       if (postinstall["script"] != "none")
