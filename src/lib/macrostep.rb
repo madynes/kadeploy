@@ -153,7 +153,7 @@ class Macrostep < Automata::TaskedTaskManager
       delete_task(:format_swap_part)
     end
 
-    delete_task(:decompress_environment) unless cexec.environment.image[:kind] == 'fsa'
+    delete_task(:decompress_environment) if !context[:cluster].decompress_environment and cexec.environment.image[:kind] != 'fsa'
 
     if ['dd','fsa'].include?(cexec.environment.image[:kind])
       delete_task(:format_deploy_part)

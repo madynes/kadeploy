@@ -76,6 +76,21 @@ require 'macrostep'
     end
   end
 
+  class BroadcastEnvCustom < BroadcastEnv
+    def steps()
+      [
+        [ :send_environment, :custom ],
+        [ :decompress_environment, :tree ],
+        [ :manage_admin_post_install, :tree ],
+        [ :manage_user_post_install, :tree ],
+        [ :check_kernel_files ],
+        [ :send_key, :tree ],
+        [ :install_bootloader ],
+        [ :sync ],
+      ]
+    end
+  end
+
   class BroadcastEnvDummy < BroadcastEnv
     def steps()
       [

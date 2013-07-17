@@ -1121,6 +1121,15 @@ module ConfigInformation
           end
         end
 
+        cp.parse('localops') do |info|
+          cp.parse('broadcastenv') do
+            unless info[:empty]
+              conf.cmd_sendenv = cp.value('cmd',String)
+              conf.decompress_environment = !(cp.value('decompress',[TrueClass,FalseClass],true))
+            end
+          end
+        end
+
         cp.parse('preinstall') do |info|
           cp.parse('files',false,Array) do
             unless info[:empty]
@@ -3307,6 +3316,8 @@ module ConfigInformation
     attr_accessor :cmd_hard_power_on
     attr_accessor :cmd_very_hard_power_on
     attr_accessor :cmd_power_status
+    attr_accessor :cmd_sendenv
+    attr_accessor :decompress_environment
     attr_accessor :group_of_nodes #Hashtable (key is a command name)
     attr_accessor :partitioning_script
     attr_accessor :bootloader_script
@@ -3352,6 +3363,8 @@ module ConfigInformation
       @cmd_hard_power_off = nil
       @cmd_very_hard_power_off = nil
       @cmd_power_status = nil
+      @cmd_sendenv = nil
+      @decompress_environment = false
       @group_of_nodes = Hash.new
       @drivers = nil
       @pxe_header = {}
@@ -3399,6 +3412,8 @@ module ConfigInformation
       dest.cmd_hard_power_off = @cmd_hard_power_off.clone if (@cmd_hard_power_off != nil) 
       dest.cmd_very_hard_power_off = @cmd_very_hard_power_off.clone if (@cmd_very_hard_power_off != nil)
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
+      dest.cmd_sendenv = @cmd_sendenv.clone if (@cmd_sendenv != nil)
+      dest.decompress_environment = @decompress_environment
       dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = Marshal.load(Marshal.dump(@pxe_header))
@@ -3448,6 +3463,8 @@ module ConfigInformation
       dest.cmd_hard_power_off = @cmd_hard_power_off.clone if (@cmd_hard_power_off != nil) 
       dest.cmd_very_hard_power_off = @cmd_very_hard_power_off.clone if (@cmd_very_hard_power_off != nil)
       dest.cmd_power_status = @cmd_power_status.clone if (@cmd_power_status != nil)
+      dest.cmd_sendenv = @cmd_sendenv.clone if (@cmd_sendenv != nil)
+      dest.decompress_environment = @decompress_environment
       dest.group_of_nodes = @group_of_nodes.clone
       dest.drivers = @drivers.clone if (@drivers != nil)
       dest.pxe_header = Marshal.load(Marshal.dump(@pxe_header))
