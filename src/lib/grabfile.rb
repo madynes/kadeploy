@@ -48,7 +48,7 @@ module Managers
     end
 
     def uptodate?(fchecksum,fmtime=nil)
-      !((mtime > fmtime) and (checksum != fchecksum))
+      !((mtime != fmtime) and (checksum != fchecksum))
     end
 
     def size
@@ -243,14 +243,10 @@ module Managers
           )
         end
 
-        fmtime, fchecksum, fpath = nil
-        if opts[:file]
-          #error(errno,"The #{tag} file '#{path}' must be local") \
-          #  unless fetcher.is_a?(LocalFetch)
-          fmtime = lambda{ fetcher.mtime }
-          fchecksum = lambda{ fetcher.checksum }
-          fpath = opts[:file]
-        end
+        fmtime = lambda{ fetcher.mtime }
+        fchecksum = lambda{ fetcher.checksum }
+        fpath = nil
+        fpath = opts[:file] if opts[:file]
 
         cf = @cache.cache(
           path,version,user,priority,tag,fetcher.size,
