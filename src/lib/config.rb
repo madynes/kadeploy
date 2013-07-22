@@ -69,6 +69,11 @@ module ConfigInformation
       end
     end
 
+    def self.dir()
+      ENV['KADEPLOY_CONFIG_DIR']||'/etc/kadeploy3'
+    end
+
+
     # Check the config of the Kadeploy tools
     #
     # Arguments
@@ -884,8 +889,8 @@ module ConfigInformation
           conf.name = clname
 
           clfile = cp.value(
-            'conf_file',String,nil,{ :type => 'file', :readable => true }
-          )
+            'conf_file',String,nil,{
+              :type => 'file', :readable => true, :prefix => Config.dir()})
           conf.prefix = cp.value('prefix',String,'')
           return false unless load_cluster_specific_config_file(clname,clfile)
 
@@ -977,15 +982,13 @@ module ConfigInformation
           conf.swap_part = 'none' if cp.value(
             'disable_swap',[TrueClass,FalseClass],false
           )
-          conf.partitioning_script = cp.value(
-            'script',String,nil,{ :type => 'file', :readable => true }
-          )
+          conf.partitioning_script = cp.value('script',String,nil,
+            { :type => 'file', :readable => true, :prefix => Config.dir() })
         end
 
         cp.parse('boot',true) do
-          conf.bootloader_script = cp.value(
-            'install_bootloader',String,nil,{ :type => 'file', :readable => true }
-          )
+          conf.bootloader_script = cp.value('install_bootloader',String,nil,
+            { :type => 'file', :readable => true, :prefix => Config.dir() })
           cp.parse('kernels',true) do
             cp.parse('user') do
               conf.kernel_params = cp.value('params',String,'')
@@ -1176,17 +1179,15 @@ module ConfigInformation
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
                 when 'send'
-                  op[:file] = cp.value(
-                    'file',String,nil,{ :type => 'file', :readable => true }
-                  )
+                  op[:file] = cp.value('file',String,nil,
+                    { :type => 'file', :readable => true, :prefix => Config.dir() })
                   op[:destination] = cp.value('destination',String)
                   op[:timeout] = cp.value('timeout',Fixnum,0)
                   op[:retries] = cp.value('retries',Fixnum,0)
                   op[:scattering] = cp.value('scattering',String,:tree)
                 when 'run'
-                  op[:file] = cp.value(
-                    'file',String,nil,{ :type => 'file', :readable => true }
-                  )
+                  op[:file] = cp.value('file',String,nil,
+                    { :type => 'file', :readable => true, :prefix => Config.dir() })
                   op[:params] = cp.value('params',String,'')
                   op[:timeout] = cp.value('timeout',Fixnum,0)
                   op[:retries] = cp.value('retries',Fixnum,0)
