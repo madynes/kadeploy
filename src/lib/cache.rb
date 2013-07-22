@@ -375,7 +375,7 @@ class Cache
       :priority => priority,
       :tag => tag,
     }) then
-      if ((mtime and mtime.call.to_i > ret.mtime.to_i) or !mtime) \
+      if ((mtime and mtime.call.to_i != ret.mtime.to_i) or !mtime) \
         and (md5 and md5.call != ret.md5)
       then
         # The file has changed
