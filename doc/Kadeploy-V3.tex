@@ -789,7 +789,7 @@ clusters:
   \begin{itemize}
     \item \yfield{name}{String} the name of the cluster
     \item \yfield{prefix}{String} the prefix that will be used for display purpose when deploying nodes from several clusters (if not set, the prefix will be a unique integer identifier)
-    \item \yfield{conf\_file}{String} the relative path (in kadeploy configuration directory) to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
+    \item \yfield{conf\_file}{String} the path to the cluster-specific configuration file of this cluster (see section \ref{sec:specific_config})
   \end{itemize}
 
   \item \ypath{/clusters/[nodes]}
@@ -946,7 +946,7 @@ automata:
   \begin{itemize}
     \item \yfield{block\_device}{String}block device of the disk used on the nodes
     \item \yfieldd{disable\_swap}{Boolean}{false} disable the swap partition on the disk
-    \item \yfield{script}{String} A script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
+    \item \yfield{script}{String} Path to a script that creates the partition table on the nodes. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:partscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/partitioning/partitions}
@@ -959,7 +959,7 @@ automata:
 
   \item \ypath{/boot}
   \begin{itemize}
-    \item \yfield{install\_bootloader}{String} A script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
+    \item \yfield{install\_bootloader}{String} Path to a script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
 
   \item \ypath{/boot/kernels} Options of OS kernel's that are booted by Kadeploy3
