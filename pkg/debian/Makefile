@@ -190,8 +190,9 @@ endif
 
 
 package_common: build-clean build tree_common install_conf_common install_src install_test install_db_script install_man
-	@mkdir -p $(DEB_ROOT_COMMON)
-	@cp -r $(DEB_TEMPLATE_COMMON)/* $(DEB_ROOT_COMMON)
+	#@mkdir -p $(DEB_ROOT_COMMON)
+	#@cp -rf $(DEB_TEMPLATE_COMMON)/* $(DEB_ROOT_COMMON)
+	@mkdir -p $(DEB_ROOT_COMMON)/DEBIAN
 	@sh set_control.sh kadeploy-common-control.in kadeploy-common $(SUFFIX) > $(DEB_ROOT_COMMON)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_COMMON) $(PKG_DIR)/kadeploy-common$(SUFFIX)-$(VERSION).deb
 	@$(MAKE) build-clean

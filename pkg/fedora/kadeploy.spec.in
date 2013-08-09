@@ -98,9 +98,9 @@ rm -rf $RPM_BUILD_ROOT
 /usr/bin/kapower3
 /usr/sbin/karights3
 
-%pre common
+%pre server
 if ! getent passwd deploy >/dev/null 2>&1 ; then
-  /usr/sbin/useradd -d /home/deploy deploy >/dev/null 2>&1 || exit 1
+  /usr/sbin/useradd --system deploy >/dev/null 2>&1 || exit 1
 fi
 
 %post server
