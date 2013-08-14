@@ -936,50 +936,55 @@ class KadeployServer
         :rid => reboot_id, :status => 2)
     end
 
-    files = []
-    if (exec_specific.reboot_kind == "set_pxe") and (!exec_specific.pxe_upload_files.empty?) then
-      gfm = Managers::GrabFileManager.new(context[:common].cache[:netboot],
-        output,client,db,744)
+    grabthr = Thread.new do
+      files = []
+      if (exec_specific.reboot_kind == "set_pxe") and (!exec_specific.pxe_upload_files.empty?) then
+        gfm = Managers::GrabFileManager.new(context[:common].cache[:netboot],
+          output,client,db,744)
 
-      exec_specific.pxe_upload_files.each do |pxefile|
-        begin
-          Managers::GrabFileManager::grab(gfm,context,pxefile,:anon,'pxe',
-            KarebootAsyncError::PXE_FILE_FETCH_ERROR,
-            :file => File.join(context[:common].cache[:netboot].directory,
-              (
-                NetBoot.custom_prefix(
-                  context[:execution].true_user,
-                  context[:reboot_id]
-                ) + '--' + File.basename(pxefile)
+        exec_specific.pxe_upload_files.each do |pxefile|
+          begin
+            Managers::GrabFileManager::grab(gfm,context,pxefile,:anon,'pxe',
+              KarebootAsyncError::PXE_FILE_FETCH_ERROR,
+              :file => File.join(context[:common].cache[:netboot].directory,
+                (
+                  NetBoot.custom_prefix(
+                    context[:execution].true_user,
+                    context[:reboot_id]
+                  ) + '--' + File.basename(pxefile)
+                )
               )
             )
-          )
-        rescue KadeployError => ke
-          gfm.clean
-          raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,
-            { :rid => ke.context[:rid], :status => 3}, ke.message)
+          rescue KadeployError => ke
+            gfm.clean
+            raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,
+              { :rid => ke.context[:rid], :status => 3}, ke.message)
+          end
         end
-      end
-      files += gfm.files
-      gfm = nil
-    end
-    if (exec_specific.key != "") and (exec_specific.reboot_kind == "deploy_env")
-      begin
-        gfm = Managers::GrabFileManager.new(context[:common].cache[:global],
-          output,client,db, 640)
-        Managers::GrabFileManager::grab(gfm,context,exec_specific.key,:anon,
-          'key',FetchFileError::INVALID_KEY)
         files += gfm.files
         gfm = nil
-      rescue KadeployError => ke
-        gfm.clean
-        raise KadeployError.new(FetchFileError::INVALID_KEY,
-          { :rid => ke.context[:rid], :status => 4}, ke.message)
       end
+      if (exec_specific.key != "") and (exec_specific.reboot_kind == "deploy_env")
+        begin
+          gfm = Managers::GrabFileManager.new(context[:common].cache[:global],
+            output,client,db, 640)
+          Managers::GrabFileManager::grab(gfm,context,exec_specific.key,:anon,
+            'key',FetchFileError::INVALID_KEY)
+          files += gfm.files
+          gfm = nil
+        rescue KadeployError => ke
+          gfm.clean
+          raise KadeployError.new(FetchFileError::INVALID_KEY,
+            { :rid => ke.context[:rid], :status => 4}, ke.message)
+        end
+      end
+      @reboot_info_hash_lock.synchronize {
+        @reboot_info_hash[reboot_id][4] = files
+      }
     end
 
     @reboot_info_hash_lock.synchronize {
-      @reboot_info_hash[reboot_id][4] = files
+      @reboot_info_hash[reboot_id][5] = grabthr
     }
 
     gfm = nil
@@ -1015,6 +1020,8 @@ class KadeployServer
     clusters.each_pair do |cluster, set|
       context[:cluster] = config.cluster_specific[cluster]
       threads << Thread.new do
+        grabthr.join
+        #@reboot_info_hash[reboot_id][5] = grabthr
         ret = KarebootAsyncError::NO_ERROR
         micro = CustomMicrostep.new(set, context)
         Thread.current[:micro] = micro
@@ -1153,6 +1160,10 @@ class KadeployServer
               disconnected = true
               output.disable_client_output()
               output.verbosel(3, "Client disconnection")
+              @reboot_info_hash_lock.synchronize {
+                @reboot_info_hash[rid][5].kill if @reboot_info_hash[rid][5] \
+                  and @reboot_info_hash[rid][5].alive?
+              }
               microthreads.each { |thread| thread.kill }
               micros.each do |micro|
                 micro.output.disable_client_output()
@@ -1202,6 +1213,8 @@ class KadeployServer
       end
       $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
       @reboot_info_hash_lock.synchronize {
+        @reboot_info_hash[rid][5].kill if @reboot_info_hash[rid][5] \
+          and @reboot_info_hash[rid][5].alive?
         # Unlock the cached files
         if @reboot_info_hash[ke.context[:rid]] and @reboot_info_hash[ke.context[:rid]].size >= 4
           @reboot_info_hash[ke.context[:rid]][4].each do |file|
@@ -1249,7 +1262,7 @@ class KadeployServer
         }
         if (@config.common.async_end_of_reboot_hook != "") then
           tmp = cmd = @config.common.async_end_of_reboot_hook.clone
-          while (tmp.sub!("REBOOT_ID", reboot_id) != nil)  do
+          while (tmp.sub!("REBOOT_ID", rid) != nil)  do
             cmd = tmp
           end
           system(cmd)
@@ -1264,9 +1277,11 @@ class KadeployServer
         microthread[:micro].kill
       end
       @reboot_info_hash_lock.synchronize {
+        @reboot_info_hash[rid][5].kill if @reboot_info_hash[rid][5] \
+          and @reboot_info_hash[rid][5].alive?
         # Unlock the cached files
-        if @reboot_info_hash[reboot_id].size >= 4
-          @reboot_info_hash[reboot_id][4].each do |file|
+        if @reboot_info_hash[rid].size >= 4
+          @reboot_info_hash[rid][4].each do |file|
             file.release
           end
         end
@@ -1294,7 +1309,7 @@ class KadeployServer
   # Output
   # * nothing
   def kareboot_add_reboot_info(reboot_id, nodes_ok, nodes_ko, finished)
-    @reboot_info_hash[reboot_id] = [nodes_ok, nodes_ko, finished]
+    @reboot_info_hash[reboot_id] = [nodes_ok, nodes_ko, finished, nil, nil]
   end
 
   # Delete reboot information
