@@ -184,8 +184,11 @@ module ConfigInformation
 
     def customcheck_file(val, fieldname, args)
       return if args[:disable]
-      val = File.join(args[:prefix],val) if args[:prefix]
-      val = File.join(val,args[:suffix]) if args[:suffix]
+      if args[:prefix]
+        tmp = Pathname.new(val)
+        val.gsub!(val,File.join(args[:prefix],val)) if !tmp.absolute?
+      end
+      val.gsub!(val,File.join(val,args[:suffix])) if args[:suffix]
       if File.exists?(val)
         if File.file?(val)
           if args[:writable]
