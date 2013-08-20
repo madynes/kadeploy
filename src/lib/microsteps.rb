@@ -839,7 +839,7 @@ class Microstep < Automata::QueueTask
   # * return the kernel parameters
   def get_kernel_params
     #We first check if the kernel parameters are defined in the environment
-    if !context[:execution].environment.kernel_params.nil?
+    if !context[:execution].environment.kernel_params.nil? and !context[:execution].environment.kernel_params.empty?
       context[:execution].environment.kernel_params
     #Otherwise we eventually check in the cluster specific configuration
     elsif !context[:cluster].kernel_params.nil?
