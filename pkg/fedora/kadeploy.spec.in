@@ -100,7 +100,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %pre server
 if ! getent passwd deploy >/dev/null 2>&1 ; then
-  /usr/sbin/useradd --system deploy >/dev/null 2>&1 || exit 1
+  /usr/sbin/useradd --system --create-home --base-dir /var/lib deploy >/dev/null 2>&1 || exit 1
 fi
 
 %post server
