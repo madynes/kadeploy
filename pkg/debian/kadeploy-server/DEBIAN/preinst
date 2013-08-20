@@ -7,5 +7,5 @@ now=`date +"%F_%T"`
 
 if ! getent passwd deploy >/dev/null 2>&1
 then
-        useradd --system deploy
+        useradd --system --create-home --base-dir /var/lib deploy
 fi
