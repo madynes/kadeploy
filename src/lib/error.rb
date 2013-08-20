@@ -69,7 +69,7 @@ class KadeployError < Exception
     when KarebootAsyncError::REBOOT_FAILED_ON_SOME_NODES
       "Reboot failed on some nodes"
     when KarebootAsyncError::DEMOLISHING_ENV
-      "Cannot reboot since the nodes have been previously deployed with a demolishinf environment"
+      "Cannot reboot since the nodes have been previously deployed with a demolishing environment"
     when KarebootAsyncError::PXE_FILE_FETCH_ERROR
       "Some PXE files cannot be fetched"
     when KarebootAsyncError::NO_RIGHT_TO_DEPLOY
