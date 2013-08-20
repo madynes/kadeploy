@@ -148,14 +148,14 @@ TFTP_OPTIONS="-v -l -s -c"
 \paragraph{Booting over the network\\}
 To allow the network booting, you must specify in the DHCP configuration file the file name option that define the file retrieve by a client. This file name can be pxelinux.0 or gpxelinux.0.
 
-Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files and directories: 
+Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files and directories:
 \begin{itemize}
  \item pxelinux.0 (or gpxelinux.0)
  \item chain.c32
  \item mboot.c32
- \item a kernels/ directory (can be changed in the server configuration file) 
+ \item a kernels/ directory (can be changed in the server configuration file)
  \item a pxelinux.cfg/ directory
-\end{itemize} 
+\end{itemize}
 These files can be found in the Syslinux software (\url{http://syslinux.org}) or directly downloaded on the kernel.org website (\url{https://www.kernel.org/pub/linux/utils/boot/syslinux/}), the 3.73 version is at least required.
 
 \subsection{HTTP server (optional)}
@@ -2425,7 +2425,7 @@ options:
 \begin{itemize}
   \item \texttt{300}: No error
   \item \texttt{301}: Reboot failed on some nodes
-  \item \texttt{302}: Cannot reboot since the nodes have been previously deployed with a demolishinf environment
+  \item \texttt{302}: Cannot reboot since the nodes have been previously deployed with a demolishing environment
   \item \texttt{303}: Some PXE files cannot be fetched
   \item \texttt{304}: You do not have the right to deploy on all the nodes
   \item \texttt{305}: Unknown node in singularity file
