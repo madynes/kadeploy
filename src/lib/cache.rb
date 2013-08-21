@@ -308,26 +308,24 @@ class Cache
       tmp = nil
       begin
         # If a size was given, clean the cache before grabbing the new file
-        @lock.lock
-        freesize = freesize!()
-        if size and size > freesize
-          if size > (freeable!() + freesize)
-            @lock.unlock
-            raise KadeployError.new(
-              FetchFileError::CACHE_FULL,nil,
-              "Impossible to cache the file '#{path}', the cache is full"
-            )
-          else
-            unless free!(size)
-              @lock.unlock
+        @lock.synchronize do
+          freesize = freesize!()
+          if size and size > freesize
+            if size > (freeable!() + freesize)
               raise KadeployError.new(
                 FetchFileError::CACHE_FULL,nil,
                 "Impossible to cache the file '#{path}', the cache is full"
               )
+            else
+              unless free!(size)
+                raise KadeployError.new(
+                  FetchFileError::CACHE_FULL,nil,
+                  "Impossible to cache the file '#{path}', the cache is full"
+                )
+              end
             end
           end
-        end
-        @lock.unlock
+        end # synchronize
 
         if fpath
           if !@tagfiles and File.exists?(fpath)
@@ -498,28 +496,28 @@ class Cache
     end
 
     # Only keep the most recently used files with the greater priority
-    @lock.lock
-    if @tagfiles
-      files.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.reverse!.each do |file|
-        if file.priority != 0 and file.size <= freesize!()
-          if cfile = add!(file)
-            debug("Load cached file #{file.path} (#{cfile.size/(1024*1024)}MB)")
-            cfile.save(@directory)
+    @lock.synchronize do
+      if @tagfiles
+        files.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.reverse!.each do |file|
+          if file.priority != 0 and file.size <= freesize!()
+            if cfile = add!(file)
+              debug("Load cached file #{file.path} (#{cfile.size/(1024*1024)}MB)")
+              cfile.save(@directory)
+            else
+              debug("Delete cached file #{file.path} from cache "\
+                "(#{file.size/(1024*1024)}MB)")
+              #FileUtils.rm_f(rfile)
+              Execute["rm -f #{file.file}"].run!.wait
+            end
           else
             debug("Delete cached file #{file.path} from cache "\
               "(#{file.size/(1024*1024)}MB)")
             #FileUtils.rm_f(rfile)
             Execute["rm -f #{file.file}"].run!.wait
           end
-        else
-          debug("Delete cached file #{file.path} from cache "\
-            "(#{file.size/(1024*1024)}MB)")
-          #FileUtils.rm_f(rfile)
-          Execute["rm -f #{file.file}"].run!.wait
         end
       end
-    end
-    @lock.unlock
+    end # synchronize
     debug("Cache #{@directory} loaded (#{@cursize/(1024*1024)}MB)")
   end
 

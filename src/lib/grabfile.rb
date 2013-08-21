@@ -84,8 +84,7 @@ module Managers
 
     def checksum
       if File.readable?(@path)
-        ret = MD5::get_md5_sum(@path)
-        ret
+        MD5::get_md5_sum(@path)
       elsif @client
         if (ret = @client.get_file_md5(@path)) == 0
           error(@errno,"Unable to grab the file #{@path}")

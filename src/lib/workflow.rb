@@ -341,40 +341,39 @@ class Workflow < Automata::TaskManager
 
     @start_time = Time.now.to_i
     debug(0, "Launching a deployment on #{@nodes.to_s_fold}")
-    context[:dblock].lock
 
-    # Check nodes deploying
-    unless context[:execution].ignore_nodes_deploying
-      _,to_discard = @nodes.check_nodes_in_deployment(
-        context[:database],
-        context[:common].purge_deployment_timer
-      )
-      unless to_discard.empty?
-        debug(0,
-          "The nodes #{to_discard.to_s_fold} are already involved in "\
-          "deployment, let's discard them"
+    context[:dblock].synchronize do
+      # Check nodes deploying
+      unless context[:execution].ignore_nodes_deploying
+        _,to_discard = @nodes.check_nodes_in_deployment(
+          context[:database],
+          context[:common].purge_deployment_timer
         )
-        to_discard.set.each do |node|
-          context[:config].set_node_state(node.hostname, '', '', 'discarded')
-          @nodes.remove(node)
+        unless to_discard.empty?
+          debug(0,
+            "The nodes #{to_discard.to_s_fold} are already involved in "\
+            "deployment, let's discard them"
+          )
+          to_discard.set.each do |node|
+            context[:config].set_node_state(node.hostname, '', '', 'discarded')
+            @nodes.remove(node)
+          end
         end
       end
-    end
 
-    if @nodes.empty?
-      debug(0, 'All the nodes have been discarded ...')
-      context[:dblock].unlock
-      error(KadeployAsyncError::NODES_DISCARDED,false)
-    else
-      @nodes.set_deployment_state(
-        'deploying',
-        (context[:execution].load_env_kind == 'file' ?
-          -1 : context[:execution].environment.id),
-        context[:database],
-        context[:user]
-      )
-      context[:dblock].unlock
-    end
+      if @nodes.empty?
+        debug(0, 'All the nodes have been discarded ...')
+        error(KadeployAsyncError::NODES_DISCARDED,false)
+      else
+        @nodes.set_deployment_state(
+          'deploying',
+          (context[:execution].load_env_kind == 'file' ?
+            -1 : context[:execution].environment.id),
+          context[:database],
+          context[:user]
+        )
+      end
+    end # synchronize
 
     load_custom_operations()
   end

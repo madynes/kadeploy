@@ -139,14 +139,14 @@ module Debug
       server_str = "#{@deploy_id}|#{@user} -> #{msg}"
       puts server_str
       if (@syslog && (l <= @syslog_dbg_level)) then
-        @syslog_lock.lock
-        while Syslog.opened?
-          sleep 0.2
+        @syslog_lock.synchronize do
+          while Syslog.opened?
+            sleep 0.2
+          end
+          sl = Syslog.open("Kadeploy-dbg")
+          sl.log(Syslog::LOG_NOTICE, "#{server_str}")
+          sl.close
         end
-        sl = Syslog.open("Kadeploy-dbg")
-        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-        sl.close
-        @syslog_lock.unlock
       end
     end
 
@@ -193,14 +193,14 @@ module Debug
       server_str = "#{@deploy_id}|#{@user} -> #{msg}"
       puts server_str
       if @syslog then
-        @syslog_lock.lock
-        while Syslog.opened?
-          sleep 0.2
+        @syslog_lock.synchronize do
+          while Syslog.opened?
+            sleep 0.2
+          end
+          sl = Syslog.open("Kadeploy-dbg")
+          sl.log(Syslog::LOG_NOTICE, "#{server_str}")
+          sl.close
         end
-        sl = Syslog.open("Kadeploy-dbg")
-        sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-        sl.close
-        @syslog_lock.unlock
       end
     end
 
@@ -382,24 +382,24 @@ module Debug
     # Output
     # * nothing
     def dump_to_syslog
-      @syslog_lock.lock
-      while Syslog.opened?
-        sleep 0.2
-      end
-      sl = Syslog.open("Kadeploy-log")
-      @nodes.each_pair { |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
-        str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
-        str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
-        str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
-        str += node_infos["start"].to_i.to_s + ","
-        str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
-        str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"]
-        str += node_infos["success"].to_s + "," + node_infos["error"].to_s
-        sl.log(Syslog::LOG_NOTICE, "#{str}")
-      }
-      sl.close
-      @syslog_lock.unlock
+      @syslog_lock.synchronize do
+        while Syslog.opened?
+          sleep 0.2
+        end
+        sl = Syslog.open("Kadeploy-log")
+        @nodes.each_pair { |hostname, node_infos|
+          str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
+          str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
+          str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
+          str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
+          str += node_infos["start"].to_i.to_s + ","
+          str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
+          str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"]
+          str += node_infos["success"].to_s + "," + node_infos["error"].to_s
+          sl.log(Syslog::LOG_NOTICE, "#{str}")
+        }
+        sl.close
+      end # synchronize
     end
 
     # Dump the logged information to the database

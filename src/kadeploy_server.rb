@@ -455,6 +455,7 @@ class KadeployServer
       end
       if @reboot_info_hash[reboot_id][4] and !@reboot_info_hash[reboot_id][4].alive?
         @reboot_info_hash[reboot_id][4].join
+        # TODO: clean if there is a problem
       end
     }
     return r
@@ -552,71 +553,72 @@ class KadeployServer
       :async => client.nil?,
     }
 
-    @workflow_info_hash_lock.lock
-    workflow_id = Digest::SHA1.hexdigest(
-      config.exec_specific.true_user \
-      + Time.now.to_s \
-      + exec_specific.node_set.to_s
-    )
-    kadeploy_create_workflow_info(workflow_id)
-    @workflow_info_hash[workflow_id][:exec_specific] = exec_specific
-    @workflow_info_hash[workflow_id][:database] = db
-    @workflow_info_hash[workflow_id][:user] = exec_specific.true_user
-    context[:deploy_id] = workflow_id
-
-    tmpoutput = nil
-    unless context[:common].kadeploy_disable_cache
-      tmpoutput = Debug::OutputControl.new(
-        context[:execution].verbose_level || context[:common].verbose_level,
-        context[:execution].debug,
-        context[:client],
-        context[:execution].true_user,
-        context[:deploy_id],
-        context[:common].dbg_to_syslog,
-        context[:common].dbg_to_syslog_level,
-        context[:syslock],
-        ''
+    clusters = nil
+    workflows = []
+    workflow_id = nil
+    @workflow_info_hash_lock.synchronize do
+      workflow_id = Digest::SHA1.hexdigest(
+        config.exec_specific.true_user \
+        + Time.now.to_s \
+        + exec_specific.node_set.to_s
       )
+      kadeploy_create_workflow_info(workflow_id)
+      @workflow_info_hash[workflow_id][:exec_specific] = exec_specific
+      @workflow_info_hash[workflow_id][:database] = db
+      @workflow_info_hash[workflow_id][:user] = exec_specific.true_user
+      context[:deploy_id] = workflow_id
 
-      @workflow_info_hash[workflow_id][:grabthread] = Thread.new do
+      tmpoutput = nil
+      unless context[:common].kadeploy_disable_cache
+        tmpoutput = Debug::OutputControl.new(
+          context[:execution].verbose_level || context[:common].verbose_level,
+          context[:execution].debug,
+          context[:client],
+          context[:execution].true_user,
+          context[:deploy_id],
+          context[:common].dbg_to_syslog,
+          context[:common].dbg_to_syslog_level,
+          context[:syslock],
+          ''
+        )
+
+        @workflow_info_hash[workflow_id][:grabthread] = Thread.new do
+          begin
+            @workflow_info_hash[workflow_id][:cached_files] =
+              Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+          rescue KadeployError => ke
+            exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],context[:user])
+            raise KadeployError.new(ke.errno,{ :wid => workflow_id },ke.message)
+          end
+        end
+      end
+
+      clusters = exec_specific.node_set.group_by_cluster
+      if clusters.size > 1
+        clid = 1
+      else
+        clid = 0
+      end
+      clusters.each_pair do |cluster,nodeset|
+        context[:cluster] = config.cluster_specific[cluster]
+        if clusters.size > 1
+          if context[:cluster].prefix.empty?
+            context[:cluster].prefix = "c#{clid}"
+            clid += 1
+          end
+        else
+          context[:cluster].prefix = ''
+        end
+
         begin
-          @workflow_info_hash[workflow_id][:cached_files] =
-            Managers::GrabFileManager.grab_user_files(context,tmpoutput)
+          workflow = Workflow.new(nodeset,context.dup)
         rescue KadeployError => ke
-          exec_specific.node_set.set_deployment_state('aborted',nil,context[:database],context[:user])
           raise KadeployError.new(ke.errno,{ :wid => workflow_id },ke.message)
         end
+        kadeploy_add_workflow_info(workflow, workflow_id)
+        workflows << workflow
       end
     end
-
-    workflows = []
-    clusters = exec_specific.node_set.group_by_cluster
-    if clusters.size > 1
-      clid = 1
-    else
-      clid = 0
-    end
-    clusters.each_pair do |cluster,nodeset|
-      context[:cluster] = config.cluster_specific[cluster]
-      if clusters.size > 1
-        if context[:cluster].prefix.empty?
-          context[:cluster].prefix = "c#{clid}"
-          clid += 1
-        end
-      else
-        context[:cluster].prefix = ''
-      end
-
-      begin
-        workflow = Workflow.new(nodeset,context.dup)
-      rescue KadeployError => ke
-        @workflow_info_hash_lock.unlock
-        raise KadeployError.new(ke.errno,{ :wid => workflow_id },ke.message)
-      end
-      kadeploy_add_workflow_info(workflow, workflow_id)
-      workflows << workflow
-    end
-    @workflow_info_hash_lock.unlock
 
     if clusters.size > 1
       tmp = ''
@@ -880,14 +882,14 @@ class KadeployServer
   # Output
   # * return the result of the block or nil if the workflow_id does not exist
   def async_deploy_lock_wid(workflow_id)
-    @workflow_info_hash_lock.lock
-    if @workflow_info_hash.has_key?(workflow_id) then
-      info = @workflow_info_hash[workflow_id]
-      ret = yield(info)
-    else
-      ret = nil
+    @workflow_info_hash_lock.synchronize do
+      if @workflow_info_hash.has_key?(workflow_id) then
+        info = @workflow_info_hash[workflow_id]
+        ret = yield(info)
+      else
+        ret = nil
+      end
     end
-    @workflow_info_hash_lock.unlock
     return ret
   end
 
@@ -1860,28 +1862,12 @@ class KadeployServer
   # * return a string containing the YAML output
   def kanodes_get_workflow_state(workflow_id = "")
     str = String.new
-    @workflow_info_hash_lock.lock
-    if (@workflow_info_hash.has_key?(workflow_id)) then
-      hash = Hash.new
+    @workflow_info_hash_lock.synchronize do
+      if (@workflow_info_hash.has_key?(workflow_id)) then
+        hash = Hash.new
 
-      states = nil
-      @workflow_info_hash[workflow_id][:workflows].each do |workflow|
-        state = workflow.state
-        if states.nil?
-          states = state
-        else
-          states['nodes'].merge!(state['nodes'])
-        end
-      end
-      hash[workflow_id] = states
-
-      str = hash.to_yaml
-      hash = nil
-    elsif (workflow_id == "") then
-      hash = Hash.new
-      @workflow_info_hash.each_pair { |key,workflow_info_hash|
         states = nil
-        workflow_info_hash[:workflows].each do |workflow|
+        @workflow_info_hash[workflow_id][:workflows].each do |workflow|
           state = workflow.state
           if states.nil?
             states = state
@@ -1889,12 +1875,28 @@ class KadeployServer
             states['nodes'].merge!(state['nodes'])
           end
         end
-        hash[key] = states
-      }
-      str = hash.to_yaml
-      hash = nil
+        hash[workflow_id] = states
+
+        str = hash.to_yaml
+        hash = nil
+      elsif (workflow_id == "") then
+        hash = Hash.new
+        @workflow_info_hash.each_pair { |key,workflow_info_hash|
+          states = nil
+          workflow_info_hash[:workflows].each do |workflow|
+            state = workflow.state
+            if states.nil?
+              states = state
+            else
+              states['nodes'].merge!(state['nodes'])
+            end
+          end
+          hash[key] = states
+        }
+        str = hash.to_yaml
+        hash = nil
+      end
     end
-    @workflow_info_hash_lock.unlock
     return str
   end
 
