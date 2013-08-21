@@ -557,88 +557,83 @@ module Automata
           retry unless done?
         end
 
-        @threads_lock.lock
+        @threads_lock.synchronize do
+          #clean_threads()
 
-        #clean_threads()
+          # Don't do anything if the nodes was already treated
+          clean_nodeset(query[:nodes])
 
-        # Don't do anything if the nodes was already treated
-        clean_nodeset(query[:nodes])
+          next if !query[:nodes] or query[:nodes].empty?
 
-        if !query[:nodes] or query[:nodes].empty?
-          @threads_lock.unlock
-          next
-        end
+          curtask = query[:task]
+          newtask = {
+            :idx => 0,
+            :subidx => 0,
+            :context => init_context(curtask)
+          }
+          query[:nsid] = curtask.nsid if query[:nsid].nil? and curtask
 
-        curtask = query[:task]
-        newtask = {
-          :idx => 0,
-          :subidx => 0,
-          :context => init_context(curtask)
-        }
-        query[:nsid] = curtask.nsid if query[:nsid].nil? and curtask
+          continue = true
 
-        continue = true
-
-        if query[:status] and curtask
-          if query[:status] == :BRK
-            break_task(curtask,query[:nodes])
-            #break!(curtask,query[:nodes])
-            continue = false
-          elsif query[:status] == :OK
-            if (curtask.idx + 1) < tasks().length
-              newtask[:idx] = curtask.idx + 1
-              newtask[:context][:local][:retries] = 0
-            else
-              curtask.mutex.synchronize do
-                success_task(curtask,query[:nodes],query[:nsid])
-                #success!(curtask,query[:nodes])
-                curtask.clean_nodes(query[:nodes])
-              end
+          if query[:status] and curtask
+            if query[:status] == :BRK
+              break_task(curtask,query[:nodes])
+              #break!(curtask,query[:nodes])
               continue = false
-            end
-          elsif query[:status] == :KO
-            if curtask.context[:local][:retries] < (@config[curtask.name][:retries])
-              newtask[:idx] = curtask.idx
-              newtask[:subidx] = curtask.subidx
-              newtask[:context][:local][:retries] += 1
-              retry!(curtask)
-            else
-              tasks = tasks()
-              if multi_task?(curtask.idx,tasks) \
-              and curtask.subidx < (tasks[curtask.idx].size - 1)
-                newtask[:idx] = curtask.idx
-                newtask[:subidx] = curtask.subidx + 1
+            elsif query[:status] == :OK
+              if (curtask.idx + 1) < tasks().length
+                newtask[:idx] = curtask.idx + 1
                 newtask[:context][:local][:retries] = 0
               else
                 curtask.mutex.synchronize do
-                  fail_task(curtask,query[:nodes],query[:nsid])
-                  #fail!(curtask,query[:nodes])
+                  success_task(curtask,query[:nodes],query[:nsid])
+                  #success!(curtask,query[:nodes])
                   curtask.clean_nodes(query[:nodes])
                 end
                 continue = false
               end
+            elsif query[:status] == :KO
+              if curtask.context[:local][:retries] < (@config[curtask.name][:retries])
+                newtask[:idx] = curtask.idx
+                newtask[:subidx] = curtask.subidx
+                newtask[:context][:local][:retries] += 1
+                retry!(curtask)
+              else
+                tasks = tasks()
+                if multi_task?(curtask.idx,tasks) \
+                and curtask.subidx < (tasks[curtask.idx].size - 1)
+                  newtask[:idx] = curtask.idx
+                  newtask[:subidx] = curtask.subidx + 1
+                  newtask[:context][:local][:retries] = 0
+                else
+                  curtask.mutex.synchronize do
+                    fail_task(curtask,query[:nodes],query[:nsid])
+                    #fail!(curtask,query[:nodes])
+                    curtask.clean_nodes(query[:nodes])
+                  end
+                  continue = false
+                end
+              end
             end
+            curtask.mutex.synchronize { curtask.clean_nodes(query[:nodes]) } if continue
           end
-          curtask.mutex.synchronize { curtask.clean_nodes(query[:nodes]) } if continue
-        end
 
-        if continue
-          task = create_task(
-            newtask[:idx],
-            newtask[:subidx],
-            query[:nodes],
-            query[:nsid],
-            newtask[:context]
-          )
+          if continue
+            task = create_task(
+              newtask[:idx],
+              newtask[:subidx],
+              query[:nodes],
+              query[:nsid],
+              newtask[:context]
+            )
 
-          @threads[task] = {
-            :treatment => Thread.new { run_task(task) }
-          }
-        end
+            @threads[task] = {
+              :treatment => Thread.new { run_task(task) }
+            }
+          end
 
-        clean_threads()
-
-        @threads_lock.unlock
+          clean_threads()
+        end # synchronize
       end
 
       @threads_lock.synchronize do
