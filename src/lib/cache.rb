@@ -330,6 +330,12 @@ class Cache
         @lock.unlock
 
         if fpath
+          if !@tagfiles and File.exists?(fpath)
+            raise KadeployError.new(
+              FetchFileError::CACHE_INTERNAL_ERROR,nil,
+              "Duplicate cache entries with the name '#{File.basename(path)}'"
+            )
+          end
           file = fpath
         else
           begin
@@ -375,24 +381,27 @@ class Cache
       :priority => priority,
       :tag => tag,
     }) then
-      if ((mtime and mtime.call.to_i != ret.mtime.to_i) or !mtime) \
+      mtime = mtime.call.to_i if mtime
+      if ((mtime and mtime > ret.mtime.to_i) or !mtime) \
         and (md5 and md5.call != ret.md5)
-      then
-        # The file has changed
+      then # The file has changed
         if ret.used?
           raise KadeployError.new(FetchFileError::INVALID_MD5,nil,
-            "The checksum of the (used) file '#{file}' does not match"
+            "The checksum of the (used) file '#{path}' does not match"
           )
         else
           delete(ret)
           ret = write(path,version,user,priority,tag,size,file) do |f,o|
-            yield(f,o)
+            yield(f,o,true)
           end
         end
+      else # The file was found in the cache
+        # Hack not for the checksum to be performed in vain the next time
+        ret.update_mtime if mtime and mtime > ret.mtime.to_i
       end
     else
       ret = write(path,version,user,priority,tag,size,file) do |f,o|
-        yield(f,o)
+        yield(f,o,false)
       end
     end
     ret

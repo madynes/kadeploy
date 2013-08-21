@@ -453,6 +453,9 @@ class KadeployServer
       if @reboot_info_hash.has_key?(reboot_id)
         r = @reboot_info_hash[reboot_id][2]
       end
+      if @reboot_info_hash[reboot_id][4] and !@reboot_info_hash[reboot_id][4].alive?
+        @reboot_info_hash[reboot_id][4].join
+      end
     }
     return r
   end
@@ -469,8 +472,8 @@ class KadeployServer
         @reboot_info_hash[reboot_id][0].free()
         @reboot_info_hash[reboot_id][1].free()
         # Unlock the cached files
-        if @reboot_info_hash[reboot_id].size >= 4
-          @reboot_info_hash[reboot_id][4].each do |file|
+        if @reboot_info_hash[reboot_id][3]
+          @reboot_info_hash[reboot_id][3].each do |file|
             file.release
           end
         end
@@ -972,7 +975,7 @@ class KadeployServer
           rescue KadeployError => ke
             gfm.clean
             raise KadeployError.new(KarebootAsyncError::PXE_FILE_FETCH_ERROR,
-              { :rid => ke.context[:rid], :status => 3}, ke.message)
+              { :rid => reboot_id, :status => 3}, ke.message)
           end
         end
         files += gfm.files
@@ -989,16 +992,16 @@ class KadeployServer
         rescue KadeployError => ke
           gfm.clean
           raise KadeployError.new(FetchFileError::INVALID_KEY,
-            { :rid => ke.context[:rid], :status => 4}, ke.message)
+            { :rid => reboot_id, :status => 4}, ke.message)
         end
       end
       @reboot_info_hash_lock.synchronize {
-        @reboot_info_hash[reboot_id][4] = files
+        @reboot_info_hash[reboot_id][3] = files
       }
     end
 
     @reboot_info_hash_lock.synchronize {
-      @reboot_info_hash[reboot_id][5] = grabthr
+      @reboot_info_hash[reboot_id][4] = grabthr
     }
 
     gfm = nil
@@ -1111,10 +1114,13 @@ class KadeployServer
         yield(reboot_id,threads)
       ensure
         @reboot_info_hash_lock.synchronize {
+          if @reboot_info_hash[reboot_id]
+            @reboot_info_hash[reboot_id][4].kill if @reboot_info_hash[reboot_id][4] and @reboot_info_hash[reboot_id][4].alive?
           # Unlock the cached files
-          if @reboot_info_hash[reboot_id].size >= 4
-            @reboot_info_hash[reboot_id][4].each do |file|
-              file.release
+            if @reboot_info_hash[reboot_id][3]
+              @reboot_info_hash[reboot_id][3].each do |file|
+                file.release
+              end
             end
           end
           kareboot_delete_reboot_info(reboot_id)
@@ -1153,6 +1159,9 @@ class KadeployServer
 
     begin
       run_kareboot(output, db, exec_specific, client) do |rid,microthreads|
+        # Join the grabthread
+        @reboot_info_hash[rid][4].join if @reboot_info_hash[rid][4]
+
         client.set_workflow_id(rid)
         # Client disconnection fallback
         micros = []
@@ -1174,10 +1183,6 @@ class KadeployServer
               disconnected = true
               output.disable_client_output()
               output.verbosel(3, "Client disconnection")
-              @reboot_info_hash_lock.synchronize {
-                @reboot_info_hash[rid][5].kill if @reboot_info_hash[rid][5] \
-                  and @reboot_info_hash[rid][5].alive?
-              }
               microthreads.each { |thread| thread.kill }
               micros.each do |micro|
                 micro.output.disable_client_output()
@@ -1185,8 +1190,20 @@ class KadeployServer
                 micro.kill
               end
               @reboot_info_hash_lock.synchronize {
+                if @reboot_info_hash[reboot_id]
+                  @reboot_info_hash[rid][4].kill if @reboot_info_hash[rid][4] and @reboot_info_hash[rid][4].alive?
+                  # Unlock the cached files
+                  if @reboot_info_hash[reboot_id][3]
+                    @reboot_info_hash[reboot_id][3].each do |file|
+                      file.release
+                    end
+                  end
+                end
                 kareboot_delete_reboot_info(rid)
               }
+              # Clean cache
+              @config.common.cache[:global].clean  if @config.common.cache[:global]
+              @config.common.cache[:netboot].clean
               drb_server.stop_service()
               db.disconnect()
               finished = true
@@ -1196,7 +1213,18 @@ class KadeployServer
         end
 
         # Join threads
-        microthreads.each { |thread| thread.join }
+        #microthreads.each { |thread| thread.join }
+        dones = []
+        until (dones.size >= microthreads.size)
+          microthreads.each do |thread|
+            if !dones.include?(thread) and !thread.alive?
+              thread.join
+              dones << thread
+            end
+          end
+          sleep(DEPLOYMENT_STATUS_CHECK_PITCH)
+        end
+
         micros.each do |micro|
           clname = micro.context[:cluster].name
           client.print("")
@@ -1225,14 +1253,15 @@ class KadeployServer
         client.print(ke.message) if ke.message and !ke.message.empty?
       rescue Exception
       end
-      $stderr.puts "#{ke.context[:wid]||''} -> Connection closed (error ##{ke.errno})"
+      $stderr.puts "#{ke.context[:rid]||''} -> Connection closed (error ##{ke.errno})"
       @reboot_info_hash_lock.synchronize {
-        @reboot_info_hash[rid][5].kill if @reboot_info_hash[rid][5] \
-          and @reboot_info_hash[rid][5].alive?
+        if @reboot_info_hash[ke.context[:rid]]
+          @reboot_info_hash[ke.context[:rid]][4].kill if @reboot_info_hash[ke.context[:rid]][4] and @reboot_info_hash[ke.context[:rid]][4].alive?
         # Unlock the cached files
-        if @reboot_info_hash[ke.context[:rid]] and @reboot_info_hash[ke.context[:rid]].size >= 4
-          @reboot_info_hash[ke.context[:rid]][4].each do |file|
-            file.release
+          if @reboot_info_hash[ke.context[:rid]][3]
+            @reboot_info_hash[ke.context[:rid]][3].each do |file|
+              file.release
+            end
           end
         end
         kareboot_delete_reboot_info(ke.context[:rid])
@@ -1291,11 +1320,11 @@ class KadeployServer
         microthread[:micro].kill
       end
       @reboot_info_hash_lock.synchronize {
-        @reboot_info_hash[rid][5].kill if @reboot_info_hash[rid][5] \
-          and @reboot_info_hash[rid][5].alive?
+        @reboot_info_hash[rid][4].kill if @reboot_info_hash[rid][4] \
+          and @reboot_info_hash[rid][4].alive?
         # Unlock the cached files
-        if @reboot_info_hash[rid].size >= 4
-          @reboot_info_hash[rid][4].each do |file|
+        if @reboot_info_hash[rid][3]
+          @reboot_info_hash[rid][3].each do |file|
             file.release
           end
         end
