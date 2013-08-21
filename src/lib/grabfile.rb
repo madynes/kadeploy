@@ -48,7 +48,7 @@ module Managers
     end
 
     def uptodate?(fchecksum,fmtime=nil)
-      !((mtime != fmtime) and (checksum != fchecksum))
+      !((mtime > fmtime) and (checksum != fchecksum))
     end
 
     def size
@@ -84,7 +84,8 @@ module Managers
 
     def checksum
       if File.readable?(@path)
-        MD5::get_md5_sum(@path)
+        ret = MD5::get_md5_sum(@path)
+        ret
       elsif @client
         if (ret = @client.get_file_md5(@path)) == 0
           error(@errno,"Unable to grab the file #{@path}")
@@ -251,11 +252,23 @@ module Managers
         cf = @cache.cache(
           path,version,user,priority,tag,fetcher.size,
           fpath,fchecksum,fmtime
-        ) do |file,op|
-          # Duplicate files in the cache
-          if !@cache.tagfiles and File.exists?(file)
-            error(errno,"Duplicate cache entries with the name '#{File.basename(path)}'")
+        ) do |file,op,hit|
+          if checksum and !checksum.empty?
+            # A file was already on the cache with the wrong checksum
+            if hit
+              error(errno,"Checksum of the file '#{path}' does not match "\
+                "(an update is necessary)")
+            # The file does not have the checksum specified in the database
+            elsif !fetcher.uptodate?(checksum,0)
+              error(errno,"Checksum of the file '#{path}' does not match "\
+                "(an update is necessary)")
+            end
           end
+
+          # Duplicate files in the cache
+          #if !@cache.tagfiles and File.exists?(file)
+          #  error(errno,"Duplicate cache entries with the name '#{File.basename(path)}'")
+          #end
           # The file isnt in the cache, grab it
           @output.verbosel(3, "Grab the #{tag} file #{path}")
           fetcher.grab(file,@cache.directory)
@@ -264,13 +277,6 @@ module Managers
         end
         cf.acquire
         @files << cf
-
-        if checksum and !checksum.empty? \
-          and !fetcher.uptodate?(checksum,cf.mtime.to_i)
-        then
-          error(errno,"Checksum of the file '#{path}' does not match "\
-            "(an update is necessary)")
-        end
       rescue Exception => e
         clean()
         raise e
@@ -284,8 +290,8 @@ module Managers
         return if !path or path.empty?
         version,user = nil
         if opts[:env] and opts[:env].recorded?
-          #version = "#{opts[:env].name}/#{opts[:env].version.to_s}"
-          version = 'env'
+          version = "#{opts[:env].name}/#{opts[:env].version}"
+          #version = 'env'
           user = opts[:env].user
         elsif prio != :anon
           version = 'file'
