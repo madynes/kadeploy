@@ -119,12 +119,18 @@ class CacheFile
         "Cant save cache file '#{@filename}'") unless File.directory?(directory)
 
       newfile = File.join(directory,@filename) + EXT_FILE
-      Execute["mv #{@file} #{newfile}"].run!.wait
-      @file = newfile
+      if @file != newfile
+        Execute["mv #{@file} #{newfile}"].run!.wait
+        @file = newfile
+      end
 
-      newmeta = File.join(directory,@filename) + EXT_META
-      Execute["mv #{@meta} #{newmeta}"].run!.wait if @meta
-      @meta = newmeta
+      if @meta
+        newmeta = File.join(directory,@filename) + EXT_META
+        if @meta != newmeta
+          Execute["mv #{@meta} #{newmeta}"].run!.wait
+          @meta = newmeta
+        end
+      end
     end
 
     update_mtime() if @mtime.nil? #and local_path?()

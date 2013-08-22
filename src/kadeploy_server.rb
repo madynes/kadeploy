@@ -868,6 +868,7 @@ class KadeployServer
   # Output
   # * return the result of the block or nil if the workflow_id does not exist
   def async_deploy_lock_wid(workflow_id)
+    ret = nil
     @workflow_info_hash_lock.synchronize do
       if @workflow_info_hash.has_key?(workflow_id) then
         info = @workflow_info_hash[workflow_id]
