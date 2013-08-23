@@ -1,0 +1,60 @@
+---
+- name: Kastafior_exp
+  git: 3.1.7
+  version: 7
+  times: 5
+  environments:
+    - debian-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 0
+    BootNewEnv:
+      type: Kexec
+      timeout: 200
+      retries: 0
+
+- name: Chain_exp
+  times: 5
+  git: 3.1.7
+  version: 7
+  environments:
+    - debian-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Chain
+      timeout: 300
+      retries: 0
+    BootNewEnv:
+      type: Kexec
+      timeout: 300
+      retries: 0
+
+- name: Tree_exp
+  times: 5
+  git: 3.1.7
+  version: 7
+  environments:
+    - debian-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Tree
+      timeout: 300
+      retries: 0
+    BootNewEnv:
+      type: Kexec
+      timeout: 300
+      retries: 0

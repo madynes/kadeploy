@@ -1,0 +1,40 @@
+---
+- name: kadeploy_317
+  git: 3.1.7
+  version: 3.1.7
+  times: 20
+  environments:
+    - debian-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 2
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 2
+    BootNewEnv:
+      type: Kexec
+      timeout: 200
+      retries: 2
+
+- name: kadeploy_316
+  git: 3.1.6
+  version: 3.1.6
+  times: 20
+  environments:
+    - debian-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 2
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 2
+    BootNewEnv:
+      type: Kexec
+      timeout: 200
+      retries: 2
