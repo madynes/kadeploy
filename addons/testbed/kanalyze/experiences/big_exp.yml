@@ -1,0 +1,91 @@
+---
+- name: reboot-kexec
+  times: 10
+  environments:
+    - squeeze-x64-big
+    - squeeze-x64-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 0
+    BootNewEnv:
+      type: Kexec
+      timeout: 200
+      retries: 0
+- name: reboot-classical
+  times: 10
+  environments:
+    - squeeze-x64-big
+    - squeeze-x64-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 0
+    BootNewEnv:
+      type: Classical
+      timeout: 300
+      retries: 0
+- name: bcast-chain
+  times: 5
+  environments:
+    - squeeze-x64-big
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Chain
+      timeout: 200
+      retries: 0
+    BootNewEnv:
+      type: Classical
+      timeout: 300
+      retries: 0
+- name: bcast-kastafior
+  times: 5
+  environments:
+    - squeeze-x64-big
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 0
+    BootNewEnv:
+      type: Classical
+      timeout: 300
+      retries: 0
+- name: basic
+  times: 20
+  environments:
+    - squeeze-x64-big
+    - squeeze-x64-base
+    - squeeze-x64-min
+    - squeeze-x64-xen
+    - squeeze-x64-nfs
+- name: simult
+  times: 4
+  simult:
+    - 1
+    - 2
+    - 4
+  environments:
+    - squeeze-x64-big
+    - squeeze-x64-base
+    - squeeze-x64-min
+    - squeeze-x64-xen
+    - squeeze-x64-nfs

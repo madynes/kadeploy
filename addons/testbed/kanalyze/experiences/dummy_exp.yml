@@ -1,0 +1,20 @@
+---
+- name: dummy
+  git: 3.1.7
+  version: 3.1.7
+  times: 1
+  environments:
+    - debian-min
+  macrosteps:
+    SetDeploymentEnv:
+      type: Untrusted
+      timeout: 300
+      retries: 0
+    BroadcastEnv:
+      type: Kastafior
+      timeout: 200
+      retries: 0
+    BootNewEnv:
+      type: Kexec
+      timeout: 200
+      retries: 0
