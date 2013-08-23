@@ -1,0 +1,8 @@
+Change-Id: Idc43ff10e4c540dc847608e267192c9c2ba12c29
+Code-Review+2: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Verified+1: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-by: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-at: Fri, 23 Aug 2013 13:12:12 +0200
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1141
+Project: kadeploy3
+Branch: refs/heads/master
