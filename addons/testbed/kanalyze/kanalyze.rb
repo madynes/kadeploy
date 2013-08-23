@@ -922,12 +922,19 @@ if $mode==Kanalyzemode::INSTALL
   puts "Creating stats directory '#{$statsdir}'" if $verbose
   FileUtils.mkdir_p($statsdir)
 
+  git=""
+  version=""
   $exps.each do |exp|
-    if $exps.index(exp)>0
-      CommonG5K.cmd("kavlan -e")
-      kadeploy($nodes.first,ENVIRONMENT,`kavlan -V`.chomp)
+    if ( exp['git']!=git || exp['version']!=version )
+      puts "New Kadeploy version to use: performing Kabootstrap" if $verbose
+      if $exps.index(exp)>0
+        CommonG5K.cmd("kavlan -e")
+        kadeploy($nodes,ENVIRONMENT,`kavlan -V`.chomp)#Redeploys nodes before Kabootstrap if it's not the first experience
+      end
+      frontend=CommonG5K.kabootstrap("$OAR_FILE_NODES","git",exp['git'],exp['version'])
     end
-    frontend=CommonG5K.kabootstrap("$OAR_FILE_NODES","git",exp['git'],exp['version'])
+    git=exp['git']
+    version=exp['version']
     command="scp #{$0} #{$expfile} #{frontend}:."
     CommonG5K.cmd(command)
     command="ssh #{frontend} ruby #{$0} --testmode -y #{$expfile.split('/').last} -f NODEFILE -e #{$exps.index(exp)} -v"
