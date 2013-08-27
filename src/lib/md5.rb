@@ -1,7 +1,3 @@
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
 module MD5
   # Compute the md5 sum of a file

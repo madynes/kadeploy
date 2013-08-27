@@ -80,6 +80,10 @@ UPDATE_PATH_CHECK = {
 UPDATE_FORWARD_PORT = 2222
 UPDATE_DIR_VAR = 'WORKINGDIR'
 
+CFG_SSL_CERT_PATH = '/etc/ssl/private/'
+CFG_CA_CERT = File.join(CFG_SSL_CERT_PATH,'testbed-ca.pem')
+CFG_CA_PRIVATE_KEY = File.join(CFG_SSL_CERT_PATH,'testbed-ca.key')
+
 
 # Kadeploy default config
 CFG_KADEPLOY_USER = 'deploy'
@@ -122,9 +126,15 @@ CFG_KADEPLOY_PORT = 25300
 CFG_KADEPLOY_VERBOSE = 3
 CFG_KADEPLOY_CONF_PATH = '/etc/kadeploy3'
 CFG_KADEPLOY_VAR_PATH = '/var/lib/kadeploy'
+CFG_KADEPLOY_LOGDIR = '/var/log/kadeploy3'
 CFG_KADEPLOY_LOGFILE = '/var/log/kadeploy.log'
 CFG_KADEPLOY_SSHKEY_PATH = File.join(CFG_KADEPLOY_CONF_PATH,'keys')
 CFG_KADEPLOY_SSHKEY_DEFAULT = File.join(CFG_KADEPLOY_SSHKEY_PATH,'id_deploy')
+CFG_KADEPLOY_CERT = File.join(CFG_KADEPLOY_CONF_PATH,'kadeploy.pem')
+CFG_KADEPLOY_PRIVATE_KEY = File.join(CFG_KADEPLOY_CONF_PATH,'kadeploy.key')
+CFG_KADEPLOY_ADMIN_CERT = File.join(CFG_KADEPLOY_CONF_PATH,'admin.pem')
+CFG_KADEPLOY_ADMIN_PRIVATE_KEY = File.join(CFG_KADEPLOY_CONF_PATH,'admin.key')
+CFG_KADEPLOY_SSHKEY_PATH = File.join(CFG_KADEPLOY_CONF_PATH,'keys')
 CFG_KADEPLOY_HOSTNAMES_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'hostnames')
 CFG_KADEPLOY_KVM_PROCS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'kvmprocs')
 CFG_KADEPLOY_KVM_HOSTS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'kvmhosts')
@@ -200,7 +210,7 @@ end
 
 def cfg_kadeploy_client()
   if $version >= 5
-    {
+    ret = {
       'default' => 'kadeploy',
       'servers' => [
         {
@@ -209,7 +219,9 @@ def cfg_kadeploy_client()
           'port' => CFG_KADEPLOY_PORT,
         },
       ],
-    }.to_yaml
+    }
+    ret['servers'].each{|s| s['secure'] = true} if $version >= 8
+    ret.to_yaml
   else
     "default = kadeploy\n"\
     "kadeploy = #{$services[:kadeploy][:fqdn]}:#{CFG_KADEPLOY_PORT}\n"
@@ -320,7 +332,24 @@ def cfg_kadeploy_conf()
         },
       }
     end
-    {
+
+    logs = nil
+    if $version >= 8
+      logs = {
+        'database' => true,
+        'logfile' => File.join(CFG_KADEPLOY_LOGDIR,'kadeploy.log'),
+        'debugfile' => File.join(CFG_KADEPLOY_LOGDIR,'kadeploy.debug'),
+      }
+    else
+      logs = {
+        'syslog' => true,
+        'database' => true,
+        'debug' => true,
+        'file' => CFG_KADEPLOY_LOGFILE,
+      }
+    end
+
+    ret = {
       'database' => {
         'kind' => 'mysql',
         'name' => CFG_SQL_DB,
@@ -333,12 +362,7 @@ def cfg_kadeploy_conf()
         'purge_deployment_timer' => 900,
         'almighty_users' => 'root,oar,deploy',
       },
-      'logs' => {
-        'syslog' => true,
-        'database' => true,
-        'debug' => true,
-        'file' => CFG_KADEPLOY_LOGFILE,
-      },
+      'logs' => logs,
       'verbosity' => {
         'logs' => CFG_KADEPLOY_VERBOSE,
         'clients' => CFG_KADEPLOY_VERBOSE,
@@ -396,7 +420,31 @@ def cfg_kadeploy_conf()
           'connector' => "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root"
         },
       },
-    }.to_yaml
+    }
+    if $version >= 8
+      ret['authentication'] = {
+        'certificate' => {
+          'ca_cert' => CFG_CA_CERT,
+          'whitelist' => [$services[:kadeploy][:fqdn],$services[:frontend][:fqdn]],
+        },
+        'secret_key' => {
+          'key' => 'KADEPLOY',
+          'whitelist' => [$services[:kadeploy][:fqdn],$services[:frontend][:fqdn]],
+        },
+        'ident' => {
+          'whitelist' => [$services[:kadeploy][:fqdn],$services[:frontend][:fqdn]],
+        },
+      }
+      ret['security'] = {
+        'secure_server' => true,
+        'certificate' => CFG_KADEPLOY_CERT,
+        'private_key' => {
+          'algorithm' => 'RSA',
+          'file' => CFG_KADEPLOY_PRIVATE_KEY,
+        }
+      }
+    end
+    ret.to_yaml
   else
     case $deploysendmeth
       when :HTTP
@@ -716,7 +764,7 @@ def cfg_kadeploy_specific_conf_filename(cluster)
     CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster
   end
 end
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 180
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 200
 CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,fat'
 
 def cfg_kadeploy_specific_conf(cluster)
@@ -3346,8 +3394,10 @@ sshgw.ssh(servername,'root') do |session|
     end
 
     msg('Creating Kadeploy directories',MSG_INFO)
-    sexec(session,"touch #{CFG_KADEPLOY_LOGFILE}")
-    sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_LOGFILE}")
+    if $version < 8
+      sexec(session,"touch #{CFG_KADEPLOY_LOGFILE}")
+      sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_LOGFILE}")
+    end
     sexec(session,"mkdir -p #{CFG_KADEPLOY_CACHE_PATH}")
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_CACHE_PATH}")
     sexec(session,"rm -Rf #{CFG_KADEPLOY_VAR_PATH}")
@@ -3472,6 +3522,39 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_PATH}")
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_HOSTS_PATH}") if $mode == :VLANKVM
 
+    if $version >= 8
+      msg('Installing identd',MSG_INFO)
+      apt_install(session,'oidentd',server)
+
+      msg('Installing openssl',MSG_INFO)
+      apt_install(session,'openssl',server)
+
+      msg('Creating x509 self-signed certificate and private key',MSG_INFO)
+      sexec(session,"mkdir -p #{CFG_SSL_CERT_PATH}")
+      sexec(session,"chmod +x #{CFG_SSL_CERT_PATH}")
+      sexec(session,"openssl req -new -x509 -nodes -subj /CN=*.#{DOMAIN} -out #{CFG_CA_CERT} -keyform RSA -keyout #{CFG_CA_PRIVATE_KEY}")
+      sexec(session,"chmod 755 #{CFG_CA_CERT}")
+      sexec(session,"chmod 700 #{CFG_CA_PRIVATE_KEY}")
+
+      msg('Creating x509 certificate and private key for kadeploy and sign it with CA',MSG_INFO)
+      reqfile = "#{CFG_KADEPLOY_CERT}.csr"
+      sexec(session,"openssl req -new -nodes -subj /CN=#{$services[:kadeploy][:fqdn]} -out #{reqfile} -keyform RSA -keyout #{CFG_KADEPLOY_PRIVATE_KEY}")
+      sexec(session,"openssl x509 -req -in #{reqfile} -CA #{CFG_CA_CERT} -CAkey #{CFG_CA_PRIVATE_KEY} -CAcreateserial -out #{CFG_KADEPLOY_CERT}")
+      sexec(session,"rm -f #{reqfile}")
+      sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_CERT}")
+      sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_PRIVATE_KEY}")
+      sexec(session,"chmod 700 #{CFG_KADEPLOY_PRIVATE_KEY}")
+
+
+      msg('Creating x509 certificate and private key for admins and sign it with CA',MSG_INFO)
+      reqfile = "#{CFG_KADEPLOY_ADMIN_CERT}.csr"
+      sexec(session,"openssl req -new -nodes -subj /CN=#{$services[:frontend][:fqdn]} -out #{reqfile} -keyform RSA -keyout #{CFG_KADEPLOY_ADMIN_PRIVATE_KEY}")
+      sexec(session,"openssl x509 -req -in #{reqfile} -CA #{CFG_CA_CERT} -CAkey #{CFG_CA_PRIVATE_KEY} -CAcreateserial -out #{CFG_KADEPLOY_ADMIN_CERT}")
+      sexec(session,"rm -f #{reqfile}")
+      sexec(session,"chown 755 #{CFG_KADEPLOY_ADMIN_CERT}")
+      sexec(session,"chown 755 #{CFG_KADEPLOY_ADMIN_PRIVATE_KEY}")
+    end
+
     msg('Configuring Kadeploy server',MSG_INFO)
     sexec(session,"mkdir -p /root/.ssh; grep \"$(cat #{CFG_KADEPLOY_SSHKEY_DEFAULT}.pub)\" /root/.ssh/authorized_keys || cat #{CFG_KADEPLOY_SSHKEY_DEFAULT}.pub >> /root/.ssh/authorized_keys")
     tempfile(cfg_kadeploy_conf()) {|path| scp(servername,path,cfg_kadeploy_conf_filename())}
@@ -3538,6 +3621,7 @@ sshgw.ssh(servername,'root') do |session|
     select_type($kanodes,:NODE).each do |node|
       tmpcmds << "-m #{node[:fqdn]}"
     end
+    # In a file just in case there is too many nodes in the list
     sexecbig(session) do |cmds|
       cmds << "karights3 --overwrite-rights -a #{tmpcmds.join(' ')} -p #{cfg_kadeploy_disk_device()}#{CFG_KADEPLOY_PARTITION_DEPLOY_ID} -u #{CFG_FRONTEND_USER}"
     end
@@ -3746,6 +3830,10 @@ sshgw.ssh(servername,'root') do |session|
   end
   sexec(session,"chown #{CFG_FRONTEND_USER}:#{CFG_FRONTEND_USER} #{nodefilepath}")
 
+  if $version >= 8
+    msg('Installing identd',MSG_INFO)
+    apt_install(session,'oidentd',server)
+  end
 
 end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)

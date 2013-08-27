@@ -1,19 +1,119 @@
-#!/bin/bash
+#!/usr/bin/ruby -w
 
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
-if [ -x /etc/kadeploy3/load_kadeploy_env ] && [ -z "${KADEPLOY_CONFIG_DIR}" ]
-then
-    KADEPLOY_CONFIG_DIR=/etc/kadeploy3
-    export KADEPLOY_CONFIG_DIR
-elif [ ! -x $KADEPLOY_CONFIG_DIR/load_kadeploy_env ]
-then
-    echo "The Kadeploy environment cannot be loaded, please check your configuration"
-    exit 1
-fi
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
 
-source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
-ruby $KADEPLOY_INSTALL_DIR/src/kanodes.rb "$@"
+$:.unshift($kadeploy_libs)
+
+require 'optparse'
+require 'yaml'
+require 'client'
+
+Signal.trap("INT") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  KaenvClient.kill() rescue nil
+  exit!(1)
+end
+
+class KanodesClient < Client
+  def self.operation()
+    'Nodes statistics'
+  end
+
+  def self.load_options()
+    {
+      :operation => String.new,
+      :user => nil,
+      :nodes => Array.new,
+      :workflow_id => nil,
+      :get_version => false,
+      :chosen_server => String.new,
+      :servers => load_configfile(),
+      :kadeploy_server => String.new,
+      :kadeploy_server_port => String.new,
+      :kadeploy_server_port => String.new,
+    }
+  end
+
+  def self.parse_options()
+    options = load_options()
+    opts = OptionParser::new do |opt|
+      opt.summary_indent = "  "
+      opt.summary_width = 28
+      opt.banner = "Usage: kanodes3 [options]"
+      opt.separator "Contact: #{CONTACT_EMAIL}"
+      opt.separator ""
+      opt.separator "General options:"
+      opt.on("-d", "--get-nodes-state", "Get the deployment state of the nodes") {
+        options[:operation] = :get_state
+      }
+      opt.on("-s", "--get-deployments-status", "Get the status of running deployments") {
+        options[:operation] = :get_status
+      }
+      opt.on("-f", "--file MACHINELIST", "Only print information about the given machines (- means stdin)")  { |f|
+        load_machinefile(options[:nodes], f)
+      }
+      opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |h|
+        h.strip!
+        load_machine(options[:nodes], h) if h != '*'
+      }
+      opt.on("-v", "--version", "Get the version") {
+        options[:get_version] = true
+      }
+      opt.on("-w", "--workflow-id WID", "Specify a workflow id (to be used with the get_status option). If no wid is specified, the information of all the running deployments will be returned.") { |w|
+        options[:workflow_id] = w
+      }
+      opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
+        options[:chosen_server] = s
+      }
+    end
+
+    begin
+      opts.parse!(ARGV)
+    rescue
+      error("Option parsing error: #{$!}")
+      return false
+    end
+
+    options[:chosen_server] = options[:servers]['default'] if options[:chosen_server].empty?
+    options[:kadeploy_server] = options[:servers][options[:chosen_server]][0]
+    options[:kadeploy_server_port] = options[:servers][options[:chosen_server]][1]
+
+    return options
+  end
+
+  def self.check_options(options)
+    if options[:operation] == :get_status and !options[:nodes].empty?
+      error('Node list is useless when gathering deployment statuses')
+      return false
+    end
+    if options[:operation] == :get_state and options[:workflow_id]
+      error('Workflow ID is useless when gathering node\'s deployment states')
+      return false
+    end
+    true
+  end
+
+  def run(options)
+    params = { :user => USER }
+
+    path = nil
+
+    case options[:operation]
+    when :get_state
+      path = api_path()
+      params[:nodes] = options[:nodes] if !options[:nodes].empty?
+    when :get_status
+      path = api_path(options[:workflow_id],:deploy)
+    else
+      raise
+    end
+
+    ret = get(path,params)
+    $stdout.puts ret.to_yaml if ret
+  end
+end
+
+if __FILE__ == $0
+  KanodesClient.launch()
+end

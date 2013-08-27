@@ -1,7 +1,3 @@
-# Kadeploy 3.1
-# Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011
-# CECILL License V2 - http://www.cecill.info
-# For details on use and redistribution please refer to License.txt
 
 #Ruby libs
 require 'tempfile'
@@ -16,7 +12,9 @@ require 'http'
 require 'debug'
 require 'configparser'
 require 'grabfile'
+require 'fetchfile'
 require 'error'
+
 
 module EnvironmentManagement
   OS_KIND = [
@@ -106,6 +104,8 @@ module EnvironmentManagement
     attr_accessor :image
     attr_accessor :preinstall
     attr_accessor :postinstall
+    attr_accessor :visibility
+    attr_accessor :demolishing_env
     attr_reader :kernel
     attr_reader :kernel_params
     attr_reader :initrd
@@ -115,8 +115,6 @@ module EnvironmentManagement
     attr_reader :filesystem
     attr_reader :user
     attr_reader :environment_kind
-    attr_reader :visibility
-    attr_reader :demolishing_env
     attr_reader :multipart
     attr_reader :options
     attr_reader :recorded
@@ -147,12 +145,12 @@ module EnvironmentManagement
       @recorded = nil
     end
 
-    def debug(client,msg)
-      Debug::distant_client_print(msg,client)
+    def debug(msg)
+      #Debug::distant_client_error(msg,client)
     end
 
-    def error(client,msg)
-      Debug::distant_client_error(msg,client)
+    def error(errno,msg)
+      raise KadeployError.new(errno,nil,msg)
     end
 
     def check_os_values()
@@ -187,11 +185,9 @@ module EnvironmentManagement
     # * description: environment description
     # * almighty_env_users: array that contains almighty users
     # * user: true user
-    # * client: DRb handler to client
-    # * record_step: specify if the function is called for a DB record purpose
     # Output
     # * returns true if the environment can be loaded correctly, false otherwise
-    def load_from_file(description, almighty_env_users, user, client, setmd5, filename=nil,migration=false)
+    def load_from_desc(description, almighty_env_users, user, client=nil, get_checksum=true)
       @recorded = false
       @user = user
       @preinstall = nil
@@ -199,7 +195,6 @@ module EnvironmentManagement
       @id = description['id'] || -1
 
       filemd5 = Proc.new do |f,kind|
-        ret = nil
         except = nil
         case kind
         when 'tarball'
@@ -209,19 +204,7 @@ module EnvironmentManagement
         when 'postinstall'
           except = FetchFileError::INVALID_POSTINSTALL
         end
-        begin
-          ret = Managers::Fetch[f,except,client].checksum()
-        rescue KadeployError => ke
-          msg = KadeployError.to_msg(ke.errno)
-          error(client,"#{msg} (error ##{ke.errno})") if msg and !msg.empty?
-          if ke.message and !ke.message.empty?
-            debug(client,ke.message)
-          else
-            error(client,"Unable to get the file #{f}")
-          end
-          return false
-        end
-        ret
+        FetchFile[f,except,client].checksum()
       end
 
       begin
@@ -231,10 +214,6 @@ module EnvironmentManagement
         @description = cp.value('description',String,'')
         @author = cp.value('author',String,'')
         @visibility = cp.value('visibility',String,'private',['public','private','shared'])
-        if @visibility == 'public' and !almighty_env_users.include?(@user)
-          error(client,'Only the environment administrators can set the "public" tag')
-          return false
-        end
         @demolishing_env = cp.value('destructive',[TrueClass,FalseClass],false)
         @environment_kind = cp.value('os',String,nil,OS_KIND)
 
@@ -247,7 +226,13 @@ module EnvironmentManagement
           else
             compress = cp.value('compression',String,nil,IMAGE_COMPRESSION)
           end
-          md5 = filemd5.call(file,'tarball')
+
+          md5 = nil
+          if get_checksum
+            md5 = filemd5.call(file,'tarball')
+          else
+            md5 = ''
+          end
           shortkind = EnvironmentManagement.image_type_short(kind,compress)
           @tarball = {
             'kind' => shortkind,
@@ -266,13 +251,19 @@ module EnvironmentManagement
         cp.parse('preinstall') do |info|
           unless info[:empty]
             file = cp.value('archive',String)
+            md5 = nil
+            if get_checksum
+              md5 = filemd5.call(file,'preinstall')
+            else
+              md5 = ''
+            end
             @preinstall = {
               'file' => file,
               'kind' => EnvironmentManagement.image_type_short(
                 'tar',
                 cp.value('compression',String,nil,IMAGE_COMPRESSION)
               ),
-              'md5' => filemd5.call(file,'preinstall'),
+              'md5' => md5,
               'script' => cp.value('script',String,'none'),
             }
           end
@@ -281,13 +272,19 @@ module EnvironmentManagement
         cp.parse('postinstalls',false,Array) do |info|
           unless info[:empty]
             file = cp.value('archive',String)
+            md5 = nil
+            if get_checksum
+              md5 = filemd5.call(file,'postinstall')
+            else
+              md5 = ''
+            end
             @postinstall << {
               'kind' => EnvironmentManagement.image_type_short(
                 'tar',
                 cp.value('compression',String,nil,IMAGE_COMPRESSION)
               ),
               'file' => file,
-              'md5' => filemd5.call(file,'postinstall'),
+              'md5' => md5,
               'script' => cp.value('script',String,'none'),
             }
           end
@@ -329,8 +326,8 @@ module EnvironmentManagement
               end
             end
             if !@multipart and @options['partitions'].size > 1
-              debug(client,
-                "Warning(#{(filename ? filename : 'env_desc')}) "\
+              warning(
+                "Warning[environment description] "\
                 "Multiple partitions defined with non-multipart "\
                 "environment, by default, the partition #0 will be installed "\
                 "on the deployment partition"
@@ -353,16 +350,16 @@ module EnvironmentManagement
 
 
       rescue ArgumentError => ae
-        debug(client,"Error(#{(filename ? filename : 'env_desc')}) #{ae.message}")
-        return false
+        error(KadeployError::LOAD_ENV_FROM_DESC_ERROR,
+          "Error[environment description] #{ae.message}")
       end
 
       cp.unused().each do |path|
-        debug(client,"Warning(#{(filename ? filename : 'env_desc')}) Unused field '#{path}'")
+        debug("Warning[environment description]: Unused field '#{path}'")
       end
 
       ret = check_os_values()
-      error(client,ret[1]) unless ret[0]
+      error(KadeployError::LOAD_ENV_FROM_DESC_ERROR,ret[1]) unless ret[0]
       return ret[0]
     end
 
@@ -421,6 +418,73 @@ module EnvironmentManagement
       end
 
       return ret
+    end
+
+    def self.get_list_from_db(dbh, user, private_envs=false, show_all_version=false)
+      args = []
+      where = ''
+      if user
+        if show_all_version
+          if private_envs then
+            where = "user = ? OR (user <> ? AND visibility = 'public')"
+            2.times{ args << user }
+          else
+            where = "user = ? AND visibility <> 'private'"
+            args << user
+          end
+        else
+          if private_envs then
+            where = "(e1.user = ? \
+                       OR (e1.user <> ? AND e1.visibility = 'public')) \
+                     AND e1.version = ( \
+                       SELECT MAX(e2.version) FROM environments e2 \
+                       WHERE e2.name = e1.name \
+                       AND e2.user = e1.user \
+                       AND (e2.user = ? \
+                       OR (e2.user <> ? AND e2.visibility = 'public')) \
+                       GROUP BY e2.user,e2.name)"
+            4.times{ args << user }
+          else
+            where = "e1.user = ? \
+                     AND e1.visibility <> 'private' \
+                     AND e1.version = ( \
+                       SELECT MAX(e2.version) FROM environments e2 \
+                       WHERE e2.name = e1.name \
+                       AND e2.user = e1.user \
+                       AND e2.visibility <> 'private' \
+                       GROUP BY e2.user, e2.name)"
+            args << user
+          end
+        end
+      else #we show the environments of all the users
+        if show_all_version
+          where = "visibility <> 'private'"
+        else
+          where = "e1.visibility <> 'private' \
+                   AND e1.version=( \
+                     SELECT MAX(e2.version) FROM environments e2 \
+                     WHERE e2.name = e1.name \
+                     AND e2.user = e1.user \
+                     AND e2.visibility <> 'private' \
+                     GROUP BY e2.user, e2.name)"
+        end
+      end
+
+      query = "SELECT * FROM environments e1"
+      query += " WHERE #{where}" unless where.empty?
+      query += " ORDER BY e1.user, e1.name, e1.version"
+
+      res = dbh.run_query(query, *args)
+      tmp = res.to_hash if res
+      if tmp and !tmp.empty?
+        ret = []
+        tmp.each do |hash|
+          ret << Environment.new.load_from_dbhash(hash)
+        end
+        ret
+      else
+        false
+      end
     end
 
     def self.del_from_db(dbh, name, version, user, private_envs)
@@ -488,11 +552,36 @@ module EnvironmentManagement
         args << env.name
         args << env.version
         args << env.user
+
         res = dbh.run_query(
           "UPDATE environments SET #{dbfields.join(',')} "\
           "WHERE name=? AND version=? AND user=?",
           *args
         )
+
+        # Update the object
+        fields.each_pair do |fieldname,val|
+          if env.send(fieldname.to_sym) != val and env.respond_to?("#{fieldname}=".to_sym)
+            case fieldname
+            when 'demolishing_env'
+              if val == 0
+                env.demolishing_env = false
+              else
+                env.demolishing_env = true
+              end
+            when 'tarball'
+              env.tarball = self.expand_tarball(val,true)
+              env.image[:file] = env.tarball['file']
+              env.image[:md5] = env.tarball['md5']
+            when 'preinstall'
+              env.preinstall = self.expand_preinstall(val,true)
+            when 'postinstall'
+              env.postinstall = self.expand_postinstall(val,true)
+            else
+              env.send("#{fieldname}=".to_sym,val)
+            end
+          end
+        end
 
         if res.affected_rows == 0
           return false
@@ -640,29 +729,6 @@ module EnvironmentManagement
       end
     end
 
-    # Print the header
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def short_view_header(client)
-      out = String.new
-      out += "Name                Version     User            Description\n"
-      out += "####                #######     ####            ###########\n"
-      Debug::distant_client_print(out, client)
-    end
-
-    # Print the short view
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def short_view(client)
-      Debug::distant_client_print(sprintf("%-21s %-7s %-10s %-40s\n", @name, @version, @user, @description), client)
-    end
-
     def to_hash
       ret = {}
       ret['name'] = @name
@@ -685,7 +751,7 @@ module EnvironmentManagement
       unless @preinstall.nil?
         ret['preinstall'] = {}
         ret['preinstall']['archive'] = @preinstall['file']
-        nothing,ret['preinstall']['compression'] =
+        _,ret['preinstall']['compression'] =
           EnvironmentManagement.image_type_long(@preinstall['kind'])
         ret['preinstall']['script'] = @preinstall['script']
       end
@@ -695,7 +761,7 @@ module EnvironmentManagement
         @postinstall.each do |post|
           tmp = {}
           tmp['archive'] = post['file']
-          nothing,tmp['compression'] =
+          _,tmp['compression'] =
             EnvironmentManagement.image_type_long(post['kind'])
           tmp['script'] = post['script']
           ret['postinstalls'] << tmp
@@ -726,30 +792,6 @@ module EnvironmentManagement
       ret['options'] = opt unless opt.empty?
 
       ret
-    end
-
-    # Print the full view
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def full_view(client)
-      # Ugly hack to write YAML attribute following a specific order
-      content_hash = to_hash()
-      yaml = YAML::quick_emit(content_hash) do |out|
-        out.map(content_hash.taguri(), content_hash.to_yaml_style()) do |map|
-          content_hash.keys.sort do |x,y|
-            tmpx = YAML_SORT.index(x)
-            tmpy = YAML_SORT.index(y)
-            tmpx,tmpy = [x.to_s,y.to_s] if !tmpx and !tmpy
-            (tmpx || max+1) <=> (tmpy || max+2)
-          end.each{ |k| map.add(k, content_hash[k]) }
-          #content_hash.sort_by { |k,v| k }.each{ |t| map.add(t[0],t[1]) }
-          #content_hash.keys.sort.each { |k| map.add(k, content_hash[k]) }
-        end
-      end
-      Debug::distant_client_print(yaml, client)
     end
 
     def self.flatten_image(img,md5=false)
@@ -818,41 +860,6 @@ module EnvironmentManagement
         end
         ret
       end
-    end
-
-    # Set the md5 value of a file in an environment
-    # Arguments
-    # * kind: kind of file (tarball, preinstall or postinstall)
-    # * file: filename
-    # * hash: hash value
-    # * dbh: database handler
-    # Output
-    # * return true
-    def set_md5(kind, file, hash, dbh)
-      return false unless @recorded
-      query = ""
-      case kind
-      when "tarball"
-        tarball = "#{@tarball["file"]}|#{@tarball["kind"]}|#{hash}"
-        query = "UPDATE environments SET tarball=\"#{tarball}\""
-      when "preinstall"
-        preinstall = "#{@preinstall["file"]}|#{@preinstall["kind"]}|#{hash}"
-        query = "UPDATE environments SET preinstall=\"#{preinstall}\""
-      when "postinstall"
-        postinstall_array = Array.new
-        @postinstall.each { |p|
-          if (file == p["file"]) then
-            postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{hash}|#{p["script"]}")
-          else
-            postinstall_array.push("#{p["file"]}|#{p["kind"]}|#{p["md5"]}|#{p["script"]}")
-          end
-        }
-        query = "UPDATE environments SET postinstall=\"#{postinstall_array.join(",")}\""
-      end
-      query += " WHERE id = ?"
-
-      dbh.run_query(query, @id)
-      return true
     end
 
     class << self
