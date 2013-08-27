@@ -214,7 +214,7 @@ def conlogger_stop(envcondir,nodes)
     # Only select the monitoring processus on the selected node
     commands=psresult.select { |line| (line =~ /#{SCRIPT_BIN}/ && line=~/#{CONSOLE_BIN}/ && line =~/#{node}/) }
     if(!commands.empty?)
-      # Get the pid of the command
+     # Get the pid of the command
       pid=commands[0].split(" ")[0]
       puts "        killing #{node} monitoring" if $verbose
       kill_recursive(pid.to_i)
@@ -318,7 +318,7 @@ def check_exp(exps)
     exp['macrosteps']['BootNewEnv'] = {} if exp['macrosteps']['BootNewEnv'].nil?
     check_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])
   end
-  $walltime=deployments/12+1
+  $walltime=deployments/6+1 if $walltime==0
   puts "versions: #{versions.join(" ")}" if $verbose
   puts "git: #{git.join(" ")}" if $verbose
   $kastat=true if (git.uniq.count>1 && versions.uniq.count>1)
@@ -443,7 +443,7 @@ def link_bugs(envcondir,envresultfile, envdebugfile,envconbugdir)
 
 end
 
-def kastat_method(expname,env,kadeploy_version,iter,nok,nko)
+def kastat_method(expname,env,kadeploy_version,iter,nok,nko,wid_file)
     $microsteps=false
     h={}
     h["expname"]=expname
@@ -452,8 +452,10 @@ def kastat_method(expname,env,kadeploy_version,iter,nok,nko)
     h["iter"]=iter
     h["id"]=expname+"-"+iter.to_s+"-"+env
     h["success"]=nok*100/(nok+nko)
+
+    workflow_id=IO.read(wid_file.path)
     
-    str=`#{KASTAT_BIN} -d -m #{$nodes[0]} -f step1 -f step2 -f step3 -f step1_duration -f step2_duration -f step3_duration`
+    str=`#{KASTAT_BIN} -d -m #{$nodes[0]} -f step1 -f step2 -f step3 -f step1_duration -f step2_duration -f step3_duration -w #{workflow_id}`
     str=str.split("\n").last
 
     res_tab=str.split(",")
@@ -467,7 +469,7 @@ def kastat_method(expname,env,kadeploy_version,iter,nok,nko)
     return h
 end
 
-def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko)
+def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,wid_file)
 
   hashes={}
   branch="0"#branch (nodeset) of the current line
@@ -477,7 +479,7 @@ def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko)
   
   if $kastat 
     hashes["0"]={}
-    hashes["0"].update(kastat_method(expname,env,kadeploy_version,iter,nok,nko))
+    hashes["0"].update(kastat_method(expname,env,kadeploy_version,iter,nok,nko,wid_file))
   else
     trunk="0"#origin of a nodeset split
     microstep_order={}
@@ -559,13 +561,16 @@ def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko)
     else#old/unknown version case => uses kastat method
       puts "Unknown or old version of Kadeploy (<=3.1.5): using Kastat method (no microsteps)" if $verbose 
       hashes["0"]={}
-      hashes["0"].update(kastat_method(expname,env,kadeploy_version,iter,nok,nko))
+      hashes["0"].update(kastat_method(expname,env,kadeploy_version,iter,nok,nko,wid_file))
     end #end case
   end#end if $kastat
   hashes.each do |key,h|
     if(h["step1"] && h["step2"] && h["step3"])
       h["branch"]=key
       $stats.store(run_id+"-"+expname+"-"+key,h)
+    end
+    if h["success"]==0
+
     end
   end
 end
@@ -591,17 +596,17 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
   end
 
   wid_file = nil
-  wid_file = Tempfile.new("widfile") if widf
+  wid_file = Tempfile.new("widfile")
 
   envcondir , envresultfile , envdebugfile  , envconbugdir = gen_logs_dir(workdir, env, simultid)
 
   cmd = "#{$kadeploy} #{node_list} -e \"#{env}\" -o #{ok} -n #{ko}"
   cmd += " #{automata_opt}" if automata_opt and !automata_opt.empty?
   cmd += " -k #{$key} " if $key
-  cmd += " --write-workflow-id #{wid_file.path}" if widf
+  cmd += " --write-workflow-id #{wid_file.path}"
 
   cmd += " | sed 's/.*/(#{simultid}) &/'" if simultid
-  cmd += "1> #{envdebugfile} 2> #{envdebugfile}"
+  cmd += " 1> #{envdebugfile} 2> #{envdebugfile}"
  
   nodefile=Tempfile.new('nodefile')
   nodes.each{ |node| nodefile.write(node+'\n') }
@@ -629,18 +634,17 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
     exit!(1)
   end
 
-  if widf
-    system("cat #{wid_file.path} >> #{widf}")
-    wid_file.unlink
-  end
 
-  add_stats(expname,envdebugfile,env,run_id,iter,count_lines(ok),count_lines(ko))
+  add_stats(expname,envdebugfile,env,run_id,iter,count_lines(ok),count_lines(ko),wid_file)
+
+  wid_file.unlink
 
   return (count_lines(ko) == 0), count_lines(ok), count_lines(ko),envresultfile unless $check
   if (count_lines(ko) > 0) then
     IO.readlines(ko).each { |node|
       $stderr.puts "### KO[#{node.chomp}]"
     }
+  CommonG5K.kadeploy($nodes,ENVIRONMENT,`kavlan -V`.chomp)    
   end
   if (count_lines(ko) == 0) then
     deployed_nodes = Array.new
@@ -740,6 +744,7 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   date=(Time.now.year.to_s+"-"+Time.now.mon.to_s+"-"+Time.now.day.to_s)+"-"
   $name=(name!="" ? name+"-" : "")+date+Time.now.to_s.split(" ")[3].split(":").join("-")
 
+
 #checks the yaml file
     if yaml_file.empty?
       exit_error "You have to specify a YAML test file"
@@ -762,6 +767,11 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
     else
       exit_error("The experiment #{exp} is not in the YAML file")
     end
+  end
+
+#ckecks the time
+  if ($walltime<0)
+    exit_error "Reservation duration must be a positive integer"
   end
 
 #checks the nodes file
@@ -822,6 +832,7 @@ def load_cmdline_options
   $kastat=false
   $dir="."
   $cluster=""
+  $walltime=0
   $mode=Kanalyzemode::RESERVE
   nodescount=2
 
@@ -844,6 +855,7 @@ def load_cmdline_options
     opts.on("--best","Uses the most possible nodes") {|b| $best=true}
     opts.on("-c", "--cluster CLUSTER", "Selects the cluster to test") { |c| $cluster=c }
     opts.on("-n", "--nodescount NODESCOUNT", "Number of nodes used for the test (min. 2)") { |n| nodescount=n }
+    opts.on("-w", "--walltime TIME", "Reservation duration") { |w| $walltime=w.to_i}
     opts.separator "Install mode options: #{$0} --installmode -y EXPFILE [options]"
     opts.on("--installmode","Launches Kanalyze in install mode (reservation must be done)") {|l| $mode=Kanalyzemode::INSTALL}
     opts.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f| $filenode=f }
