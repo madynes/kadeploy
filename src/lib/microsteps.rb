@@ -1091,13 +1091,13 @@ class Microstep < Automata::QueueTask
     expected_clients = @nodes.length
     if not Bittorrent::wait_end_of_download(context[:common].bt_download_timeout, torrent, context[:common].bt_tracker_ip, tracker_port, expected_clients) then
       failed_microstep("A timeout for the bittorrent download has been reached")
-      ProcessManagement::killall(seed_pid)
+      Execute.kill_recursive(seed_pid)
       return false
     end
     debug(3, "Shutdown the seed for #{torrent}")
-    ProcessManagement::killall(seed_pid)
+    Execute.kill_recursive(seed_pid)
     debug(3, "Shutdown the tracker for #{torrent}")
-    ProcessManagement::killall(tracker_pid)
+    Execute.kill_recursive(tracker_pid)
     command("rm -f #{btdownload_state}")
 
     if not parallel_exec(decompress) then
