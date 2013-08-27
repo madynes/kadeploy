@@ -121,7 +121,7 @@ class Client
       end
 
       servers = {}
-      cp = ConfigInformation::ConfigParser.new(config)
+      cp = Configuration::Parser.new(config)
 
       cp.parse('servers',true,Array) do
         servers[cp.value('name',String)] = [
@@ -175,7 +175,7 @@ class Client
     tmpfile.unlink
 
     begin
-      EnvironmentManagement::Environment.new.load_from_desc(Marshal.load(Marshal.dump(ret)),[],USER,nil,false)
+      Environment.new.load_from_desc(Marshal.load(Marshal.dump(ret)),[],USER,nil,false)
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno) || ''
       msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
@@ -360,7 +360,7 @@ class Client
 
   def self.check_macrostep_interface(name)
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep
+      klass.superclass == Macrostep::Kadeploy
     }
     macrointerfaces.collect!{ |klass| klass.name.split('::').last }
 
@@ -370,18 +370,18 @@ class Client
   def self.check_macrostep_instance(name)
     # Gathering a list of availables macrosteps
     macrosteps = ObjectSpace.each_object(Class).select { |klass|
-      klass.ancestors.include?(Macrostep)
+      klass.ancestors.include?(Macrostep::Kadeploy)
     }
 
     # Do not consider rought step names as valid
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep
+      klass.superclass == Macrostep::Kadeploy
     }
     macrointerfaces.each { |interface| macrosteps.delete(interface) }
 
-    macrosteps.collect!{ |klass| klass.name.split('::').last }
+    macrosteps.collect!{ |klass| klass.step_name }
 
-    return macrosteps.include?(name)
+    return macrosteps.include?("Kadeploy#{name}")
   end
 
   def self.check_microstep(name)
@@ -513,7 +513,7 @@ class Client
   end
 
   def self.get(host,port,path,secure=false)
-    HTTPClient::get(host,port,path,secure,service_name())
+    HTTP::Client::get(host,port,path,secure,service_name())
   end
 
   def get(uri,params=nil)
@@ -521,13 +521,13 @@ class Client
     if query
       path = "#{path}?#{query}"
     elsif params
-      path = HTTPClient.path_params(path,params)
+      path = HTTP::Client.path_params(path,params)
     end
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::get(host,port,path,@secure,self.class.service_name)
-    rescue HTTPClientError => e
+      HTTP::Client::get(host,port,path,@secure,self.class.service_name)
+    rescue HTTP::ClientError => e
       error(e.message)
     end
   end
@@ -538,8 +538,8 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::post(host,port,path,data,@secure,content_type,self.class.service_name)
-    rescue HTTPClientError => e
+      HTTP::Client::post(host,port,path,data,@secure,content_type,self.class.service_name)
+    rescue HTTP::ClientError => e
       error(e.message)
     end
   end
@@ -550,8 +550,8 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::put(host,port,path,data,@secure,content_type,self.class.service_name)
-    rescue HTTPClientError => e
+      HTTP::Client::put(host,port,path,data,@secure,content_type,self.class.service_name)
+    rescue HTTP::ClientError => e
       error(e.message)
     end
   end
@@ -561,13 +561,13 @@ class Client
     if query
       path = "#{path}?#{query}"
     elsif params
-      path = HTTPClient.path_params(path,params)
+      path = HTTP::Client.path_params(path,params)
     end
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::delete(host,port,path,@secure,self.class.service_name)
-    rescue HTTPClientError => e
+      HTTP::Client::delete(host,port,path,@secure,self.class.service_name)
+    rescue HTTP::ClientError => e
       error(e.message)
     end
   end
@@ -576,8 +576,8 @@ class Client
     nodelist = nil
     begin
       Timeout.timeout(8) do
-        path = HTTPClient.path_params('/nodes',{:user => USER,:list=>true})
-        nodelist = HTTPClient::get(server,port,path,secure)
+        path = HTTP::Client.path_params('/nodes',{:user => USER,:list=>true})
+        nodelist = HTTP::Client::get(server,port,path,secure)
       end
     rescue Timeout::Error
       error("Cannot check the nodes on the #{server} server")

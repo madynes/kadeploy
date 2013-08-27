@@ -2,13 +2,15 @@ require 'debug'
 require 'macrostep'
 
 module Kadeploy
-  class BroadcastEnv < Macrostep
+
+module Macrostep
+  class KadeployBroadcastEnv < Kadeploy
     def load_config()
       super()
     end
   end
 
-  class BroadcastEnvChain < BroadcastEnv
+  class KadeployBroadcastEnvChain < KadeployBroadcastEnv
     def steps()
       [
         [ :send_environment, :chain ],
@@ -23,7 +25,7 @@ module Kadeploy
     end
   end
 
-  class BroadcastEnvKastafior < BroadcastEnv
+  class KadeployBroadcastEnvKastafior < KadeployBroadcastEnv
     def steps()
       [
         [ :send_environment, :kastafior ],
@@ -39,7 +41,7 @@ module Kadeploy
     end
   end
 
-  class BroadcastEnvTree < BroadcastEnv
+  class KadeployBroadcastEnvTree < KadeployBroadcastEnv
     def steps()
       [
         [ :send_environment, :tree ],
@@ -54,7 +56,7 @@ module Kadeploy
     end
   end
 
-  class BroadcastEnvBittorrent < BroadcastEnv
+  class KadeployBroadcastEnvBittorrent < KadeployBroadcastEnv
     def steps()
       [
         [ :mount_tmp_part ], #we need /tmp to store the tarball
@@ -70,7 +72,7 @@ module Kadeploy
     end
   end
 
-  class BroadcastEnvCustom < BroadcastEnv
+  class KadeployBroadcastEnvCustom < KadeployBroadcastEnv
     def steps()
       [
         [ :send_environment, :custom ],
@@ -85,7 +87,7 @@ module Kadeploy
     end
   end
 
-  class BroadcastEnvDummy < BroadcastEnv
+  class KadeployBroadcastEnvDummy < KadeployBroadcastEnv
     def steps()
       [
         [ :dummy ],
@@ -93,4 +95,6 @@ module Kadeploy
       ]
     end
   end
+end
+
 end

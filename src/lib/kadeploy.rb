@@ -148,7 +148,7 @@ module Kadeploy
 
         kind = p.check(env['kind'],String,:values=>['anonymous','database'])
 
-        context.environment = EnvironmentManagement::Environment.new
+        context.environment = Environment.new
 
         case kind
         when 'anonymous'
@@ -322,7 +322,7 @@ module Kadeploy
           (config.common.log_to_db ? context[:database] : nil)
         )
 
-        workflow = Workflow.new(nodeset,context.dup)
+        workflow = Workflow::Kadeploy.new(nodeset,context.dup)
 
         workflows[cluster] = workflow
       end
