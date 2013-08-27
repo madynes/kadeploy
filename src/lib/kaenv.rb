@@ -31,7 +31,7 @@ module Kaenv
         # Check Environment
         env = p.parse('environment',Hash,:mandatory=>true)
           #:errno=>KadeployError::NO_ENV_CHOSEN)
-        context.environment = EnvironmentManagement::Environment.new
+        context.environment = Environment.new
 
         # Check user
         if env['user'] and config.common.almighty_env_users.include?(context.user)
@@ -137,7 +137,7 @@ module Kaenv
     envs = nil
     if user and name
       if !user.empty? and !name.empty?
-        envs = EnvironmentManagement::Environment.get_from_db(
+        envs = Environment.get_from_db(
           cexec.database,
           name,
           version || cexec.show_all_version,
@@ -146,7 +146,7 @@ module Kaenv
           false
         )
       elsif user.empty? and !name.empty? # if no user and an env name, look for public envs
-        envs = EnvironmentManagement::Environment.get_from_db(
+        envs = Environment.get_from_db(
           cexec.database,
           name,
           version || cexec.show_all_version,
@@ -158,7 +158,7 @@ module Kaenv
         error_not_found!
       end
     else
-      envs = EnvironmentManagement::Environment.get_list_from_db(
+      envs = Environment.get_list_from_db(
         cexec.database,
         user,
         cexec.user == user, #If the user wants to print the environments of another user, private environments are not shown
@@ -207,8 +207,7 @@ module Kaenv
 
       file = file[0] unless arr
       if changes
-        EnvironmentManagement::Environment.send(
-          "flatten_#{kind}".to_sym,file,true)
+        Environment.send("flatten_#{kind}".to_sym,file,true)
       else
         nil
       end
@@ -218,8 +217,7 @@ module Kaenv
       ret = []
       updates = {}
 
-      envs = EnvironmentManagement::Environment.get_list_from_db(cexec.database,
-        user,true,true)
+      envs = Environment.get_list_from_db(cexec.database,user,true,true)
 
       envs.each do |env|
         cexec.environment[:update_files].each do |oldf,newf|
@@ -232,7 +230,7 @@ module Kaenv
           updates.each{ |k,v| updates.delete(k) if v.nil? }
 
           unless updates.empty?
-            if (r = EnvironmentManagement::Environment.update_to_db(
+            if (r = Environment.update_to_db(
               cexec.database,
               name,
               version,
@@ -250,7 +248,7 @@ module Kaenv
       end
       kaerror(APIError::NOTHING_MODIFIED) if ret.empty?
       ret
-    elsif (env = EnvironmentManagement::Environment.get_from_db(
+    elsif (env = Environment.get_from_db(
       cexec.database,
       name,
       version,
@@ -287,7 +285,7 @@ module Kaenv
 
       updates.each{ |k,v| updates.delete(k) if v.nil? }
 
-      if (ret = EnvironmentManagement::Environment.update_to_db(
+      if (ret = Environment.update_to_db(
         cexec.database,
         name,
         version,
@@ -306,7 +304,7 @@ module Kaenv
   end
 
   def envs_delete(cexec,user,name,version=nil)
-    if (ret = EnvironmentManagement::Environment.del_from_db(
+    if (ret = Environment.del_from_db(
       cexec.database,
       name,
       version,

@@ -41,11 +41,11 @@ class KadeployServer
     @logfile = @config.common.log_to_file
     check_database()
     @window_managers = {
-      :reboot => Managers::WindowManager.new(
+      :reboot => WindowManager.new(
         @config.common.reboot_window,
         @config.common.reboot_window_sleep_time
       ),
-      :check => Managers::WindowManager.new(
+      :check => WindowManager.new(
         @config.common.nodes_check_window,
         1
       ),
@@ -69,7 +69,7 @@ class KadeployServer
   def load_config()
     ret = nil
     begin
-      ret = ConfigInformation::Config.new(false)
+      ret = Configuration::Config.new(false)
     rescue KadeployError, ArgumentError => e
       kaerror(APIError::BAD_CONFIGURATION,e.message)
     end
@@ -130,7 +130,7 @@ class KadeployServer
       instpath = File.join(info[:wid],path||'')
       unless multi
         path = API.path(kind,instpath)
-        info[:resources][resource] = HTTPClient.path_params(
+        info[:resources][resource] = HTTP::Client.path_params(
           API.ppath(kind,@httpd.url,instpath),{:user=>info[:user]})
         if block_given?
           yield(@httpd,path)
@@ -141,7 +141,7 @@ class KadeployServer
         multi.each do |res|
           minstpath = File.join(instpath,res)
           path = API.path(kind,minstpath)
-          info[:resources][resource][res] = HTTPClient.path_params(
+          info[:resources][resource][res] = HTTP::Client.path_params(
             API.ppath(kind,@httpd.url,minstpath),{:user=>info[:user]})
           if block_given?
             yield(@httpd,path,res)
