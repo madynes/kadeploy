@@ -7,7 +7,6 @@ require 'parallel_runner'
 require 'netboot'
 require 'cache'
 require 'bittorrent'
-require 'process_management'
 require 'port_scanner'
 
 #Ruby libs

@@ -1,5 +1,4 @@
 require 'tempfile'
-require 'process_management'
 
 module Kadeploy
 
