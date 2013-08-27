@@ -12,11 +12,9 @@ require 'time'
 
 require 'json'
 
-include WEBrick
-
 if RUBY_VERSION < "2.0"
   # Monkey patch to remove DH encryption related warnings
-  class GenericServer
+  class WEBrick::GenericServer
     alias_method :__setup_ssl_context__, :setup_ssl_context
 
     def setup_ssl_context(config)
@@ -26,6 +24,8 @@ if RUBY_VERSION < "2.0"
     end
   end
 end
+
+module Kadeploy
 
 module HTTPd
   class InvalidError < Exception
@@ -438,7 +438,7 @@ module HTTPd
         opts[:SSLVerifyClient] = OpenSSL::SSL::VERIFY_NONE
       end
 
-      @server = HTTPServer.new(opts)
+      @server = WEBrick::HTTPServer.new(opts)
       @host = @server.config[:ServerName] if @host.empty?
       @port = @server.config[:Port] if @port == 0
     end
@@ -492,4 +492,6 @@ module HTTPd
       @server.umount(path)
     end
   end
+end
+
 end

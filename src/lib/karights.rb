@@ -1,5 +1,7 @@
 require 'rights'
 
+module Kadeploy
+
 module Karights
   def rights_init_exec_context()
     ret = init_exec_context()
@@ -151,4 +153,6 @@ module Karights
       kaerror(APIError::NOTHING_MODIFIED)
     end
   end
+end
+
 end

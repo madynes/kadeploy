@@ -5,8 +5,7 @@ require 'nodes'
 #Ruby libs
 require 'thread'
 
-#module ParallelRunner
-  #class PRunner
+module Kadeploy
   class ParallelRunner
     @execs = nil
     @output = nil
@@ -125,4 +124,4 @@ require 'thread'
       [good, bad]
     end
   end
-#end
+end

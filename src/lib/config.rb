@@ -1,4 +1,3 @@
-
 #Kadeploy libs
 require 'environment'
 require 'nodes'
@@ -21,6 +20,8 @@ require 'fileutils'
 require 'resolv'
 require 'ipaddr'
 require 'yaml'
+
+module Kadeploy
 
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 R_HTTP = /^http[s]?:\/\//
@@ -1012,9 +1013,9 @@ module ConfigInformation
 
             treatmacro = Proc.new do |macroname|
               insts = ObjectSpace.each_object(Class).select { |klass|
-                klass.ancestors.include?(Module.const_get(macroname))
+                klass.ancestors.include?(::Kadeploy.const_get(macroname))
               } unless macroname.empty?
-              insts.collect!{ |klass| klass.name.sub(/^#{macroname}/,'') }
+              insts.collect!{ |klass| klass.name.sub(/^Kadeploy::#{macroname}/,'') }
               macroinsts = []
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]
@@ -2353,4 +2354,6 @@ module ConfigInformation
       return @array_of_instances
     end
   end
+end
+
 end

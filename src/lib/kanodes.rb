@@ -1,3 +1,5 @@
+module Kadeploy
+
 module Kanodes
   def nodes_init_exec_context()
     ret = init_exec_context()
@@ -59,4 +61,6 @@ module Kanodes
       end
     end
   end
+end
+
 end

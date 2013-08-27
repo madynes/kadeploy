@@ -3,6 +3,7 @@ require 'uri'
 require 'grabfile'
 require 'workflow'
 
+module Kadeploy
 DEPLOY_STATUS_CHECK_PITCH=1
 
 module Kadeploy
@@ -635,4 +636,6 @@ module Kadeploy
       end
     end
   end
+end
+
 end

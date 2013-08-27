@@ -1,7 +1,7 @@
-
-#Ruby libs
 require 'tempfile'
 require 'process_management'
+
+module Kadeploy
 
 module Bittorrent
   DEFAULT_BITTORRENT_PORT = 6969
@@ -161,4 +161,6 @@ module Bittorrent
     end
     return finished
   end
+end
+
 end

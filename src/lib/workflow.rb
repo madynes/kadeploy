@@ -1,4 +1,3 @@
-
 #Kadeploy libs
 require 'debug'
 require 'nodes'
@@ -18,6 +17,8 @@ require 'window'
 require 'thread'
 require 'uri'
 require 'tempfile'
+
+module Kadeploy
 
 class Workflow < Automata::TaskManager
   include Printer
@@ -261,7 +262,7 @@ class Workflow < Automata::TaskManager
     taskval = get_task(idx,subidx)
 
     begin
-      klass = Module.const_get(taskval[0].to_s)
+      klass = ::Kadeploy.const_get(taskval[0].to_s)
     rescue NameError
       raise "Invalid kind of Macrostep #{taskval[0]}"
     end
@@ -496,4 +497,6 @@ class Workflow < Automata::TaskManager
       end
     end
   end
+end
+
 end

@@ -1,6 +1,8 @@
 require 'pathname'
 require 'fileutils'
 
+module Kadeploy
+
 module ConfigInformation
   class ParserError < StandardError
   end
@@ -407,3 +409,4 @@ module ConfigInformation
   end
 end
 
+end

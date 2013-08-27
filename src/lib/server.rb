@@ -17,8 +17,8 @@ require 'window'
 require 'rights'
 require 'http'
 
+module Kadeploy
 AUTOCLEAN_THRESHOLD = 3600
-
 
 class KadeployServer
   include Kadeploy
@@ -454,4 +454,6 @@ class KadeployServer
 
     return ret
   end
+end
+
 end

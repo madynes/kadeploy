@@ -6,6 +6,8 @@ require 'http'
 require 'md5'
 require 'error'
 
+module Kadeploy
+
 class FetchFile
   def initialize(path,errno,client=nil)
     @path = path
@@ -173,4 +175,6 @@ class LocalFetchFile < HTTPFetchFile
       raise KadeployError.new(APIError::INVALID_CLIENT,nil,'Invalid client path')
     end
   end
+end
+
 end

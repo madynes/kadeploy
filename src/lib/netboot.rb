@@ -1,5 +1,7 @@
 require 'pathname'
 
+module Kadeploy
+
 module NetBoot
   def self.custom_prefix(user,id)
     "#{user}-#{id.to_s}"
@@ -377,4 +379,6 @@ module NetBoot
       [ profile ]
     end
   end
+end
+
 end

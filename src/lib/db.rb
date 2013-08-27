@@ -1,6 +1,6 @@
-
-#Ruby libs
 require 'mysql'
+
+module Kadeploy
 
 module Database
   class DbFactory
@@ -193,4 +193,6 @@ module Database
       return res
     end
   end
+end
+
 end

@@ -1,5 +1,7 @@
 require 'execute'
 
+module Kadeploy
+
 module TakTuk
   class Aggregator
     def initialize(criteria)
@@ -510,26 +512,28 @@ module TakTuk
       self
     end
   end
+
+  ###
+  # Execution samples:
+  ###
+  #   taktuk('hostfile',:connector => 'ssh -A', :self_propagate => true).broadcast_exec['hostname'].run!
+  ###
+  #   taktuk(['node-1','node-2'],:dynamic => 3).broadcast_put['myfile']['dest'].run!
+  ###
+  #   taktuk(nodes).broadcast_exec['hostname'].seq!.broadcast_exec['df'].run!
+  ###
+  #   taktuk(nodes).broadcast_exec['cat - | fdisk'].seq!.broadcast_input_file['fdiskdump'].run!
+  ###
+  #   tak = taktuk(nodes)
+  #   tak.broadcast_exec['hostname']
+  #   tak.seq!.broadcast_exec['df']
+  #   tak.streams[:output] => OutputStream.new(Template[:line,:rank]),
+  #   tak.streams[:info] => ConnectorStream.new(Template[:command,:line])
+  #   tak.run!
+  ###
+  def self.taktuk(*args)
+    TakTuk.new(*args)
+  end
 end
 
-###
-# Execution samples:
-###
-#   taktuk('hostfile',:connector => 'ssh -A', :self_propagate => true).broadcast_exec['hostname'].run!
-###
-#   taktuk(['node-1','node-2'],:dynamic => 3).broadcast_put['myfile']['dest'].run!
-###
-#   taktuk(nodes).broadcast_exec['hostname'].seq!.broadcast_exec['df'].run!
-###
-#   taktuk(nodes).broadcast_exec['cat - | fdisk'].seq!.broadcast_input_file['fdiskdump'].run!
-###
-#   tak = taktuk(nodes)
-#   tak.broadcast_exec['hostname']
-#   tak.seq!.broadcast_exec['df']
-#   tak.streams[:output] => OutputStream.new(Template[:line,:rank]),
-#   tak.streams[:info] => ConnectorStream.new(Template[:command,:line])
-#   tak.run!
-###
-def taktuk(*args)
-  TakTuk::TakTuk.new(*args)
 end

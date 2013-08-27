@@ -1,10 +1,11 @@
-
 require 'tempfile'
 require 'net/http'
 require 'net/https'
 require 'uri'
 require 'error'
 require 'time'
+
+module Kadeploy
 
 module HTTP
   public
@@ -198,4 +199,6 @@ class HTTPClient
     end
     res
   end
+end
+
 end

@@ -1,3 +1,4 @@
+module Kadeploy
 
 class KadeployError < Exception
   attr_reader :errno, :context
@@ -193,4 +194,6 @@ end
 
 class KapowerError
   NO_ERROR = 400
+end
+
 end

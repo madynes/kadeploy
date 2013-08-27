@@ -4,6 +4,8 @@ require 'timeout'
 require 'socket'
 require 'openssl'
 
+module Kadeploy
+
 class Authentication
   UNTRUSTED_SOURCE='Trying to authenticate from an untrusted source'
   INVALID_PARAMS='Invalid authentication parameters'
@@ -115,4 +117,6 @@ class IdentAuthentication < Authentication
 
     [user == params[:user],'Specified user does not match with the one given by the ident service']
   end
+end
+
 end

@@ -1,4 +1,3 @@
-
 CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
 USER = `id -nu`.strip
 
@@ -22,6 +21,12 @@ require 'environment'
 require 'http'
 require 'httpd'
 require 'api'
+# For custom steps
+# TODO: find another way to do this
+require 'macrostep'
+require 'stepdeployenv'
+require 'stepbroadcastenv'
+require 'stepbootnewenv'
 
 require 'thread'
 require 'uri'
@@ -31,6 +36,8 @@ require 'timeout'
 require 'json'
 require 'yaml'
 
+
+module Kadeploy
 
 class Client
   attr_reader :wid
@@ -355,6 +362,8 @@ class Client
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
       klass.superclass == Macrostep
     }
+    macrointerfaces.collect!{ |klass| klass.name.split('::').last }
+
     return macrointerfaces.include?(name)
   end
 
@@ -370,7 +379,7 @@ class Client
     }
     macrointerfaces.each { |interface| macrosteps.delete(interface) }
 
-    macrosteps.collect!{ |klass| klass.name }
+    macrosteps.collect!{ |klass| klass.name.split('::').last }
 
     return macrosteps.include?(name)
   end
@@ -495,7 +504,7 @@ class Client
   end
 
   def self.service_name
-    name.gsub(/Client$/,'')
+    name.split('::').last.gsub(/Client$/,'')
   end
 
   def parse_uri(uri)
@@ -716,3 +725,4 @@ class Client
   end
 end
 
+end
