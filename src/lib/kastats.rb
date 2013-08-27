@@ -21,7 +21,11 @@ module Kastats
       # Check nodelist
       context.nodes = p.parse('nodes',Array,:type=>:nodeset,
         :errno=>APIError::INVALID_NODELIST)
-      context.nodes = context.nodes.make_array_of_hostname if context.nodes
+      if context.nodes
+        tmp = context.nodes.make_array_of_hostname
+        context.nodes.free
+        context.nodes = tmp
+      end
 
       context.kind = p.parse('kind',String,:values=>['all','failure_rates'],:default=>'all')
       context.fields = p.parse('fields',Array,:values=>['deploy_id','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'], :default=>['deploy_id','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'])

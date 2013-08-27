@@ -61,6 +61,14 @@ class SecretKeyAuthentication < Authentication
 
     [params[:key] == @secret_key,"#{INVALID_PARAMS} '#{params[:key]}'"]
   end
+
+  def ==(auth)
+    if auth.is_a?(self.class)
+      (@secret_key == auth.instance_variable_get(:@secret_key) and @whitelist == auth.whitelist)
+    else
+      false
+    end
+  end
 end
 
 class CertificateAuthentication < Authentication
@@ -73,6 +81,14 @@ class CertificateAuthentication < Authentication
     return [false,UNTRUSTED_SOURCE] unless check_host?(source_sock)
 
     [params[:cert].verify(@public_key),INVALID_PARAMS]
+  end
+
+  def ==(auth)
+    if auth.is_a?(self.class)
+      (@public_key.to_der == auth.instance_variable_get(:@public_key).to_der and @whitelist == auth.whitelist)
+    else
+      false
+    end
   end
 end
 
@@ -116,6 +132,14 @@ class IdentAuthentication < Authentication
     end
 
     [user == params[:user],'Specified user does not match with the one given by the ident service']
+  end
+
+  def ==(auth)
+    if auth.is_a?(self.class)
+      @whitelist == auth.whitelist
+    else
+      false
+    end
   end
 end
 

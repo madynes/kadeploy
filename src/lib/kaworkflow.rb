@@ -7,6 +7,7 @@ module Kaworkflow
 
   def work_init_exec_context(kind)
     ret = init_exec_context()
+    ret.config = nil
     ret.info = nil
     ret.nodes = nil
     ret.nodelist = nil
@@ -38,12 +39,17 @@ module Kaworkflow
 
   def work_free_exec_context(kind,context)
     context = free_exec_context(context)
+    context.nodes.free if context.nodes
+    context.nodes = nil
+    context.config = nil
     context.outputfile = nil
     context.loggerfile = nil
     context
   end
 
   def work_init_info(kind,cexec)
+    nodes = Nodes::NodeSet.new(0)
+    cexec.nodes.duplicate(nodes)
     {
       :wid => uuid(API.wid_prefix(kind)),
       :user => cexec.user,
@@ -51,9 +57,10 @@ module Kaworkflow
       :end_time => nil,
       :done => false,
       :thread => nil,
+      :config => cexec.config,
       :nodelist => cexec.nodelist,
-      :clusterlist => cexec.nodes.group_by_cluster.keys,
-      :nodes => cexec.nodes,
+      :clusterlist => nodes.group_by_cluster.keys,
+      :nodes => nodes,
       :state => Nodes::NodeState.new(),
       :database => database_handler(),
       :workflows => {},
@@ -61,7 +68,7 @@ module Kaworkflow
       :outputfile => cexec.outputfile,
       :loggerfile => cexec.loggerfile,
       :output => Debug::OutputControl.new(
-        cexec.verbose_level || config.common.verbose_level,
+        cexec.verbose_level || cexec.config.common.verbose_level,
         cexec.outputfile,
         ''
       ),
@@ -97,6 +104,7 @@ module Kaworkflow
 
     case operation
     when :create, :modify
+      context.config = duplicate_config()
       parse_params(params) do |p|
         # Check nodelist
         context.nodes = p.parse('nodes',Array,:mandatory=>true,
@@ -124,13 +132,13 @@ module Kaworkflow
         context.debug = p.parse('debug',nil,:toggle=>true)
 
         # Loading OutputControl
-        if config.common.dbg_to_file and !config.common.dbg_to_file.empty?
-          context.outputfile = Debug::FileOutput.new(config.common.dbg_to_file,
-            config.common.dbg_to_file_level)
+        if context.config.common.dbg_to_file and !context.config.common.dbg_to_file.empty?
+          context.outputfile = Debug::FileOutput.new(context.config.common.dbg_to_file,
+            context.config.common.dbg_to_file_level)
         end
 
-        if config.common.log_to_file and !config.common.log_to_file.empty?
-          context.loggerfile = Debug::FileOutput.new(config.common.log_to_file)
+        if context.config.static[:logfile] and !context.config.static[:logfile].empty?
+          context.loggerfile = Debug::FileOutput.new(context.config.static[:logfile])
         end
 
         if [:deploy,:reboot].include?(kind)
@@ -147,7 +155,7 @@ module Kaworkflow
             context.vlan_addr = {}
             context.nodelist.each do |hostname|
               host,domain = hostname.split('.',2)
-              vlan_hostname = "#{host}#{config.common.vlan_hostname_suffix}"\
+              vlan_hostname = "#{host}#{context.config.common.vlan_hostname_suffix}"\
                 ".#{domain}".gsub!('VLAN_ID', context.vlan_id)
               begin
                 context.vlan_addr = dns.getaddress(vlan_hostname).to_s
@@ -235,14 +243,14 @@ module Kaworkflow
     when :get
       if wid and names
         workflow_get(kind,wid) do |info|
-          return (config.common.almighty_env_users.include?(cexec.user) \
+          return (cexec.almighty_users.include?(cexec.user) \
             or cexec.user == info[:user])
         end
       end
     when :delete
       return false unless wid
       workflow_get(kind,wid) do |info|
-        return (config.common.almighty_env_users.include?(cexec.user) \
+        return (cexec.almighty_users.include?(cexec.user) \
           or cexec.user == info[:user])
       end
     else
@@ -267,9 +275,10 @@ module Kaworkflow
         :nodesets_id => 0,
 
         :execution => cexec,
-        :config => config,
-        :common => config.common,
+        :common => info[:config].common,
+        :caches => info[:config].caches,
         :cluster => nil,
+        :cluster_prefix => nil,
 
         :database => info[:database],
 
@@ -298,21 +307,23 @@ module Kaworkflow
 
       # Run a Workflow by cluster
       clusters.each_pair do |cluster,nodeset|
-        context[:cluster] = config.cluster_specific[cluster]
+        context[:cluster] = info[:config].clusters[cluster]
         if clusters.size > 1
           if context[:cluster].prefix.empty?
-            context[:cluster].prefix = "c#{clid}"
+            context[:cluster_prefix] = "c#{clid}"
             clid += 1
+          else
+            context[:cluster_prefix] = context[:cluster].prefix.dup
           end
         else
-          context[:cluster].prefix = ''
+          context[:cluster_prefix] = ''
         end
 
         cexec.outputfile.prefix = "#{context[:wid]}|#{cexec.user} -> " if cexec.outputfile
         context[:output] = Debug::OutputControl.new(
-          cexec.verbose_level || config.common.verbose_level,
+          cexec.verbose_level || info[:config].common.verbose_level,
           cexec.outputfile,
-          context[:cluster].prefix
+          context[:cluster_prefix]
         )
         context[:logger] = Debug::Logger.new(
           cexec.nodelist,
@@ -322,7 +333,7 @@ module Kaworkflow
           (context[:execution].environment ? "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}" : nil),
           (context[:execution].environment and context[:execution].environment.id < 0),
           cexec.loggerfile,
-          (config.common.log_to_db ? context[:database] : nil)
+          (info[:config].common.log_to_db ? context[:database] : nil)
         )
 
         workflow = Workflow.const_get("#{kind.to_s.capitalize}").new(nodeset,context.dup)
@@ -337,7 +348,7 @@ module Kaworkflow
         output.push(0,"---")
         output.push(0,"Clusters involved in the operation:")
         workflows.each_value do |workflow|
-          output.push(0,"  #{Debug.prefix(workflow.context[:cluster].prefix)}: #{workflow.context[:cluster].name}")
+          output.push(0,"  #{Debug.prefix(workflow.context[:cluster_prefix])}: #{workflow.context[:cluster].name}")
         end
         output.push(0,"---")
       end
@@ -426,7 +437,7 @@ module Kaworkflow
         :error => error,
       }
 
-      if config.common.almighty_env_users.include?(cexec.user) or cexec.user == info[:user]
+      if cexec.almighty_users.include?(cexec.user) or cexec.user == info[:user]
         if info[:environment]
           ret[:environment] = {
             :id => info[:environment].id,
@@ -542,7 +553,6 @@ module Kaworkflow
     unless info[:freed]
       info[:nodes].free if info[:nodes]
       info.delete(:nodes)
-
       info[:clusterlist].clear if info[:clusterlist]
       info.delete(:clusterlist)
 
@@ -579,8 +589,11 @@ module Kaworkflow
       info[:cached_files].each{|file| file.release } if info[:cached_files]
       info.delete(:cached_files)
 
-      config.common.cache[:global].clean if @config.common.cache[:global]
-      config.common.cache[:netboot].clean
+      info[:config].caches[:global].clean if info[:config].caches[:global]
+      info[:config].caches[:netboot].clean
+
+      info[:config].free
+      info.delete(:config)
 
       info.delete(:resources)
       # ...

@@ -12,7 +12,20 @@ class ParamsParser
   def initialize(params,config)
     raise unless params.is_a?(Hash)
     @params = params
-    @config = config
+    @secure_client = config.common.secure_client
+    @nodes = Nodes::NodeSet.new(0)
+    config.common.nodes.duplicate(@nodes)
+    @vlan_hostname_suffix = config.common.vlan_hostname_suffix.dup
+    @set_vlan_cmd = config.common.set_vlan_cmd
+    @curparam = nil
+  end
+
+  def free()
+    @params = nil
+    @secure_client = nil
+    @nodes = nil
+    @vlan_hostname_suffix = nil
+    @set_vlan_cmd = nil
     @curparam = nil
   end
 
@@ -112,12 +125,12 @@ class ParamsParser
         unless ['http','https'].include?(param.scheme.downcase)
 
       error(APIError::INVALID_CLIENT, 'Secure connection is mandatory for the client fileserver') \
-        if @config.common.secure_client and param.scheme.downcase == 'http'
+        if @secure_client and param.scheme.downcase == 'http'
     when :node
       error(APIError::INVALID_NODELIST,"Must be a single node") if Nodes::REGEXP_NODELIST =~ param
 
       # Get the node
-      unless param = @config.common.nodes_desc.get_node_by_host(param)
+      unless param = @nodes.get_node_by_host(param)
         error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
       end
     when :nodeset
@@ -134,14 +147,14 @@ class ParamsParser
       # Create a nodeset
       param = Nodes::NodeSet.new(0)
       hosts.each do |host|
-        if node = @config.common.nodes_desc.get_node_by_host(host)
-          param.push(node.dup)
+        if node = @nodes.get_node_by_host(host)
+          param.push(node)
         else
           error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
         end
       end
     when :vlan
-      if @config.common.vlan_hostname_suffix.empty? or @config.common.set_vlan_cmd.empty?
+      if @vlan_hostname_suffix.empty? or @set_vlan_cmd.empty?
         error(APIError::INVALID_VLAN, "The VLAN management is disabled")
       end
     when :breakpoint

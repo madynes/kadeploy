@@ -16,7 +16,11 @@ module Kanodes
       # Check nodelist
       context.nodes = p.parse('nodes',Array,:type=>:nodeset,
         :errno=>APIError::INVALID_NODELIST)
-      context.nodes = context.nodes.make_array_of_hostname if context.nodes
+      if context.nodes
+        tmp = context.nodes.make_array_of_hostname
+        context.nodes.free
+        context.nodes = tmp
+      end
       context.list = p.parse('list',nil,:toggle=>true)
     end
 

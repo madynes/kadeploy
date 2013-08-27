@@ -27,7 +27,7 @@ module Kaenvs
         context.environment = Environment.new
 
         # Check user
-        if env['user'] and config.common.almighty_env_users.include?(context.user)
+        if env['user'] and context.almighty_users.include?(context.user)
         # almighty users can add environments for other users
           context.username = env['user']
         else
@@ -36,7 +36,7 @@ module Kaenvs
 
         unless (context.environment.load_from_desc(
           env,
-          config.common.almighty_env_users,
+          context.almighty_users,
           context.username,
           context.client
         ))
@@ -94,21 +94,21 @@ module Kaenvs
     # check if cexec == user on DELETE
     case operation
     when :create
-      if cexec.environment.visibility == 'public' and !config.common.almighty_env_users.include?(cexec.username)
+      if cexec.environment.visibility == 'public' and !cexec.almighty_users.include?(cexec.username)
         return [false,'Only administrators can use the "public" tag']
       end
     when :get
     when :modify
-      unless config.common.almighty_env_users.include?(cexec.user)
+      unless cexec.almighty_users.include?(cexec.user)
         return [false,'Only administrators are allowed to modify other user\'s environment'] if cexec.user != user
         return [false,'Only administrators can move the files in the environments'] if cexec.environment[:update_files]
       end
 
-      unless config.common.almighty_env_users.include?(user)
+      unless cexec.almighty_users.include?(user)
         return [false,'Only administrators can use the "public" tag'] if cexec.environment[:visibility] == 'public'
       end
     when :delete
-      if cexec.user != user and !config.common.almighty_env_users.include?(cexec.user)
+      if cexec.user != user and !cexec.almighty_users.include?(cexec.user)
         return [false,'Only administrators are allowed to delete other user\'s environment']
       end
     else
@@ -140,7 +140,7 @@ module Kaenvs
           name,
           version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           user,
-          (cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
+          (cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
           false
         )
       elsif user.empty? and !name.empty? # if no user and an env name, look for public envs
@@ -149,7 +149,7 @@ module Kaenvs
           name,
           version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           cexec.user,
-          (cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
+          (cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
           false
         )
       else
@@ -158,8 +158,8 @@ module Kaenvs
     else
       envs = Environment.get_list_from_db(
         cexec.database,
-        user || (config.common.almighty_env_users.include?(cexec.user) ? nil : cexec.user), # Almighty user can see everything
-        (!user or cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
+        user || (cexec.almighty_users.include?(cexec.user) ? nil : cexec.user), # Almighty user can see everything
+        (!user or cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
         (user.nil? or user.empty?),# Show only the environments of a specific user if user is defined
         !cexec.last
       )

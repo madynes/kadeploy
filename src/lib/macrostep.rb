@@ -201,12 +201,12 @@ module Macrostep
     end
 
     def split!(nsid0,nsid1,ns1,nsid2,ns2)
-      initnsid = Debug.prefix(context[:cluster].prefix,nsid0)
+      initnsid = Debug.prefix(context[:cluster_prefix],nsid0)
       initnsid = '[0] ' if initnsid.empty?
       debug(1,'---')
       debug(1,"Nodeset #{initnsid}split into :")
-      debug(1,"  #{Debug.prefix(context[:cluster].prefix,nsid1)}#{ns1.to_s_fold}")
-      debug(1,"  #{Debug.prefix(context[:cluster].prefix,nsid2)}#{ns2.to_s_fold}")
+      debug(1,"  #{Debug.prefix(context[:cluster_prefix],nsid1)}#{ns1.to_s_fold}")
+      debug(1,"  #{Debug.prefix(context[:cluster_prefix],nsid2)}#{ns2.to_s_fold}")
       debug(1,'---')
     end
 

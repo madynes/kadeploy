@@ -41,7 +41,7 @@ module Karights
 
   def rights_rights?(cexec,operation,names,*args)
     # check almighty
-    unless config.common.almighty_env_users.include?(cexec.user)
+    unless cexec.almighty_users.include?(cexec.user)
       return [ false, 'Only administrators are allowed to manage rights' ]
     end
 
@@ -70,7 +70,7 @@ module Karights
       # Rights already exists for another user that isnt almighty
       if existing and (existing.keys.size > 1 or existing.keys[0] != cexec.username)
         existing.keys.each do |usr|
-          unless config.common.almighty_env_users.include?(usr)
+          unless cexec.almighty_users.include?(usr)
             kaerror(APIError::CONFLICTING_ELEMENTS,
               "Some rights are already set for user #{usr}"\
               " on nodes #{cexec.nodes.join(',')}"
