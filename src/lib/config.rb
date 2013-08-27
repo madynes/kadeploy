@@ -26,7 +26,7 @@ module Kadeploy
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 R_HTTP = /^http[s]?:\/\//
 
-module ConfigInformation
+module Configuration
   CONFIGURATION_FOLDER = $kadeploy_config_directory
   VERSION_FILE = File.join(CONFIGURATION_FOLDER, "version")
   SERVER_CONFIGURATION_FILE = File.join(CONFIGURATION_FOLDER, "server_conf.yml")
@@ -257,7 +257,7 @@ module ConfigInformation
         end
 
         conf = @common
-        cp = ConfigParser.new(config)
+        cp = Parser.new(config)
 
         cp.parse('database',true) do
           conf.db_kind = cp.value('kind',String,nil,'mysql')
@@ -293,7 +293,7 @@ module ConfigInformation
                 begin
                   addr = Regexp.new(Regexp.last_match(1))
                 rescue
-                  raise ArgumentError.new(ConfigParser.errmsg(path,"Invalid regexp #{hostname}"))
+                  raise ArgumentError.new(Parser.errmsg(path,"Invalid regexp #{hostname}"))
                 end
               end
             end
@@ -302,9 +302,9 @@ module ConfigInformation
               begin
                 addr = IPAddr.new(Resolv.getaddress(hostname))
               rescue Resolv::ResolvError
-                raise ArgumentError.new(ConfigParser.errmsg(path,"Cannot resolv hostname #{hostname}"))
+                raise ArgumentError.new(Parser.errmsg(path,"Cannot resolv hostname #{hostname}"))
               rescue Exception => e
-                raise ArgumentError.new(ConfigParser.errmsg(path,"Invalid hostname #{hostname.inspect} (#{e.message})"))
+                raise ArgumentError.new(Parser.errmsg(path,"Invalid hostname #{hostname.inspect} (#{e.message})"))
               end
             end
             addr
@@ -331,7 +331,7 @@ module ConfigInformation
                   raise
                 end
               rescue Exception => e
-                raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"Unable to load #{kind} public key: #{e.message}"))
+                raise ArgumentError.new(Parser.errmsg(nfo[:path],"Unable to load #{kind} public key: #{e.message}"))
               end
             end
 
@@ -340,13 +340,13 @@ module ConfigInformation
               cert = cp.value('ca_cert',String,'',
                 { :type => 'file', :readable => true, :prefix => Config.dir()})
               if cert.empty?
-                raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"At least a certificate or a public key have to be specified"))
+                raise ArgumentError.new(Parser.errmsg(nfo[:path],"At least a certificate or a public key have to be specified"))
               else
                 begin
                   cert = OpenSSL::X509::Certificate.new(File.read(cert))
                   public_key = cert.public_key
                 rescue Exception => e
-                  raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"Unable to load x509 cert file: #{e.message}"))
+                  raise ArgumentError.new(Parser.errmsg(nfo[:path],"Unable to load x509 cert file: #{e.message}"))
                 end
               end
             end
@@ -377,7 +377,7 @@ module ConfigInformation
             end
           end
           if conf.auth.empty?
-            raise ArgumentError.new(ConfigParser.errmsg(nfo[:path],"You must set at least one authentication method"))
+            raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
           end
         end
 
@@ -403,7 +403,7 @@ module ConfigInformation
                 raise
               end
             rescue Exception => e
-              raise ArgumentError.new(ConfigParser.errmsg(inf[:path],"Unable to load #{kind} private key: #{e.message}"))
+              raise ArgumentError.new(Parser.errmsg(inf[:path],"Unable to load #{kind} private key: #{e.message}"))
             end
           end
           cert = cp.value('certificate',String,'',
@@ -412,16 +412,16 @@ module ConfigInformation
             begin
               conf.cert = OpenSSL::X509::Certificate.new(File.read(cert))
             rescue Exception => e
-              raise ArgumentError.new(ConfigParser.errmsg(info[:path],"Unable to load x509 cert file: #{e.message}"))
+              raise ArgumentError.new(Parser.errmsg(info[:path],"Unable to load x509 cert file: #{e.message}"))
             end
           end
 
           if conf.cert
             unless conf.private_key
-              raise ArgumentError.new(ConfigParser.errmsg(info[:path],"You have to specify the private key associated with the x509 certificate"))
+              raise ArgumentError.new(Parser.errmsg(info[:path],"You have to specify the private key associated with the x509 certificate"))
             end
             unless conf.cert.check_private_key(conf.private_key)
-              raise ArgumentError.new(ConfigParser.errmsg(info[:path],"The private key does not match with the x509 certificate"))
+              raise ArgumentError.new(Parser.errmsg(info[:path],"The private key does not match with the x509 certificate"))
             end
           end
 
@@ -565,7 +565,7 @@ module ConfigInformation
                   profiles_dir = File.join(repo,profiles_dir)
                 end
                 if !File.exist?(profiles_dir) or !File.directory?(profiles_dir)
-                  raise ArgumentError.new(ConfigParser.errmsg(info[:path],"The directory '#{profiles_dir}' does not exist"))
+                  raise ArgumentError.new(Parser.errmsg(info[:path],"The directory '#{profiles_dir}' does not exist"))
                 end
                 args << cp.value('filename',String,nil,
                   ['ip','ip_hex','hostname','hostname_short']
@@ -576,7 +576,7 @@ module ConfigInformation
               begin
                 conf.pxe[name] = NetBoot.Factory(*args)
               rescue NetBoot::Exception => nbe
-                raise ArgumentError.new(ConfigParser.errmsg(info[:path],nbe.message))
+                raise ArgumentError.new(Parser.errmsg(info[:path],nbe.message))
               end
             end
           end
@@ -691,7 +691,7 @@ module ConfigInformation
           raise ArgumentError.new("Invalid file format'#{configfile}'")
         end
 
-        cp = ConfigParser.new(config)
+        cp = Parser.new(config)
 
         cp.parse('clusters',true,Array) do
           clname = cp.value('name',String)
@@ -724,7 +724,7 @@ module ConfigInformation
                   ))
                 end
               else
-                raise ArgumentError.new(ConfigParser.errmsg(
+                raise ArgumentError.new(Parser.errmsg(
                     info[:path],"Incoherent number of hostnames and IP addresses"
                   )
                 )
@@ -738,7 +738,7 @@ module ConfigInformation
                     generate_commands(name, clname)
                 ))
               rescue ArgumentError
-                raise ArgumentError.new(ConfigParser.errmsg(
+                raise ArgumentError.new(Parser.errmsg(
                     info[:path],"Invalid address"
                   )
                 )
@@ -782,7 +782,7 @@ module ConfigInformation
         end
 
         conf = @cluster_specific[cluster]
-        cp = ConfigParser.new(config)
+        cp = Parser.new(config)
 
         cp.parse('partitioning',true) do
           conf.block_device = cp.value('block_device',String,nil,Pathname)
@@ -832,7 +832,7 @@ module ConfigInformation
           addgroup = Proc.new do
             if group
               unless add_group_of_nodes("#{name}_reboot", group, cluster)
-                raise ArgumentError.new(ConfigParser.errmsg(
+                raise ArgumentError.new(Parser.errmsg(
                     info[:path],"Unable to create group of node '#{group}' "
                   )
                 )
@@ -843,7 +843,7 @@ module ConfigInformation
           cp.parse('reboot',false,Array) do |info|
 =begin
             if info[:empty]
-              raise ArgumentError.new(ConfigParser.errmsg(
+              raise ArgumentError.new(Parser.errmsg(
                   info[:path],'You need to specify at least one value'
                 )
               )
@@ -912,7 +912,7 @@ module ConfigInformation
             unless info[:empty]
               #ugly temporary hack
               if info[:iter] > 0
-                raise ArgumentError.new(ConfigParser.errmsg(
+                raise ArgumentError.new(Parser.errmsg(
                     info[:path],"At the moment you can only set one single value "
                   )
                 )
@@ -926,7 +926,7 @@ module ConfigInformation
           cp.parse('console',true,Array) do |info|
             #ugly temporary hack
             if info[:iter] > 0
-              raise ArgumentError.new(ConfigParser.errmsg(
+              raise ArgumentError.new(Parser.errmsg(
                   info[:path],"At the moment you can only set one single value "
                 )
               )
@@ -1013,9 +1013,9 @@ module ConfigInformation
 
             treatmacro = Proc.new do |macroname|
               insts = ObjectSpace.each_object(Class).select { |klass|
-                klass.ancestors.include?(::Kadeploy.const_get(macroname))
+                klass.ancestors.include?(Macrostep.const_get("Kadeploy#{macroname}"))
               } unless macroname.empty?
-              insts.collect!{ |klass| klass.name.sub(/^Kadeploy::#{macroname}/,'') }
+              insts.collect!{ |klass| klass.name.sub(/^Kadeploy::Macrostep::Kadeploy#{macroname}/,'') }
               macroinsts = []
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]
@@ -1085,7 +1085,7 @@ module ConfigInformation
           begin
             code.to_i
           rescue
-            raise ArgumentError.new(ConfigParser.errmsg(
+            raise ArgumentError.new(Parser.errmsg(
                 info[:path],"Expression evaluation is not an integer"
               )
             )
@@ -1099,7 +1099,7 @@ module ConfigInformation
               'SetDeploymentEnvNfsroot',
             ].include?(macroinst[0]) and tmptime > macroinst[2]
             then
-              raise ArgumentError.new(ConfigParser.errmsg(
+              raise ArgumentError.new(Parser.errmsg(
                   info[:path],"Global reboot timeout is greater than the timeout of the macrostep #{macroinst[0]}"
                 )
               )
@@ -1111,7 +1111,7 @@ module ConfigInformation
               'BootNewEnvHardReboot',
             ].include?(macroinst[0]) and tmptime > macroinst[2]
             then
-              raise ArgumentError.new(ConfigParser.errmsg(
+              raise ArgumentError.new(Parser.errmsg(
                   info[:path],"Global reboot timeout is greater than the timeout of the macrostep #{macroinst[0]}"
                 )
               )
@@ -1125,7 +1125,7 @@ module ConfigInformation
           begin
             code.to_i
           rescue
-            raise ArgumentError.new(ConfigParser.errmsg(
+            raise ArgumentError.new(Parser.errmsg(
                 info[:path],"Expression evaluation is not an integer"
               )
             )
@@ -1136,7 +1136,7 @@ module ConfigInformation
           conf.workflow_steps[0].get_instances.each do |macroinst|
             if macroinst[0] == 'SetDeploymentEnvKexec' and tmptime > macroinst[2]
             then
-              raise ArgumentError.new(ConfigParser.errmsg(
+              raise ArgumentError.new(Parser.errmsg(
                   info[:path],"Global kexec timeout is greater than the timeout of the macrostep #{macroinst[0]}"
                 )
               )
@@ -1145,7 +1145,7 @@ module ConfigInformation
           conf.workflow_steps[2].get_instances.each do |macroinst|
             if macroinst[0] == 'BootNewEnvKexec' and tmptime > macroinst[2]
             then
-              raise ArgumentError.new(ConfigParser.errmsg(
+              raise ArgumentError.new(Parser.errmsg(
                   info[:path],"Global kexec timeout is greater than the timeout of the macrostep #{macroinst[0]}"
                 )
               )

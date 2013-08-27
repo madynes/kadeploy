@@ -3,7 +3,7 @@ require 'fileutils'
 
 module Kadeploy
 
-module ConfigInformation
+module Configuration
   class ParserError < StandardError
   end
 
@@ -23,7 +23,7 @@ module ConfigInformation
   ###
   # Parser
   ###
-  # cp = ConfigParser.new(yamlstr)
+  # cp = Configuration::Parser.new(yamlstr)
   # conf = {:db=>{}, :cache=>{}, :env=>{}, :pxe => {}}
   # cp.parse('database',true) do
   #   # String with default value
@@ -64,7 +64,7 @@ module ConfigInformation
   #   )
   # end
 
-  class ConfigParser
+  class Parser
     attr_reader :basehash
     PATH_SEPARATOR = '/'
 
@@ -91,7 +91,7 @@ module ConfigInformation
     end
 
     def path(val=nil)
-      ConfigParser.pathstr(@path + [val])
+      self.class.pathstr(@path + [val])
     end
 
     def curval
@@ -161,7 +161,7 @@ module ConfigInformation
         end
       rescue ParserError => pe
         raise ArgumentError.new(
-          ConfigParser.errmsg(path(fieldname),pe.message)
+          self.class.errmsg(path(fieldname),pe.message)
         )
       end
     end
@@ -384,7 +384,7 @@ module ConfigInformation
         curval.each do |key,value|
           curpath << key
           if value.nil?
-            result << ConfigParser.pathstr(curpath)
+            result << self.class.pathstr(curpath)
           else
             unused(result,value,curpath)
           end
@@ -394,14 +394,14 @@ module ConfigInformation
         curval.each_index do |i|
           curpath << i
           if curval[i].nil?
-            result << ConfigParser.pathstr(curpath)
+            result << self.class.pathstr(curpath)
           else
             unused(result,curval[i],curpath)
           end
           curpath.pop
         end
       else
-        result << ConfigParser.pathstr(curpath)
+        result << self.class.pathstr(curpath)
       end
 
       result
