@@ -8,8 +8,6 @@ require 'optparse'
 require 'client'
 require 'nodes'
 
-SLEEP_PITCH = 1
-
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
   KadeployClient.kill() rescue nil
@@ -18,7 +16,7 @@ end
 
 module Kadeploy
 
-class KadeployClient < Client
+class KadeployClient < ClientWorkflow
   def self.operation()
     'Deployment'
   end
@@ -422,20 +420,11 @@ class KadeployClient < Client
 
     params[:force] = options[:ignore_nodes_deploying] if options[:ignore_nodes_deploying]
 
-require 'pp'
-pp params
-    ret = post(api_path(),params.to_json)
-
-    @wid = ret['wid']
-    @resources = ret['resources']
-p @resources['resource']
     debug = nil
-    start!
-    res = nil
     out = []
-    begin
-      res = get(api_path('resource'))
 
+    # Launch the workflow
+    launch_workflow(params) do |res|
       if res['outputs']
         output = get(api_path('output'))
         out += output.split("\n")
@@ -455,20 +444,7 @@ p @resources['resource']
         puts out.join("\n")
         out.clear
       end
-
-      sleep SLEEP_PITCH
-    end until res['done']
-
-    get(api_path('error')) if res['error']
-
-    done!
-
-    unless res['error']
-      success!(res['nodes']['ok'])
-      fail!(res['nodes']['ko'])
     end
-
-    delete(api_path()) if @wid
   end
 end
 
