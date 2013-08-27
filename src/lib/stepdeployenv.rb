@@ -1,9 +1,7 @@
-
-#Kadelpoy libs
 require 'debug'
 require 'macrostep'
 
-#module MacroSteps
+module Kadeploy
   class SetDeploymentEnv < Macrostep
     def load_config()
       super()
@@ -100,4 +98,4 @@ require 'macrostep'
       ]
     end
   end
-#end
+end

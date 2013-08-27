@@ -1,6 +1,8 @@
 require 'socket'
 require 'thread'
 
+module Kadeploy
+
 module PortScanner
   # Test if a port is open
   #
@@ -69,4 +71,6 @@ module PortScanner
     end
     ret
   end
+end
+
 end

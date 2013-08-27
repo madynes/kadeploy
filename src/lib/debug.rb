@@ -1,5 +1,6 @@
-
 require 'thread'
+
+module Kadeploy
 
 module Debug
   def self.prefix(clid,nsid=nil)
@@ -419,4 +420,6 @@ module Printer
       logger().set(operation,value,nodeset)
     end
   end
+end
+
 end

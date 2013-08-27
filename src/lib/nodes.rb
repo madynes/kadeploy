@@ -1,6 +1,7 @@
-
 require 'drb/drb'
 require 'thread'
+
+module Kadeploy
 
 module Nodes
   REGEXP_LIST = /(?:(?:(?:\d+\-\d+|\d+),)*)(?:\d+\-\d+|\d+)/
@@ -1031,4 +1032,6 @@ module Nodes
       @states[hostname]
     end
   end
+end
+
 end

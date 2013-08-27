@@ -5,6 +5,8 @@ require 'nodes'
 require 'openssl'
 require 'uri'
 
+module Kadeploy
+
 class ParamsParser
   def initialize(params,config)
     raise unless params.is_a?(Hash)
@@ -127,4 +129,6 @@ class ParamsParser
 
     param
   end
+end
+
 end

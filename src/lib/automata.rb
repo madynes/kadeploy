@@ -5,6 +5,8 @@ require 'nodes'
 
 #Thread::abort_on_exception = true
 
+module Kadeploy
+
 module Automata
 
   module Task
@@ -819,4 +821,6 @@ module Automata
       __done__()
     end
   end
+end
+
 end

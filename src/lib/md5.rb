@@ -1,3 +1,4 @@
+module Kadeploy
 
 module MD5
   # Compute the md5 sum of a file
@@ -9,4 +10,6 @@ module MD5
   def MD5::get_md5_sum(file)
     return `md5sum #{file}|cut -f1 -d" " `.chomp
   end
+end
+
 end

@@ -1,3 +1,5 @@
+module Kadeploy
+
 module Kastat
   def stats_prepare(params,operation=:get)
   end
@@ -9,3 +11,4 @@ module Kastat
   end
 end
 
+end

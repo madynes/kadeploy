@@ -1,4 +1,3 @@
-
 #Contrib libs
 require 'taktuk'
 
@@ -6,8 +5,7 @@ require 'taktuk'
 require 'yaml'
 require 'socket'
 
-#module ParallelOperations
-  #class ParallelOps
+module Kadeploy
   class ParallelOperation
     @nodes = nil
     @output = nil
@@ -291,7 +289,7 @@ require 'socket'
         end
       end
 
-      taktuk(nodes_array(),taktuk_opts)
+      TakTuk.taktuk(nodes_array(),taktuk_opts)
     end
 
     def do_taktuk(opts={})
@@ -301,4 +299,4 @@ require 'socket'
       @taktuk = nil
     end
   end
-#end
+end

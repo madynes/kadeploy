@@ -1,4 +1,3 @@
-
 #Kadeploy libs
 require 'debug'
 require 'nodes'
@@ -8,6 +7,8 @@ require 'error'
 require 'thread'
 require 'uri'
 require 'tempfile'
+
+module Kadeploy
 
 module Managers
   class WindowManager
@@ -115,4 +116,6 @@ module Managers
       end
     end
   end
+end
+
 end

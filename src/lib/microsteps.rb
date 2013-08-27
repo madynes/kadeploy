@@ -1,4 +1,3 @@
-
 #Kadeploy libs
 require 'debug'
 require 'nodes'
@@ -15,6 +14,8 @@ require 'port_scanner'
 require 'fileutils'
 require 'socket'
 require 'tempfile'
+
+module Kadeploy
 
 class Microstep < Automata::QueueTask
   attr_reader :output
@@ -2101,4 +2102,6 @@ class CustomMicrostep < Microstep
     @nodes.clean
     @nodes_ok.linked_copy(@nodes)
   end
+end
+
 end

@@ -1,4 +1,3 @@
-
 #Ruby libs
 require 'pathname'
 require 'thread'
@@ -6,12 +5,13 @@ require 'fileutils'
 require 'digest'
 require 'uri'
 require 'yaml'
-#require 'ftools'
 
 #Kadeploy3 libs
 require 'error'
 require 'md5'
 require 'execute'
+
+module Kadeploy
 
 class CacheIndexPVHash
   def self.idx(params)
@@ -565,4 +565,6 @@ class Cache
     @cursize -= @files[idx].remove().size
     @files.delete(idx)
   end
+end
+
 end

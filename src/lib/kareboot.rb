@@ -1,3 +1,5 @@
+module Kadeploy
+
 module Kareboot
   def reboot_check_params(params)
     raise
@@ -14,4 +16,6 @@ module Kareboot
   def reboot_delete(wid)
     raise
   end
+end
+
 end

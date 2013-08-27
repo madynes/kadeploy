@@ -155,9 +155,10 @@ Socket::do_not_reverse_lookup = true
 
 # Load the configuration
 begin
-  $kadeploy = KadeployServer.new()
-rescue KadeployError => ke
-  error("#{KadeployError.to_msg(ke.errno)}#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
+  $kadeploy = Kadeploy::KadeployServer.new()
+rescue Kadeploy::KadeployError => ke
+  error("#{Kadeploy::KadeployError.to_msg(ke.errno)}"\
+    "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
 end
 $stdout.puts 'Configuration files loaded'
 
@@ -173,8 +174,8 @@ end
 # Prepare to launch HTTPd
 begin
   $stderr = $stdout
-  $httpd = HTTPd::Server.new($kadeploy.host,$kadeploy.port,$kadeploy.secure,
-    $kadeploy.cert,$kadeploy.private_key,dh_seeds)
+  $httpd = Kadeploy::HTTPd::Server.new($kadeploy.host,$kadeploy.port,
+    $kadeploy.secure,$kadeploy.cert,$kadeploy.private_key,dh_seeds)
   $stderr = STDERR
 
   $kadeploy_logfiles[:httpd] = $httpd.logs[:httpd]

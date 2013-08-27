@@ -1,3 +1,5 @@
+module Kadeploy
+
 # To be used as you're using Open3.popen3 in ruby 1.9.2
 class Execute
   require 'thread'
@@ -225,4 +227,6 @@ class Execute
       exec.run()
     end
   end
+end
+
 end

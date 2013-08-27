@@ -1,8 +1,9 @@
-
 #Kadelpoy libs
 require 'automata'
 require 'netboot'
 require 'debug'
+
+module Kadeploy
 
 class Macrostep < Automata::TaskedTaskManager
   attr_reader :output, :logger, :tasks
@@ -30,6 +31,10 @@ class Macrostep < Automata::TaskedTaskManager
 
   def steps
     raise 'Should be reimplemented'
+  end
+
+  def step_name()
+    self.class.name.split('::').last
   end
 
   def load_config()
@@ -120,7 +125,7 @@ class Macrostep < Automata::TaskedTaskManager
     delete = lambda do |arr,index|
       if arr[index][0] == taskname
         arr.delete_at(index)
-        debug(5, " * Bypassing the step #{self.class.name}-#{taskname.to_s}",nsid)
+        debug(5, " * Bypassing the step #{step_name}-#{taskname.to_s}",nsid)
       end
     end
 
@@ -231,13 +236,13 @@ class Macrostep < Automata::TaskedTaskManager
 
   def break!(task,nodeset)
     debug(2,"*** Breakpoint on #{task.name.to_s} reached for #{nodeset.to_s_fold}",task.nsid)
-    debug(1,"Step #{self.class.name} breakpointed",task.nsid)
+    debug(1,"Step #{step_name} breakpointed",task.nsid)
     log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
   end
 
   def success!(task,nodeset)
     debug(1,
-      "End of step #{self.class.name} after #{Time.now.to_i - @start_time}s",
+      "End of step #{step_name} after #{Time.now.to_i - @start_time}s",
       task.nsid
     )
     log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
@@ -246,7 +251,7 @@ class Macrostep < Automata::TaskedTaskManager
   def fail!(task,nodeset)
     debug(2,"!!! The nodes #{nodeset.to_s_fold} failed on step #{task.name.to_s}",task.nsid)
     debug(1,
-      "Step #{self.class.name} failed for #{nodeset.to_s_fold} "\
+      "Step #{step_name} failed for #{nodeset.to_s_fold} "\
       "after #{Time.now.to_i - @start_time}s",
       task.nsid
     )
@@ -279,14 +284,16 @@ class Macrostep < Automata::TaskedTaskManager
   def start!()
     @start_time = Time.now.to_i
     debug(1,
-      "Performing a #{self.class.name} step",
+      "Performing a #{step_name} step",
       nsid
     )
-    log("step#{idx+1}", self.class.name,nodes)
+    log("step#{idx+1}",step_name,nodes)
     log("timeout_step#{idx+1}", context[:local][:timeout] || 0, nodes)
   end
 
   def done!()
     @start_time = nil
   end
+end
+
 end

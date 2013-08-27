@@ -15,6 +15,8 @@ Signal.trap("INT") do
   exit!(1)
 end
 
+module Kadeploy
+
 class KanodesClient < Client
   def self.operation()
     'Nodes statistics'
@@ -114,6 +116,8 @@ class KanodesClient < Client
   end
 end
 
+end
+
 if __FILE__ == $0
-  KanodesClient.launch()
+  Kadeploy::KanodesClient.launch()
 end

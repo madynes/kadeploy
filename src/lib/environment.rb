@@ -1,4 +1,3 @@
-
 #Ruby libs
 require 'tempfile'
 require 'pathname'
@@ -15,6 +14,7 @@ require 'grabfile'
 require 'fetchfile'
 require 'error'
 
+module Kadeploy
 
 module EnvironmentManagement
   OS_KIND = [
@@ -867,4 +867,6 @@ module EnvironmentManagement
       alias :flatten_tarball :flatten_image
     end
   end
+end
+
 end

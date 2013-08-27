@@ -1,5 +1,7 @@
 require 'httpd'
 
+module Kadeploy
+
 module Kaenv
   def envs_init_exec_context()
     ret = init_exec_context()
@@ -316,4 +318,6 @@ module Kaenv
       kaerror(APIError::NOTHING_MODIFIED)
     end
   end
+end
+
 end

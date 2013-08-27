@@ -1,3 +1,5 @@
+module Kadeploy
+
 module Rights
   class Factory
     def self.create(kind, db = nil)
@@ -297,4 +299,6 @@ module Rights
       end
     end
   end
+end
+
 end

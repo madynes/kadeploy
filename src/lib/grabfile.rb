@@ -1,4 +1,3 @@
-
 #Kadeploy libs
 require 'debug'
 require 'nodes'
@@ -14,6 +13,8 @@ require 'thread'
 require 'uri'
 require 'fileutils'
 require 'tempfile'
+
+module Kadeploy
 
 class GrabFile
   include Printer
@@ -226,3 +227,4 @@ class GrabFile
   end
 end
 
+end

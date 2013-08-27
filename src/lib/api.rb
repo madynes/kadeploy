@@ -1,3 +1,5 @@
+module Kadeploy
+
 module API
   def self.base(kind)
     case kind
@@ -27,4 +29,6 @@ module API
   def self.ppath(kind,prefix,*args)
     File.join(prefix,base(kind),*args)
   end
+end
+
 end

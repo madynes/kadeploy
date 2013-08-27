@@ -16,6 +16,8 @@ Signal.trap("INT") do
   exit!(1)
 end
 
+module Kadeploy
+
 class KadeployClient < Client
   def self.operation()
     'Deployment'
@@ -466,10 +468,12 @@ p @resources['resource']
       fail!(res['nodes']['ko'])
     end
 
-    #delete(api_path()) if @wid
+    delete(api_path()) if @wid
   end
 end
 
+end
+
 if __FILE__ == $0
-  KadeployClient.launch()
+  Kadeploy::KadeployClient.launch()
 end
