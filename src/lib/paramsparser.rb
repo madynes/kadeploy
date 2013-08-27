@@ -111,7 +111,7 @@ class ParamsParser
       # Create a nodeset
       param = Nodes::NodeSet.new(0)
       hosts.each do |host|
-        if node = @config.common.nodes_desc.get_node_by_host(host)
+        if node = @config.common.nodes.get_node_by_host(host)
           param.push(node.dup)
         else
           error(KadeployError::NODE_NOT_EXIST,host)

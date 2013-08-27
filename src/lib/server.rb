@@ -435,7 +435,7 @@ class KadeployServer
   end
 
   def get_nodes()
-    @config.common.nodes_desc.make_array_of_hostname
+    @config.common.nodes.make_array_of_hostname
   end
 
   def get_clusters()
