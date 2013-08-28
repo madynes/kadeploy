@@ -14,6 +14,7 @@ $clients = []
 $httpd = nil
 $httpd_thread = nil
 $killing = false
+$debug_http = nil
 
 require 'configparser'
 require 'port_scanner'
@@ -43,11 +44,10 @@ module Kadeploy
 class Client
   attr_reader :wid
 
-  def initialize(server,port,nodes,secure=false)
+  def initialize(server,port,secure=false)
     @server = server
     @port = port
     @secure = secure
-    @nodes = nodes
   end
 
   def kill
@@ -88,6 +88,8 @@ class Client
         $httpd_thread.kill if $httpd_thread
         $httpd.kill if $httpd
       end
+
+      $debug_http.close if $debug_http and $debug_http != $stdout
 
       $files.each do |file|
         file.close unless file.closed?
@@ -499,7 +501,7 @@ class Client
   end
 
   def self.get(host,port,path,secure=false)
-    HTTPClient::get(host,port,path,secure,service_name())
+    HTTPClient::get(host,port,path,secure)
   end
 
   def get(uri,params=nil)
@@ -512,7 +514,7 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::get(host,port,path,@secure,self.class.service_name)
+      HTTPClient::get(host,port,path,@secure)
     rescue HTTPClientError => e
       error(e.message)
     end
@@ -524,7 +526,7 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::post(host,port,path,data,@secure,content_type,self.class.service_name)
+      HTTPClient::post(host,port,path,data,@secure,content_type)
     rescue HTTPClientError => e
       error(e.message)
     end
@@ -536,7 +538,7 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::put(host,port,path,data,@secure,content_type,self.class.service_name)
+      HTTPClient::put(host,port,path,data,@secure,content_type)
     rescue HTTPClientError => e
       error(e.message)
     end
@@ -552,7 +554,7 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTPClient::delete(host,port,path,@secure,self.class.service_name)
+      HTTPClient::delete(host,port,path,@secure)
     rescue HTTPClientError => e
       error(e.message)
     end
@@ -637,27 +639,31 @@ class Client
 
     # Treatment of -m/--machine and -f/--file options
 
-    options[:nodes] = [] unless options[:nodes]
+    options[:nodes] = nil if options[:nodes] and options[:nodes].empty?
     treated = []
     # Sort nodes from the list by server (if multiserver option is specified)
     if options[:multi_server]
       options[:servers].each_pair do |server,inf|
         next if server.downcase == 'default'
-        nodelist = get_nodelist(inf[0],inf[1],inf[2])
-        nodes = options[:nodes] & nodelist
-        treated += nodes
-        $clients << self.new(inf[0],inf[1],nodes,inf[2])
+        if options[:nodes]
+          nodelist = get_nodelist(inf[0],inf[1],inf[2])
+          nodes = options[:nodes] & nodelist
+          treated += nodes
+        end
+        $clients << self.new(inf[0],inf[1],inf[2])
       end
     else
       info = options[:servers][options[:chosen_server]]
-      nodelist = get_nodelist(info[0],info[1],info[2])
-      nodes = options[:nodes] & nodelist
-      treated += nodes
-      $clients << self.new(info[0],info[1],nodes,info[2])
+      if options[:nodes]
+        nodelist = get_nodelist(info[0],info[1],info[2])
+        nodes = options[:nodes] & nodelist
+        treated += nodes
+      end
+      $clients << self.new(info[0],info[1],info[2])
     end
 
     # Check that every nodes was treated
-    error("The nodes #{(options[:nodes] - treated).join(", ")} does not belongs to any server") unless treated.sort == options[:nodes].sort
+    error("The nodes #{(options[:nodes] - treated).join(", ")} does not belongs to any server") if options[:nodes] and treated.sort != options[:nodes].sort
 
     # Launch the deployment
     $clients.each do |client|
@@ -691,8 +697,8 @@ class Client
 end
 
 class ClientWorkflow < Client
-  def initialize(server,port,nodes,secure=false)
-    super(server,port,nodes,secure)
+  def initialize(server,port,secure=false)
+    super(server,port,secure)
     @wid = nil
     @resources = nil
   end
@@ -719,8 +725,6 @@ class ClientWorkflow < Client
   end
 
   def launch_workflow(params)
-require 'pp'
-pp params
     ret = post(api_path(),params.to_json)
     @wid = ret['wid']
     @resources = ret['resources']

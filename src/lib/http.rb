@@ -97,17 +97,20 @@ class HTTPClient
         client.use_ssl = true
         client.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
+      client.set_debug_output($debug_http) if $debug_http
       yield(client)
     rescue Errno::ECONNREFUSED
       error("Connection atempt refused by the server")
     end
   end
 
-  def self.request(server,port,path,secure=true,service='Client',method='')
+  def self.request(server,port,secure=true,request=nil)
     res = nil
     connect(server,port,secure) do |client|
       begin
-        response = yield(client)
+        request = yield(client) unless request
+        raise unless request.is_a?(Net::HTTPRequest)
+        response = client.request(request)
       rescue Exception => e
         error("Invalid request on #{server}:#{port}\n#{e.message} (#{e.class.name})")
       end
@@ -123,10 +126,10 @@ class HTTPClient
         case response.code.to_i
         when 400
           if response['X-Application-Error-Code']
-            error("[#{service} Error ##{response['X-Application-Error-Code']}]\n#{response.body}")
+            error("[Kadeploy error ##{response['X-Application-Error-Code']}]\n#{response.body}")
           else
             error(
-              "[HTTP Error ##{response.code} on #{method.to_s} #{path}]\n"\
+              "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
               "-----------------\n"\
               "#{response.body}\n"\
               "-----------------"
@@ -136,7 +139,7 @@ class HTTPClient
           error("[Internal Server Error]\n#{response.body}")
         else
           error(
-            "[HTTP Error ##{response.code} on #{method.to_s} #{path}]\n"\
+            "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
             "-----------------\n"\
             "#{response.body}\n"\
             "-----------------"
@@ -148,8 +151,34 @@ class HTTPClient
     res
   end
 
-  def self.get(server,port,path,secure=true,service='Client')
-    res = request(server,port,path,secure,service,:GET) { |client| client.get(path) }
+  def self.gen_request(kind,path,data=nil,content_type='application/json')
+    header = { 'Accept' => 'text/plain, application/json' }
+    if data
+      header['Content-Type'] = content_type
+      header['Content-Length'] = data.size.to_s
+    end
+
+    ret = nil
+    case kind
+    when :GET
+      ret = Net::HTTP::Get.new(path,header)
+    when :POST
+      ret = Net::HTTP::Post.new(path,header)
+    when :PUT
+      ret = Net::HTTP::Put.new(path,header)
+    when :DELETE
+      ret = Net::HTTP::Delete.new(path,header)
+    else
+      raise
+    end
+
+    ret.body = data if data
+
+    ret
+  end
+
+  def self.get(server,port,path,secure=true)
+    res = request(server,port,secure,gen_request(:GET,path))
     if block_given?
       yield(res)
       res = nil
@@ -157,16 +186,9 @@ class HTTPClient
     res
   end
 
-  def self.post(server,port,path,data,secure=true,content_type='application/json',service='Client')
-    res = request(server,port,path,secure,service,:POST) do |client|
-      client.post(path,data,
-        {
-          'Accept' => 'text/plain, application/json',
-          'Content-Type' => content_type,
-          'Content-Length' => data.size.to_s,
-        }
-      )
-    end
+  def self.post(server,port,path,data,secure=true,content_type='application/json')
+    res = request(server,port,secure,gen_request(:POST,path,data,content_type))
+
     if block_given?
       yield(res)
       res = nil
@@ -174,16 +196,9 @@ class HTTPClient
     res
   end
 
-  def self.put(server,port,path,data,secure=true,content_type='application/json',service='Client')
-    res = request(server,port,path,secure,service,:PUT) do |client|
-      client.put(path,data,
-        {
-          'Accept' => 'text/plain, application/json',
-          'Content-Type' => content_type,
-          'Content-Length' => data.size.to_s,
-        }
-      )
-    end
+  def self.put(server,port,path,data,secure=true,content_type='application/json')
+    res = request(server,port,secure,gen_request(:PUT,path,data,content_type))
+
     if block_given?
       yield(res)
       res = nil
@@ -191,8 +206,8 @@ class HTTPClient
     res
   end
 
-  def self.delete(server,port,path,secure=true,service='Client')
-    res = request(server,port,path,secure,service,:DELETE) {|client| client.delete(path) }
+  def self.delete(server,port,path,secure=true)
+    res = request(server,port,path,secure,:DELETE,gen_request(:DELETE,path))
     if block_given?
       yield(res)
       res = nil
