@@ -111,7 +111,7 @@ module HTTP
           raise unless request.is_a?(Net::HTTPRequest)
           response = client.request(request)
         rescue Exception => e
-          error("Invalid request on #{server}:#{port}\n#{e.message} (#{e.class.name})")
+          error("Invalid request on #{server}:#{port} (#{e.class.name})")
         end
         if response.is_a?(Net::HTTPOK)
           if response['Content-Type'] == 'application/json'
@@ -128,7 +128,7 @@ module HTTP
               error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{response.body}")
             else
               error(
-                "[HTTP Error ##{response.code} on #{method.to_s} #{request.path}]\n"\
+                "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
                 "-----------------\n"\
                 "#{response.body}\n"\
                 "-----------------"
