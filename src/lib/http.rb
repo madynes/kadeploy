@@ -109,7 +109,7 @@ class HTTPClient
       begin
         response = yield(client)
       rescue Exception => e
-        error("Invalid request on #{server}:#{port}\n#{e.message} (#{e.class.name})")
+        error("Invalid request on #{server}:#{port} (#{e.class.name})")
       end
       if response.is_a?(Net::HTTPOK)
         if response['Content-Type'] == 'application/json'
