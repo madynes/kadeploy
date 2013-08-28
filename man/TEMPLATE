@@ -1,0 +1,16 @@
+[SEE ALSO]
+\fBkareboot3\fR(1),
+\fBkaenv3\fR(1),
+\fBkaconsole3\fR(1),
+\fBkastat3\fR(1),
+\fBkanodes3\fR(1),
+\fBkarights3\fR(1)
+\fBkapower3\fR(1)
+.PP
+Project homepage: \(lahttps://gforge.inria.fr/projects/kadeploy3/\(ra
+.PP
+Contact: kadeploy3-users@lists.gforge.inria.fr
+[AUTHOR]
+Copyright (c) by INRIA, Emmanuel Jeanvoine - 2008-2011 <\*(T<emmanuel.jeanvoine@inria.fr\*(T>>
+.PP
+CECILL License V2 - http://www.cecill.info
