@@ -162,6 +162,9 @@ class KaenvsClient < Client
       opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
         options[:operation] = :'move-files'
       }
+      opt.on("-D", "--debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") {
+        $debug_http = IO.new(3) rescue $stdout unless $debug_http
+      }
     end
 
     begin
