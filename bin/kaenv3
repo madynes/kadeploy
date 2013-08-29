@@ -1,6 +1,5 @@
 #!/usr/bin/ruby -w
 
-
 $kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
 
 $:.unshift($kadeploy_libs)
@@ -10,7 +9,7 @@ require 'client'
 
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
-  KaenvClient.kill() rescue nil
+  Kadeploy::KaenvClient.kill() rescue nil
   exit!(1)
 end
 

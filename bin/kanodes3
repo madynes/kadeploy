@@ -11,7 +11,7 @@ require 'client'
 
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
-  KaenvClient.kill() rescue nil
+  Kadeploy::KanodesClient.kill() rescue nil
   exit!(1)
 end
 

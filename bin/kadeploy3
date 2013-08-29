@@ -12,7 +12,7 @@ SLEEP_PITCH = 1
 
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
-  KadeployClient.kill() rescue nil
+  Kadeploy::KadeployClient.kill() rescue nil
   exit!(1)
 end
 
