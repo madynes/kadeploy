@@ -8,8 +8,6 @@ require 'optparse'
 require 'client'
 require 'nodes'
 
-SLEEP_PITCH = 1
-
 Signal.trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
   Kadeploy::KadeployClient.kill() rescue nil
@@ -18,7 +16,7 @@ end
 
 module Kadeploy
 
-class KadeployClient < Client
+class KadeployClient < ClientWorkflow
   def self.operation()
     'Deployment'
   end
@@ -26,41 +24,40 @@ class KadeployClient < Client
   def self.load_options()
     {
       :environment => {},
-      :nodes => Array.new,
-      :env_kind => String.new,
-      :env_desc => String.new,
-      :env_name => String.new,
+      :nodes => [],
+      :env_kind => '',
+      :env_desc => '',
+      :env_name => '',
       :env_version => nil, #By default we load the latest version
       :user => nil,
-      :true_user => USER,
       :block_device => nil,
       :deploy_part => nil,
       :boot_part => nil,
       :verbose_level => nil,
       :debug => false,
-      :script => String.new,
-      :key => String.new,
+      :script => '',
+      :key => '',
       :reformat_tmp => false,
-      :pxe_profile_msg => String.new,
-      :pxe_upload_files => Array.new,
+      :pxe_profile_msg => '',
+      :pxe_upload_files => [],
       :pxe_profile_singularities => nil,
-      :steps => Array.new,
+      :steps => [],
       :ignore_nodes_deploying => false,
-      :breakpoint_on_microstep => String.new,
-      :custom_operations_file => String.new,
+      :breakpoint_on_microstep => '',
+      :custom_operations_file => nil,
       :custom_operations => nil,
       :disable_bootloader_install => false,
       :disable_disk_partitioning => false,
-      :nodes_ok_file => String.new,
-      :nodes_ko_file => String.new,
-      :write_workflow_id => String.new,
+      :nodes_ok_file => nil,
+      :nodes_ko_file => nil,
+      :write_workflow_id => nil,
       :get_version => false,
       :get_users_info => false,
-      :chosen_server => String.new,
+      :chosen_server => '',
       :servers => load_configfile(),
       :multi_server => false,
-      :kadeploy_server => String.new,
-      :kadeploy_server_port => String.new,
+      :kadeploy_server => '',
+      :kadeploy_server_port => '',
       :reboot_classical_timeout => nil,
       :reboot_kexec_timeout => nil,
       :vlan => nil,
@@ -239,9 +236,9 @@ class KadeployClient < Client
         options[:chosen_server] = s
       }
       opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
-        if d =~ /\A\d+\Z/ then
+        begin
           options[:verbose_level] = d.to_i
-        else
+        rescue
           error("Invalid verbose level")
           return false
         end
@@ -348,16 +345,14 @@ class KadeployClient < Client
   end
 
   def self.check_options(options)
-    if !options[:get_version] and !options[:get_users_info] then
-      error('You must choose an environment') if options[:env_kind].empty?
-      if options[:nodes].empty? then
-        error("You must specify some nodes to deploy")
-        return false
-      end
-      if (options[:nodes_ok_file] != "") && (options[:nodes_ok_file] == options[:nodes_ko_file]) then
-        error("The files used for the output of the OK and the KO nodes must not be the same")
-        return false
-      end
+    error('You must choose an environment') if options[:env_kind].empty?
+    if options[:nodes].empty? then
+      error("You must specify some nodes to deploy")
+      return false
+    end
+    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
+      error("The files used for the output of the OK and the KO nodes cannot be the same")
+      return false
     end
 
     return true
@@ -422,20 +417,11 @@ class KadeployClient < Client
 
     params[:force] = options[:ignore_nodes_deploying] if options[:ignore_nodes_deploying]
 
-require 'pp'
-pp params
-    ret = post(api_path(),params.to_json)
-
-    @wid = ret['wid']
-    @resources = ret['resources']
-p @resources['resource']
     debug = nil
-    start!
-    res = nil
     out = []
-    begin
-      res = get(api_path('resource'))
 
+    # Launch the workflow
+    launch_workflow(params) do |res|
       if res['outputs']
         output = get(api_path('output'))
         out += output.split("\n")
@@ -455,20 +441,7 @@ p @resources['resource']
         puts out.join("\n")
         out.clear
       end
-
-      sleep SLEEP_PITCH
-    end until res['done']
-
-    get(api_path('error')) if res['error']
-
-    done!
-
-    unless res['error']
-      success!(res['nodes']['ok'])
-      fail!(res['nodes']['ko'])
     end
-
-    delete(api_path()) if @wid
   end
 end
 

@@ -2,6 +2,7 @@ CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
 USER = `id -nu`.strip
 
 STATUS_UPDATE_DELAY = 2
+SLEEP_PITCH = 1
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 
 $kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
@@ -46,34 +47,19 @@ class Client
     @server = server
     @port = port
     @secure = secure
-    @wid = nil
-    @resources = nil
     @nodes = nodes
   end
 
   def kill
-    delete(api_path(),{:user=>USER}) if @wid
   end
 
   def api_path(path=nil,kind=nil,*args)
-    if @resources
-      if @resources[path]
-        @resources[path]
-      else
-        if path
-          File.join(@resources['resource'],path,*args)
-        else
-          File.join(@resources['resource'],*args)
-        end
-      end
-    else
-      API.ppath(
-        kind||self.class.service_name.downcase.gsub(/^ka/,'').to_sym,
-        File.join("#{(@secure ? 'https' : 'http')}://","#{@server}:#{@port}"),
-        path||'',
-        *args
-      )
-    end
+    API.ppath(
+      kind||self.class.service_name.downcase.gsub(/^ka/,'').to_sym,
+      File.join("#{(@secure ? 'https' : 'http')}://","#{@server}:#{@port}"),
+      path||'',
+      *args
+    )
   end
 
   def self.error(msg='',abrt = true)
@@ -639,6 +625,7 @@ class Client
     $httpd
   end
 
+  # TODO: check_int_range, check_ssh_key, check_operation_level, check_username, check_file, check_pxe..., check_env_version, check_verbose_level
   def self.launch()
     options = nil
     error() unless options = parse_options()
@@ -701,27 +688,74 @@ class Client
   def self.operation()
     raise
   end
+end
 
-  def start!()
+class ClientWorkflow < Client
+  def initialize(server,port,nodes,secure=false)
+    super(server,port,nodes,secure)
+    @wid = nil
+    @resources = nil
+  end
+
+  def api_path(path=nil,kind=nil,*args)
+    if @resources
+      if @resources[path]
+        @resources[path]
+      else
+        if path
+          File.join(@resources['resource'],path,*args)
+        else
+          File.join(@resources['resource'],*args)
+        end
+      end
+    else
+      super(path,kind,*args)
+    end
+  end
+
+  def kill
+    super()
+    delete(api_path(),{:user=>USER}) if @wid
+  end
+
+  def launch_workflow(params)
+require 'pp'
+pp params
+    ret = post(api_path(),params.to_json)
+    @wid = ret['wid']
+    @resources = ret['resources']
+p @resources['resource']
+
     puts "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
-  end
 
-  def done!()
+    res = nil
+    begin
+      res = get(api_path('resource'))
+
+      yield(res)
+
+      sleep SLEEP_PITCH
+    end until res['done']
+
+    get(api_path('error')) if res['error']
+
     puts "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
-  end
 
-  def success!(nodes)
-    if nodes and !nodes.empty?
-      puts "The #{self.class.operation().downcase} is successful on nodes"
-      puts nodes.join("\n")
-    end
-  end
+    unless res['error']
+      # Success
+      if res['nodes']['ok'] and !res['nodes']['ok'].empty?
+        puts "The #{self.class.operation().downcase} is successful on nodes"
+        puts res['nodes']['ok'].join("\n")
+      end
 
-  def fail!(nodes)
-    if nodes and !nodes.empty?
-      puts "The #{self.class.operation().downcase} operation failed on nodes"
-      puts nodes.join("\n")
+      # Fail
+      if res['nodes']['ko'] and !res['nodes']['ko'].empty?
+        puts "The #{self.class.operation().downcase} operation failed on nodes"
+        puts res['nodes']['ko'].join("\n")
+      end
     end
+
+    delete(api_path()) if @wid
   end
 end
 
