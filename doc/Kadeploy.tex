@@ -1541,53 +1541,7 @@ The Kadeploy client is actually the user interface for the Kadeploy software. It
 \begin{small}
 \begin{verbatim}
 > kadeploy3 -h
-Usage: kadeploy3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -a, --env-file ENVFILE           File containing the environment description
-  -b, --block-device BLOCKDEVICE   Specify the block device to use
-  -c, --boot-partition NUMBER Specify the number of the partition to boot on (use 0 to boot on the MBR)
-  -d, --debug-mode                 Activate the debug mode
-  -e, --env-name ENVNAME           Name of the recorded environment to deploy
-  -f, --file MACHINELIST           Files containing list of nodes (- means stdin)
-  -k, --key [FILE]                 Public key to copy in the root's authorized_keys,
-                                   if no argument is specified, use the authorized_keys
-  -i, --server-info                Get information about the server's configuratio
-  -m, --machine MACHINE            Node to run on
-      --multi-server               Activate the multi-server mode
-  -n, --output-ko-nodes FILENAME   File that will contain the nodes not correctly deployed
-  -o, --output-ok-nodes FILENAME   File that will contain the nodes correctly deployed
-  -p, --partition-number NUMBER    Specify the partition number to use
-  -r, --reformat-tmp FSTYPE        Reformat the /tmp partition with the given filesystem type
-                                   (this filesystem need to be supported by the deployment environment)
-  -s, --script FILE                Execute a script at the end of the deployment
-  -u, --user USERNAME              Specify the user
-  -v, --version                    Get the version
-      --vlan VLANID                Set the VLAN"
-  -w, --set-pxe-profile FILE       Set the PXE profile (use with caution)
-      --set-pxe-pattern FILE      Specify a file containing the substituation of a pattern for
-                                  each node in the PXE profile (the NODE_SINGULARITY pattern must
-                                  be used in the PXE profile)
-  -x, --upload-pxe-files FILES     Upload a list of files (file1,file2,file3) to the "tftp_images_path"
-                                   directory. Those files will then be available with the prefix FILES_PREFIX--
-      --env-version NUMBER         Number of version of the environment to deploy
-      --server STRING              Specify the Kadeploy server to use
-  -V, --verbose-level VALUE        Verbose level between 0 to 5
-Advanced options:
-      --write-workflow-id FILE     Write the workflow id in a file
-      --ignore-nodes-deploying     Allow to deploy even on the nodes tagged as "currently deploying"
-                                   (use this only if you know what you do)
-      --disable-bootloader-install Disable the automatic installation of a bootloader for a
-                                   Linux based environment
-      --disable-disk-partitioning  Disable the disk partitioning
-      --breakpoint MICROSTEP       Set a breakpoint just before launching the give micro-step, the
-                                   syntax is macrostep:microstep (use this only if you know what you do)
-      --set-custom-operations FILE Add some custom operations defined in a file
-      --reboot-classical-timeout V Overload the default timeout for classical reboots
-      --reboot-kexec-timeout V     Overload the default timeout for kexec reboots
-      --secure                     Use a secure connection to export files to the server
-      --force-steps STRING         Undocumented, for administration purpose only
-
+__HELP_kadeploy3_HELP__
 \end{verbatim}
 \end{small}
 
@@ -1777,37 +1731,7 @@ Kareboot can be used by using the \texttt{kareboot3} command. The CLI looks like
 \begin{small}
 \begin{verbatim}
 > kareboot3 -h
-Usage: kareboot3 [options]
-Contact: kadeploy3-users@lists.gforge.inria.fr
-
-General options:
-  -b, --block-device BLOCKDEVICE Specify the block device to use
-  -c, --check-destructive-tag    Check if some nodes was deployed with an environment that have the destructive tag
-  -e, --env-name ENVNAME         Name of the recorded environment
-  -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
-  -k, --key [FILE]               Public key to copy in the root's authorized_keys,
-                                 if no argument is specified, use the authorized_keys
-  -l, --reboot-level VALUE       Reboot level (soft, hard, very_hard)
-  -m, --machine MACHINE          Reboot the given machines
-      --multi-server             Activate the multi-server mode
-  -n, --output-ko-nodes FILENAME File that will contain the nodes not correctly rebooted
-  -o, --output-ok-nodes FILENAME File that will contain the nodes correctly rebooted
-  -p, --partition-number NUMBER  Specify the partition number to use
-  -r, --reboot-kind REBOOT_KIND  Specify the reboot kind (set_pxe, simple_reboot,
-                                 deploy_env, env_recorded)
-  -u, --user USERNAME            Specify the user
-  -v, --version                  Get the version
-  -w, --set-pxe-profile FILE     Set the PXE profile (use with caution)
-      --set-pxe-pattern FILE     Specify a file containing the substituation of a pattern for
-                                 each node in the PXE profile (the NODE_SINGULARITY pattern must
-                                 be used in the PXE profile)
-  -x, --upload-pxe-files FILES   Upload a list of files (file1,file2,file3) to the "tftp_images_path"
-                                 directory. Those files will then be available with the prefix FILES_PREFIX--
-      --env-version NUMBER       Specify the environment version
-      --no-wait                  Do not wait the end of the reboot
-      --server STRING            Specify the Kadeploy server to use
-  -V, --verbose-level VALUE      Verbose level between 0 to 5
-      --reboot-classical-timeout V Overload the default timeout for classical reboots
+__HELP_kareboot3_HELP__
 \end{verbatim}
 \end{small}
 
@@ -1851,26 +1775,7 @@ Kaenv can be used by using the \texttt{kaenv3} command. The CLI looks like this:
 \begin{small}
 \begin{verbatim}
 > kaenv3 -h
-Usage: kaenv3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -a, --add ENVFILE                     Add an environment
-  -d, --delete ENVNAME                  Delete an environment
-  -l, --list                            List environments
-  -m, --files-to-move FILES             Files to move (src1::dst1,src2::dst2,...)
-  -p, --print ENVNAME                   Print an environment
-  -s, --show-all-versions               Show all versions of an environment
-  -t, --visibility-tag TAG              Set the visibility tag (private, shared, public)
-  -u, --user USERNAME                   Specify the user
-      --env-version NUMBER              Specify the version
-      --server STRING                   Specify the Kadeploy server to use
-Advanced options:
-      --toggle-destructive-tag ENVNAME  Toggle the destructive tag on an environment
-      --set-visibility-tag ENVNAME      Set the visibility tag on an environment
-      --update-image-checksum ENVNAME   Update the checksum of the environment image
-      --update-preinstall-checksum ENVNAME   Update the checksum of the environment preinstall
-      --update-postinstalls-checksum ENVNAME Update the checksum of the environment postinstalls
-      --move-files                      Move the files of the environment (for administrators only)
+__HELP_kaenv3_HELP__
 \end{verbatim}
 \end{small}
 
@@ -2052,28 +1957,7 @@ Kastat can be used by using the \texttt{kastat3} command. The CLI looks like thi
 \begin{small}
 \begin{verbatim}
 > kastat3 -h
-Usage: kastat3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -a, --list-min-retries NB        Print the statistics about the nodes that need several attempts
-  -b, --list-failure-rate          Print the failure rate for the nodes
-  -c, --list-min-failure-rate RATE Print the nodes which have a minimum failure-rate of
-                                   RATE (0 <= RATE <= 100
-  -d, --list-all                   Print all the information
-  -f, --field FIELD                Only print the given fields (user,hostname,step1,step2,step3,
-                                                           timeout_step1,timeout_step2,timeout_step3,
-                                                           retry_step1,retry_step2,retry_step3,
-                                                           start,
-                                                           step1_duration,step2_duration,step3_duration,
-                                                           env,md5,success,error)
-  -l, --last                       Only print the most recent information of selected machines
-  -m, --machine MACHINE            Only print information about the given machines
-  -s, --step STEP                  Applies the retry filter on the given steps (1, 2 or 3)
-  -v, --version                    Get the version
-  -w, --workflow-id ID             Get the stats of a specific deployment
-  -x, --date-min DATE              Get the stats from this date (yyyy:mm:dd:hh:mm:ss)
-  -y, --date-max DATE              Get the stats to this date
-      --server STRING              Specify the Kadeploy server to use
+__HELP_kastat3_HELP__
 \end{verbatim}
 \end{small}
 
@@ -2120,16 +2004,7 @@ Kanodes can be used by using the \texttt{kanodes3} command. The CLI looks like t
 \begin{small}
 \begin{verbatim}
 > kanodes3 -h
-Usage: kanodes3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -d, --get-nodes-state        Get the deploy state of the nodes
-  -s, --get-deployments-status Get the status of running deployments
-  -f, --file MACHINELIST       Only print information about the given machines (- means stdin)
-  -m, --machine MACHINE        Only print information about the given machines
-  -v, --version                Get the version
-  -w, --workflow-id WID        Specify a workflow id (to be used with the get_status option). If no wid is specified, the information of all the running deployments will be returned.
-      --server STRING          Specify the Kadeploy server to use
+__HELP_kanodes3_HELP__
 \end{verbatim}
 \end{small}
 
@@ -2171,25 +2046,7 @@ Kapower can be used by using the \texttt{kapower3} command. The CLI looks like t
 \begin{small}
 \begin{verbatim}
 > kapower3 -h
-Usage: kapower3 [options]
-Contact: kadeploy3-users@lists.gforge.inria.fr
-General options:
-  -d, --debug-mode               Activate the debug mode
-  -f, --file MACHINELIST         Files containing list of nodes (- means stdin)
-  -l, --level VALUE              Level (soft, hard, very_hard)
-  -m, --machine MACHINE          Operate on the given machines
-      --multi-server             Activate the multi-server mode
-  -n, --output-ko-nodes FILENAME File that will contain the nodes on which
-                                 the operation has not been correctly performed
-  -o, --output-ok-nodes FILENAME File that will contain the nodes on which the
-                                 operation has been correctly performed
-      --off                      Shutdown the nodes
-      --on                       Power on the nodes
-      --status                   Get the status of the nodes
-  -v, --version                  Get the version
-      --no-wait                  Do not wait the end of the power operation
-      --server STRING            Specify the Kadeploy server to use
-  -V, --verbose-level VALUE      Verbose level between 0 to 5
+__HELP_kapower3_HELP__
 \end{verbatim}
 \end{small}
 
@@ -2220,19 +2077,7 @@ Karights can be used by using the \texttt{karights3} command (it is designed for
 \begin{small}
 \begin{verbatim}
 > karights3 -h
-Usage: karights3 [options]
-Contact: kadeploy3-users@lists.grid5000.fr
-General options:
-  -a, --add                    Add some rights to a user
-  -d, --delete                 Delete some rights to a user
-  -f, --file FILE              Machine file (- means stdin)
-  -m, --machine MACHINE        Include the machine in the operation
-  -o, --overwrite-rights       Overwrite existing rights
-  -p, --part PARTNAME          Include the partition in the operation
-  -s, --show-rights            Show the rights for a given user
-  -u, --user USERNAME          Specify the user
-  -v, --version                Get the version
-      --server STRING          Specify the Kadeploy server to use
+__HELP_karights3_HELP__
 \end{verbatim}
 \end{small}
 
