@@ -24,41 +24,40 @@ class KadeployClient < ClientWorkflow
   def self.load_options()
     {
       :environment => {},
-      :nodes => Array.new,
-      :env_kind => String.new,
-      :env_desc => String.new,
-      :env_name => String.new,
+      :nodes => [],
+      :env_kind => '',
+      :env_desc => '',
+      :env_name => '',
       :env_version => nil, #By default we load the latest version
       :user => nil,
-      :true_user => USER,
       :block_device => nil,
       :deploy_part => nil,
       :boot_part => nil,
       :verbose_level => nil,
       :debug => false,
-      :script => String.new,
-      :key => String.new,
+      :script => '',
+      :key => '',
       :reformat_tmp => false,
-      :pxe_profile_msg => String.new,
-      :pxe_upload_files => Array.new,
+      :pxe_profile_msg => '',
+      :pxe_upload_files => [],
       :pxe_profile_singularities => nil,
-      :steps => Array.new,
+      :steps => [],
       :ignore_nodes_deploying => false,
-      :breakpoint_on_microstep => String.new,
-      :custom_operations_file => String.new,
+      :breakpoint_on_microstep => '',
+      :custom_operations_file => nil,
       :custom_operations => nil,
       :disable_bootloader_install => false,
       :disable_disk_partitioning => false,
-      :nodes_ok_file => String.new,
-      :nodes_ko_file => String.new,
-      :write_workflow_id => String.new,
+      :nodes_ok_file => nil,
+      :nodes_ko_file => nil,
+      :write_workflow_id => nil,
       :get_version => false,
       :get_users_info => false,
-      :chosen_server => String.new,
+      :chosen_server => '',
       :servers => load_configfile(),
       :multi_server => false,
-      :kadeploy_server => String.new,
-      :kadeploy_server_port => String.new,
+      :kadeploy_server => '',
+      :kadeploy_server_port => '',
       :reboot_classical_timeout => nil,
       :reboot_kexec_timeout => nil,
       :vlan => nil,
@@ -237,9 +236,9 @@ class KadeployClient < ClientWorkflow
         options[:chosen_server] = s
       }
       opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
-        if d =~ /\A\d+\Z/ then
+        begin
           options[:verbose_level] = d.to_i
-        else
+        rescue
           error("Invalid verbose level")
           return false
         end
@@ -346,16 +345,14 @@ class KadeployClient < ClientWorkflow
   end
 
   def self.check_options(options)
-    if !options[:get_version] and !options[:get_users_info] then
-      error('You must choose an environment') if options[:env_kind].empty?
-      if options[:nodes].empty? then
-        error("You must specify some nodes to deploy")
-        return false
-      end
-      if (options[:nodes_ok_file] != "") && (options[:nodes_ok_file] == options[:nodes_ko_file]) then
-        error("The files used for the output of the OK and the KO nodes must not be the same")
-        return false
-      end
+    error('You must choose an environment') if options[:env_kind].empty?
+    if options[:nodes].empty? then
+      error("You must specify some nodes to deploy")
+      return false
+    end
+    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
+      error("The files used for the output of the OK and the KO nodes cannot be the same")
+      return false
     end
 
     return true

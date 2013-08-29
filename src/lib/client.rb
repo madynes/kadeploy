@@ -625,6 +625,7 @@ class Client
     $httpd
   end
 
+  # TODO: check_int_range, check_ssh_key, check_operation_level, check_username, check_file, check_pxe..., check_env_version, check_verbose_level
   def self.launch()
     options = nil
     error() unless options = parse_options()

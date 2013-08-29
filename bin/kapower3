@@ -1,22 +1,149 @@
-#!/bin/bash
+#!/usr/bin/ruby -w
 
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
 
-if [ -x /etc/kadeploy3/load_kadeploy_env ] && [ -z "${KADEPLOY_CONFIG_DIR}" ]
-then
-    KADEPLOY_CONFIG_DIR=/etc/kadeploy3
-    export KADEPLOY_CONFIG_DIR
-elif [ ! -x $KADEPLOY_CONFIG_DIR/load_kadeploy_env ]
-then
-    echo "The Kadeploy environment cannot be loaded, please check your configuration"
-    exit 1
-fi
+$:.unshift($kadeploy_libs)
 
-source $KADEPLOY_CONFIG_DIR/load_kadeploy_env
+require 'optparse'
+require 'yaml'
+require 'client'
 
-# Load the normal or async client
-if [[ " $@" == *" --async "* ]] || [[ "$@" == *" --async" ]]
-then
-  ruby $KADEPLOY_INSTALL_DIR/src/kapower_async.rb "${@//--async}"
-else
-  ruby $KADEPLOY_INSTALL_DIR/src/kapower.rb "$@"
-fi
+Signal.trap("INT") do
+  puts "\nSIGINT trapped, let's clean everything ..."
+  Kadeploy::KapowerClient.kill() rescue nil
+  exit!(1)
+end
+
+module Kadeploy
+
+class KapowerClient < ClientWorkflow
+  def self.operation()
+    'Power operation'
+  end
+
+  def self.load_options()
+    {
+      :verbose_level => nil,
+      :nodes => [],
+      :nodes_ok_file => String.new,
+      :nodes_ko_file => String.new,
+      :operation => nil,
+      :level => :soft,
+      :wait => true,
+      :debug => false,
+      :get_version => false,
+      :chosen_server => String.new,
+      :servers => load_configfile(),
+      :kadeploy_server => String.new,
+      :kadeploy_server_port => String.new,
+      :kadeploy_server_port => String.new,
+    }
+  end
+
+  def self.parse_options()
+    options = load_options()
+    opts = OptionParser::new do |opt|
+      opt.summary_indent = "  "
+      opt.summary_width = 30
+      opt.banner = "Usage: kapower3 [options]"
+      opt.separator "Contact: #{CONTACT_EMAIL}"
+      opt.separator ""
+      opt.separator "General options:"
+      opt.on("-d", "--debug-mode", "Activate the debug mode") {
+        options[:debug] = true
+      }
+      opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
+        load_machinefile(options[:nodes], f)
+      }
+      opt.on("-l", "--level VALUE", "Level (soft, hard, very_hard)") { |l|
+        if check_operation_level(l)
+          options[:level] = l.downcase
+        else
+          error("Invalid level")
+          return false
+        end
+      }
+      opt.on("-m", "--machine MACHINE", "Operate on the given machines") { |hostname|
+        load_machine(options[:nodes], hostname)
+      }
+      opt.on("--multi-server", "Activate the multi-server mode") {
+        options[:multi_server] = true
+      }
+      opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes on which the operation has not been correctly performed")  { |f|
+        options[:nodes_ko_file] = f
+      }
+      opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes on which the operation has been correctly performed")  { |f|
+        options[:nodes_ok_file] = f
+      }
+      opt.on("--off", "Shutdown the nodes") {
+        options[:operation] = :off
+      }
+      opt.on("--on", "Power on the nodes") {
+        options[:operation] = :on
+      }
+      opt.on("--status", "Get the status of the nodes") {
+        options[:operation] = :status
+      }
+      opt.on("-v", "--version", "Get the version") {
+        options[:get_version] = true
+      }
+      opt.on("--no-wait", "Do not wait the end of the power operation") {
+        options[:wait] = false
+      }
+      opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
+        options[:chosen_server] = s
+      }
+      opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
+        begin
+          options[:verbose_level] = d.to_i
+        rescue
+          error("Invalid verbose level")
+          return false
+        end
+      }
+    end
+
+    begin
+      opts.parse!(ARGV)
+    rescue
+      error("Option parsing error: #{$!}")
+      return false
+    end
+
+    options[:chosen_server] = options[:servers]['default'] if options[:chosen_server].empty?
+    options[:kadeploy_server] = options[:servers][options[:chosen_server]][0]
+    options[:kadeploy_server_port] = options[:servers][options[:chosen_server]][1]
+
+    return options
+  end
+
+  def self.check_options(options)
+    if options[:nodes].empty?
+      error("No node is chosen")
+      return false
+    end
+    unless (1..5).include?(options[:verbose_level])
+      error("Invalid verbose level")
+      return false
+    end
+    if !options[:operation] or options[:operation].empty?
+      error("No operation is chosen")
+      return false
+    end
+    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
+      error("The files used for the output of the OK and the KO nodes cannot be the same")
+      return false
+    end
+    true
+  end
+
+  def run(options)
+    raise 'Not implemented yet !'
+  end
+end
+
+end
+
+if __FILE__ == $0
+  Kadeploy::KapowerClient.launch()
+end
