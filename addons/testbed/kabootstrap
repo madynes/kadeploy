@@ -1219,6 +1219,14 @@ def cfg_dhcp(net=nil)
       "}\n"
   end
 
+  pxe = nil
+  case $deploysendmeth
+  when :HTTP
+    pxe = 'gpxelinux.0'
+  else
+    pxe = 'pxelinux.0'
+  end
+
   "default-lease-time 28800;\n"\
   "max-lease-time 86400;\n"\
   + # specific boot options
@@ -1271,7 +1279,7 @@ def cfg_dhcp(net=nil)
   "    if exists user-class and option user-class = \"iPXE\" {\n"\
   "      filename=concat(\"http://#{(HTTP_OVER_NFS ? $services[:www][:fqdn] : $kanodes[:kadeploy][:ipv4])}/\",host-decl-name);\n"\
   "    } else {\n"\
-  "      filename \"#{CFG_DHCP_PXE_CLIENT}\";\n"\
+  "      filename \"#{pxe}\";\n"\
   "    }\n"\
   "    next-server #{$kanodes[:tftp][:ipv4]};\n\n"\
   + # Deploiement nodes
