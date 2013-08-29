@@ -51,6 +51,7 @@ class Client
   end
 
   def kill
+    $stderr.puts "Error encountered, let's clean everything ..."
   end
 
   def api_path(path=nil,kind=nil,*args)
@@ -63,9 +64,11 @@ class Client
   end
 
   def self.error(msg='',abrt = true)
-    $stderr.puts msg if msg and !msg.empty?
-    self.kill
-    exit!(1) if abrt
+    unless $killing
+      $stderr.puts msg if msg and !msg.empty?
+      self.kill
+      exit!(1) if abrt
+    end
   end
 
   def error(msg='',abrt = true)
