@@ -1,0 +1,49 @@
+operation 'Environments management' do
+  resource :POST, '/environments' do
+    request do
+      parameter :user, :String, 'The user that is doing the request', true
+      parameter :environment, :Hash, '...', true do
+        parameter :user, :String, '...', false
+      end
+      parameter :client, :String, '...', false
+    end
+    response do
+      field :user, :String, 'The owner of the environment'
+      field :name, :String, 'The name of the environment'
+      field :version, :String, 'The version of the environment'
+    end
+
+    example \
+      <<-EOS ,
+        POST /environments?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: ...
+        {
+          ...
+        }
+      EOS
+  end
+
+  resource :GET, '/environments/:user?/:name?/:version?' do
+    request do
+    end
+    response :Array do
+      field '#i', :Hash, '...' do
+        field :user, :String, 'The owner of the environment'
+        field :name, :String, 'The name of the environment'
+        field :version, :String, 'The version of the environment'
+      end
+    end
+  end
+
+  resource :PUT, '/environments/:user/:name?/:version?' do
+  end
+
+  resource :DELETE, '/environments/:user/:name?/:version?' do
+  end
+end

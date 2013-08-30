@@ -1,0 +1,16 @@
+introduction do
+  section "Request's parameters" do
+  end
+  section 'Authentication' do
+  end
+  section 'Errors management' do
+    paragraph 'X-Application-Error-Code, ...'
+    paragraph 'Kadeploy Error numbers'
+  end
+  section 'Workflow based operations' do
+  end
+  section 'Exporting files for the server' do
+  end
+  section "API path notation" do
+  end
+end

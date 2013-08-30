@@ -1,0 +1,86 @@
+operation 'Nodes information' do
+  resource :GET, '/nodes/:nodename?', 'Gather nodes information' do
+    request do
+      parameter :user, :String, 'The user that is doing the request', true
+      parameter :':nodename', :String, 'Gather information of a specific node', false
+      parameter :list, :Boolean, 'Ask to return an Array of node names corresponding to the nodes that are managed by the server', false
+    end
+    response :'Hash/Array' do
+      field 'nodename', :Hash, 'The status of the node nodename' do
+        field :state, :String, 'The current state of the node', ['1','2','3','...']
+        field :user, :String, 'The last user that deployed the node'
+        field :environment, :Hash, 'The last environment that was deployed on the node' do
+          field :user, :String, 'The owner of the environment'
+          field :name, :String, 'The name of the environment'
+          field :version, :String, 'The version of the environment'
+        end
+      end
+    end
+
+    example \
+      <<-EOS ,
+        GET /nodes?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 356
+        {
+          "node-1.testbed.lan": {
+            "state": "deploying",
+            "user": "frontend",
+            "environment": {
+              "name": "debian-min",
+              "version": 1,
+              "user": "root"
+            }
+          },
+          "node-2.testbed.lan": {
+            "state": "deploying",
+            "user": "frontend",
+            "environment": {
+              "name": "debian-min",
+              "version": 1,
+              "user": "root"
+            }
+          }
+        }
+      EOS
+
+    example \
+      <<-EOS ,
+        GET /nodes/node-1.testbed.lan?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 134
+        {
+          "state": "deployed",
+          "user": "frontend",
+          "environment": {
+            "name": "debian-min",
+            "version": 1,
+            "user": "root"
+          }
+        }
+      EOS
+
+    example \
+      <<-EOS ,
+        GET /nodes?user=frontend&list HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 43
+        ["node-1.testbed.lan", "node-2.testbed.lan"]
+      EOS
+  end
+end

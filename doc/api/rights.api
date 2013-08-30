@@ -1,0 +1,310 @@
+operation 'Rights management' do
+  resource :POST, '/rights', 'Add permessions to a specific user on some node\'s partitions' do
+    request do
+      parameter :user, :String, 'The user that is doing the request', true
+      parameter :username, :String, 'The name of the user the rights should be granted. Defaults to "user"', false
+      parameter :nodes, :Array, 'The list of nodes the rights should be added to. If not specified, rights will be added on all the nodes', false
+      parameter :partitions, :Array, 'The partitions/disks the rights should be added to. If the array contains *, rights will be added on every partition/disk', false
+      parameter :overwrite, :Boolean, 'Overwrite if some rights are already set for this user', false
+    end
+
+    response do
+      field 'username', :Hash, 'The rights that was added for the user "username"' do
+        field 'nodename', :Array, 'The rights that was added on the node "nodename". If "nodename" is *, the rights was added on every nodes' do
+          field '#i', :String, 'The partition the rights was added to'
+        end
+      end
+      code [400,11], 'Some elements of the request are conflicting'
+      code [400,12], 'No element has been modified'
+    end
+
+    example \
+    <<-EOS ,
+      POST /rights HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 89
+      {
+        "user" : "root",
+        "username": "frontend",
+        "nodes": [
+          "node-1.testbed.lan"
+        ]
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 67
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "*"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      POST /rights?user=root&overwrite HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 136
+      {
+        "username": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "partitions": [
+          "/dev/sda3"
+        ]
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 128
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "/dev/sda3"
+          ],
+          "node-2.testbed.lan": [
+            "/dev/sda3"
+          ]
+        }
+      }
+    EOS
+  end
+
+  resource :GET, '/rights/:username?/:node?', 'Gather information about someone\'s permission on nodes' do
+    request do
+      parameter ':username', :String, 'The name of the user to check the rights for. If not specified, returns the rights of every users', false
+      parameter ':node', :String, 'The node to check the rights on', false
+      parameter :user, :String, 'The user that is doing the request', true
+      parameter :nodes, :Array, 'The list of nodes the rights should be checked on. If nor "node" or "nodes" are specified, rights of all the nodes will be returned. If both "node" and "nodes" are specified, the rights of [nodes]+node will be returned', false
+    end
+
+    response do
+      field 'username', :Hash, 'The rights of the user "username"' do
+        field 'nodename', :Array, 'The rights on the node "nodename". All the nodes if "nodename" is *' do
+          field '#i', :String, 'The partition the rights are set on'
+        end
+      end
+    end
+
+    example \
+    <<-EOS ,
+      GET /rights?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 172
+      {
+        "root": {
+          "*": [
+            "*"
+          ]
+        },
+        "frontend": {
+          "node-1.testbed.lan": [
+            "/dev/sda3"
+          ],
+          "node-2.testbed.lan": [
+            "/dev/sda3"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      GET /rights/frontend?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 172
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "/dev/sda3"
+          ],
+          "node-2.testbed.lan": [
+            "/dev/sda3"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      GET /rights/frontend/node-1.testbed.lan?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 75
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "/dev/sda3"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      GET /rights/frontend?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 66
+      {
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ]
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 128
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "/dev/sda3"
+          ],
+          "node-2.testbed.lan": [
+            "/dev/sda3"
+          ]
+        }
+      }
+    EOS
+  end
+
+  resource :PUT, '/rights/:username?/:node?', 'Not implemented ATM' do
+    # TODO: add examples
+  end
+
+  resource :DELETE, '/rights/:username/:node?/:partition?' do
+    request do
+      parameter ':username', :String, 'The name of the username to remove the rights to', true
+      parameter ':node', :String, 'The node to remove the rights from', false
+      parameter ':partition', :String, 'The partitions to remove the rights from (should be urlencoded)', false
+      parameter :user, :String, 'The user that is doing the request', true
+      parameter :nodes, :Array, 'The list of nodes the rights should removed from. If nor "node" or "nodes" are specified, rights of all the nodes will be removed. If both "node" and "nodes" are specified, the rights of [nodes]+node will be removed', false
+    end
+
+    response do
+      field 'username', :Hash, 'The name of the user the rights was removed to' do
+        field 'nodename', :Array, 'The nodes the rights was removed from. All the nodes if "nodename" is *' do
+          field :'#i', :String, 'The partition/disk the rights removed from. All the partitions/disks if "#i" is *'
+        end
+      end
+      code [400,11], 'Some elements of the request are conflicting'
+      code [400,12], 'No element has been modified'
+    end
+
+    example \
+    <<-EOS ,
+      DELETE /rights/frontend?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 50
+      {
+        "frontend": {
+          "*": [
+            "*"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      DELETE /rights/frontend/node-1.testbed.lan?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 67
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "*"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      DELETE /rights/frontend?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 66
+      {
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ]
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 112
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "*"
+          ],
+          "node-2.testbed.lan": [
+            "*"
+          ]
+        }
+      }
+    EOS
+
+    example \
+    <<-EOS ,
+      DELETE /rights/frontend/node-1.testbed.lan/%2Fdev%2Fsda3?user=root HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 75
+      {
+        "frontend": {
+          "node-1.testbed.lan": [
+            "/dev/sda3"
+          ]
+        }
+      }
+    EOS
+  end
+end
