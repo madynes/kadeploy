@@ -1,0 +1,28 @@
+operation 'Rights management' do
+  resource :POST, '/rights' do
+  end
+
+  resource :GET, '/rights' do
+  end
+
+  resource :GET, '/rights/:user' do
+  end
+
+  resource :GET, '/rights/:user/:node' do
+  end
+
+  resource :PUT, '/rights/:user' do
+  end
+
+  resource :PUT, '/rights/:user/:node' do
+  end
+
+  resource :DELETE, '/rights/:user' do
+  end
+
+  resource :DELETE, '/rights/:user/:node' do
+  end
+
+  resource :DELETE, '/rights/:user/:node/:partition' do
+  end
+end

@@ -1,0 +1,31 @@
+operation 'Environments management' do
+  resource :POST, '/environments' do
+  end
+
+  resource :GET, '/environments' do
+  end
+
+  resource :GET, '/environments/:user' do
+  end
+
+  resource :GET, '/environments/:user/:name' do
+  end
+
+  resource :GET, '/environments/:user/:name/:version' do
+  end
+
+  resource :PUT, '/environments/:user' do
+  end
+
+  resource :PUT, '/environments/:user/:name' do
+  end
+
+  resource :PUT, '/environments/:user/:name/:version' do
+  end
+
+  resource :DELETE, '/environments/:user/:name' do
+  end
+
+  resource :DELETE, '/environments/:user/:name/:version' do
+  end
+end

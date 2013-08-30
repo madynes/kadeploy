@@ -1,0 +1,13 @@
+# @markup markdown
+# @title Kadeploy 3.2 Network API specification
+# @author Copyright (c) by INRIA - 2008-2013
+
+
+## Introduction
+## Request's parameters
+## Authentication
+## Errors management
+X-Application-Error-Code, ...
+Kadeploy Error numbers
+## Workflow based operations
+## Exporting files for the server
