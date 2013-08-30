@@ -1,0 +1,96 @@
+##
+# Get information about environments
+#
+class Environments
+  ##
+  #
+  #
+  # @resource /environments
+  # @action POST
+  #
+  def post
+  end
+
+  ##
+  #
+  #
+  # @resource /environments
+  # @action GET
+  #
+  def get
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user
+  # @action GET
+  #
+  def get_user
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user/:name
+  # @action GET
+  #
+  def get_user_name
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user/:name/:version
+  # @action GET
+  #
+  def get_user_name_version
+  end
+
+  ##
+  #
+  #
+  # @resource /environments
+  # @action PUT
+  #
+  def put
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user
+  # @action PUT
+  #
+  def put_user
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user/:name
+  # @action PUT
+  #
+  def put_user_name
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user/:name/:version
+  # @action PUT
+  #
+  def put_user_name_version
+  end
+
+  ##
+  #
+  #
+  # @resource /environments/:user/:name
+  # @action DELETE
+  #
+  def delete_user_name
+  end
+  ##
+  #
+  #
+  # @resource /environments/:user/:name/:version
+  # @action DELETE
+  #
+  def delete_user_name_version
+  end
+end
