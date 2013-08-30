@@ -298,6 +298,13 @@ class KadeployServer
       else
         raise e
       end
+    rescue NoMethodError => e
+    # if the problem is that the method does not exists
+      if e.name.to_sym == meth.to_sym
+        error_not_found!
+      else
+        raise e
+      end
     end
   end
 
