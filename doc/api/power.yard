@@ -1,0 +1,5 @@
+##
+# Manage power operations
+#
+class Power
+end

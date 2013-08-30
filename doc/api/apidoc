@@ -1,0 +1,296 @@
+#!/usr/bin/ruby -w
+
+$stdin = nil
+
+require 'cgi'
+require 'singleton'
+
+class APIDoc
+  include Singleton
+
+  def initialize()
+    @operations = []
+  end
+
+  public
+  def operation(name)
+    obj = Operation.new(name)
+    yield(obj) if block_given?
+    @operations << obj
+    obj
+  end
+
+  def to_html(cgi)
+    #cgi.div(:class => 'operations_frame') do
+      @operations.inject(''){ |out,o| out << o.to_html(cgi) }
+    #end
+  end
+end
+
+class Operation
+  def initialize(name)
+    @name = name
+    @resources = []
+  end
+
+  def resource(method,path,desc)
+    method = method.to_sym
+    obj = Resource.new(method,path,desc)
+    yield(obj) if block_given?
+    @resources << obj
+    obj
+  end
+
+  def to_html(cgi)
+    cgi.div(:class => 'operation_frame') do
+      cgi.h1(:class => 'operation'){@name}
+      @resources.inject(''){|out,r| out << r.to_html(cgi)}
+    end
+  end
+end
+
+class Resource
+  attr_accessor :description
+  def initialize(method,path,desc)
+    @method = method
+    @path = path
+    @description = desc
+    @request = nil
+    @response = nil
+    @examples = []
+  end
+
+  def request(type,content)
+    obj = Request.new(type,content)
+    yield(obj) if block_given?
+    @request = obj
+  end
+
+  def response(type,content)
+    obj = Response.new(type,content)
+    yield(obj) if block_given?
+    @response = obj
+  end
+
+  def example(request,response)
+    obj = Example.new(@examples.size+1,request,response)
+    yield(obj) if block_given?
+    @examples << obj
+    obj
+  end
+
+  def to_html(cgi)
+    cgi.div(:class => 'resource_frame') do
+      cgi.h2(:class => 'resource_title') do
+        cgi.b(:class => 'resource_method'){@method} +
+        " " +
+        cgi.em(:class => 'resource_path'){@path}
+      end +
+      cgi.p(:class => 'resource_desc'){@description} +
+      @request.to_html(cgi) +
+      @response.to_html(cgi) +
+      @examples.inject(''){|out,e| out << e.to_html(cgi)}
+    end
+  end
+end
+
+class HTTPRequest
+  def initialize(type,content)
+    @type = type
+    @content = content
+    @parameters = []
+  end
+
+  def parameter(name,type,desc,mandatory,parent=nil)
+    obj = Parameter.new(name,type,desc,mandatory,parent)
+    yield(obj) if block_given?
+    @parameters << obj
+    obj
+  end
+
+  def to_html(cgi)
+    raise
+  end
+end
+
+class Request < HTTPRequest
+  def to_html(cgi)
+    cgi.div(:class => 'request_frame') do
+      cgi.h3(:class => 'request_title'){"Request [#{@type}] (#{@content})"} +
+      cgi.h4(:class => 'request_subtitle'){'Request parameters'} +
+      @parameters.inject(''){|out,p| out << p.to_html(cgi,true)}
+    end
+  end
+end
+
+class Response < HTTPRequest
+  def initialize(type,content)
+    super(type,content)
+    @codes = []
+  end
+
+  def code(number,desc)
+    obj = Code.new(number,desc)
+    yield(obj) if block_given?
+    @codes << obj
+    obj
+  end
+
+  def to_html(cgi)
+    cgi.div(:class => 'response_frame') do
+      cgi.h3(:class => 'response_title'){"Response [#{@type}] (#{@content})"} +
+      cgi.h4(:class => 'response_subtitle'){'Response fields'} +
+      @parameters.inject(''){|out,p| out << p.to_html(cgi,false)} +
+      cgi.h4(:class => 'response_subtitle'){'Return codes'} +
+      @codes.inject(''){|out,c| out << c.to_html(cgi)}
+    end
+  end
+end
+
+class Parameter
+  attr_reader :parent,:type
+  # if name is a Symbol -> static name else -> dynamic name
+  def initialize(name,type,desc,mandatory,parent=nil)
+    @name = name
+    @type = type
+    @description = desc
+    @dynamic = name.is_a?(String)
+    @mandatory = mandatory
+    @parent = parent
+  end
+
+  def name(cgi)
+    if @dynamic
+      cgi.span(:style => 'text-decoration: underline;'){@name.to_s}
+    else
+      @name.to_s
+    end
+  end
+
+  def parents(cgi)
+    if @parent
+      case @parent.type
+      when :Hash
+        "#{@parent.parents(cgi)}#{@parent.name(cgi)}."
+      when :Array
+        "#{@parent.parents(cgi)}#{@parent.name(cgi)}[]."
+      else
+        raise
+      end
+    else
+      ''
+    end
+  end
+
+  def to_html(cgi,disp_mandat)
+    cgi.div(:class => 'parameter_frame') do
+      cgi.h5(:class => 'parameter_name') do
+        "#{parents(cgi)}#{name(cgi)}"
+      end +
+      cgi.p(:class => 'parameter_type'){"Type: #{@type}"} +
+      (disp_mandat ? cgi.p(:class => 'parameter_name'){"Mandatory: #{@mandatory}"} : '') +
+      cgi.p(:class => 'parameter_desc'){@description}
+    end
+  end
+end
+
+class Code
+  def initialize(number,desc)
+    @number = number
+    @description = desc
+  end
+
+  def to_html(cgi)
+    cgi.div(:class => 'code_frame') do
+      cgi.h5(:class => 'code_number'){@number.to_s} +
+      cgi.p(:class => 'code_desc'){@description}
+    end
+  end
+end
+
+class Example
+  def initialize(number,request,response)
+    @number = number
+    @request = request
+    @response = response
+  end
+
+  def to_html(cgi)
+    cgi.div(:class => 'example_frame') do
+      cgi.h3(:class => 'example_title'){"Example ##{@number}"} +
+      cgi.h4(:class => 'example_subtitle'){'Request'} +
+      cgi.pre(:class => 'example_request'){@request} +
+      cgi.h4(:class => 'example_subtitle'){'Response'} +
+      cgi.pre(:class => 'example_response'){@response}
+    end
+  end
+end
+
+def parse(obj)
+  prev = $current
+  $current = obj
+  yield if block_given?
+  $current = prev
+end
+
+def operation(name,&block)
+  parse($current.operation(name),&block)
+end
+
+def resource(method,path,desc='',&block)
+  parse($current.resource(method,path,desc),&block)
+end
+
+def request(type=:Hash,content='application/json',&block)
+  parse($current.request(type,content),&block)
+end
+
+def response(type=:Hash,content='application/json',&block)
+  parse($current.response(type,content),&block)
+end
+
+def example(request,response,&block)
+  parse($current.example(request,response),&block)
+end
+
+def parameter(name,type,desc='',mandatory=true,&block)
+  prev = $parent
+  $parent = $current.parameter(name,type,desc,mandatory,$parent)
+  yield if block_given?
+  $parent = prev
+end
+
+def code(number,desc='',&block)
+  parse($current.code(number,desc),&block)
+end
+
+
+$current = APIDoc.instance
+$parent = nil
+
+if ARGV.size <= 0
+  $stderr.puts "usage: #{$0} <file1> <file2> ..."
+  exit 1
+end
+
+ARGV.each do |file|
+  unless File.readable?(file)
+    $stderr.puts "File not found #{file}"
+    exit 1
+  end
+  load file
+end
+
+#require 'pp'
+#pp $current
+cgi = CGI.new('html4')
+out = cgi.html do
+    cgi.head do
+      cgi.title{ 'Kadeploy API' }
+    end
+    cgi.body do
+      $current.to_html(cgi)
+    end
+  end
+#puts CGI::pretty(out)
+puts out

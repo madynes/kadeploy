@@ -1,0 +1,30 @@
+operation 'Deployment' do
+  resource :POST, '/deploy', 'Launch a deployment' do
+    request do
+      parameter :environment, :Hash, 'test' do
+        parameter :kind, :String, 'test2', false
+        parameter :params, :Hash, 'test2', false do
+          parameter :truc, :String, 'test2', false
+        end
+      end
+    end
+    response do
+      parameter 'node', :Array, 'test' do
+        parameter :name, :String, 'test2'
+        parameter :status, :String, 'test2'
+      end
+      code 500, 'Internal Error'
+      code 200, 'OK'
+    end
+    example 'sdfnsddfsdfsdf
+sdfsdfsdf', 'dsdffsf 
+a'
+  end
+
+  resource :GET, '/deploy/:id' do
+    request do
+    end
+    response do
+    end
+  end
+end

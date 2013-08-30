@@ -1,0 +1,81 @@
+##
+# Get information about rights
+#
+class Rights
+  ##
+  #
+  #
+  # @resource /rights
+  # @action POST
+  #
+  def post
+  end
+
+  ##
+  #
+  #
+  # @resource /rights
+  # @action GET
+  #
+  def get
+  end
+  ##
+  #
+  #
+  # @resource /rights/:user
+  # @action GET
+  #
+  def get_user
+  end
+  ##
+  #
+  #
+  # @resource /rights/:user/:node
+  # @action GET
+  #
+  def get_user_node
+  end
+
+  ##
+  #
+  #
+  # @resource /rights/:user
+  # @action PUT
+  #
+  def put_user
+  end
+  ##
+  #
+  #
+  # @resource /rights/:user/:node
+  # @action PUT
+  #
+  def put_user_node
+  end
+
+  ##
+  #
+  #
+  # @resource /rights/:user
+  # @action DELETE
+  #
+  def delete_user
+  end
+  ##
+  #
+  #
+  # @resource /rights/:user/:node
+  # @action DELETE
+  #
+  def delete_user_node
+  end
+  ##
+  #
+  #
+  # @resource /rights/:user/:node/:partition
+  # @action DELETE
+  #
+  def delete_user_node_partition
+  end
+end
+

@@ -1,0 +1,87 @@
+##
+# Run deployments on nodes
+#
+class Deployment
+  ##
+  #
+  #
+  #@resource /deploy
+  # @action POST
+  # @required [String] user
+  # @optional [boolean] force
+  # @response_field [Hash] workflow
+  # @response_field [Integer] workflow.wid
+  # @response_field [Hash] workflow.resources
+  def post
+  end
+  ##
+  #
+  #
+  #@resource /deploy
+  # @action GET
+  def get
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id
+  # @action GET
+  def get_id
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/outputs
+  # @action GET
+  def get_outputs
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/outputs/:cluster
+  # @action GET
+  def get_output_cluster
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/debugs
+  # @action GET
+  def get_debug
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/debugs/:node
+  # @action GET
+  def get_debug_node
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/state
+  # @action GET
+  def get_state
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/status
+  # @action GET
+  def get_status
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id/error
+  # @action GET
+  def get_error
+  end
+  ##
+  #
+  #
+  # @resource /deploy/:id
+  # @action DELETE
+  def get_delete
+  end
+end

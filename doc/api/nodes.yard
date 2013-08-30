@@ -1,0 +1,44 @@
+##
+# Get information about nodes
+#
+class Nodes
+  ##
+  # Get information about every nodes
+  #
+  # @resource /nodes
+  # @action GET
+  # @required [String] user
+  # @optional [Boolean] list
+  # @response_field [Hash<String,Hash>] content A hash of Name->State
+  # @response_field [Hash] content[nodename] The status of the node nodename
+  # @response_field [Hash] content[nodename].state
+  # @response_field [Hash] content[nodename].user
+  # @response_field [Hash] content[nodename].environment
+  #
+  # @example_request_description Gather the list of nodes
+  # @example_request 
+  #   ```http
+  #   GET /nodes?user=frontend&list=true HTTP/1.1
+  #   Accept: text/plain, application/json
+  #   ```
+  # @example_response 
+  #   ```http
+  #   HTTP/1.1 200 OK
+  #   Content-Type: application/json
+  #   Content-Length: 43
+  #   ```
+  #   ```json
+  #   ["node-1.testbed.lan", "node-2.testbed.lan"]
+  #   ```
+  def get
+  end
+
+  ##
+  # Get information about a specific node
+  #
+  # @resource /nodes/:id
+  # @action GET
+  #
+  def get_id
+  end
+end
