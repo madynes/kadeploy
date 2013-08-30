@@ -1,0 +1,50 @@
+operation 'Reboot operations' do
+  resource :POST, '/reboot', 'Launch a reboot operation' do
+    request do
+      parameter :'...', :String
+    end
+    response do
+      field :wid, :String, 'The id# of the workflow that was initiated'
+      field :resources, :Hash, 'The resources associated with the workflow and their URL' do
+        field :output, :String, 'Concatenated outputs'
+        field :outputs, :Hash, 'Outputs by cluster' do
+          field 'clustername', :String, 'Output of cluster clustername'
+        end
+        field :debug, :String, 'Concatenated debugs'
+        field :debugs, :Hash, 'Debugs by node' do
+          field 'nodename', :String, 'Debug of node nodename'
+        end
+        field :state, :String, 'Deployment state of nodes'
+        field :status, :String, 'Status of deployment instances'
+        field :error, :String, 'Error message'
+      end
+      code 500, 'Internal Error'
+      code 200, 'OK'
+    end
+  end
+
+  resource :GET, '/reboot/:id' do
+  end
+
+  resource :GET, '/reboot/:id/outputs' do
+  end
+
+  resource :GET, '/reboot/:id/outputs/:cluster' do
+  end
+
+  resource :GET, '/reboot/:id/debugs' do
+  end
+
+  resource :GET, '/reboot/:id/debugs/:node' do
+  end
+
+  resource :GET, '/reboot/:id/state' do
+  end
+
+  resource :GET, '/reboot/:id/status' do
+  end
+
+  resource :GET, '/reboot/:id/error' do
+  end
+end
+

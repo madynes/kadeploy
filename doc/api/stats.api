@@ -1,0 +1,4 @@
+operation 'Statistics' do
+  resource :GET, '/stats', 'Gather statistics' do
+  end
+end
