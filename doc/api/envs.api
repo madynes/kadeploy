@@ -1,0 +1,958 @@
+operation 'Environments management' do
+  type :Environment, :Hash, 'The description of an environment' do
+    field :user, :String, 'The owner of the environment'
+    field :name, :String, 'The name of the environment'
+    field :os, :String, 'The operating system of the environment', ['linux','xen','other']
+    field :image, :Hash, 'The image file that contains the environment' do
+      field :file, :String, "The path to the image file (see more #{$cgi.a(:href => '#file_export'){'here'}})"
+      field :kind, :String, "The kind of image", ['tar','dd','fsa']
+      field :compression, :String, "The compression algorithm used to compress the image", ['gzip','bzip2','xz']
+    end
+    field :version, :Integer, 'The version of the environment'
+    field :description, :String, 'The description of the environment'
+    field :author, :String, 'The author of the environment'
+    field :visibility, :String, 'The visibility of the environment', ['public', 'private', 'shared']
+    field :destructive, :Boolean, 'The environment destruct the disk partitioning'
+    field :multipart, :Boolean, 'The environment image is a multi-partitioned archive'
+    field :preinstall, :Hash, 'A preinstall script archive' do
+      field :file, :String, "The path to the archive file (see more #{$cgi.a(:href => '#file_export'){'here'}})"
+      field :compression, :String, "The compression algorithm used to compress the archive", ['gzip','bzip2','xz']
+      field :script, :String, "Path to a script (inside the archive) that will be launched during the pre-install step"
+    end
+    field :postinstalls, :Array, 'A list of postinstall script archives' do
+      field '#i', :Hash, 'A postinstall script archive' do
+        field :file, :String, "The path to the archive file (see more #{$cgi.a(:href => '#file_export'){'here'}})"
+        field :compression, :String, "The compression algorithm used to compress the archive", ['gzip','bzip2','xz']
+        field :script, :String, "Path to a script (inside the archive) that will be launched during the post-install step"
+      end
+    end
+    field :boot, :Hash, 'The environment\'s boot parameters' do
+      field :kernel, :String, 'Path to the kernel file (inside the environment\s image)'
+      field :initrd, :String, 'Path to the initrd file (inside the environment\s image)'
+      field :kernel_params, :String, 'The parameters to be given to the kernel at launch time'
+      field :hypervisor, :String, 'Path to the hypervisor file (inside the environment\s image), useful when deploying Xen environments'
+      field :hypervisor_params, :String, 'The parameters to be given to the hypervisor at launch time, useful when deploying Xen environments'
+      field :block_device, :String, 'The block device environment should be installed on, useful for multi-partitioned environments'
+      field :deploy_part, :String, 'The partition the environment should be installed on, useful for multi-partitioned environments'
+    end
+    field :partition_type, :String, 'The partition type that will be set when partitioning the disk'
+    field :filesystem, :String, 'The filesystem type of the environment, useful for tar environments'
+    field :options, :String, 'Custom options' do
+      field :partitions, :Array, 'A list of id/partition association' do
+        field :id, :Integer, 'The id of the partition inside the compressed archive'
+        field :device, :String, 'The physical device this archive part should be installed on'
+      end
+    end
+
+    sample \
+      <<-EOS
+        {
+          "name": "debian-custom",
+          "version": 2,
+          "visibility": "private",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "boot": {
+            "kernel": "/boot/vmlinuz",
+            "initrd": "/boot/initrd.img"
+          },
+          "filesystem": "ext4",
+          "partition_type": 0,
+          "multipart": false,
+          "user": "frontend"
+        }
+      EOS
+
+    sample \
+      <<-EOS
+        {
+          "name": "debian-base",
+          "version": 2,
+          "description": "My custom Debian 7",
+          "author": "frontend@testbed.lan",
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "/home/frontend/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "/home/frontend/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 83,
+          "multipart": false
+        }
+      EOS
+
+    sample \
+      <<-EOS
+        {
+          "user": "frontend",
+          "environment": {
+            "name": "debian-base",
+            "version": 2,
+            "multipart": true,
+            "os": "linux",
+            "image": {
+              "file": "server:///tmp/debian-base.fsa",
+              "kind": "fsa",
+              "compression": 3
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img",
+              "block_device": "/dev/sda",
+              "partition": 2
+            },
+            "filesystem": "ext3",
+            "options": {
+              "partitions": [
+                {
+                  "id": 0,
+                  "device": "/dev/sda1"
+                },
+                {
+                  "id": 1,
+                  "device": "/dev/sda2"
+                },
+                {
+                  "id": 2,
+                  "device": "/dev/sda3"
+                }
+              ]
+            }
+          }
+        }
+      EOS
+  end
+
+  resource :POST, '/environments' do
+    request do
+      parameter :client, :String, "The client used to export files to the server, useful for local:// files (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
+      parameter :environment, :Hash, 'The environment to add', true do
+        parameter :name, :String, 'The name of the environment', true
+        parameter :os, :String, 'The operating system of the environment', true, :expected => ['linux','xen','other']
+        parameter :image, :Hash, 'The image file that contains the environment', true do
+          parameter :file, :String, "The path to the image file (see more #{$cgi.a(:href => '#file_export'){'here'}})", true
+          parameter :kind, :String, "The kind of image", true, :expected => ['tar','dd','fsa']
+          parameter :compression, :String, "The compression algorithm used to compress the image", true, :expected => ['gzip','bzip2','xz']
+        end
+        parameter :version, :Integer, 'The version of the environment', false, :default => 1
+        parameter :description, :String, 'The description of the environment', false, :default => ''
+        parameter :author, :String, 'The author of the environment', false, :default => ''
+        parameter :visibility, :String, 'The visibility of the environment', false, :expected => ['public', 'private', 'shared'], :default => 'private'
+        parameter :destructive, :Boolean, 'The environment destruct the disk partitioning', false, :default => 'false'
+        parameter :multipart, :Boolean, 'The environment image is a multi-partitioned archive', false, :default => 'false'
+        parameter :preinstall, :Hash, 'A preinstall script archive', false do
+          parameter :file, :String, "The path to the archive file (see more #{$cgi.a(:href => '#file_export'){'here'}})", true
+          parameter :compression, :String, "The compression algorithm used to compress the archive", true, :expected => ['gzip','bzip2','xz']
+          parameter :script, :String, "Path to a script (inside the archive) that will be launched during the pre-install step", true, :default => 'none'
+        end
+        parameter :postinstalls, :Array, 'A list of postinstall script archives', false do
+          parameter '#i', :Hash, 'A postinstall script archive', false do
+            parameter :file, :String, "The path to the archive file (see more #{$cgi.a(:href => '#file_export'){'here'}})", true
+            parameter :compression, :String, "The compression algorithm used to compress the archive", true, :expected => ['gzip','bzip2','xz']
+            parameter :script, :String, "Path to a script (inside the archive) that will be launched during the post-install step", true, :default => 'none'
+            end
+        end
+        parameter :boot, :Hash, 'The environment\'s boot parameters', false do
+          parameter :kernel, :String, 'Path to the kernel file (inside the environment\s image)', false, :default => ''
+          parameter :initrd, :String, 'Path to the initrd file (inside the environment\s image)', false, :default => ''
+          parameter :kernel_params, :String, 'The parameters to be given to the kernel at launch time', false, :default => ''
+          parameter :hypervisor, :String, 'Path to the hypervisor file (inside the environment\s image), useful when deploying Xen environments', false, :default => ''
+          parameter :hypervisor_params, :String, 'The parameters to be given to the hypervisor at launch time, useful when deploying Xen environments', false, :default => ''
+          parameter :block_device, :String, 'The block device environment should be installed on, useful for multi-partitioned environments', false, :default => ''
+          parameter :deploy_part, :String, 'The partition the environment should be installed on, useful for multi-partitioned environments', false, :default => ''
+        end
+        parameter :partition_type, :String, 'The partition type that will be set when partitioning the disk', false, :default => '0'
+        parameter :filesystem, :String, 'The filesystem type of the environment, useful for tar environments', false, :default => ''
+        parameter :options, :String, 'Custom options', false do
+          parameter :partitions, :Array, 'A list of id/partition association', false do
+            parameter :id, :Integer, 'The id of the partition inside the compressed archive', true
+            parameter :device, :String, 'The physical device this archive part should be installed on', true
+          end
+        end
+      end
+    end
+    response do
+      field '', 'Environment', "The environment that was added"
+      code [400,6], 'Invalid environment, something went wrong with the environment description checking, check the error message'
+      code [400,9], 'Invalid content, check your JSON\'s structure'
+      code [400,10], 'Already existing element, an environment with the same user/name/version already exists'
+      code [400,12], 'Nothing modified'
+    end
+
+    example 'Create a basic environment (the image\'s archive is exported from the client to the server)',
+      <<-EOS ,
+        POST /environments HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+        Content-Type: application/json
+        Content-Length: 751
+        {
+          "user": "frontend",
+          "client": "http://frontend.testbed.lan:12345",
+          "environment": {
+            "name": "debian-base",
+            "version": 2,
+            "description": "My custom Debian 7",
+            "author": "frontend@testbed.lan",
+            "visibility": "shared",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "/home/frontend/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "postinstalls": [
+              {
+                "archive": "/home/frontend/debian-base-postinstall.tgz",
+                "compression": "gzip",
+                "script": "traitement.ash /rambin"
+              }
+            ],
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 83,
+            "multipart": false
+          }
+        }
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 605
+        {
+          "name": "debian-base",
+          "version": 2,
+          "description": "My custom Debian 7",
+          "author": "frontend@testbed.lan",
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "/home/frontend/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "/home/frontend/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 83,
+          "multipart": false
+        }
+      EOS
+
+    example 'Create a minimal environment (the image\'s archive is accessible on HTTP)',
+      <<-EOS ,
+        POST /environments HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+        Content-Type: application/json
+        Content-Length: 321
+        {
+          "user": "frontend",
+          "environment": {
+            "name": "debian-base",
+            "os": "linux",
+            "image": {
+              "file": "http://testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3"
+          }
+        }
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 364
+        {
+          "name": "debian-base",
+          "version": 1,
+          "visibility": "private",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 0,
+          "multipart": false
+        }
+      EOS
+
+    example 'Create a multi-partitioned environment (the image\'s archive is stored on the server)',
+      <<-EOS ,
+        POST /environments HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+        Content-Type: application/json
+        Content-Length: 677
+        {
+          "user": "frontend",
+          "environment": {
+            "name": "debian-base",
+            "version": 2,
+            "multipart": true,
+            "os": "linux",
+            "image": {
+              "file": "server:///tmp/debian-base.fsa",
+              "kind": "fsa",
+              "compression": 3
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img",
+              "block_device": "/dev/sda",
+              "partition": 2
+            },
+            "filesystem": "ext3",
+            "options": {
+              "partitions": [
+                {
+                  "id": 0,
+                  "device": "/dev/sda1"
+                },
+                {
+                  "id": 1,
+                  "device": "/dev/sda2"
+                },
+                {
+                  "id": 2,
+                  "device": "/dev/sda3"
+                }
+              ]
+            }
+          }
+        }
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 642
+        {
+          "name": "debian-base",
+          "version": 2,
+          "visibility": "private",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "server:///tmp/debian-base.fsa",
+            "kind": "fsa",
+            "compression": 3
+          },
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img",
+            "block_device": "/dev/sda",
+            "partition": 2
+          },
+          "filesystem": "ext3",
+          "partition_type": 0,
+          "multipart": true,
+          "options": {
+            "partitions": [
+              {
+                "id": 0,
+                "device": "/dev/sda1"
+              },
+              {
+                "id": 1,
+                "device": "/dev/sda2"
+              },
+              {
+                "id": 2,
+                "device": "/dev/sda3"
+              }
+            ]
+          }
+        }
+      EOS
+  end
+
+  resource :GET, '/environments/:username?/:name?/:version?', 'Gather the description of environments. If no user is given, the public environment will be displayed, otherwise a list of all environments that are public or owned by the user will be returned' do
+    request do
+      parameter ':username', :String, 'The owner of the environment', false
+      parameter ':name', :String, 'The name of the environment', false
+      parameter ':version', :String, 'The version of the environment', false
+      parameter :all_versions, :Toggle, 'Show all the versions of environments (by default only the last version is returned)', false
+    end
+    response :Array do
+      field '#i', 'Environment', 'One of the environment that were matching the request\'s parameters'
+      code 404,'File not found, the resource you are looking for cannot be found'
+    end
+
+    example 'Get the list of all visible environments',
+      <<-EOS ,
+        GET /environments?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 1589
+        [
+          {
+            "name": "debian-base",
+            "version": 1,
+            "description": "Debian 6. https://www.grid5000.fr/mediawiki/index.php/Squeeze-x64-base-1.0",
+            "author": "support-staff@lists.grid5000.fr",
+            "visibility": "public",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "/var/lib/kadeploy/envs/images/squeeze-x64-base-1.6.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "postinstalls": [
+              {
+                "archive": "/var/lib/kadeploy/envs/install_scripts/debian-x64-base-2.4-post.tgz",
+                "compression": "gzip",
+                "script": "traitement.ash /rambin"
+              }
+            ],
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 83,
+            "multipart": false,
+            "user": "root"
+          },
+          {
+            "name": "debian-min-http",
+            "version": 1,
+            "description": "Debian 6. https://www.grid5000.fr/mediawiki/index.php/Squeeze-x64-base-1.0",
+            "author": "support-staff@lists.grid5000.fr",
+            "visibility": "public",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://kadeploy.testbed.lan/squeeze-x64-min-1.4.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "postinstalls": [
+              {
+                "archive": "http://kadeploy.testbed.lan/debian-x64-min-1.1-post.tgz",
+                "compression": "gzip",
+                "script": "traitement.ash /rambin"
+              }
+            ],
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 83,
+            "multipart": false,
+            "user": "root"
+          }
+        ]
+      EOS
+
+    example 'Get the list of the environments a specified user can see',
+      <<-EOS ,
+        GET /environments/frontend?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 2029
+        [
+          {
+            "name": "debian-custom",
+            "version": 2,
+            "visibility": "private",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/boot/vmlinuz",
+              "initrd": "/boot/initrd.img"
+            },
+            "filesystem": "ext4",
+            "partition_type": 0,
+            "multipart": false,
+            "user": "frontend"
+          },
+          {
+            "name": "debian-base",
+            "version": 1,
+            "description": "Debian 6. https://www.grid5000.fr/mediawiki/index.php/Squeeze-x64-base-1.0",
+            "author": "support-staff@lists.grid5000.fr",
+            "visibility": "public",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "/var/lib/kadeploy/envs/images/squeeze-x64-base-1.6.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "postinstalls": [
+              {
+                "archive": "/var/lib/kadeploy/envs/install_scripts/debian-x64-base-2.4-post.tgz",
+                "compression": "gzip",
+                "script": "traitement.ash /rambin"
+              }
+            ],
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 83,
+            "multipart": false,
+            "user": "root"
+          },
+          {
+            "name": "debian-min-http",
+            "version": 1,
+            "description": "Debian 6. https://www.grid5000.fr/mediawiki/index.php/Squeeze-x64-base-1.0",
+            "author": "support-staff@lists.grid5000.fr",
+            "visibility": "public",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://kadeploy.testbed.lan/squeeze-x64-min-1.4.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "postinstalls": [
+              {
+                "archive": "http://kadeploy.testbed.lan/debian-x64-min-1.1-post.tgz",
+                "compression": "gzip",
+                "script": "traitement.ash /rambin"
+              }
+            ],
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 83,
+            "multipart": false,
+            "user": "root"
+          }
+        ]
+      EOS
+
+    example 'Get the description of a specific environment',
+      <<-EOS ,
+        GET /environments/frontend/debian-custom?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 442
+        [
+          {
+            "name": "debian-custom",
+            "version": 2,
+            "visibility": "private",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/boot/vmlinuz",
+              "initrd": "/boot/initrd.img"
+            },
+            "filesystem": "ext4",
+            "partition_type": 0,
+            "multipart": false,
+            "user": "frontend"
+          }
+        ]
+      EOS
+
+    example 'Get the description of a specific version of a specific environment',
+      <<-EOS ,
+        GET /environments/frontend/debian-custom/1?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 432
+        [
+          {
+            "name": "debian-custom",
+            "version": 1,
+            "visibility": "private",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 0,
+            "multipart": false,
+            "user": "frontend"
+          }
+        ]
+      EOS
+
+    example 'Get the description of every versions of a specific environment',
+      <<-EOS ,
+        GET /environments/frontend/debian-custom?user=frontend&all_versions HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 872
+        [
+          {
+            "name": "debian-custom",
+            "version": 1,
+            "visibility": "private",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 0,
+            "multipart": false,
+            "user": "frontend"
+          },
+          {
+            "name": "debian-custom",
+            "version": 2,
+            "visibility": "private",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/boot/vmlinuz",
+              "initrd": "/boot/initrd.img"
+            },
+            "filesystem": "ext4",
+            "partition_type": 0,
+            "multipart": false,
+            "user": "frontend"
+          }
+        ]
+      EOS
+  end
+
+  resource :PUT, '/environments/:username?/:name?/:version?', 'Modify some environment(s) properties, returns the modified environment. If no version is specified, modify the last version' do
+    request do
+      parameter ':username', :String, 'The owner of the environment, mandatory if the operation is not update_file', false
+      parameter ':name', :String, 'The name of the environment, mandatory if the operation is not update_file', false
+      parameter ':version', :String, 'The version of the environment', false
+      parameter :client, :String, "The client used to export files to the server, needed to update the checksum of local:// files (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
+      parameter :visibility, :String, 'Set the visibility of the environment', false
+      parameter :toggle_destructive, :Toggle, 'Toggle the destructive flag', false
+      parameter :update_image_checksum, :Toggle, 'Update the checksum of the image\'s archive in the database (the server will get the checksum of the recorded archive file)', false
+      parameter :update_preinstall_checksum, :Toggle, 'Update the checksum of the preinstall\'s archive in the database (the server will get the checksum of the recorded archive file)', false
+      parameter :update_postinstalls_checksum, :Toggle, 'Update the checksum of the preinstall\'s archive(s) in the database (the server will get the checksum of the recorded archive file)', false
+      parameter :update_files, :Hash, 'Batch renaming of file\'s paths, admins only', false do
+        parameter 'old_path_prefix', :String, 'The new path prefix', true
+      end
+    end
+
+    response :'Hash/Array' do
+      field '', 'Environment', "The environment that was modified"
+      code [400,9], 'Invalid content, check your JSON\'s structure'
+      code [400,12], 'Nothing modified'
+    end
+
+    example 'Change the visibility flag of an environment',
+      <<-EOS ,
+        PUT /environments/frontend/debian-custom HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+        Content-Type: application/json
+        Content-Length: 50
+        {
+          "user": "frontend",
+          "visibility": "shared"
+        }
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 375
+        {
+          "name": "debian-custom",
+          "version": 2,
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "boot": {
+            "kernel": "/boot/vmlinuz",
+            "initrd": "/boot/initrd.img"
+          },
+          "filesystem": "ext4",
+          "partition_type": 0,
+          "multipart": false
+        }
+      EOS
+
+    example 'Tell the server to gather the new checksum of the image\'s archive',
+      <<-EOS ,
+        PUT /environments/frontend/debian-custom?user=frontend&update_image_checksum HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 369
+        {
+          "name": "debian-custom",
+          "version": 1,
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://www.testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 0,
+          "multipart": false
+        }
+      EOS
+
+    example 'Change the path to some files on all the environments',
+      <<-EOS ,
+        PUT /environments HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+        Content-Type: application/json
+        Content-Length: 96
+        {
+          "user": "root",
+          "update_files": {
+            "http://testbed.lan": "http://www.testbed.lan"
+          }
+        }
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 830
+        [
+          {
+            "name": "debian-custom",
+            "version": 1,
+            "visibility": "shared",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://www.testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 0,
+            "multipart": false
+          },
+          {
+            "name": "debian-custom",
+            "version": 2,
+            "visibility": "shared",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://www.testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/boot/vmlinuz",
+              "initrd": "/boot/initrd.img"
+            },
+            "filesystem": "ext4",
+            "partition_type": 0,
+            "multipart": false
+          }
+        ]
+      EOS
+  end
+
+  resource :DELETE, '/environments/:username/:name/:version?', 'Delete a specific environment, returns the resources that was deleted' do
+    request do
+      parameter ':username', :String, 'The owner of the environment', false
+      parameter ':name', :String, 'The name of the environment', false
+      parameter ':version', :String, 'The version of the environment', false
+    end
+    response :'Hash/Array' do
+      field '', 'Environment', "The environment(s) that was deleted"
+      code [400,12], 'Nothing modified, no environment was deleted (none were matching the conditions)'
+    end
+
+    example 'Delete every versions of a specific environment',
+      <<-EOS ,
+        DELETE /environments/frontend/debian-custom?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 830
+        [
+          {
+            "name": "debian-custom",
+            "version": 1,
+            "visibility": "shared",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://www.testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/vmlinuz",
+              "initrd": "/initrd.img"
+            },
+            "filesystem": "ext3",
+            "partition_type": 0,
+            "multipart": false
+          },
+          {
+            "name": "debian-custom",
+            "version": 2,
+            "visibility": "shared",
+            "destructive": false,
+            "os": "linux",
+            "image": {
+              "file": "http://www.testbed.lan/debian-base.tgz",
+              "kind": "tar",
+              "compression": "gzip"
+            },
+            "boot": {
+              "kernel": "/boot/vmlinuz",
+              "initrd": "/boot/initrd.img"
+            },
+            "filesystem": "ext4",
+            "partition_type": 0,
+            "multipart": false
+          }
+        ]
+      EOS
+
+    example 'Delete a specific version of an environment',
+      <<-EOS ,
+        DELETE /environments/frontend/debian-custom/2?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 376
+        {
+          "name": "debian-custom",
+          "version": 2,
+          "visibility": "private",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "boot": {
+            "kernel": "/boot/vmlinuz",
+            "initrd": "/boot/initrd.img"
+          },
+          "filesystem": "ext4",
+          "partition_type": 0,
+          "multipart": false
+        }
+      EOS
+  end
+end
