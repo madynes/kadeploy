@@ -50,7 +50,7 @@ require 'macrostep'
     def get_kernel_params
       kernel_params = String.new
       #We first check if the kernel parameters are defined in the environment
-      if (context[:execution].environment.kernel_params != nil) then
+      if !context[:execution].environment.kernel_params.nil? and !context[:execution].environment.kernel_params.empty?
         kernel_params = context[:execution].environment.kernel_params
       #Otherwise we eventually check in the cluster specific configuration
       elsif (context[:cluster].kernel_params != nil) then
