@@ -153,6 +153,7 @@ module HTTPd
         response['Content-Type'] = 'text/plain'
         response['Allow'] = (@allowed + [:HEAD]).collect{|m|m.to_s}.join(',')
       end
+      res << "\n" if response['Content-Type'] == 'text/plain'
       response['Content-Length'] = res.size
       response.body = res unless get_method(request) == :HEAD
       res = nil
@@ -281,7 +282,7 @@ module HTTPd
       #end
 
       fields = request.request_uri.path.split('/')[1..-1]
-      @args += fields.values_at(*filter).compact
+      @args += fields.values_at(*filter).compact.collect{|v| URI.decode_www_form_component(v)}
       @params[:names] = fields.values_at(*names).compact
       @params[:names] = nil if @params[:names].empty?
       #if suffix.empty?
@@ -332,6 +333,7 @@ module HTTPd
     raise ArgumentError.new('Content must be a Hash') unless res.is_a?(Hash)
 
     # Parse HTTP request's query string
+    # CGI.parse do decode_www_form
     CGI.parse(request.request_uri.query||'').each do |key,val|
       if val.is_a?(Array)
         if val.size > 1
