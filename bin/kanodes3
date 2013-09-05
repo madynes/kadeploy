@@ -23,9 +23,9 @@ class KanodesClient < Client
 
   def self.load_options()
     {
-      :operation => String.new,
+      :operation => nil,
       :user => nil,
-      :nodes => Array.new,
+      :nodes => [],
       :workflow_id => nil,
       :get_version => false,
       :chosen_server => String.new,
@@ -87,13 +87,22 @@ class KanodesClient < Client
   end
 
   def self.check_options(options)
-    if options[:operation] == :get_status and !options[:nodes].empty?
-      error('Node list is useless when gathering deployment statuses')
+    unless [:get_state,:get_status].include?(options[:operation])
+      error("You must choose an operation")
       return false
     end
-    if options[:operation] == :get_state and options[:workflow_id]
-      error('Workflow ID is useless when gathering node\'s deployment states')
-      return false
+
+    case options[:operation]
+    when :get_status
+      if !options[:nodes].empty?
+        error('Node list is useless when gathering deployment statuses')
+        return false
+      end
+    when :get_state
+      if options[:workflow_id]
+        error('Workflow ID is useless when gathering node\'s deployment states')
+        return false
+      end
     end
     true
   end
@@ -106,7 +115,7 @@ class KanodesClient < Client
     case options[:operation]
     when :get_state
       path = api_path()
-      params[:nodes] = options[:nodes] if !options[:nodes].empty?
+      params[:nodes] = options[:nodes]
     when :get_status
       path = api_path(options[:workflow_id],:deploy)
     else
