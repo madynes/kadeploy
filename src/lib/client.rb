@@ -578,6 +578,8 @@ class Client
       error("Cannot check the nodes on the #{server} server")
     rescue Errno::ECONNRESET
       error("The #{server} server refused the connection on port #{port}")
+    rescue HTTP::ClientError => e
+      error(e.message)
     end
     nodelist
   end
