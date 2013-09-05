@@ -263,7 +263,7 @@ module Rights
       if res.affected_rows > 0
         ret = res.to_hash.inject({}) do |h,v|
           h[v['user']] = {} unless h[v['user']]
-          h[v['user']][v['node']] = [] unless h[v['node']]
+          h[v['user']][v['node']] = [] unless h[v['user']][v['node']]
           h[v['user']][v['node']] << v['part']
           h
         end
