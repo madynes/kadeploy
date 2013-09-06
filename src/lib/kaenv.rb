@@ -9,7 +9,7 @@ module Kaenv
     ret.client = nil
     ret.username = nil
     ret.environment = nil
-    ret.show_all_version = false
+    ret.last = false
     ret
   end
 
@@ -52,7 +52,7 @@ module Kaenv
       end
     when :get
       parse_params(params) do |p|
-        context.show_all_version = p.parse('all_versions',nil,:toggle=>true)
+        context.last = p.parse('last',nil,:toggle=>true)
       end
     when :modify
       context.environment = {}
@@ -82,8 +82,13 @@ module Kaenv
             env[:update_files][oldf] = newf
           end
         end
+
+        context.last = p.parse('last',nil,:toggle=>true)
       end
     when :delete
+      parse_params(params) do |p|
+        context.last = p.parse('last',nil,:toggle=>true)
+      end
     else
       raise
     end
@@ -140,19 +145,19 @@ module Kaenv
         envs = Environment.get_from_db(
           cexec.database,
           name,
-          version || cexec.show_all_version,
+          version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           user,
-          cexec.user == user, #If the user wants to print the environments of another user, private environments are not shown
+          (cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
           false
         )
       elsif user.empty? and !name.empty? # if no user and an env name, look for public envs
         envs = Environment.get_from_db(
           cexec.database,
           name,
-          version || cexec.show_all_version,
+          version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           cexec.user,
-          cexec.user == user, #If the user wants to print the environments of another user, private environments are not shown
-          true
+          (cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
+          false
         )
       else
         error_not_found!
@@ -160,9 +165,10 @@ module Kaenv
     else
       envs = Environment.get_list_from_db(
         cexec.database,
-        user,
-        cexec.user == user, #If the user wants to print the environments of another user, private environments are not shown
-        cexec.show_all_version
+        user || (config.common.almighty_env_users.include?(cexec.user) ? nil :cexec.user), # Almighty user can see everything
+        (!user or cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
+        (user.nil? or user.empty?),# Show only the environments of a specific user if user is defined
+        !cexec.last
       )
     end
 
@@ -171,7 +177,7 @@ module Kaenv
         env.to_hash.merge!({'user'=>env.user})
       end
     else
-      []
+      error_not_found!
     end
   end
 
@@ -217,7 +223,7 @@ module Kaenv
       ret = []
       updates = {}
 
-      envs = Environment.get_list_from_db(cexec.database,user,true,true)
+      envs = Environment.get_list_from_db(cexec.database,user,true,true,true)
 
       envs.each do |env|
         cexec.environment[:update_files].each do |oldf,newf|
@@ -248,72 +254,86 @@ module Kaenv
       end
       kaerror(APIError::NOTHING_MODIFIED) if ret.empty?
       ret
-    elsif (env = Environment.get_from_db(
-      cexec.database,
-      name,
-      version,
-      user,
-      true,
-      true
-    )) then
-      env = env[0]
-      updates = {}
-
-      if cexec.environment[:visibility]
-        updates['visibility'] = cexec.environment[:visibility]
-      end
-
-      if cexec.environment[:destructive]
-        if env.demolishing_env
-          updates['demolishing_env'] = 0
-        else
-          updates['demolishing_env'] = 1
-        end
-      end
-
-      if cexec.environment[:update_image_checksum]
-        updates['tarball'] = fileupdate.call(env,'tarball')
-      end
-
-      if cexec.environment[:update_preinstall_checksum]
-        updates['preinstall'] = fileupdate.call(env,'preinstall')
-      end
-
-      if cexec.environment[:update_postinstalls_checksum]
-        updates['postinstall'] = fileupdate.call(env,'postinstall')
-      end
-
-      updates.each{ |k,v| updates.delete(k) if v.nil? }
-
-      if (ret = Environment.update_to_db(
+    else
+      if (!version or version.empty?) and !cexec.last
+        error_not_found!
+      elsif (env = Environment.get_from_db(
         cexec.database,
         name,
         version,
         user,
         true,
-        updates,
-        env
+        true
       )) then
-        ret.to_hash
+        env = env[0]
+        updates = {}
+
+        if cexec.environment[:visibility]
+          updates['visibility'] = cexec.environment[:visibility]
+        end
+
+        if cexec.environment[:destructive]
+          if env.demolishing_env
+            updates['demolishing_env'] = 0
+          else
+            updates['demolishing_env'] = 1
+          end
+        end
+
+        if cexec.environment[:update_image_checksum]
+          updates['tarball'] = fileupdate.call(env,'tarball')
+        end
+
+        if cexec.environment[:update_preinstall_checksum]
+          updates['preinstall'] = fileupdate.call(env,'preinstall')
+        end
+
+        if cexec.environment[:update_postinstalls_checksum]
+          updates['postinstall'] = fileupdate.call(env,'postinstall')
+        end
+
+        updates.each{ |k,v| updates.delete(k) if v.nil? }
+
+        if (ret = Environment.update_to_db(
+          cexec.database,
+          name,
+          version,
+          user,
+          true,
+          updates,
+          env
+        )) then
+          ret.to_hash
+        else
+          if ret.nil?
+            error_not_found!
+          else
+            kaerror(APIError::NOTHING_MODIFIED)
+          end
+        end
       else
-        kaerror(APIError::NOTHING_MODIFIED)
+        error_not_found!
       end
-    else
-      error_not_found!
     end
   end
 
   def envs_delete(cexec,user,name,version=nil)
-    if (ret = Environment.del_from_db(
+    if (envs = Environment.del_from_db(
       cexec.database,
       name,
-      version,
+      version || !cexec.last || nil, # if nil->last, if version->version, if true->all
       user,
       true
     )) then
-      ret.to_hash
+      envs.collect do |env|
+        env.to_hash
+      end
     else
-      kaerror(APIError::NOTHING_MODIFIED)
+      if envs.nil?
+        error_not_found!
+      else
+        kaerror(APIError::NOTHING_MODIFIED)
+      end
     end
   end
 end

@@ -56,7 +56,7 @@ class KaenvsClient < Client
       :env_version => nil,
       :env_user => nil,
       :visibility_tag => String.new,
-      :show_all_version => false,
+      :all_versions => false,
       :files_to_move => Hash.new,
       :get_version => false,
       :chosen_server => String.new,
@@ -105,8 +105,8 @@ class KaenvsClient < Client
         options[:env_name] = n
         options[:operation] = :print
       }
-      opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
-        options[:show_all_version] = true
+      opt.on("-s", "--all-versions", "Apply the operation on all the versions of the environment") {
+        options[:all_versions] = true
       }
       opt.on("-t", "--visibility-tag TAG", "Set the visibility tag (private, shared, public)") { |v|
         if /\A(private|shared|public)\Z/ =~ v then
@@ -225,7 +225,7 @@ class KaenvsClient < Client
     path = api_path()
     if ![:add, :list, :'move-files'].include?(options[:operation])
       path = File.join(path,options[:env_user]||USER)
-      path = File.join(path,options[:env_name])
+      path = File.join(path,options[:env_name]) if options[:env_name]
       path = File.join(path,options[:env_version]) if options[:env_version]
     elsif options[:operation] != :add
       path = File.join(path,options[:env_user]) if options[:env_user]
@@ -281,7 +281,7 @@ class KaenvsClient < Client
         raise
     end
 
-    params[:all_versions] = true if options[:show_all_version]
+    params[:last] = true unless options[:all_versions]
 
     ret = nil
     case method
