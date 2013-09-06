@@ -33,7 +33,7 @@ module Karights
 
       case operation
       when :create
-        context.username = p.parse('username',String, :default => context.username)
+        context.username = p.parse('username',String, :default => context.user)
         context.overwrite = p.parse('overwrite',nil,:toggle=>true)
 
       when :get

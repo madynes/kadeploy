@@ -33,10 +33,10 @@ class KarightsClient < Client
 
   def self.load_options()
     {
-      :operation => String.new,
+      :operation => nil,
       :user => nil,
-      :nodes => Array.new,
-      :parts => Array.new,
+      :nodes => [],
+      :parts => [],
       :overwrite => false,
       :get_version => false,
       :chosen_server => String.new,
@@ -138,7 +138,7 @@ class KarightsClient < Client
     case options[:operation]
       when :add
         method = :POST
-        params[:nodes] = options[:nodes] if !options[:nodes].empty?
+        params[:nodes] = options[:nodes] if options[:nodes]
         params[:partitions] = options[:parts] if !options[:parts].empty?
       when :show
         method = :GET
@@ -146,7 +146,7 @@ class KarightsClient < Client
       when :delete
         method = :DELETE
         path = File.join(path,options[:user])
-        params[:nodes] = options[:nodes] if !options[:nodes].empty?
+        params[:nodes] = options[:nodes] if options[:nodes]
         params[:partitions] = options[:parts] if !options[:parts].empty?
       else
         raise
