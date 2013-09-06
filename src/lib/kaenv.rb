@@ -196,11 +196,13 @@ module Kaenv
             tmp = f['file'].gsub(upfile[:old],'')
             f['file'] = upfile[:new]
             f['file'] = File.join(f['file'],tmp) unless tmp.empty?
+            FetchFile[f['file'],APIError::INVALID_CONTENT,cexec.client].size
+          else
+            md5 = FetchFile[f['file'],APIError::INVALID_CONTENT,cexec.client].checksum
+            kaerror(APIError::INVALID_CONTENT,"#{kind} md5") if !md5 or md5.empty?
+            kaerror(APIError::NOTHING_MODIFIED) if f['md5'] and f['md5'] == md5
+            f['md5'] = md5
           end
-          md5 = FetchFile[f['file'],APIError::INVALID_CONTENT,cexec.client].checksum
-          kaerror(APIError::INVALID_CONTENT,"#{kind} md5") if !md5 or md5.empty?
-          kaerror(APIError::NOTHING_MODIFIED) if f['md5'] and f['md5'] == md5
-          f['md5'] = md5
           changes = true
         end
       end
