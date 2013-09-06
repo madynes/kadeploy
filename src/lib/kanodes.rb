@@ -44,13 +44,17 @@ module Kanodes
     nodes += cexec.nodes if cexec.nodes
     nodes = nil if nodes.empty?
 
+    server_nodes = get_nodes()
+
     if cexec.list
-      nodes || get_nodes()
+      nodes.each{|node| error_not_found!(node) unless server_nodes.include?(node)} if nodes
+      nodes || server_nodes
     else
       ret = Nodes::get_states(cexec.database,nodes)
+      error_not_found!(node) if nodes and (!ret or ret.empty?)
 
       # Check that every nodes has a state, init to nil if not
-      (nodes || get_nodes()).each do |n|
+      (nodes || server_nodes).each do |n|
         ret[n] = nil unless ret[n]
       end
 
