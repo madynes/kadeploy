@@ -171,7 +171,7 @@ module Kaenv
         env.to_hash.merge!({'user'=>env.user})
       end
     else
-      []
+      error_not_found!
     end
   end
 
