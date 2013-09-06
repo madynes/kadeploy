@@ -100,6 +100,7 @@ module Karights
     nodes += cexec.nodes if cexec.nodes
 
     res = cexec.rights.get(user,nodes)
+    error_not_found! unless res
     ret = {}
     res.each do |usr,nods|
       ret[usr] = {} unless ret[usr]
@@ -119,7 +120,7 @@ module Karights
     error_invalid!
   end
 
-  def rights_delete(cexec,user,node=nil,partition=nil)
+  def rights_delete(cexec,user,node=nil)
     nodes = []
     nodes << node if node
     nodes += cexec.nodes if cexec.nodes
@@ -130,9 +131,7 @@ module Karights
     kaerror(APIError::NOTHING_MODIFIED) unless existing = cexec.rights.get(user,nodes)
     existing = existing[user]
 
-    partitions = []
-    partitions << partition if partition
-    partitions += cexec.partitions if cexec.partitions
+    partitions = cexec.partitions
     partitions = nil if partitions.empty?
 
     if nodes and existing.include?('*')
