@@ -117,19 +117,24 @@ class KarightsClient < Client
       return false
     end
 
-    if options[:operation] != :show and !options[:user]
-      error('You must choose a user')
-      return false
+    case options[:operation]
+    when :show
+      if !options[:nodes].empty?
+        error('Node list is useless when showing rights of a specific user')
+        return false
+      end
+    else
+      unless options[:user]
+        error('You must choose a user')
+        return false
+      end
     end
 
     return true
   end
 
   def run(options)
-    params = {
-      :user => USER,
-      :username => options[:user],
-    }
+    params = { :user => USER }
 
     params[:overwrite] = true if options[:overwrite]
 
@@ -138,6 +143,7 @@ class KarightsClient < Client
     case options[:operation]
       when :add
         method = :POST
+        params[:username] = options[:user]
         params[:nodes] = options[:nodes] if options[:nodes]
         params[:partitions] = options[:parts] if !options[:parts].empty?
       when :show
