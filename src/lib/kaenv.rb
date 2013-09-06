@@ -304,14 +304,16 @@ module Kaenv
   end
 
   def envs_delete(cexec,user,name,version=nil)
-    if (ret = Environment.del_from_db(
+    if (envs = Environment.del_from_db(
       cexec.database,
       name,
       version,
       user,
       true
     )) then
-      ret.to_hash
+      envs.collect do |env|
+        env.to_hash
+      end
     else
       kaerror(APIError::NOTHING_MODIFIED)
     end
