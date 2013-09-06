@@ -488,24 +488,27 @@ class Environment
 
   def self.del_from_db(dbh, name, version, user, private_envs)
     # load the environment from the database (check that it exists)
-    env = get_from_db(
+    envs = get_from_db(
       dbh,
       name,
-      version,
+      version||true, # returns all the versions if version is not specified
       user,
       private_envs,
       false
     )
-    if env and !env.empty?
-      env = env[0]
-      res = dbh.run_query(
-        "DELETE FROM environments WHERE name=? AND version=? AND user=?",
-        env.name, env.version, env.user
-      )
+    if envs and !envs.empty?
+      env = envs[0]
+      query = "DELETE FROM environments WHERE name=? AND user=?"
+      args = [env.name,env.user]
+      if version and !version.empty?
+        query << ' AND version=?'
+        args << env.version
+      end
+      res = dbh.run_query(query,*args)
       if res.affected_rows == 0
         return false
       else
-        return env
+        return envs
       end
     else
       return false
