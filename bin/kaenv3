@@ -148,7 +148,7 @@ class KaenvsClient < Client
       }
       opt.on("--update-image-checksum ENVNAME", "Update the checksum of the environment image") { |n|
         options[:env_name] = n
-        options[:operation] = :'update-tarball-checksum'
+        options[:operation] = :'update-image-checksum'
       }
       opt.on("--update-preinstall-checksum ENVNAME", "Update the checksum of the environment preinstall") { |n|
         options[:env_name] = n
@@ -189,7 +189,7 @@ class KaenvsClient < Client
       end
     when :list
 
-    when :delete, :print, :'update-tarball-checksum', :'update-preinstall-checksum', :'update-postinstalls-checksum', :'toggle-destructive-tag'
+    when :delete, :print, :'update-image-checksum', :'update-preinstall-checksum', :'update-postinstalls-checksum', :'toggle-destructive-tag'
       if options[:env_name].empty?
         error("You must choose an environment")
         return false
@@ -231,7 +231,7 @@ class KaenvsClient < Client
       path = File.join(path,options[:env_user]) if options[:env_user]
     end
 
-    if [:add, :'update-tarball-checksum',:'update-postinstalls-checksum',:'update-preinstall-checksum',:'move-files'].include?(options[:operation])
+    if [:add, :'update-image-checksum',:'update-postinstalls-checksum',:'update-preinstall-checksum',:'move-files'].include?(options[:operation])
       # Check if the environment contains local files
       desc = nil
       case options[:operation]
@@ -243,6 +243,7 @@ class KaenvsClient < Client
         desc = get(path,params)[0]
       end
       localfiles = get_localfiles(desc)
+
       # Serve local files throught HTTP(s)
       params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
     end
