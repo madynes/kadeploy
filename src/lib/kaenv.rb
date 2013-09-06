@@ -47,7 +47,7 @@ module Kaenv
           context.username,
           context.client
         ))
-          kaerror(KadeployError::LOAD_ENV_FROM_DESC_ERROR)
+          kaerror(APIError::INVALID_ENVIRONMENT)
         end
       end
     when :get

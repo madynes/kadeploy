@@ -11,7 +11,7 @@ require 'http'
 require 'debug'
 require 'configparser'
 require 'grabfile'
-require 'fetchfile'
+rAPIError::INVALID_ENVIRONMENTequire 'fetchfile'
 require 'error'
 
 module Kadeploy
@@ -168,7 +168,7 @@ class Environment
     mandatory.each do |name|
       val = self.instance_variable_get(name)
       if val.nil? or val.empty?
-        return [false,"The field '#{name.to_s[1..-1]}' is mandatory for OS #{@environment_kind} with the '#{type[0]}' image kind"]
+        return [false,"The field '#{name.to_s[1..-1]}' is mandatory for OS #{@environment_kind} with the '#{@image[:kind]}' image kind"]
       end
     end
     return [true,'']
@@ -349,7 +349,7 @@ class Environment
 
 
     rescue ArgumentError => ae
-      error(KadeployError::LOAD_ENV_FROM_DESC_ERROR,
+      error(APIError::INVALID_ENVIRONMENT,
         "Error[environment description] #{ae.message}")
     end
 
@@ -358,7 +358,7 @@ class Environment
     end
 
     ret = check_os_values()
-    error(KadeployError::LOAD_ENV_FROM_DESC_ERROR,ret[1]) unless ret[0]
+    error(APIError::INVALID_ENVIRONMENT,ret[1]) unless ret[0]
     return ret[0]
   end
 
