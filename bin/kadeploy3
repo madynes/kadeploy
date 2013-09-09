@@ -22,57 +22,45 @@ class KadeployClient < ClientWorkflow
   end
 
   def self.load_options()
-    {
-      :environment => {},
-      :nodes => [],
-      :env_kind => '',
-      :env_desc => '',
-      :env_name => '',
-      :env_version => nil, #By default we load the latest version
-      :user => nil,
-      :block_device => nil,
-      :deploy_part => nil,
-      :boot_part => nil,
-      :verbose_level => nil,
-      :debug => false,
-      :script => '',
-      :key => '',
-      :reformat_tmp => false,
-      :pxe_profile_msg => '',
-      :pxe_upload_files => [],
-      :pxe_profile_singularities => nil,
-      :steps => [],
-      :ignore_nodes_deploying => false,
-      :breakpoint_on_microstep => '',
-      :custom_operations_file => nil,
-      :custom_operations => nil,
-      :disable_bootloader_install => false,
-      :disable_disk_partitioning => false,
-      :nodes_ok_file => nil,
-      :nodes_ko_file => nil,
-      :write_workflow_id => nil,
-      :get_version => false,
-      :get_users_info => false,
-      :chosen_server => '',
-      :servers => load_configfile(),
-      :multi_server => false,
-      :kadeploy_server => '',
-      :kadeploy_server_port => '',
-      :reboot_classical_timeout => nil,
-      :reboot_kexec_timeout => nil,
-      :vlan => nil,
-      :secure => false,
-    }
+    global_load_options().merge(
+      {
+        :environment => {},
+        :env_kind => '',
+        :env_desc => '',
+        :env_name => '',
+        :env_version => nil, #By default we load the latest version
+        :user => nil,
+        :block_device => nil,
+        :deploy_part => nil,
+        :boot_part => nil,
+        :verbose_level => nil,
+        :debug => false,
+        :script => '',
+        :key => '',
+        :reformat_tmp => false,
+        :pxe_profile_msg => '',
+        :pxe_upload_files => [],
+        :pxe_profile_singularities => nil,
+        :steps => [],
+        :ignore_nodes_deploying => false,
+        :breakpoint_on_microstep => '',
+        :custom_operations_file => nil,
+        :custom_operations => nil,
+        :disable_bootloader_install => false,
+        :disable_disk_partitioning => false,
+        :nodes_ok_file => nil,
+        :nodes_ko_file => nil,
+        :write_workflow_id => nil,
+        :reboot_classical_timeout => nil,
+        :reboot_kexec_timeout => nil,
+        :vlan => nil,
+        :secure => false,
+      }
+    )
   end
 
   def self.parse_options()
-    options = load_options()
-    opts = OptionParser::new do |opt|
-      opt.summary_indent = "  "
-      opt.summary_width = 32
-      opt.banner = "Usage: kadeploy3 [options]"
-      opt.separator "Contact: #{CONTACT_EMAIL}"
-      opt.separator ""
+    global_parse_options() do |opt,options|
       opt.separator "General options:"
       opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
         if tmp = load_envfile(f)
@@ -109,9 +97,6 @@ class KadeployClient < ClientWorkflow
       opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
         load_machinefile(options[:nodes], f)
       }
-      opt.on("-i", "--server-info", "Get information about the server's configuration") {
-        options[:get_users_info] = true
-      }
       opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
         if (f != nil) then
           if (f =~ R_HTTP) then
@@ -136,9 +121,6 @@ class KadeployClient < ClientWorkflow
       }
       opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
         load_machine(options[:nodes], hostname)
-      }
-      opt.on("--multi-server", "Activate the multi-server mode") {
-        options[:multi_server] = true
       }
       opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
         options[:nodes_ko_file] = f
@@ -178,9 +160,6 @@ class KadeployClient < ClientWorkflow
           error("Invalid user name")
           return false
         end
-      }
-      opt.on("-v", "--version", "Get the version") {
-        options[:get_version] = true
       }
       opt.on("--vlan VLANID", "Set the VLAN") { |id|
         options[:vlan] = id
@@ -232,9 +211,6 @@ class KadeployClient < ClientWorkflow
           return false
         end
       }
-      opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
-        options[:chosen_server] = s
-      }
       opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
         begin
           options[:verbose_level] = d.to_i
@@ -243,6 +219,7 @@ class KadeployClient < ClientWorkflow
           return false
         end
       }
+      opt.separator ""
       opt.separator "Advanced options:"
       opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |file|
         options[:write_workflow_id] = file
@@ -328,23 +305,7 @@ class KadeployClient < ClientWorkflow
       opt.on("--secure", "Use a secure connection to export files to the server") {
         options[:secure] = true
       }
-      opt.on("-D", "--debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") {
-        $debug_http = IO.new(3) rescue $stdout unless $debug_http
-      }
     end
-
-    begin
-      opts.parse!(ARGV)
-    rescue
-      error("Option parsing error: #{$!}")
-      return false
-    end
-
-    options[:chosen_server] = options[:servers]['default'] if options[:chosen_server].empty?
-    options[:kadeploy_server] = options[:servers][options[:chosen_server]][0]
-    options[:kadeploy_server_port] = options[:servers][options[:chosen_server]][1]
-
-    return options
   end
 
   def self.check_options(options)

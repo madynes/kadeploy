@@ -22,48 +22,22 @@ class KaconsoleClient < Client
   end
 
   def self.load_options()
-    {
-      :node => nil,
-      :get_version => false,
-      :chosen_server => String.new,
-      :servers => load_configfile(),
-      :kadeploy_server => String.new,
-      :kadeploy_server_port => String.new,
-      :kadeploy_server_port => String.new,
-    }
+    global_load_options().merge(
+      {
+        :node => nil,
+      }
+    )
   end
 
   def self.parse_options()
-    options = load_options()
-    opts = OptionParser::new do |opt|
-      opt.summary_indent = "  "
-      opt.summary_width = 28
-      opt.banner = "Usage: kaconsole3 [options]"
-      opt.separator "Contact: #{CONTACT_EMAIL}"
-      opt.separator ""
+    global_parse_options() do |opt,options|
       opt.separator "General options:"
       opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |h|
         tmp = []
         load_machine(tmp, h.strip)
         options[:node] = tmp[0]
       }
-      opt.on("-v", "--version", "Get the version") {
-        options[:get_version] = true
-      }
     end
-
-    begin
-      opts.parse!(ARGV)
-    rescue
-      error("Option parsing error: #{$!}")
-      return false
-    end
-
-    options[:chosen_server] = options[:servers]['default'] if options[:chosen_server].empty?
-    options[:kadeploy_server] = options[:servers][options[:chosen_server]][0]
-    options[:kadeploy_server_port] = options[:servers][options[:chosen_server]][1]
-
-    return options
   end
 
   def self.check_options(options)

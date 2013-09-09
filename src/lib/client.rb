@@ -636,6 +636,62 @@ class Client
     $httpd
   end
 
+  def self.global_load_options()
+    {
+      :nodes => [],
+      :get_version => false,
+      :get_user_info => false,
+      :multi_server => false,
+      :servers => load_configfile(),
+      :chosen_server => nil,
+      :server_host => nil,
+      :server_port => nil,
+    }
+  end
+
+  def self.global_parse_options()
+    options = load_options()
+    opts = OptionParser::new do |opt|
+      opt.summary_indent = "  "
+      opt.summary_width = 28
+      opt.banner = "Usage: #{$0.split('/')[-1]} [options]"
+      opt.separator "Contact: #{CONTACT_EMAIL}"
+      opt.separator ""
+      opt.separator "Generic options:"
+      opt.on("-v", "--version", "Get the server's version") {
+        options[:get_version] = true
+      }
+      opt.on("-I", "--server-info", "Get information about the server's configuration") {
+        options[:get_users_info] = true
+      }
+      opt.on("-M","--multi-server", "Activate the multi-server mode") {
+        options[:multi_server] = true
+      }
+      opt.on("-H", "--debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") {
+        $debug_http = IO.new(3) rescue $stdout unless $debug_http
+      }
+      opt.on("-S","--server STRING", "Specify the Kadeploy server to use") { |s|
+        options[:chosen_server] = s
+      }
+      opt.separator ""
+      yield(opt,options)
+    end
+
+    begin
+      opts.parse!(ARGV)
+    rescue
+      error("Option parsing error: #{$!}")
+      return false
+    end
+
+    options[:chosen_server] = options[:servers]['default'] unless options[:chosen_server]
+    error("The server '#{options[:chosen_server]}' does not exist") unless options[:servers][options[:chosen_server]]
+    options[:server_host] = options[:servers][options[:chosen_server]][0]
+    options[:server_port] = options[:servers][options[:chosen_server]][1]
+
+    return options
+  end
+
   # TODO: check_int_range, check_ssh_key, check_operation_level, check_username, check_file, check_pxe..., check_env_version, check_verbose_level
   def self.launch()
     options = nil
