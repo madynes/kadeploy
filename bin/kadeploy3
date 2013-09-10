@@ -225,7 +225,7 @@ p c
     out = []
 
     # Launch the workflow
-    launch_workflow(params) do |res|
+    launch_workflow(options,params) do |res|
       if res['outputs']
         output = get(api_path('output'))
         out += output.split("\n")

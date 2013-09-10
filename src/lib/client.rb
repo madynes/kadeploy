@@ -1040,10 +1040,11 @@ class ClientWorkflow < Client
     true
   end
 
-  def launch_workflow(params)
+  def launch_workflow(options,params)
     ret = post(api_path(),params.to_json)
     @wid = ret['wid']
     @resources = ret['resources']
+    File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
 p @resources['resource']
 
     puts "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
@@ -1076,6 +1077,15 @@ p @resources['resource']
     end
 
     delete(api_path()) if @wid
+
+    if options[:script]
+      puts "\nRunning #{options[:script]}\n"
+      if system(options[:script])
+        puts "\nSuccess !"
+      else
+        puts "\nFail !"
+      end
+    end
   end
 end
 
