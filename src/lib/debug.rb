@@ -158,7 +158,7 @@ module Debug
           err.each_line do |line|
             @debug[node.hostname] << Debug.format("STDERR: #{line}\n")
           end
-          stat.each_line do |line|
+          stat.to_s.each_line do |line|
             @debug[node.hostname] << Debug.format("STATUS: #{line}\n")
           end
         end
