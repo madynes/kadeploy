@@ -26,7 +26,6 @@ class KapowerClient < ClientWorkflow
       {
         :operation => nil,
         :level => :soft,
-        :wait => true,
       }
     )
   end
@@ -43,9 +42,6 @@ class KapowerClient < ClientWorkflow
       }
       opt.on("--status", "Get the status of the nodes") {
         options[:operation] = :status
-      }
-      opt.on("--no-wait", "Do not wait the end of the power operation") {
-        options[:wait] = false
       }
     end
   end

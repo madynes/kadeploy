@@ -991,6 +991,12 @@ class ClientWorkflow < Client
       }
   end
 
+  def self.parse_wait(opt,options)
+    opt.on("--[no-]wait", "Wait the end of the operation, set by default") { |v|
+      options[:wait] = v
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -1000,6 +1006,7 @@ class ClientWorkflow < Client
         :nodes_ko_file => nil,
         :wid_file => nil,
         :script => nil,
+        :wait => true,
       }
     )
   end
@@ -1016,6 +1023,7 @@ class ClientWorkflow < Client
       parse_scriptfile(opt,options)
       parse_verbose(opt,options)
       parse_wid(opt,options)
+      parse_wait(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -1032,6 +1040,13 @@ class ClientWorkflow < Client
       return false
     end
 
+    unless options[:wait]
+      if options[:nodes_ok_file] or options[:nodes_ko_file]
+        error("-o/--output-ok-nodes and/or -n/--output-ko-nodes cannot be used with --no-wait")
+        return false
+      end
+    end
+
     if options[:verbose_level] and !(1..5).include?(options[:verbose_level])
       error("Invalid verbose level")
       return false
@@ -1041,42 +1056,51 @@ class ClientWorkflow < Client
   end
 
   def launch_workflow(options,params)
+    if !options[:wait] and !$files.empty?
+      error("Cannot use --no-wait since some files have to be exported to the server:\n  #{$files.collect{|f|f.path}.join("\n  ")}")
+    end
+
+    # Launch the operation
     ret = post(api_path(),params.to_json)
     @wid = ret['wid']
     @resources = ret['resources']
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
 p @resources['resource']
 
-    puts "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
+    if options[:wait]
+      puts "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
 
-    res = nil
-    begin
-      res = get(api_path('resource'))
+      res = nil
+      begin
+        res = get(api_path('resource'))
 
-      yield(res)
+        yield(res)
 
-      sleep SLEEP_PITCH
-    end until res['done']
+        sleep SLEEP_PITCH
+      end until res['done']
 
-    get(api_path('error')) if res['error']
+      get(api_path('error')) if res['error']
 
-    puts "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
+      puts "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
-    unless res['error']
-      # Success
-      if res['nodes']['ok'] and !res['nodes']['ok'].empty?
-        puts "The #{self.class.operation().downcase} is successful on nodes"
-        puts res['nodes']['ok'].join("\n")
+      unless res['error']
+        # Success
+        if res['nodes']['ok'] and !res['nodes']['ok'].empty?
+          puts "The #{self.class.operation().downcase} is successful on nodes"
+          puts res['nodes']['ok'].join("\n")
+        end
+
+        # Fail
+        if res['nodes']['ko'] and !res['nodes']['ko'].empty?
+          puts "The #{self.class.operation().downcase} operation failed on nodes"
+          puts res['nodes']['ko'].join("\n")
+        end
       end
 
-      # Fail
-      if res['nodes']['ko'] and !res['nodes']['ko'].empty?
-        puts "The #{self.class.operation().downcase} operation failed on nodes"
-        puts res['nodes']['ko'].join("\n")
-      end
+      delete(api_path()) if @wid
+    else
+      puts "#{@wid} #{@resources['resource']}\n"
     end
-
-    delete(api_path()) if @wid
 
     if options[:script]
       puts "\nRunning #{options[:script]}\n"

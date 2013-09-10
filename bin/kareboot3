@@ -35,7 +35,6 @@ class KarebootClient < ClientWorkflow
         :pxe_profile_singularities => nil,
         :key => nil,
         :level => :soft,
-        :wait => true,
         :reboot_classical_timeout => nil,
         :vlan => nil,
         :secure => false,
@@ -63,9 +62,6 @@ class KarebootClient < ClientWorkflow
       parse_pxe_pattern(opt,options)
       parse_pxe_files(opt,options)
       parse_env_version(opt,options)
-      opt.on("--no-wait", "Do not wait the end of the reboot") {
-        options[:wait] = false
-      }
       opt.on("--reboot-classical-timeout V", /^\d+$/, "Overload the default timeout for classical reboots") { |t|
         options[:reboot_classical_timeout] = t.to_i
       }
@@ -101,17 +97,6 @@ class KarebootClient < ClientWorkflow
     if options[:key] and options[:operation] != :deploy_env
       error("The -k option can be only used with the deploy_env reboot kind")
       return false
-    end
-
-    unless options[:wait]
-      if options[:nodes_ok_file] or options[:nodes_ko_file]
-        error("-o/--output-ok-nodes and/or -n/--output-ko-nodes cannot be used with --no-wait")
-        return false
-      end
-      if options[:key]
-        error("-k/--key cannot be used with --no-wait")
-        return false
-      end
     end
 
     true
