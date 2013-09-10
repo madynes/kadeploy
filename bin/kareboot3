@@ -34,15 +34,11 @@ class KarebootClient < ClientWorkflow
         :pxe_files => [],
         :pxe_profile_singularities => nil,
         :key => nil,
-        :nodes_ok_file => nil,
-        :nodes_ko_file => nil,
         :level => :soft,
         :wait => true,
-        :debug => false,
         :reboot_classical_timeout => nil,
         :vlan => nil,
-        :verbose_level => nil,
-        :debug => false,
+        :secure => false,
       }
     )
   end
@@ -50,163 +46,36 @@ class KarebootClient < ClientWorkflow
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
-        if /\A[\w\/]+\Z/ =~ b then
-          options[:block_device] = b
-        else
-          error("Invalid block device")
-          return false
-        end
-      }
+      parse_block_device(opt,options)
       opt.on("-c", "--check-destructive-tag", "Check if some nodes was deployed with an environment that have the destructive tag") {
         options[:check_demolishing] = true
       }
-      opt.on("-d", "--debug-mode", "Activate the debug mode") {
-        options[:debug] = true
-      }
-      opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |n|
-        options[:env_name] = n
-      }
-      opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-        load_machinefile(options[:nodes], f)
-      }
-      opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
-        if (f != nil) then
-          if (f =~ R_HTTP) then
-            options[:key] = f
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              options[:key] = File.expand_path(f)
-            end
-          end
-        else
-          authorized_keys = File.expand_path("~/.ssh/authorized_keys")
-          if File.readable?(authorized_keys) then
-            options[:key] = authorized_keys
-          else
-            error("The authorized_keys file #{authorized_keys} cannot be read")
-            return false
-          end
-        end
-      }
-      opt.on("-l", "--reboot-level VALUE", "Reboot level (soft, hard, very_hard)") { |l|
-        if check_operation_level(l)
-          options[:level] = l.downcase
-        else
-          error("Invalid level")
-          return false
-        end
-      }
-      opt.on("-m", "--machine MACHINE", "Reboot the given machines") { |hostname|
-        load_machine(options[:nodes], hostname)
-      }
-      opt.on("--multi-server", "Activate the multi-server mode") {
-        options[:multi_server] = true
-      }
-      opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly rebooted")  { |f|
-        options[:nodes_ko_file] = f
-      }
-      opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly rebooted")  { |f|
-        options[:nodes_ok_file] = f
-      }
-      opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
-        options[:deploy_part] = p
-      }
-      opt.on("-r", "--reboot-kind REBOOT_KIND", "Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded)") { |k|
+      parse_env_name(opt,options){ options[:env_kind] = :database }
+      parse_keyfile(opt,options)
+      parse_op_level(opt,options)
+      parse_deploy_part(opt,options)
+      opt.on("-r", "--reboot-kind REBOOT_KIND", ['set_pxe', 'simple_reboot', 'deploy_env', 'env_recorded'], "Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded)") { |k|
         options[:operation] = k.strip.downcase.to_sym
       }
-      opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-        if /\A\w+\Z/ =~ u then
-          options[:user] = u
-        else
-          error("Invalid user name")
-          return false
-        end
-      }
-      opt.on("--vlan VLANID", "Set the VLAN") { |id|
-        options[:vlan] = id
-      }
-      opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
-        unless File.readable?(f)
-          error("The file #{f} cannot be read")
-          return false
-        else
-          options[:pxe_profile] = File.read(f)
-        end
-      }
-      opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
-        if not File.readable?(f) then
-          error("The file #{f} cannot be read")
-          return false
-        else
-          options[:pxe_profile_singularities] = {}
-          IO.readlines(f).each { |l|
-            if !(/^#/ =~ l) and !(/^$/ =~ l) then #we ignore commented and empty lines
-              content = l.split(",")
-              options[:pxe_profile_singularities[content[0]]] = content[1].strip
-            end
-          }
-        end
-      }
-      opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |l|
-        l.split(",").each { |file|
-          if (file =~ R_HTTP) then
-            options[:pxe_files] << file
-          else
-            f = File.expand_path(file)
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              options[:pxe_files] << (f)
-            end
-          end
-        }
-      }
-      opt.on("--env-version NUMBER", "Specify the environment version") { |v|
-        if /\A\d+\Z/ =~ v then
-          options[:env_version] = v
-        else
-          error("Invalid version number")
-          return false
-        end
-      }
+      parse_user(opt,options)
+      parse_vlan(opt,options)
+      parse_pxe_profile(opt,options)
+      parse_pxe_pattern(opt,options)
+      parse_pxe_files(opt,options)
+      parse_env_version(opt,options)
       opt.on("--no-wait", "Do not wait the end of the reboot") {
         options[:wait] = false
       }
-      opt.on("--server STRING", "Specify the Kadeploy server to use") { |s|
-        options[:chosen_server] = s
+      opt.on("--reboot-classical-timeout V", /^\d+$/, "Overload the default timeout for classical reboots") { |t|
+        options[:reboot_classical_timeout] = t.to_i
       }
-      opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
-        begin
-          options[:verbose_level] = d.to_i
-        rescue
-          error("Invalid verbose level")
-          return false
-        end
-      }
-      opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
-        if (t =~ /\A\d+\Z/) then
-          options[:reboot_classical_timeout] = t
-        else
-          error("A number is required for the reboot classical timeout")
-        end
-      }
+      parse_secure(opt,options)
     end
   end
 
   def self.check_options(options)
-    if options[:nodes].empty?
-      error("No node is chosen")
-      return false
-    end
-    unless (1..5).include?(options[:verbose_level])
-      error("Invalid verbose level")
-      return false
-    end
+    return false unless super(options)
+
     if !options[:operation] or options[:operation].empty?
       error("No operation is chosen")
       return false
@@ -231,11 +100,6 @@ class KarebootClient < ClientWorkflow
 
     if options[:key] and options[:operation] != :deploy_env
       error("The -k option can be only used with the deploy_env reboot kind")
-      return false
-    end
-
-    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
-      error("The files used for the output of the OK and the KO nodes cannot be the same")
       return false
     end
 

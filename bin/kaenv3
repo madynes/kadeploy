@@ -51,14 +51,15 @@ class KaenvsClient < Client
     global_load_options().merge(
       {
         :environment => {},
-        :operation => String.new,
-        :env_desc => String.new,
-        :env_name => String.new,
+        :operation => nil,
+        :env_desc => '',
+        :env_name => '',
         :env_version => nil,
         :env_user => nil,
-        :visibility_tag => String.new,
+        :visibility_tag => nil,
         :show_all_version => false,
-        :files_to_move => Hash.new,
+        :files_to_move => {},
+        :secure => false,
       }
     )
   end
@@ -67,12 +68,9 @@ class KaenvsClient < Client
     global_parse_options() do |opt,options|
       opt.separator "General options:"
       opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
-        if tmp = load_envfile(f)
-          options[:env_desc] = tmp
-          options[:operation] = :add
-        else
-          return false
-        end
+        options[:operation] = :add
+        options[:env_desc] = ''
+        load_envfile(options[:env_desc],f)
       }
       opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
         options[:env_name] = n
@@ -99,29 +97,11 @@ class KaenvsClient < Client
       opt.on("-s", "--show-all-versions", "Show all versions of an environment") {
         options[:show_all_version] = true
       }
-      opt.on("-t", "--visibility-tag TAG", "Set the visibility tag (private, shared, public)") { |v|
-        if /\A(private|shared|public)\Z/ =~ v then
-          options[:visibility_tag] = v
-        else
-          error("Invalid visibility tag")
-        end
+      opt.on("-t", "--visibility-tag TAG", ['public','private','shared'], "Set the visibility tag (private, shared, public)") { |v|
+        options[:visibility_tag] = v
       }
-      opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-        if /\A(\w+|\*)\Z/ =~ u then
-          options[:env_user] = u
-        else
-          error("Invalid user name")
-          return false
-        end
-      }
-      opt.on("--env-version NUMBER", "Specify the version") { |v|
-        if /\A\d+\Z/ =~ v then
-          options[:env_version] = v
-        else
-          error("Invalid version number")
-          return false
-        end
-      }
+      parse_user(opt,options)
+      parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
       opt.on("--toggle-destructive-tag ENVNAME", "Toggle the destructive tag on an environment") { |n|
@@ -147,9 +127,7 @@ class KaenvsClient < Client
       opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
         options[:operation] = :'move-files'
       }
-      opt.on("-D", "--debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") {
-        $debug_http = IO.new(3) rescue $stdout unless $debug_http
-      }
+      parse_secure(opt,options)
     end
   end
 
@@ -187,6 +165,9 @@ class KaenvsClient < Client
     end
 
     return true
+  end
+
+  def parse_env_name(opt,options)
   end
 
   def run(options)

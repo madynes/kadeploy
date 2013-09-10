@@ -51,9 +51,7 @@ class KarightsClient < Client
       opt.on("-d", "--delete", "Delete some rights to a user") {
         options[:operation] = :delete
       }
-      opt.on("-f", "--file FILE", "Machine file (- means stdin)")  { |f|
-        load_machinefile(options[:nodes], f)
-      }
+      parse_machinefile(opt,options)
       opt.on("-l", "--list", "List the rights for a given user") {
         options[:operation] = :show
       }
@@ -68,13 +66,8 @@ class KarightsClient < Client
         p.strip!
         options[:parts] << p if p != '*'
       }
-      opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-        if /\A\w+\Z/ =~ u then
-          options[:user] = u
-        else
-          error("Invalid user name")
-          return false
-        end
+      opt.on("-u", "--user USERNAME", /^\w+$/, "Specify the user") { |u|
+        options[:user] = u
       }
     end
   end

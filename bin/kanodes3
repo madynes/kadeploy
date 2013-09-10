@@ -26,7 +26,7 @@ class KanodesClient < Client
       {
         :operation => nil,
         :user => nil,
-        :workflow_id => nil,
+        :wid => nil,
       }
     )
   end
@@ -40,15 +40,10 @@ class KanodesClient < Client
       opt.on("-s", "--get-deployments-status", "Get the status of running deployments") {
         options[:operation] = :get_status
       }
-      opt.on("-f", "--file MACHINELIST", "Only print information about the given machines (- means stdin)")  { |f|
-        load_machinefile(options[:nodes], f)
-      }
-      opt.on("-m", "--machine MACHINE", "Only print information about the given machines") { |h|
-        h.strip!
-        load_machine(options[:nodes], h) if h != '*'
-      }
+      parse_machinefile(opt,options)
+      parse_machine(opt,options)
       opt.on("-w", "--workflow-id WID", "Specify a workflow id (to be used with the get_status option). If no wid is specified, the information of all the running deployments will be returned.") { |w|
-        options[:workflow_id] = w
+        options[:wid] = w
       }
     end
   end
@@ -66,7 +61,7 @@ class KanodesClient < Client
         return false
       end
     when :get_state
-      if options[:workflow_id]
+      if options[:wid]
         error('Workflow ID is useless when gathering node\'s deployment states')
         return false
       end
@@ -84,7 +79,7 @@ class KanodesClient < Client
       path = api_path()
       params[:nodes] = options[:nodes]
     when :get_status
-      path = api_path(options[:workflow_id],:deploy)
+      path = api_path(options[:wid],:deploy)
     else
       raise
     end

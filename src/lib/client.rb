@@ -131,7 +131,25 @@ class Client
     return servers
   end
 
-  def self.load_envfile(srcfile)
+  def self.load_outputfile(file)
+    begin
+      File.open(file,'w'){}
+    rescue
+      error("Cannot create the file '#{file}'")
+      return false
+    end
+  end
+
+  def self.load_inputfile(file)
+    if file.is_a?(IO) or check_file(f)
+      file = File.new(file) unless file.is_a?(IO)
+      file.readlines.collect{|v|v.chomp}.delete_if{|v|v=~/^\s*#.*$/ or v.empty?}
+    else
+      return false
+    end
+  end
+
+  def self.load_envfile(envfile,srcfile)
     tmpfile = Tempfile.new("env_file")
     begin
       uri = URI(File.absolute_path(srcfile))
@@ -174,7 +192,7 @@ class Client
       error(msg)
     end
 
-    ret
+    envfile << ret
   end
 
   def self.load_machine(nodelist, hostname)
@@ -187,29 +205,62 @@ class Client
   end
 
   def self.load_machinefile(nodelist, param)
-    if (param == "-") then
-      STDIN.read.split("\n").sort.uniq.each do |hostname|
+    file = nil
+    if (param == "-")
+      file = STDIN
+    else
+      file = File.new(param)
+    end
+
+    if (machines = load_inputfile(file))
+      machines.each do |hostname|
         load_machine(nodelist,hostname)
       end
     else
-      file = File.absolute_path(param)
-      if File.readable?(file) then
-        IO.readlines(file).sort.uniq.each do |hostname|
-          load_machine(nodelist,hostname)
-        end
-      else
-        error("The file #{file} cannot be read")
-      end
+      return false
     end
-    return true
+  end
+
+  def self.parse_machinefile(opt,options)
+    opt.on("-f", "--file MACHINELIST", "A file containing a list of nodes (- means stdin)")  { |f|
+      load_machinefile(options[:nodes], f)
+    }
+  end
+
+  def self.parse_machine(opt,options)
+    opt.on("-m", "--machine MACHINE", "The node to run on") { |m|
+      load_machine(options[:nodes], m)
+    }
+  end
+
+  def self.parse_user(opt,options)
+    opt.on("-u", "--user USERNAME", /^\w+$/, "Specify the user") { |u|
+      options[:user] = u
+    }
+  end
+
+  def self.parse_env_name(opt,options)
+    opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |n|
+      options[:env_name] = n
+      yield(n)
+    }
+  end
+
+  def self.parse_env_version(opt,options)
+    opt.on("--env-version NUMBER", /^\d+$/, "Version number of the recorded environment") { |n|
+      options[:env_version] = n.to_i
+    }
+  end
+
+  def self.parse_secure(opt,options)
+    opt.on("--[no-]secure", "Use a secure connection to export files to the server") { |v|
+      options[:secure] = v
+    }
   end
 
   def self.load_custom_ops_file(file)
     file = File.absolute_path(file)
-    if not File.readable?(file) then
-      error("The file #{file} cannot be read")
-      return false
-    end
+    return false unless check_file(file)
 
     begin
       config = YAML.load_file(file)
@@ -349,10 +400,6 @@ class Client
     return ret
   end
 
-  def self.check_operation_level(name)
-    ['soft','hard','very_hard'].include?(name.downcase)
-  end
-
   def self.check_macrostep_interface(name)
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
       klass.superclass == Macrostep::Kadeploy
@@ -387,6 +434,15 @@ class Client
     microsteps.collect!{ |microname| microname.to_s.sub(/^ms_/,'') }
 
     return microsteps.include?(name)
+  end
+
+  def self.check_file(file)
+    if File.readable?(file)
+      return true
+    else
+      error("The file #{file} cannot be read")
+      return false
+    end
   end
 
   def self.check_servers(options)
@@ -667,8 +723,10 @@ class Client
       opt.on("-M","--multi-server", "Activate the multi-server mode") {
         options[:multi_server] = true
       }
-      opt.on("-H", "--debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") {
-        $debug_http = IO.new(3) rescue $stdout unless $debug_http
+      opt.on("-H", "--[no-]debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") { |v|
+        if v
+          $debug_http = IO.new(3) rescue $stdout unless $debug_http
+        end
       }
       opt.on("-S","--server STRING", "Specify the Kadeploy server to use") { |s|
         options[:chosen_server] = s
@@ -679,7 +737,7 @@ class Client
 
     begin
       opts.parse!(ARGV)
-    rescue
+    rescue OptionParser::ParseError
       error("Option parsing error: #{$!}")
       return false
     end
@@ -787,6 +845,199 @@ class ClientWorkflow < Client
   def kill
     super()
     delete(api_path(),{:user=>USER}) if @wid
+  end
+
+  def self.load_file(file)
+    kind = (URI.parse(file)||'local')
+    case kind
+    when 'local'
+      if check_file(file)
+        File.expand_path(file)
+      else
+        return false
+      end
+    when 'http','https'
+      options[:key] = file
+    else
+      error("Invalid protocol '#{kind}'")
+      return false
+    end
+  end
+
+  def self.load_keyfile(file,val)
+    if file and !file.empty?
+      unless (val << load_file(file))
+        return false
+      end
+    else
+      authorized_keys = File.expand_path('~/.ssh/authorized_keys')
+      if check_file(authorized_keys)
+        val << authorized_keys
+      else
+        return false
+      end
+    end
+  end
+
+  def self.parse_okfile(opt,options)
+    opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes on which the operation has been correctly performed")  { |f|
+      options[:nodes_ok_file] = f
+      load_outputfile(f)
+    }
+  end
+
+  def self.parse_kofile(opt,options)
+    opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes on which the operation has not been correctly performed")  { |f|
+      options[:nodes_ko_file] = f
+      load_outputfile(f)
+    }
+  end
+
+  def self.parse_keyfile(opt,options)
+    opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use ~/.ssh/authorized_keys") { |f|
+      options[:key] =  ''
+      load_keyfile(f,options[:key])
+    }
+  end
+
+  def self.parse_op_level(opt,options)
+    opt.on("-l", "--op-level VALUE", ['soft','hard','very_hard'], "Operation\'s level (soft, hard, very_hard)") { |l|
+      options[:level] = l.downcase
+    }
+  end
+
+  def self.parse_debug(opt,options)
+    opt.on("-d", "--[no-]debug-mode", "Activate the debug mode") { |v|
+      options[:debug] = v
+    }
+  end
+
+  def self.parse_verbose(opt,options)
+    opt.on("-V", "--verbose-level VALUE", /^[0-5]$/, "Verbose level (between 0 to 5)") { |d|
+      options[:verbose_level] = d.to_i
+    }
+  end
+
+  def self.parse_block_device(opt,options)
+    opt.on("-b", "--block-device BLOCKDEVICE", /^[\w\/]+$/, "Specify the block device to use") { |b|
+      options[:block_device] = b
+      options[:deploy_part] = '' unless options[:deploy_part]
+    }
+  end
+
+  def self.parse_deploy_part(opt,options)
+    opt.on("-p", "--partition-number NUMBER", /^\d+$/, "Specify the partition number to use") { |p|
+      options[:deploy_part] = p.to_i
+    }
+  end
+
+  def self.parse_vlan(opt,options)
+    opt.on("--vlan VLANID", "Set the VLAN") { |id|
+      options[:vlan] = id
+    }
+  end
+
+  def self.parse_pxe_profile(opt,options)
+    opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+      if check_file(f)
+        options[:pxe_profile] = File.read(f)
+      else
+        return false
+      end
+    }
+  end
+
+  def self.parse_pxe_pattern(opt,options)
+    opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
+      if (lines = load_inputfile(f))
+        lines.each do |line|
+          content = line.split(",")
+          options[:pxe_profile_singularities[content[0]]] = content[1].strip
+        end
+      else
+        return false
+      end
+    }
+  end
+
+  def self.parse_pxe_files(opt,options)
+    opt.on("-x", "--upload-pxe-files FILES", Array, "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |fs|
+      fs.each do |file|
+        return false unless (filename = load_file(file))
+        options[:pxe_files] << filename
+      end
+    }
+  end
+
+  def self.parse_wid(opt,options)
+    opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |f|
+      options[:wid_file] = f
+      load_outputfile(f)
+    }
+  end
+
+  def self.parse_scriptfile(opt,options)
+      opt.on("-s", "--script FILE", "Execute a script at the end of the operation") { |f|
+      if check_file(f)
+        if File.stat(f).executable?
+          options[:script] = File.expand_path(f)
+        else
+          error("The file #{f} must be executable")
+          return false
+        end
+      else
+        return false
+      end
+      }
+  end
+
+  def self.global_load_options()
+    super.merge(
+      {
+        :debug => nil,
+        :verbose_level => nil,
+        :nodes_ok_file => nil,
+        :nodes_ko_file => nil,
+        :wid_file => nil,
+        :script => nil,
+      }
+    )
+  end
+
+  def self.global_parse_options()
+    super do |opt,options|
+      #opt.separator ""
+      #opt.separator "Workflow options:"
+      parse_debug(opt,options)
+      parse_machinefile(opt,options)
+      parse_machine(opt,options)
+      parse_kofile(opt,options)
+      parse_okfile(opt,options)
+      parse_scriptfile(opt,options)
+      parse_verbose(opt,options)
+      parse_wid(opt,options)
+      opt.separator ""
+      yield(opt,options)
+    end
+  end
+
+  def self.check_options(options)
+    if options[:nodes].empty?
+      error("No node is chosen")
+      return false
+    end
+
+    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
+      error("The files used for the output of the OK and the KO nodes cannot be the same")
+      return false
+    end
+
+    if options[:verbose_level] and !(1..5).include?(options[:verbose_level])
+      error("Invalid verbose level")
+      return false
+    end
+
+    true
   end
 
   def launch_workflow(params)
