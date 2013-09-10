@@ -32,11 +32,7 @@ class KaconsoleClient < Client
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-m", "--machine MACHINE", "Obtain a console on the given machine") { |h|
-        tmp = []
-        load_machine(tmp, h.strip)
-        options[:node] = tmp[0]
-      }
+      parse_machine(opt,options)
     end
   end
 

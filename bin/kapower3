@@ -25,12 +25,8 @@ class KapowerClient < ClientWorkflow
     global_load_options().merge(
       {
         :operation => nil,
-        :nodes_ok_file => String.new,
-        :nodes_ko_file => String.new,
         :level => :soft,
         :wait => true,
-        :verbose_level => nil,
-        :debug => false,
       }
     )
   end
@@ -38,29 +34,7 @@ class KapowerClient < ClientWorkflow
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-d", "--debug-mode", "Activate the debug mode") {
-        options[:debug] = true
-      }
-      opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-        load_machinefile(options[:nodes], f)
-      }
-      opt.on("-l", "--level VALUE", "Level (soft, hard, very_hard)") { |l|
-        if check_operation_level(l)
-          options[:level] = l.downcase
-        else
-          error("Invalid level")
-          return false
-        end
-      }
-      opt.on("-m", "--machine MACHINE", "Operate on the given machines") { |hostname|
-        load_machine(options[:nodes], hostname)
-      }
-      opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes on which the operation has not been correctly performed")  { |f|
-        options[:nodes_ko_file] = f
-      }
-      opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes on which the operation has been correctly performed")  { |f|
-        options[:nodes_ok_file] = f
-      }
+      parse_op_level(opt,options)
       opt.on("--off", "Shutdown the nodes") {
         options[:operation] = :off
       }
@@ -73,34 +47,17 @@ class KapowerClient < ClientWorkflow
       opt.on("--no-wait", "Do not wait the end of the power operation") {
         options[:wait] = false
       }
-      opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
-        begin
-          options[:verbose_level] = d.to_i
-        rescue
-          error("Invalid verbose level")
-          return false
-        end
-      }
     end
   end
 
   def self.check_options(options)
-    if options[:nodes].empty?
-      error("No node is chosen")
-      return false
-    end
-    unless (1..5).include?(options[:verbose_level])
-      error("Invalid verbose level")
-      return false
-    end
+    return false unless super(options)
+
     if !options[:operation] or options[:operation].empty?
       error("No operation is chosen")
       return false
     end
-    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
-      error("The files used for the output of the OK and the KO nodes cannot be the same")
-      return false
-    end
+
     true
   end
 

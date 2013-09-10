@@ -33,12 +33,9 @@ class KadeployClient < ClientWorkflow
         :block_device => nil,
         :deploy_part => nil,
         :boot_part => nil,
-        :verbose_level => nil,
-        :debug => false,
-        :script => '',
-        :key => '',
+        :key => nil,
         :reformat_tmp => false,
-        :pxe_profile_msg => '',
+        :pxe_profile => nil,
         :pxe_upload_files => [],
         :pxe_profile_singularities => nil,
         :steps => [],
@@ -48,9 +45,6 @@ class KadeployClient < ClientWorkflow
         :custom_operations => nil,
         :disable_bootloader_install => false,
         :disable_disk_partitioning => false,
-        :nodes_ok_file => nil,
-        :nodes_ko_file => nil,
-        :write_workflow_id => nil,
         :reboot_classical_timeout => nil,
         :reboot_kexec_timeout => nil,
         :vlan => nil,
@@ -63,167 +57,30 @@ class KadeployClient < ClientWorkflow
     global_parse_options() do |opt,options|
       opt.separator "General options:"
       opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
-        if tmp = load_envfile(f)
-          options[:env_desc] = tmp
-          options[:env_kind] = :anonymous
-        else
-          return false
-        end
+        options[:env_kind] = :anonymous
+        options[:env_desc] = ''
+        load_envfile(options[:env_desc],f)
       }
-      opt.on("-b", "--block-device BLOCKDEVICE", "Specify the block device to use") { |b|
-        if /\A[\w\/]+\Z/ =~ b then
-          options[:block_device] = b
-          options[:deploy_part] = '' unless options[:deploy_part]
-        else
-          error("Invalid block device")
-          return false
-        end
+      parse_block_device(opt,options)
+      opt.on("-c", "--boot-partition NUMBER", /^\d+$/, "Specify the number of the partition to boot on (use 0 to boot on the MBR)") { |c|
+p c
+        options[:boot_part] = c.to_i
       }
-      opt.on("-c", "--boot-partition NUMBER", "Specify the number of the partition to boot on (use 0 to boot on the MBR)") { |c|
-        if /\A\d+\Z/ =~ c then
-          options[:boot_part] = c.to_i
-        else
-          error("Invalid chainload partition number")
-          return false
-        end
-      }
-      opt.on("-d", "--debug-mode", "Activate the debug mode") {
-        options[:debug] = true
-      }
-      opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment to deploy") { |n|
-        options[:env_kind] = :database
-        options[:env_name] = n
-      }
-      opt.on("-f", "--file MACHINELIST", "Files containing list of nodes (- means stdin)")  { |f|
-        load_machinefile(options[:nodes], f)
-      }
-      opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use the authorized_keys") { |f|
-        if (f != nil) then
-          if (f =~ R_HTTP) then
-            options[:key] = f
-          else
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              options[:key] = File.expand_path(f)
-            end
-          end
-        else
-          authorized_keys = File.expand_path("~/.ssh/authorized_keys")
-          if File.readable?(authorized_keys) then
-            options[:key] = authorized_keys
-          else
-            error("The authorized_keys file #{authorized_keys} cannot be read")
-            return false
-          end
-        end
-      }
-      opt.on("-m", "--machine MACHINE", "Node to run on") { |hostname|
-        load_machine(options[:nodes], hostname)
-      }
-      opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes not correctly deployed")  { |f|
-        options[:nodes_ko_file] = f
-      }
-      opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes correctly deployed")  { |f|
-        options[:nodes_ok_file] = f
-      }
-      opt.on("-p", "--partition-number NUMBER", "Specify the partition number to use") { |p|
-        if /\A\d+\Z/ =~ p then
-          options[:deploy_part] = p
-        else
-          error("Invalid partition number")
-          return false
-        end
-      }
+      parse_env_name(opt,options){ options[:env_kind] = :database }
+      parse_keyfile(opt,options)
+      parse_deploy_part(opt,options)
       opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (this filesystem need to be supported by the deployment environment)") { |t|
         options[:reformat_tmp] = true
         options[:reformat_tmp_fstype] = t
       }
-      opt.on("-s", "--script FILE", "Execute a script at the end of the deployment") { |f|
-        if not File.readable?(f) then
-          error("The file #{f} cannot be read")
-          return false
-        else
-          if not File.stat(f).executable? then
-            error("The file #{f} must be executable to be run at the end of the deployment")
-            return false
-          else
-            options[:script] = File.expand_path(f)
-          end
-        end
-      }
-      opt.on("-u", "--user USERNAME", "Specify the user") { |u|
-        if /\A\w+\Z/ =~ u then
-          options[:user] = u
-        else
-          error("Invalid user name")
-          return false
-        end
-      }
-      opt.on("--vlan VLANID", "Set the VLAN") { |id|
-        options[:vlan] = id
-      }
-      opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
-        if not File.readable?(f) then
-          error("The file #{f} cannot be read")
-          return false
-        else
-          IO.readlines(f).each { |l|
-            options[:pxe_profile_msg].concat(l)
-          }
-        end
-      }
-      opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
-        if not File.readable?(f) then
-          error("The file #{f} cannot be read")
-          return false
-        else
-          options[:pxe_profile_singularities] = Hash.new
-          IO.readlines(f).each { |l|
-            if !(/^#/ =~ l) and !(/^$/ =~ l) then #we ignore commented and empty lines
-              content = l.split(",")
-              options[:pxe_profile_singularities][content[0]] = content[1].strip
-            end
-          }
-        end
-      }
-      opt.on("-x", "--upload-pxe-files FILES", "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |l|
-        l.split(",").each { |file|
-          if (file =~ R_HTTP) then
-            options[:pxe_upload_files].push(file)
-          else
-            f = File.expand_path(file)
-            if not File.readable?(f) then
-              error("The file #{f} cannot be read")
-              return false
-            else
-              options[:pxe_upload_files].push(f)
-            end
-          end
-        }
-      }
-      opt.on("--env-version NUMBER", "Number of version of the environment to deploy") { |n|
-        if /\A\d+\Z/ =~ n then
-          options[:env_version] = n
-        else
-          error("Invalid version number")
-          return false
-        end
-      }
-      opt.on("-V", "--verbose-level VALUE", "Verbose level between 0 to 5") { |d|
-        begin
-          options[:verbose_level] = d.to_i
-        rescue
-          error("Invalid verbose level")
-          return false
-        end
-      }
+      parse_user(opt,options)
+      parse_vlan(opt,options)
+      parse_pxe_profile(opt,options)
+      parse_pxe_pattern(opt,options)
+      parse_pxe_files(opt,options)
+      parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
-      opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |file|
-        options[:write_workflow_id] = file
-      }
       opt.on("--ignore-nodes-deploying", "Allow to deploy even on the nodes tagged as \"currently deploying\" (use this only if you know what you do)") {
         options[:ignore_nodes_deploying] = true
       }
@@ -259,12 +116,8 @@ class KadeployClient < ClientWorkflow
           error("A number is required for the reboot classical timeout")
         end
       }
-      opt.on("--reboot-kexec-timeout V", "Overload the default timeout for kexec reboots") { |t|
-        if (t =~ /\A\d+\Z/) then
-          options[:reboot_kexec_timeout] = t
-        else
-          error("A number is required for the reboot kexec timeout")
-        end
+      opt.on("--reboot-kexec-timeout V", /^\d+$/, "Overload the default timeout for kexec reboots") { |t|
+        options[:reboot_kexec_timeout] = t.to_i
       }
       opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
         s.split("&").each do |macrostep|
@@ -302,24 +155,16 @@ class KadeployClient < ClientWorkflow
           options[:steps].push(MacroStep.new(macroname, insts))
         end
       }
-      opt.on("--secure", "Use a secure connection to export files to the server") {
-        options[:secure] = true
-      }
+      parse_secure(opt,options)
     end
   end
 
   def self.check_options(options)
-    error('You must choose an environment') if options[:env_kind].empty?
-    if options[:nodes].empty? then
-      error("You must specify some nodes to deploy")
-      return false
-    end
-    if options[:nodes_ok_file] and options[:nodes_ok_file] == options[:nodes_ko_file]
-      error("The files used for the output of the OK and the KO nodes cannot be the same")
-      return false
-    end
+    return false unless super(options)
 
-    return true
+    error('You must choose an environment') if options[:env_kind].empty?
+
+    true
   end
 
   def run(options)
@@ -368,11 +213,6 @@ class KadeployClient < ClientWorkflow
     else
       raise
     end
-
-
-    # TODO: Fetch environment description if kind is database
-    # options[:env_desc] = ...
-
 
     # Check if the environment contains local files
     localfiles = get_localfiles(env)
