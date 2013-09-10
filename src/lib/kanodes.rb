@@ -47,7 +47,7 @@ module Kanodes
     server_nodes = get_nodes()
 
     if cexec.list
-      nodes.each{|node| error_not_found!(node) unless server_nodes.include?(node)} if nodes
+      nodes.each{|n| error_not_found!(n) unless server_nodes.include?(n)} if nodes
       nodes || server_nodes
     else
       ret = Nodes::get_states(cexec.database,nodes)
