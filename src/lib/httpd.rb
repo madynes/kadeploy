@@ -1,7 +1,3 @@
-LOGFILE_HTTPD='httpd.log'
-LOGFILE_ACCESS='access.log'
-MAX_CLIENTS = 1000
-
 require 'webrick'
 require 'webrick/https'
 require 'webrick/httpservlet/abstract'
@@ -9,8 +5,8 @@ require 'socket'
 require 'base64'
 require 'cgi'
 require 'time'
-
 require 'json'
+require 'yaml'
 
 if RUBY_VERSION < "2.0"
   # Monkey patch to remove DH encryption related warnings
@@ -28,42 +24,179 @@ end
 module Kadeploy
 
 module HTTPd
-  class InvalidError < Exception
+  LOGFILE_HTTPD='httpd.log'
+  LOGFILE_ACCESS='access.log'
+  MAX_CLIENTS = 1000
+  MAX_CONTENT_SIZE = 1048576 # 1 MB
+
+  class HTTPError < Exception
+    attr_reader :code
+    def initialize(code,name,msg=nil)
+      super(msg)
+      @code = code
+      @name = name
+    end
+
+    def message
+      tmp = super()
+      @name + ((tmp and !tmp.empty?) ? " -- #{tmp}" : '')
+    end
   end
-  class NotFoundError < Exception
+  class InvalidError < HTTPError
+    def initialize(msg=nil)
+      super(405,'Method Not Allowed',msg)
+    end
   end
-  class UnauthorizedError < Exception
+  class NotFoundError < HTTPError
+    def initialize(msg=nil)
+      super(404,'File Not Found',msg)
+    end
   end
-  class ForbiddenError < Exception
+  class UnauthorizedError < HTTPError
+    def initialize(msg=nil)
+      super(401,'Unauthorized',msg)
+    end
   end
+  class ForbiddenError < HTTPError
+    def initialize(msg=nil)
+      super(403,'Forbidden',msg)
+    end
+  end
+  class UnsupportedError < HTTPError
+    def initialize(msg=nil)
+      super(415,'Unsupported Media Type',msg)
+    end
+  end
+
   class ContentBinding < Hash
+  end
+
+  class RequestHandler
+    TYPES = {
+      :json => 'application/json',
+      :yaml => 'application/x-yaml',
+    }
+    def initialize(request)
+      @request = request
+      @body = @request.body
+      @uri = @request.request_uri
+      if @request['Accept'] and !@request['Accept'].strip.empty?
+        @accept = @request['Accept'].split(',').collect{|v| v.split(';')[0].strip.downcase}
+      else
+        @accept = nil
+      end
+
+      @accept = nil unless (@accept & ['*','*/*']).empty?
+
+      if @accept and (@accept & TYPES.values).empty?
+        raise HTTPError.new(406,'Not Acceptable',@accept.join(', '))
+      end
+    end
+
+    def params()
+      res = {}
+      # Parse HTTP request's body
+      if !@body.nil? and !@body.empty?
+        if @request['Content-Type'] and !@request['Content-Type'].strip.empty?
+          if @request['Content-Length'] and !@request['Content-Length'].strip.empty?
+            length = nil
+            begin
+              length = @request['Content-Length'].to_i
+            rescue
+              raise HTTPError.new(411,'Length Required',
+                "The Content-Length HTTP header has to be an integer")
+            end
+
+            if length > MAX_CONTENT_SIZE
+              raise HTTPError.new(413,'Request Entity Too Large',
+                "The content in the request's body cannot be greater than "\
+                "#{MAX_CONTENT_SIZE} bytes")
+            end
+          else
+            raise HTTPError.new(411,'Length Required',
+              "The Content-Length HTTP header has to be sed")
+          end
+
+          case @request['Content-Type'].downcase
+          when TYPES[:json]
+            begin
+              res = JSON::load(@body)
+            rescue JSON::ParserError
+              raise UnsupportedError.new("Invalid JSON content in request's body")
+            end
+          when TYPES[:yaml]
+            begin
+              res = YAML::load(@body)
+            rescue SyntaxError
+              raise UnsupportedError.new("Invalid YAML content in request's body")
+
+            end
+          else
+            raise UnsupportedError.new(
+              "The Content-Type #{@request['Content-Type']} is not supported"\
+              "\nSupported: #{TYPES.values.join(', ')}")
+          end
+        else
+          raise UnsupportedError.new('The Content-Type HTTP header has to be set')
+        end
+      end
+
+      unless res.is_a?(Hash)
+        raise UnsupportedError.new(
+          'The content of the request\'s body must be ''a Hash')
+      end
+
+      # Parse HTTP request's query string
+      if @uri.query and @uri.query.size > MAX_CONTENT_SIZE
+        raise HTTPError.new(414,'Request-URI Too Long',
+          "The the request's query size cannot be greater than "\
+          "#{MAX_CONTENT_SIZE} chars")
+      end
+
+      # CGI.parse do decode_www_form
+      CGI.parse(@uri.query||'').each do |key,val|
+        if val.is_a?(Array)
+          if val.size > 1
+            res[key] = val
+          else
+            res[key] = val[0]
+          end
+        elsif val.is_a?(String)
+            res[key] = val
+        else
+          raise
+        end
+      end
+
+      res
+    end
+
+    def output(obj)
+      if @accept
+        case (@accept & TYPES.values)[0]
+        when TYPES[:json]
+          [ TYPES[:json], obj.to_json ]
+        when TYPES[:yaml]
+          [ TYPES[:yaml], obj.to_yaml ]
+        else
+          raise HTTPError.new(406,'Not Acceptable',@accept.join(', '))
+        end
+      else
+        [ TYPES[:json], obj.to_json ]
+      end
+    end
   end
 
   class HTTPdHandler < WEBrick::HTTPServlet::AbstractServlet
     def initialize(allowed_methods)
-      @types = nil
       if allowed_methods.is_a?(Array)
         @allowed = allowed_methods.collect{|m| m.to_s.upcase.to_sym}
-      elsif allowed_methods.is_a?(Hash)
-        @allowed = []
-        @types = {}
-        allowed_methods.each_pair do |method,type|
-          method = method.to_s.upcase.to_sym
-          @allowed << method
-          @types[method] = type
-        end
       elsif allowed_methods.is_a?(Symbol)
         @allowed = [allowed_methods.to_s.upcase.to_sym]
       else
         raise
       end
-      #[:HEAD, :GET, :POST, :DELETE].each do |m|
-      #  if @allowed.include?(m)
-      #    class_eval "alias :\"do_#{m.to_s.upcase}\", :do_METHOD"
-      #  else
-      #    class_eval "alias :\"do_#{m.to_s.upcase}\", :do_INVALID"
-      #  end
-      #end
+      # class_eval "alias :\"do_#{m.to_s.upcase}\", :do_METHOD"
     end
 
     def get_instance(server, *options)
@@ -74,63 +207,50 @@ module HTTPd
       request.request_method.upcase.to_sym
     end
 
+    def get_output_type(request)
+    end
+
+    # priority given to query string parameters
+    def parse_params(request)
+    end
+
     def do_METHOD(request, response)
       if @allowed.include?(get_method(request))
         begin
-          if !@types or !@types[get_method(request)] or (request['Content-Type']||'') == @types[get_method(request)]
-            # No caching
-            response['ETag'] = nil
-            response['Cache-Control'] = 'no-store, no-cache'
-            response['Pragma'] = 'no-cache'
+          request_handler = RequestHandler.new(request)
 
-            res = handle(request,response)
+          res = handle(request,response,request_handler)
 
-            response.status = 200
-            if res.is_a?(String)
-              response['Content-Type'] = 'text/plain'
-            elsif res.nil?
-              res = ''
-              response['Content-Type'] = 'text/plain'
-            elsif res.is_a?(TrueClass)
-              res = 'true'
-              response['Content-Type'] = 'text/plain'
-            elsif res.is_a?(File)
-              st = res.stat
-              response['ETag'] = sprintf("\"%x-%x-%x\"",st.ino,st.size,
-                st.mtime.to_i)
-              response['Last-Modified'] = st.mtime.httpdate
-              response['Content-Type'] = 'application/octet-stream'
-            else
-              res = res.to_json
-              response['Content-Type'] = 'application/json'
-            end
-          else
-            res = 'Unsupported Media Type'
-            res += " -- Supported: #{@types[get_method(request)]}"
-            response.status = 415
+          # No caching
+          response['ETag'] = nil
+          response['Cache-Control'] = 'no-store, no-cache'
+          response['Pragma'] = 'no-cache'
+
+          response.status = 200
+          if res.is_a?(String)
             response['Content-Type'] = 'text/plain'
+          elsif res.nil?
+            res = ''
+            response['Content-Type'] = 'text/plain'
+          elsif res.is_a?(TrueClass)
+            res = 'true'
+            response['Content-Type'] = 'text/plain'
+          elsif res.is_a?(File)
+            st = res.stat
+            response['ETag'] = sprintf("\"%x-%x-%x\"",st.ino,st.size,
+              st.mtime.to_i)
+            response['Last-Modified'] = st.mtime.httpdate
+            response['Content-Type'] = 'application/octet-stream'
+          else
+            response['Content-Type'],res = request_handler.output(res)
           end
-        rescue UnauthorizedError => e
-          res = 'Unauthorized'
-          res += " -- #{e.message}" if e.message
-          response.status = 401
+        rescue HTTPError => e
+          res = e.message
+          response.status = e.code
           response['Content-Type'] = 'text/plain'
-        rescue ForbiddenError => e
-          res = 'Forbidden'
-          res += " -- #{e.message}" if e.message
-          response.status = 403
-          response['Content-Type'] = 'text/plain'
-        rescue NotFoundError => e
-          res = 'File not found'
-          res += " -- #{e.message}" if e.message
-          response.status = 404
-          response['Content-Type'] = 'text/plain'
-        rescue InvalidError => e
-          res = 'Method Not Allowed'
-          res += " -- #{e.message}" if e.message
-          response.status = 405
-          response['Content-Type'] = 'text/plain'
-          response['Allow'] = @allowed.collect{|m|m.to_s}.join(',')
+          if e.is_a?(InvalidError)
+            response['Allow'] = @allowed.collect{|m|m.to_s}.join(',')
+          end
         rescue KadeployError => ke
           res = KadeployError.to_msg(ke.errno)
           res += " -- #{ke.message}" if ke.message and !ke.message.empty?
@@ -159,7 +279,7 @@ module HTTPd
       res = nil
     end
 
-    def handle(request, response)
+    def handle(request, response, request_handler)
       raise
     end
 
@@ -176,7 +296,7 @@ module HTTPd
       @proc = proc
     end
 
-    def handle(request, response)
+    def handle(request, response, request_handler)
       @proc.call(get_method(request),request)
     end
   end
@@ -192,7 +312,7 @@ module HTTPd
       @params = {}
     end
 
-    def handle(request, response)
+    def handle(request, response, request_handler)
       args = nil
       if @args.is_a?(ContentBinding)
         args = @args[get_method(request)]
@@ -211,6 +331,7 @@ module HTTPd
 
       @params[:kind] = get_method(request)
       @params[:request] = request
+      @params[:params] = request_handler.params
       params = @params
       @params = {}
 
@@ -245,7 +366,7 @@ module HTTPd
       @static = static
     end
 
-    def handle(request, response)
+    def handle(request, response, request_handler)
       @args = []
 
       filter = nil
@@ -291,7 +412,7 @@ module HTTPd
       #  @method = (prefix.to_s + '_' + suffix.join('_')).to_sym
       #end
 
-      super(request, response)
+      super(request, response, request_handler)
     end
   end
 
@@ -301,7 +422,7 @@ module HTTPd
       @content = content
     end
 
-    def handle(request, response)
+    def handle(request, response, request_handler)
       if @content.is_a?(ContentBinding)
         @content[get_method(request)]
       else
@@ -312,43 +433,6 @@ module HTTPd
 
   def self.get_sockaddr(request)
     request.instance_variable_get(:@peeraddr)
-  end
-
-  # priority given to query string parameters
-  def self.parse_params(request,body_type=:json)
-    res = {}
-    # Parse HTTP request's body
-    if request.body and !request.body.empty?
-      case body_type
-      when :json
-        begin
-          res = JSON::load(request.body)
-        rescue JSON::ParserError
-          raise ArgumentError.new("Invalid JSON content in request's body")
-        end
-      else
-        raise
-      end
-    end
-    raise ArgumentError.new('Content must be a Hash') unless res.is_a?(Hash)
-
-    # Parse HTTP request's query string
-    # CGI.parse do decode_www_form
-    CGI.parse(request.request_uri.query||'').each do |key,val|
-      if val.is_a?(Array)
-        if val.size > 1
-          res[key] = val
-        else
-          res[key] = val[0]
-        end
-      elsif val.is_a?(String)
-          res[key] = val
-      else
-        raise
-      end
-    end
-
-    res
   end
 
   class Server
