@@ -124,9 +124,9 @@ class KarightsClient < Client
       when :GET
         ret = get(path,params)
       when :POST
-        ret = post(path,params.to_json)
+        ret = post(path,params)
       when :PUT
-        ret = put(path,params.to_json)
+        ret = put(path,params)
       when :DELETE
         ret = delete(path,params)
       else

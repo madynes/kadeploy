@@ -173,16 +173,6 @@ class KadeployServer
     ret
   end
 
-  def parse_request_params(request,body_type=:json)
-    ret = nil
-    begin
-      ret = HTTPd.parse_params(request,body_type)
-    rescue ArgumentError => ae
-      kaerror(APIError::INVALID_CONTENT,ae.message)
-    end
-    ret
-  end
-
   def parse_params_default(params,context)
     parse_params(params) do |p|
       # Check user/key
@@ -239,11 +229,7 @@ class KadeployServer
     #@httpd.bind([:GET],'/nodes',:method,:object=>self,:method=>:get_nodes)
 
     [:deploy,:reboot,:power].each do |kind|
-      @httpd.bind(
-        {
-          :POST=>'application/json',
-          :GET=>nil,
-        },
+      @httpd.bind([:POST,:GET],
         API.path(kind),:filter,:object=>self,:method=>:launch,
         :args=>[1],:static=>[kind]
       )
@@ -263,13 +249,7 @@ class KadeployServer
     }
 
     [:envs,:rights].each do |kind|
-      @httpd.bind(
-        {
-          :POST=>'application/json',
-          :PUT=>'application/json',
-          :GET=>nil,
-          :DELETE=>nil,
-        },
+      @httpd.bind([:POST,:GET,:PUT,:DELETE],
         API.path(kind),:filter,:object=>self,
         :method =>:launch,:args=>args[kind],:static=>[kind],:name=>names[kind]
       )
@@ -324,8 +304,7 @@ class KadeployServer
     end
 
     # prepare the treatment
-    options = send(:"#{kind}_prepare",
-      parse_request_params(params[:request]),query)
+    options = send(:"#{kind}_prepare",params[:params],query)
     authenticate!(params[:request],options)
     ok,msg = send(:"#{kind}_rights?",options,query,*args)
     error_unauthorized!(msg) unless ok

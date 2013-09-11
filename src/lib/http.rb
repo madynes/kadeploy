@@ -4,6 +4,8 @@ require 'net/https'
 require 'uri'
 require 'error'
 require 'time'
+require 'json'
+require 'yaml'
 
 module Kadeploy
 
@@ -103,7 +105,7 @@ module HTTP
       end
     end
 
-    def self.request(server,port,secure=true,request=nil)
+    def self.request(server,port,secure=true,request=nil,parse=true)
       res = nil
       connect(server,port,secure) do |client|
         begin
@@ -114,12 +116,18 @@ module HTTP
           error("Invalid request on #{server}:#{port} (#{e.class.name})")
         end
         if response.is_a?(Net::HTTPOK)
-          if response['Content-Type'] == 'application/json'
-            res = JSON::load(response.body)
-          elsif response['Content-Type'] == 'text/plain'
-            res = response.body
+          if parse
+            if response['Content-Type'] == 'application/json'
+              res = JSON::load(response.body)
+            elsif response['Content-Type'] == 'application/x-yaml'
+              res = YAML::load(response.body)
+            elsif response['Content-Type'] == 'text/plain'
+              res = response.body
+            else
+              error("Invalid server response (Content-Type: '#{response['Content-Type']}')")
+            end
           else
-            error("Invalid server response (Content-Type: '#{response['Content-Type']}')")
+            res = response.body
           end
         else
           case response.code.to_i
@@ -149,10 +157,33 @@ module HTTP
       res
     end
 
-    def self.gen_request(kind,path,data=nil,content_type='application/json')
-      header = { 'Accept' => 'text/plain, application/json' }
+    def self.content_type(kind)
+      case kind
+        when :json
+          'application/json'
+        when :yaml
+          'application/x-yaml'
+        else
+          raise
+      end
+    end
+
+    def self.content_cast(kind,obj)
+      case kind
+        when :json
+          obj.to_json
+        when :yaml
+          obj.to_yaml
+        else
+          raise
+      end
+    end
+
+    def self.gen_request(kind,path,data=nil,content_type=:json,accept_type=:json)
+      header = { 'Accept' => content_type(accept_type) }
       if data
-        header['Content-Type'] = content_type
+        data = content_cast(content_type,data)
+        header['Content-Type'] = content_type(content_type)
         header['Content-Length'] = data.size.to_s
       end
 
@@ -175,20 +206,20 @@ module HTTP
       ret
     end
 
-    def self.get(server,port,path,secure=true)
-      request(server,port,secure,gen_request(:GET,path))
+    def self.get(server,port,path,secure=true,content_type=:json,accept_type=:json,parse=true)
+      request(server,port,secure,gen_request(:GET,path,nil,nil,accept_type),parse)
     end
 
-    def self.post(server,port,path,data,secure=true,content_type='application/json')
-      request(server,port,secure,gen_request(:POST,path,data,content_type))
+    def self.post(server,port,path,data,secure=true,content_type=:json,accept_type=:json,parse=true)
+      request(server,port,secure,gen_request(:POST,path,data,content_type,accept_type),parse)
     end
 
-    def self.put(server,port,path,data,secure=true,content_type='application/json')
-      request(server,port,secure,gen_request(:PUT,path,data,content_type))
+    def self.put(server,port,path,data,secure=true,content_type=:json,accept_type=:json,parse=true)
+      request(server,port,secure,gen_request(:PUT,path,data,content_type,accept_type),parse)
     end
 
-    def self.delete(server,port,path,secure=true)
-      request(server,port,secure,gen_request(:DELETE,path))
+    def self.delete(server,port,path,secure=true,content_type=:json,accept_type=:json,parse=true)
+      request(server,port,secure,gen_request(:DELETE,path,nil,nil,accept_type),parse)
     end
   end
 end
