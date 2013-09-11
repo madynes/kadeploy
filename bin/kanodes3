@@ -84,8 +84,8 @@ class KanodesClient < Client
       raise
     end
 
-    ret = get(path,params)
-    $stdout.puts ret.to_yaml if ret
+    $stdout.puts get(path,params,:yaml,false)
+    #$stdout.puts ret.to_yaml if ret
   end
 end
 

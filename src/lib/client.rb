@@ -567,7 +567,7 @@ class Client
     HTTP::Client::get(host,port,path,secure)
   end
 
-  def get(uri,params=nil)
+  def get(uri,params=nil,accept_type=:json,parse=true)
     host,port,path,query = parse_uri(uri)
     if query
       path = "#{path}?#{query}"
@@ -577,37 +577,37 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTP::Client::get(host,port,path,@secure)
+      HTTP::Client::get(host,port,path,@secure,nil,accept_type,parse)
     rescue HTTP::ClientError => e
       error(e.message)
     end
   end
 
-  def post(uri,data,content_type='application/json')
+  def post(uri,data,content_type=:json,accept_type=:json,parse=true)
     host,port,path,query = parse_uri(uri)
     path = "#{path}?#{query}" if query
     host = @server unless host
     port = @port unless port
     begin
-      HTTP::Client::post(host,port,path,data,@secure,content_type)
+      HTTP::Client::post(host,port,path,data,@secure,content_type,parse)
     rescue HTTP::ClientError => e
       error(e.message)
     end
   end
 
-  def put(uri,data,content_type='application/json')
+  def put(uri,data,content_type=:json,accept_type=:json,parse=true)
     host,port,path,query = parse_uri(uri)
     path = "#{path}?#{query}" if query
     host = @server unless host
     port = @port unless port
     begin
-      HTTP::Client::put(host,port,path,data,@secure,content_type)
+      HTTP::Client::put(host,port,path,data,@secure,content_type,accept_type,parse)
     rescue HTTP::ClientError => e
       error(e.message)
     end
   end
 
-  def delete(uri,params=nil)
+  def delete(uri,params=nil,accept_type=:json,parse=true)
     host,port,path,query = parse_uri(uri)
     if query
       path = "#{path}?#{query}"
@@ -617,7 +617,7 @@ class Client
     host = @server unless host
     port = @port unless port
     begin
-      HTTP::Client::delete(host,port,path,@secure)
+      HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse)
     rescue HTTP::ClientError => e
       error(e.message)
     end
@@ -1041,7 +1041,7 @@ class ClientWorkflow < Client
   end
 
   def launch_workflow(options,params)
-    ret = post(api_path(),params.to_json)
+    ret = post(api_path(),params)
     @wid = ret['wid']
     @resources = ret['resources']
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
