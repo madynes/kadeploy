@@ -215,6 +215,13 @@ p c
 
     # Check if the environment contains local files
     localfiles = get_localfiles(env)
+
+    # Add the authorized_keys file
+    if options[:key]
+      params[:ssh_authorized_keys] = options[:key]
+      localfiles += get_localfiles(params[:ssh_authorized_keys])
+    end
+
     # Serve local files throught HTTP(s)
     params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
 

@@ -91,7 +91,7 @@ module Kadeploy
   def deploy_prepare(params,operation=:create)
     context = deploy_init_exec_context()
 
-    # Check user/key
+    # Check user
     parse_params_default(params,context)
 
     case operation
@@ -105,6 +105,9 @@ module Kadeploy
       parse_params(params) do |p|
         # Check client
         context.client = p.parse('client',String,:type=>:client)
+
+        # authorized_keys file
+        context.key = p.parse('ssh_authorized_keys',String)
 
         # Check nodelist
         context.nodes = p.parse('nodes',Array,:mandatory=>true,

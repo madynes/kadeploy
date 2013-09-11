@@ -531,7 +531,7 @@ class Client
         end
       end
     else
-      raise
+      localfiles << localfile?(env)
     end
     localfiles.compact!
     localfiles
