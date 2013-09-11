@@ -192,7 +192,7 @@ class Client
       error(msg)
     end
 
-    envfile << ret
+    envfile.merge!(ret)
   end
 
   def self.load_machine(nodelist, hostname)

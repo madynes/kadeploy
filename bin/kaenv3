@@ -52,7 +52,7 @@ class KaenvsClient < Client
       {
         :environment => {},
         :operation => nil,
-        :env_desc => '',
+        :env_desc => {},
         :env_name => '',
         :env_version => nil,
         :env_user => nil,
@@ -69,7 +69,6 @@ class KaenvsClient < Client
       opt.separator "General options:"
       opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
         options[:operation] = :add
-        options[:env_desc] = ''
         load_envfile(options[:env_desc],f)
       }
       opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
@@ -165,9 +164,6 @@ class KaenvsClient < Client
     end
 
     return true
-  end
-
-  def parse_env_name(opt,options)
   end
 
   def run(options)
