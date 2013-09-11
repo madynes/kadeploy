@@ -165,7 +165,7 @@ module Kaenv
     else
       envs = Environment.get_list_from_db(
         cexec.database,
-        user || (config.common.almighty_env_users.include?(cexec.user) ? nil :cexec.user), # Almighty user can see everything
+        user || (config.common.almighty_env_users.include?(cexec.user) ? nil : cexec.user), # Almighty user can see everything
         (!user or cexec.user == user) || config.common.almighty_env_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
         (user.nil? or user.empty?),# Show only the environments of a specific user if user is defined
         !cexec.last

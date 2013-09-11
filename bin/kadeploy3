@@ -26,7 +26,7 @@ class KadeployClient < ClientWorkflow
       {
         :environment => {},
         :env_kind => '',
-        :env_desc => '',
+        :env_desc => {},
         :env_name => '',
         :env_version => nil, #By default we load the latest version
         :user => nil,
@@ -58,7 +58,6 @@ class KadeployClient < ClientWorkflow
       opt.separator "General options:"
       opt.on("-a", "--env-file ENVFILE", "File containing the environment description") { |f|
         options[:env_kind] = :anonymous
-        options[:env_desc] = ''
         load_envfile(options[:env_desc],f)
       }
       parse_block_device(opt,options)
