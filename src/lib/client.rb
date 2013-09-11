@@ -801,6 +801,12 @@ class Client
       $httpd.kill if $httpd_thread.alive?
       $httpd_thread.join
     end
+
+    $files.each do |file|
+      file.close unless file.closed?
+    end
+
+    $debug_http.close if $debug_http and $debug_http != $stdout and !$debug_http.closed?
   end
 
   def self.parse_options()
