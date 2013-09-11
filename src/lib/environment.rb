@@ -419,52 +419,46 @@ class Environment
     return ret
   end
 
-  def self.get_list_from_db(dbh, user, private_envs=false, show_all_version=false)
+  def self.get_list_from_db(dbh, user, private_envs=false, public_envs=false, show_all_version=false)
     args = []
     where = ''
     if user
       if show_all_version
-        if private_envs then
-          where = "user = ? OR (user <> ? AND visibility = 'public')"
-          2.times{ args << user }
-        else
-          where = "user = ? AND visibility <> 'private'"
+        where = "user = ?"
+        args << user
+
+        where << " AND visibility <> 'private'" unless private_envs
+
+        if public_envs
+          where <<  " OR (user <> ? AND visibility = 'public')"
           args << user
         end
       else
-        if private_envs then
-          where = "(e1.user = ? \
-                     OR (e1.user <> ? AND e1.visibility = 'public')) \
-                   AND e1.version = ( \
-                     SELECT MAX(e2.version) FROM environments e2 \
-                     WHERE e2.name = e1.name \
-                     AND e2.user = e1.user \
-                     AND (e2.user = ? \
-                     OR (e2.user <> ? AND e2.visibility = 'public')) \
-                     GROUP BY e2.user,e2.name)"
-          4.times{ args << user }
-        else
-          where = "e1.user = ? \
-                   AND e1.visibility <> 'private' \
-                   AND e1.version = ( \
-                     SELECT MAX(e2.version) FROM environments e2 \
-                     WHERE e2.name = e1.name \
-                     AND e2.user = e1.user \
-                     AND e2.visibility <> 'private' \
-                     GROUP BY e2.user, e2.name)"
-          args << user
+        cond = Proc.new do |lab,ar|
+          ret = "(e1.user = ?"
+          ar << user
+          ret << " AND visibility <> 'private'" unless private_envs
+          if public_envs
+            ret <<  " OR (user <> ? AND visibility = 'public')"
+            ar << user
+          end
+          ret << ")"
         end
-      end
-    else #we show the environments of all the users
-      if show_all_version
-        where = "visibility <> 'private'"
-      else
-        where = "e1.visibility <> 'private' \
-                 AND e1.version=( \
+
+        where = "#{cond.call('e1',args)} \
+                 AND e1.version = ( \
                    SELECT MAX(e2.version) FROM environments e2 \
                    WHERE e2.name = e1.name \
                    AND e2.user = e1.user \
-                   AND e2.visibility <> 'private' \
+                   AND #{cond.call('e2',args)} \
+                   GROUP BY e2.user,e2.name)"
+      end
+    else #we show the environments of all the users
+      unless show_all_version
+        where = "e1.version=( \
+                   SELECT MAX(e2.version) FROM environments e2 \
+                   WHERE e2.name = e1.name \
+                   AND e2.user = e1.user \
                    GROUP BY e2.user, e2.name)"
       end
     end
@@ -488,7 +482,7 @@ class Environment
 
   def self.del_from_db(dbh, name, version, user, private_envs)
     # load the environment from the database (check that it exists)
-    env = get_from_db(
+    envs = get_from_db(
       dbh,
       name,
       version,
@@ -496,19 +490,22 @@ class Environment
       private_envs,
       false
     )
-    if env and !env.empty?
-      env = env[0]
-      res = dbh.run_query(
-        "DELETE FROM environments WHERE name=? AND version=? AND user=?",
-        env.name, env.version, env.user
-      )
+    if envs and !envs.empty?
+      env = envs[0]
+      query = "DELETE FROM environments WHERE name=? AND user=?"
+      args = [env.name,env.user]
+      if (version and version != true and !version.empty?) or version.nil?
+        query << ' AND version=?'
+        args << env.version
+      end
+      res = dbh.run_query(query,*args)
       if res.affected_rows == 0
         return false
       else
-        return env
+        return envs
       end
     else
-      return false
+      return nil
     end
   end
 
@@ -533,7 +530,7 @@ class Environment
         env = env[0] if env and !env.empty?
       end
 
-      return false unless env
+      return nil unless env
 
       args = []
       dbfields = []
