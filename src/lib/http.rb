@@ -4,6 +4,8 @@ require 'net/https'
 require 'uri'
 require 'error'
 require 'time'
+require 'zlib'
+require 'stringio'
 require 'json'
 require 'yaml'
 
@@ -115,40 +117,52 @@ module HTTP
         rescue Exception => e
           error("Invalid request on #{server}:#{port} (#{e.class.name})")
         end
+
+        body = nil
+        if response.content_length and response.content_length > 0 and response['Content-Encoding'] == 'gzip'
+          sio = StringIO.new(response.body,'rb')
+          gzr = Zlib::GzipReader.new(sio)
+          body = gzr.read
+          gzr.close
+        else
+          body = response.body
+        end
+
         if response.is_a?(Net::HTTPOK)
+
           if parse
             if response['Content-Type'] == 'application/json'
-              res = JSON::load(response.body)
+              res = JSON::load(body)
             elsif response['Content-Type'] == 'application/x-yaml'
-              res = YAML::load(response.body)
+              res = YAML::load(body)
             elsif response['Content-Type'] == 'text/plain'
-              res = response.body
+              res = body
             else
               error("Invalid server response (Content-Type: '#{response['Content-Type']}')")
             end
           else
-            res = response.body
+            res = body
           end
         else
           case response.code.to_i
           when 400
             if response['X-Application-Error-Code']
-              error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{response.body}")
+              error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{body}")
             else
               error(
                 "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
                 "-----------------\n"\
-                "#{response.body}\n"\
+                "#{body}\n"\
                 "-----------------"
               )
             end
           when 500
-            error("[Internal Server Error]\n#{response.body}")
+            error("[Internal Server Error]\n#{body}")
           else
             error(
               "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
               "-----------------\n"\
-              "#{response.body}\n"\
+              "#{body}\n"\
               "-----------------"
             )
           end
