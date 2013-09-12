@@ -813,6 +813,15 @@ class Client
       $httpd.kill if $httpd_thread.alive?
       $httpd_thread.join
     end
+
+    if options[:script]
+      $stdout.puts "\nRunning #{options[:script]}\n"
+      if system(options[:script])
+        $stdout.puts "\nSuccess !"
+      else
+        $stdout.puts "\nFail !"
+      end
+    end
   end
 
   def self.parse_options()
@@ -1091,15 +1100,6 @@ p @resources['resource']
     end
 
     delete(api_path()) if @wid
-
-    if options[:script]
-      $stdout.puts "\nRunning #{options[:script]}\n"
-      if system(options[:script])
-        $stdout.puts "\nSuccess !"
-      else
-        $stdout.puts "\nFail !"
-      end
-    end
   end
 end
 
