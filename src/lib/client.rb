@@ -1063,7 +1063,7 @@ class ClientWorkflow < Client
     true
   end
 
-  def launch_workflow(options,params)
+  def run_workflow(options,params)
     ret = post(api_path(),params.to_json)
     @wid = ret['wid']
     @resources = ret['resources']
@@ -1072,11 +1072,34 @@ p @resources['resource']
 
     debug "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
 
+    dbg = nil
+    out = []
+
     res = nil
     begin
       res = get(api_path('resource'))
 
-      yield(res)
+      yield(res) if block_given?
+
+      if res['outputs']
+        output = get(api_path('output'))
+        out += output.split("\n")
+      end
+
+      if options[:debug] and res['debugs']
+        dbg = get(api_path('debug')) if options[:debug]
+        dbg = dbg.split("\n")
+        dbg.delete_if{|line| line.empty?}
+        dbg.collect!{|line| "#{line.split('|')[0]}|[dbg] #{line.split('|')[1]}" rescue "[dbg] #{line}"}
+        out += dbg
+      end
+
+      unless out.empty?
+        out.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
+        out.collect!{|line| line.split("|")[1] rescue line }
+        debug out.join("\n")
+        out.clear
+      end
 
       sleep SLEEP_PITCH
     end until res['done']
