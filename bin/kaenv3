@@ -55,7 +55,7 @@ class KaenvsClient < Client
         :env_desc => {},
         :env_name => '',
         :env_version => nil,
-        :env_user => nil,
+        :user => nil,
         :all_versions => false,
         :visibility_tag => nil,
         :files_to_move => {},
@@ -174,11 +174,11 @@ class KaenvsClient < Client
     # set path
     path = api_path()
     if ![:add, :list, :'move-files'].include?(options[:operation])
-      path = File.join(path,options[:env_user]||USER)
+      path = File.join(path,options[:user]||USER)
       path = File.join(path,options[:env_name]) if options[:env_name]
       path = File.join(path,options[:env_version]) if options[:env_version]
     elsif options[:operation] != :add
-      path = File.join(path,options[:env_user]) if options[:env_user]
+      path = File.join(path,options[:user]) if options[:user]
     end
 
     if [:add, :'update-image-checksum',:'update-postinstalls-checksum',:'update-preinstall-checksum',:'move-files'].include?(options[:operation])
