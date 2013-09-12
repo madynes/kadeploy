@@ -5,6 +5,8 @@ require 'socket'
 require 'base64'
 require 'cgi'
 require 'time'
+require 'zlib'
+require 'stringio'
 require 'json'
 require 'yaml'
 
@@ -80,16 +82,25 @@ module HTTPd
       @request = request
       @body = @request.body
       @uri = @request.request_uri
-      if @request['Accept'] and !@request['Accept'].strip.empty?
-        @accept = @request['Accept'].split(',').collect{|v| v.split(';')[0].strip.downcase}
-      else
-        @accept = nil
-      end
-
-      @accept = nil unless (@accept & ['*','*/*']).empty?
+      @accept = self.class.parse_header_list(@request['Accept'])
+      @encoding = self.class.parse_header_list(@request['Accept-Encoding'])
 
       if @accept and (@accept & TYPES.values).empty?
         raise HTTPError.new(406,'Not Acceptable',@accept.join(', '))
+      end
+
+    end
+
+    def self.parse_header_list(val)
+      if val and !val.strip.empty?
+        ret = val.split(',').collect{|v| v.split(';')[0].strip.downcase}
+        if (ret & ['*','*/*']).empty?
+          ret
+        else
+          nil
+        end
+      else
+        nil
       end
     end
 
@@ -172,17 +183,31 @@ module HTTPd
     end
 
     def output(obj)
+      type = nil
+      content = nil
       if @accept
         case (@accept & TYPES.values)[0]
         when TYPES[:json]
-          [ TYPES[:json], obj.to_json ]
+          type,content = [ TYPES[:json], obj.to_json ]
         when TYPES[:yaml]
-          [ TYPES[:yaml], obj.to_yaml ]
+          type,content = [ TYPES[:yaml], obj.to_yaml ]
         else
           raise HTTPError.new(406,'Not Acceptable',@accept.join(', '))
         end
       else
-        [ TYPES[:json], obj.to_json ]
+        type,content = [ TYPES[:json], obj.to_json ]
+      end
+
+      if @encoding and @encoding.include?('gzip')
+        sio = StringIO.new('w')
+        gzw = Zlib::GzipWriter.new(sio)
+        gzw.write(content)
+        gzw.close
+        content = sio.string
+        #sio.close
+        [type, 'gzip', content]
+      else
+        [type, nil, content]
       end
     end
   end
@@ -205,13 +230,6 @@ module HTTPd
 
     def get_method(request)
       request.request_method.upcase.to_sym
-    end
-
-    def get_output_type(request)
-    end
-
-    # priority given to query string parameters
-    def parse_params(request)
     end
 
     def do_METHOD(request, response)
@@ -242,7 +260,8 @@ module HTTPd
             response['Last-Modified'] = st.mtime.httpdate
             response['Content-Type'] = 'application/octet-stream'
           else
-            response['Content-Type'],res = request_handler.output(res)
+            response['Content-Type'],response['Content-Encoding'],res = \
+              request_handler.output(res)
           end
         rescue HTTPError => e
           res = e.message
