@@ -236,10 +236,16 @@ module Kadeploy
     context
   end
 
-  def deploy_rights?(cexec,operation,wid=nil)
+  def deploy_rights?(cexec,operation,names,wid=nil,*args)
     case operation
     when :create
     when :get
+      if wid and names
+        workflow_get(:deploy,wid) do |info|
+          return (config.common.almighty_env_users.include?(cexec.user) \
+            or cexec.user == info[:user])
+        end
+      end
     when :delete
       return false unless wid
       workflow_get(:deploy,wid) do |info|
@@ -378,18 +384,6 @@ module Kadeploy
         unless workflow.nodes_ko.empty?
           info[:nodes_ko] += workflow.nodes_ko.make_array_of_hostname
         end
-      #  unless workflow.nodes_brk.empty?
-      #    output.push(0,"Nodes breakpointed on cluster #{clname}")
-      #    output.push(0,workflow.nodes_brk.to_s(false,false,"\n"))
-      #  end
-      #  unless workflow.nodes_ok.empty?
-      #    output.push(0,"Nodes correctly deployed on cluster #{clname}")
-      #    output.push(0,workflow.nodes_ok.to_s(false,false,"\n"))
-      #  end
-      #  unless workflow.nodes_ko.empty?
-      #    output.push(0,"Nodes not correctly deployed on cluster #{clname}")
-      #    output.push(0,workflow.nodes_ko.to_s(false,true,"\n"))
-      #  end
       end
 
       if output
@@ -585,6 +579,7 @@ module Kadeploy
     # check if already done
     workflow_get(:deploy,wid) do |info|
       break if !info[:done] and !info[:thread].alive? # error
+      error_not_found! if info[:workflows] and cluster and !info[:workflows][cluster]
 
       if info[:workflows] and info[:workflows][cluster]
         info[:workflows][cluster].output.pop unless info[:workflows][cluster].done?
@@ -604,7 +599,9 @@ module Kadeploy
   def deploy_get_debugs(cexec,wid,node=nil)
     workflow_get(:deploy,wid) do |info|
       break if !info[:done] and !info[:thread].alive? # error
-      info[:debugger].pop(node) if info[:debugger]
+      error_not_found! if (node and !info[:nodelist].include?(node)) or !info[:debugger]
+
+      info[:debugger].pop(node)
     end
   end
 

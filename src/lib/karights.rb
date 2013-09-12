@@ -46,7 +46,7 @@ module Karights
     context
   end
 
-  def rights_rights?(cexec,operation,*args)
+  def rights_rights?(cexec,operation,names,*args)
     # check almighty
     unless config.common.almighty_env_users.include?(cexec.user)
       return [ false, 'Only administrators are allowed to manage rights' ]

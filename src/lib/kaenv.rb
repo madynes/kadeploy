@@ -96,7 +96,7 @@ module Kaenv
     context
   end
 
-  def envs_rights?(cexec,operation,user=nil,name=nil,version=nil)
+  def envs_rights?(cexec,operation,names,user=nil,name=nil,version=nil)
     # check if env is private and cexec != user on GET
     # check if cexec == user on DELETE
     case operation
