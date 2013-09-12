@@ -227,31 +227,8 @@ p c
 
     params[:force] = options[:ignore_nodes_deploying] if options[:ignore_nodes_deploying]
 
-    debug = nil
-    out = []
-
     # Launch the workflow
-    launch_workflow(options,params) do |res|
-      if res['outputs']
-        output = get(api_path('output'))
-        out += output.split("\n")
-      end
-
-      if options[:debug] and res['debugs']
-        debug = get(api_path('debug')) if options[:debug]
-        debug = debug.split("\n")
-        debug.delete_if{|line| line.empty?}
-        debug.collect!{|line| "#{line.split('|')[0]}|[dbg] #{line.split('|')[1]}" rescue "[dbg] #{line}"}
-        out += debug
-      end
-
-      unless out.empty?
-        out.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
-        out.collect!{|line| line.split("|")[1] rescue line }
-        debug out.join("\n")
-        out.clear
-      end
-    end
+    run_workflow(options,params)
   end
 end
 
