@@ -29,7 +29,7 @@ module Kanodes
     context
   end
 
-  def nodes_rights?(cexec,operation,*args)
+  def nodes_rights?(cexec,operation,names,*args)
     true
   end
 

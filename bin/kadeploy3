@@ -173,12 +173,12 @@ p c
       :environment => {
         :kind => options[:env_kind],
       },
-      :vlan => options[:vlan],
-      :debug => options[:debug],
     }
 
     params[:deploy_part] = options[:deploy_part] if options[:deploy_part]
     params[:block_device] = options[:block_device] if options[:block_device]
+    params[:vlan] = options[:vlan] if options[:vlan]
+    params[:debug] = options[:debug] if options[:debug]
 
     env = nil
     case options[:env_kind]

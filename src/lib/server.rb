@@ -327,7 +327,7 @@ class KadeployServer
     options = send(:"#{kind}_prepare",
       parse_request_params(params[:request]),query)
     authenticate!(params[:request],options)
-    ok,msg = send(:"#{kind}_rights?",options,query,*args)
+    ok,msg = send(:"#{kind}_rights?",options,query,params[:names],*args)
     error_unauthorized!(msg) unless ok
 
     if query == :create
