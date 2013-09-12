@@ -170,6 +170,7 @@ class KadeployServer
     ret.secret_key = nil
     ret.cert = nil
     ret.info = nil
+    ret.dry_run = nil
     ret
   end
 
@@ -189,6 +190,7 @@ class KadeployServer
       context.user = p.parse('user',String,:mandatory=>:unauthorized).strip
       context.secret_key = p.parse('secret_key',String)
       context.cert = p.parse('cert',Array,:type=>:x509)
+      context.dry_run = p.parse('dry_run',nil,:toggle=>true)
     end
   end
 
@@ -335,15 +337,10 @@ class KadeployServer
       send(:"#{kind}_init_resources",options) if respond_to?(:"#{kind}_init_resources")
     end
 
-    #if block_given?
-    #  tmp = yield(options)
-    #  args = tmp + args if tmp and tmp.is_a?(Array)
-    #end
-
     meth = "#{kind}_#{query}"
     meth << "_#{params[:names].join('_')}" if params[:names]
 
-    run_method(meth.to_sym,options,*args)
+    run_method(meth.to_sym,options,*args) unless options.dry_run
   end
 
   def workflow_create(kind,wid,info)

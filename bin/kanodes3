@@ -70,7 +70,7 @@ class KanodesClient < Client
   end
 
   def run(options)
-    params = { :user => USER }
+    params = init_params(options)
 
     path = nil
 
@@ -84,7 +84,10 @@ class KanodesClient < Client
       raise
     end
 
-    ret = get(path,params)
+    get(path,params)
+  end
+
+  def result(options,ret)
     debug ret.to_yaml if ret
   end
 end
