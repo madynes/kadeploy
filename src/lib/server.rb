@@ -18,7 +18,7 @@ require 'rights'
 require 'http'
 
 module Kadeploy
-AUTOCLEAN_THRESHOLD = 3600
+AUTOCLEAN_THRESHOLD = 21600 # 6h
 
 class KadeployServer
   include Kadeploy
