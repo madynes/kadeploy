@@ -8,7 +8,7 @@ require 'optparse'
 require 'client'
 
 Signal.trap("INT") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  $stdout.puts "\nSIGINT trapped"
   Kadeploy::KaenvClient.kill() rescue nil
   exit!(1)
 end
@@ -17,18 +17,17 @@ module Kadeploy
 
 class KaenvsClient < Client
   def print_headers()
-    #$stdout.puts "Name\t\tVersion\tUser\t\tDescription"
-    printf("%-21s %-7s %-11s %.35s\n",'Name','Version','User','Description')
-    printf("%-21s %-7s %-11s %.35s\n",'####','#######','####','###########')
+    debug sprintf("%-21s %-7s %-11s %.35s\n",'Name','Version','User','Description')
+    debug sprintf("%-21s %-7s %-11s %.35s\n",'####','#######','####','###########')
   end
 
   def print_short(env)
-    printf("%-21s %-7s %-11s %.35s%.3s\n", env['name'], env['version'], env['user'], env['description'],(env['description'].size>35 ? '...' : ''))
+    debug sprintf("%-21s %-7s %-11s %.35s%.3s\n", env['name'], env['version'], env['user'], env['description'],(env['description'].size>35 ? '...' : ''))
   end
 
   def print_full(env)
     env.delete('user')
-    $stdout.puts env.to_yaml
+    debug env.to_yaml
     #YAML::quick_emit(env) do |out|
     #  out.map(env.taguri(), env.to_yaml_style()) do |map|
     #    env.keys.sort do |x,y|
@@ -251,7 +250,7 @@ class KaenvsClient < Client
     case options[:operation]
     when :list
       if ret.empty?
-        $stdout.puts 'No environment has been found'
+        debug 'No environment has been found'
       else
         print_headers()
         ret.each do |env|
@@ -260,14 +259,14 @@ class KaenvsClient < Client
       end
     when :print
       if ret.empty?
-        $stdout.puts 'No environment has been found'
+        debug 'No environment has been found'
       else
         ret.each do |env|
           print_full(env)
         end
       end
     when :'move-files'
-      ret.each{|env| $stdout.puts "#{env['name']} v#{env['version']}"}
+      ret.each{|env| debug "#{env['name']} v#{env['version']}"}
     end
   end
 end

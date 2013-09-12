@@ -9,7 +9,7 @@ require 'client'
 require 'nodes'
 
 Signal.trap("INT") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  $stdout.puts "\nSIGINT trapped"
   Kadeploy::KadeployClient.kill() rescue nil
   exit!(1)
 end
@@ -169,7 +169,7 @@ p c
   def run(options)
     params = {
       :user => USER,
-      :nodes => options[:nodes],
+      :nodes => nodes(),
       :environment => {
         :kind => options[:env_kind],
       },
@@ -248,7 +248,7 @@ p c
       unless out.empty?
         out.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
         out.collect!{|line| line.split("|")[1] rescue line }
-        puts out.join("\n")
+        debug out.join("\n")
         out.clear
       end
     end

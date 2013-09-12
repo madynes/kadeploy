@@ -9,7 +9,7 @@ require 'optparse'
 require 'client'
 
 Signal.trap("INT") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  $stdout.puts "\nSIGINT trapped"
   Kadeploy::KarightsClient.kill() rescue nil
   exit!(1)
 end
@@ -18,13 +18,12 @@ module Kadeploy
 
 class KarightsClient < Client
   def print_headers()
-    #$stdout.puts "Name\t\tVersion\tUser\t\tDescription"
-    printf("%-15s %-41s %s\n",'User','Node','Partitions')
-    printf("%-15s %-41s %s\n",'####','####','##########')
+    debug sprintf("%-15s %-41s %s\n",'User','Node','Partitions')
+    debug sprintf("%-15s %-41s %s\n",'####','####','##########')
   end
 
   def print_rights(user,node,parts)
-    printf("%-15s %-41s %s\n", user, node, parts.join(','))
+    debug sprintf("%-15s %-41s %s\n", user, node, parts.join(','))
   end
 
   def self.operation()
@@ -105,7 +104,7 @@ class KarightsClient < Client
       when :add
         method = :POST
         params[:username] = options[:user]
-        params[:nodes] = options[:nodes] if options[:nodes]
+        params[:nodes] = nodes() if nodes()
         params[:partitions] = options[:parts] if !options[:parts].empty?
       when :show
         method = :GET
@@ -113,7 +112,7 @@ class KarightsClient < Client
       when :delete
         method = :DELETE
         path = File.join(path,options[:user])
-        params[:nodes] = options[:nodes] if options[:nodes]
+        params[:nodes] = nodes() if nodes()
         params[:partitions] = options[:parts] if !options[:parts].empty?
       else
         raise
