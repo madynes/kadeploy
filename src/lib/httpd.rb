@@ -175,14 +175,14 @@ module HTTPd
       if @accept
         case (@accept & TYPES.values)[0]
         when TYPES[:json]
-          [ TYPES[:json], obj.to_json ]
+          [ TYPES[:json], JSON.pretty_generate(obj) ]
         when TYPES[:yaml]
           [ TYPES[:yaml], obj.to_yaml ]
         else
           raise HTTPError.new(406,'Not Acceptable',@accept.join(', '))
         end
       else
-        [ TYPES[:json], obj.to_json ]
+        [ TYPES[:json], JSON.pretty_generate(obj) ]
       end
     end
   end
