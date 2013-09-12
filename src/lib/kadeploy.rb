@@ -468,6 +468,7 @@ module Kadeploy
               :processing => [],
             }
             info[:workflows].each_value do |workflow|
+              status = workflow.status
               ok = status[:OK].make_array_of_hostname rescue []
               ko = status[:KO].make_array_of_hostname rescue []
               nodes = workflow.nodes.make_array_of_hostname
