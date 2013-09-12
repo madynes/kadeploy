@@ -132,7 +132,7 @@ module Karights
     existing = existing[user]
 
     partitions = cexec.partitions
-    partitions = nil if partitions.empty?
+    partitions = nil if partitions and partitions.empty?
 
     if nodes and existing.include?('*')
       kaerror(APIError::CONFLICTING_ELEMENTS,"Trying to remove rights for a specific node while rights are defined with a wildcard")
