@@ -4,6 +4,8 @@ require 'net/https'
 require 'uri'
 require 'error'
 require 'time'
+require 'zlib'
+require 'stringio'
 require 'json'
 require 'yaml'
 
@@ -116,6 +118,16 @@ module HTTP
           error("Invalid request on #{server}:#{port} (#{e.class.name})")
         end
         if response.is_a?(Net::HTTPOK)
+          body = nil
+          if response['Content-Encoding'] == 'gzip'
+            sio = StringIO.new(response.body,'rb')
+            gzr = Zlib::GzipReader.new(sio)
+            body = gzr.read
+            gzr.close
+          else
+            body = response.body
+          end
+
           if parse
             if response['Content-Type'] == 'application/json'
               res = JSON::load(response.body)
