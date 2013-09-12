@@ -9,7 +9,7 @@ require 'yaml'
 require 'client'
 
 Signal.trap("INT") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  $stdout.puts "\nSIGINT trapped"
   Kadeploy::KanodesClient.kill() rescue nil
   exit!(1)
 end
@@ -77,15 +77,15 @@ class KanodesClient < Client
     case options[:operation]
     when :get_state
       path = api_path()
-      params[:nodes] = options[:nodes]
+      params[:nodes] = nodes() if nodes()
     when :get_status
       path = api_path(options[:wid],:deploy)
     else
       raise
     end
 
-    $stdout.puts get(path,params,:yaml,false)
-    #$stdout.puts ret.to_yaml if ret
+    ret = get(path,params,:yaml,false)
+    debug ret if ret
   end
 end
 

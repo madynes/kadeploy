@@ -9,7 +9,7 @@ require 'yaml'
 require 'client'
 
 Signal.trap("INT") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  $stdout.puts "\nSIGINT trapped"
   Kadeploy::KapowerClient.kill() rescue nil
   exit!(1)
 end

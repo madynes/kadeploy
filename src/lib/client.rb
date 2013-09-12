@@ -42,16 +42,18 @@ require 'yaml'
 module Kadeploy
 
 class Client
-  attr_reader :wid
+  attr_reader :name, :nodes
 
-  def initialize(server,port,secure=false)
+  def initialize(name,server,port,secure=false,nodes=nil)
+    @name = name
     @server = server
     @port = port
     @secure = secure
+    @nodes = nodes
   end
 
   def kill
-    $stderr.puts "Error encountered, let's clean everything ..."
+    debug "Error encountered, let's clean everything ..."
   end
 
   def api_path(path=nil,kind=nil,*args)
@@ -72,7 +74,7 @@ class Client
   end
 
   def error(msg='',abrt = true)
-    self.class.error(msg,abrt)
+    self.class.error(debug(msg,false),abrt)
   end
 
   def self.kill()
@@ -472,7 +474,7 @@ class Client
   def self.do_version(options)
     if options[:get_version]
       print = Proc.new do |res,prefix|
-        puts "#{prefix if prefix}Kadeploy version: #{res['version']}"
+        $stdout.puts "#{prefix if prefix}Kadeploy version: #{res['version']}"
       end
       if options[:multi_server]
         options[:servers].each_pair do |server,inf|
@@ -491,15 +493,15 @@ class Client
   def self.do_info(options)
     if options[:get_users_info]
       print = Proc.new do |res,prefix|
-        puts "#{prefix if prefix}Kadeploy server configuration:"
-        puts "#{prefix if prefix}  Custom PXE boot method: #{res['pxe']}"
-        puts "#{prefix if prefix}  Deployment environment:"
-        puts "#{prefix if prefix}    Supported file systems:"
+        $stdout.puts "#{prefix if prefix}Kadeploy server configuration:"
+        $stdout.puts "#{prefix if prefix}  Custom PXE boot method: #{res['pxe']}"
+        $stdout.puts "#{prefix if prefix}  Deployment environment:"
+        $stdout.puts "#{prefix if prefix}    Supported file systems:"
         res['supported_fs'].each_pair do |clname,fslist|
-          puts "#{prefix if prefix}      #{clname}: #{fslist.join(',')}"
+          $stdout.puts "#{prefix if prefix}      #{clname}: #{fslist.join(',')}"
         end
-        puts "#{prefix if prefix}    Variables exported to custom scripts:"
-        puts print_arraystr(res['vars'],"#{prefix if prefix}      ")
+        $stdout.puts "#{prefix if prefix}    Variables exported to custom scripts:"
+        $stdout.puts print_arraystr(res['vars'],"#{prefix if prefix}      ")
       end
 
       if options[:multi_server]
@@ -512,6 +514,22 @@ class Client
         print.call(get(info[0],info[1],'/info',info[2]))
       end
       exit 0
+    end
+  end
+
+  def debug(msg='',print=true)
+    if @name
+      tmp = ''
+      msg.each_line do |line|
+        tmp << sprintf("%-10s%s","[#{@name}] ",line)
+      end
+      msg = tmp
+    end
+
+    if print
+      $stdout.puts msg
+    else
+      msg
     end
   end
 
@@ -750,7 +768,6 @@ class Client
     return options
   end
 
-  # TODO: check_int_range, check_ssh_key, check_operation_level, check_username, check_file, check_pxe..., check_env_version, check_verbose_level
   def self.launch()
     options = nil
     error() unless options = parse_options()
@@ -765,6 +782,7 @@ class Client
     options[:nodes] = nil if options[:nodes] and options[:nodes].empty?
     treated = []
     # Sort nodes from the list by server (if multiserver option is specified)
+    nodes = nil
     if options[:multi_server]
       options[:servers].each_pair do |server,inf|
         next if server.downcase == 'default'
@@ -773,7 +791,7 @@ class Client
           nodes = options[:nodes] & nodelist
           treated += nodes
         end
-        $clients << self.new(inf[0],inf[1],inf[2])
+        $clients << self.new(server,inf[0],inf[1],inf[2],nodes)
       end
     else
       info = options[:servers][options[:chosen_server]]
@@ -782,7 +800,7 @@ class Client
         nodes = options[:nodes] & nodelist
         treated += nodes
       end
-      $clients << self.new(info[0],info[1],info[2])
+      $clients << self.new(nil,info[0],info[1],info[2],nodes)
     end
 
     # Check that every nodes was treated
@@ -826,8 +844,10 @@ class Client
 end
 
 class ClientWorkflow < Client
-  def initialize(server,port,secure=false)
-    super(server,port,secure)
+  attr_reader :wid
+
+  def initialize(name,server,port,secure=false,nodes=nil)
+    super(name,server,port,secure,nodes)
     @wid = nil
     @resources = nil
   end
@@ -1074,7 +1094,7 @@ class ClientWorkflow < Client
 p @resources['resource']
 
     if options[:wait]
-      puts "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
+      debug "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
 
       res = nil
       begin
@@ -1087,33 +1107,33 @@ p @resources['resource']
 
       get(api_path('error')) if res['error']
 
-      puts "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
+      debug "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
       unless res['error']
         # Success
         if res['nodes']['ok'] and !res['nodes']['ok'].empty?
-          puts "The #{self.class.operation().downcase} is successful on nodes"
-          puts res['nodes']['ok'].join("\n")
+          debug "The #{self.class.operation().downcase} is successful on nodes"
+          debug res['nodes']['ok'].join("\n")
         end
 
         # Fail
         if res['nodes']['ko'] and !res['nodes']['ko'].empty?
-          puts "The #{self.class.operation().downcase} operation failed on nodes"
-          puts res['nodes']['ko'].join("\n")
+          debug "The #{self.class.operation().downcase} operation failed on nodes"
+          debug res['nodes']['ko'].join("\n")
         end
       end
 
       delete(api_path()) if @wid
     else
-      puts "#{@wid} #{@resources['resource']}\n"
+      debug "#{@wid} #{@resources['resource']}\n"
     end
 
     if options[:script]
-      puts "\nRunning #{options[:script]}\n"
+      $stdout.puts "\nRunning #{options[:script]}\n"
       if system(options[:script])
-        puts "\nSuccess !"
+        $stdout.puts "\nSuccess !"
       else
-        puts "\nFail !"
+        $stdout.puts "\nFail !"
       end
     end
   end
