@@ -715,6 +715,7 @@ class Client
       :nodes => [],
       :get_version => false,
       :get_user_info => false,
+      :dry_run => false,
       :multi_server => false,
       :servers => load_configfile(),
       :chosen_server => nil,
@@ -749,6 +750,9 @@ class Client
       opt.on("-S","--server STRING", "Specify the Kadeploy server to use") { |s|
         options[:chosen_server] = s
       }
+      opt.on("","--[no-]dry-run", "Perform a dry run") { |v|
+        options[:dry_run] = v
+      }
       opt.separator ""
       yield(opt,options)
     end
@@ -766,6 +770,12 @@ class Client
     options[:server_port] = options[:servers][options[:chosen_server]][1]
 
     return options
+  end
+
+  def init_params(options)
+    ret = { :user => USER }
+    ret[:dry_run] = options[:dry_run] if options[:dry_run]
+    ret
   end
 
   def self.launch()
@@ -810,7 +820,8 @@ class Client
     $clients.each do |client|
       $threads << Thread.new do
         Thread.current[:client] = client
-        client.run(options)
+        ret = client.run(options)
+        client.result(options,ret) if ret and !options[:dry_run]
       end
     end
     $threads.each { |thread| thread.join }
@@ -845,6 +856,9 @@ class Client
 
   def run(options)
     raise
+  end
+
+  def result(options,ret)
   end
 
   def self.operation()
@@ -1090,6 +1104,12 @@ class ClientWorkflow < Client
     true
   end
 
+  def init_params(options)
+    super(options).merge({
+      :nodes => nodes(),
+    })
+  end
+
   def run_workflow(options,params)
     if !options[:wait] and !$files.empty?
       error("Cannot use --no-wait since some files have to be exported to the server:\n  #{$files.collect{|f|f.path}.join("\n  ")}")
@@ -1097,6 +1117,8 @@ class ClientWorkflow < Client
 
     # Launch the operation
     ret = post(api_path(),params)
+    return if options[:dry_run]
+
     @wid = ret['wid']
     @resources = ret['resources']
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
@@ -1141,23 +1163,28 @@ p @resources['resource']
 
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
-      unless res['error']
-        # Success
-        if res['nodes']['ok'] and !res['nodes']['ok'].empty?
-          debug "The #{self.class.operation().downcase} is successful on nodes"
-          debug res['nodes']['ok'].join("\n")
-        end
-
-        # Fail
-        if res['nodes']['ko'] and !res['nodes']['ko'].empty?
-          debug "The #{self.class.operation().downcase} operation failed on nodes"
-          debug res['nodes']['ko'].join("\n")
-        end
-      end
-
       delete(api_path()) if @wid
+
+      res
     else
       debug "#{@wid} #{@resources['resource']}\n"
+      nil
+    end
+  end
+
+  def result(options,res)
+    unless res['error']
+      # Success
+      if res['nodes']['ok'] and !res['nodes']['ok'].empty?
+        debug "The #{self.class.operation().downcase} is successful on nodes"
+        debug res['nodes']['ok'].join("\n")
+      end
+
+      # Fail
+      if res['nodes']['ko'] and !res['nodes']['ko'].empty?
+        debug "The #{self.class.operation().downcase} operation failed on nodes"
+        debug res['nodes']['ko'].join("\n")
+      end
     end
   end
 end

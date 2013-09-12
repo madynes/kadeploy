@@ -166,9 +166,7 @@ class KaenvsClient < Client
   end
 
   def run(options)
-    params = {
-      :user => USER,
-    }
+    params = init_params(options)
 
     # set path
     path = api_path()
@@ -233,20 +231,21 @@ class KaenvsClient < Client
 
     params[:last] = true unless options[:all_versions]
 
-    ret = nil
     case method
       when :GET
-        ret = get(path,params)
+        get(path,params)
       when :POST
-        ret = post(path,params)
+        post(path,params)
       when :PUT
-        ret = put(path,params)
+        put(path,params)
       when :DELETE
-        ret = delete(path,params)
+        delete(path,params)
       else
         raise
     end
+  end
 
+  def result(options,ret)
     case options[:operation]
     when :list
       if ret.empty?

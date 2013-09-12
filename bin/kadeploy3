@@ -167,12 +167,10 @@ p c
   end
 
   def run(options)
-    params = {
-      :user => USER,
-      :nodes => nodes(),
-      :environment => {
-        :kind => options[:env_kind],
-      },
+    params = init_params(options)
+
+    params[:environment] = {
+      :kind => options[:env_kind],
     }
 
     params[:deploy_part] = options[:deploy_part] if options[:deploy_part]
