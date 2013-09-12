@@ -825,6 +825,15 @@ class Client
     end
 
     $debug_http.close if $debug_http and $debug_http != $stdout and !$debug_http.closed?
+
+    if options[:script]
+      $stdout.puts "\nRunning #{options[:script]}\n"
+      if system(options[:script])
+        $stdout.puts "\nSuccess !"
+      else
+        $stdout.puts "\nFail !"
+      end
+    end
   end
 
   def self.parse_options()
@@ -1126,15 +1135,6 @@ p @resources['resource']
       delete(api_path()) if @wid
     else
       debug "#{@wid} #{@resources['resource']}\n"
-    end
-
-    if options[:script]
-      $stdout.puts "\nRunning #{options[:script]}\n"
-      if system(options[:script])
-        $stdout.puts "\nSuccess !"
-      else
-        $stdout.puts "\nFail !"
-      end
     end
   end
 end
