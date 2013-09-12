@@ -441,15 +441,15 @@ class KadeployServer
     end
   end
 
-  def get_nodes()
+  def get_nodes(*args)
     @config.common.nodes_desc.make_array_of_hostname
   end
 
-  def get_clusters()
+  def get_clusters(*args)
     @config.cluster_specific.keys
   end
 
-  def get_users_info
+  def get_users_info(*args)
     ret = {}
 
     ret[:pxe] = @config.common.pxe[:dhcp].class.name.split('::').last
