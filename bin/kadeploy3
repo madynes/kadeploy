@@ -41,7 +41,6 @@ class KadeployClient < ClientWorkflow
         :steps => [],
         :ignore_nodes_deploying => false,
         :breakpoint_on_microstep => '',
-        :custom_operations_file => nil,
         :custom_operations => nil,
         :disable_bootloader_install => nil,
         :disable_disk_partitioning => nil,
@@ -102,7 +101,6 @@ class KadeployClient < ClientWorkflow
         end
       }
       opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
-        options[:custom_operations_file] = file
         options[:custom_operations] = load_custom_ops_file(file)
         return false unless options[:custom_operations]
       }
@@ -183,6 +181,7 @@ class KadeployClient < ClientWorkflow
       params[:pxe][:singularities] = options[:pxe_profile_singularities] if options[:pxe_profile_singularities]
       params[:pxe][:files] = options[:pxe_files] unless options[:pxe_files].empty?
     end
+    params[:custom_operations] = options[:custom_operations] if options[:custom_operations]
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:debug] = options[:debug] if options[:debug]
 

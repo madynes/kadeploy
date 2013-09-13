@@ -88,6 +88,43 @@ module Kadeploy
     end
   end
 
+  def deploy_check_macrostep_interface(name)
+    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+      klass.superclass == Macrostep::Kadeploy
+    }
+    macrointerfaces.collect!{ |klass| klass.name.split('::').last }
+
+    return macrointerfaces.include?(name)
+  end
+
+  def deploy_check_macrostep_instance(name)
+    # Gathering a list of availables macrosteps
+    macrosteps = ObjectSpace.each_object(Class).select { |klass|
+      klass.ancestors.include?(Macrostep::Kadeploy)
+    }
+
+    # Do not consider rought step names as valid
+    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+      klass.superclass == Macrostep::Kadeploy
+    }
+    macrointerfaces.each { |interface| macrosteps.delete(interface) }
+
+    macrosteps.collect!{ |klass| klass.step_name }
+
+    return macrosteps.include?(name)
+  end
+
+  def deploy_check_microstep(name)
+    # Gathering a list of availables microsteps
+    microsteps = Microstep.instance_methods.select{
+      |microname| microname =~ /^ms_/
+    }
+    microsteps.collect!{ |microname| microname.to_s.sub(/^ms_/,'') }
+
+    return microsteps.include?(name)
+  end
+
+
   def deploy_prepare(params,operation=:create)
     context = deploy_init_exec_context()
 
@@ -146,7 +183,98 @@ module Kadeploy
           context.pxe_upload_files = p.check(pxe['files'],Array)
         end
 
-        # TODO: check custom operations
+        # Check custom microsteps
+        p.parse('custom_operations',Hash) do |custom_ops|
+          context.custom_operations = { :operations => {}, :overrides => {}}
+          customops = context.custom_operations[:operations]
+          customover = context.custom_operations[:overrides]
+
+          custom_ops.each_pair do |macro,micros|
+            p.check(macro,String,:errno=>APIError::INVALID_CUSTOMOP)
+            p.check(micros,Hash,:errno=>APIError::INVALID_CUSTOMOP)
+            kaerror(APIError::INVALID_CUSTOMOP,"Invalid macrostep '#{macro}'") \
+              unless deploy_check_macrostep_instance(macro)
+
+            customops[macro.to_sym] = {} unless customops[macro.to_sym]
+
+            micros.each_pair do |micro,operations|
+              p.check(micro,String,:errno=>APIError::INVALID_CUSTOMOP)
+              p.check(operations,Hash,:errno=>APIError::INVALID_CUSTOMOP)
+              kaerror(APIError::INVALID_CUSTOMOP,"The microstep #{micro} is empty") unless operations
+              error(APIError::INVALID_CUSTOMOP,"Invalid microstep '#{micro}'") \
+                unless deploy_check_microstep(micro)
+
+              customops[macro.to_sym][micro.to_sym] = [] unless customops[macro.to_sym][micro.to_sym]
+              operations.each_pair do |operatio,ops|
+                p.check(operatio,String,:errno=>APIError::INVALID_CUSTOMOP,
+                  :values => ['pre-ops','post-ops','substitute','override'])
+                p.check(ops,Array,:errno=>APIError::INVALID_CUSTOMOP)
+
+                if operatio == 'override'
+                  customover[macro.to_sym] = {} unless customover[macro.to_sym]
+                  customover[macro.to_sym][micro.to_sym] = true
+                  next
+                end
+
+                ops.each do |op|
+                  p.check(op['name'],String,:errno=>APIError::INVALID_CUSTOMOP,
+                    :mandatory=>true)
+                  p.check(op['action'],String,:errno=>APIError::INVALID_CUSTOMOP,
+                    :mandatory=>true, :values => ['exec','send','run'])
+                  scattering = op['scattering'] || 'tree'
+                  timeout = p.check(op['timeout'],Fixnum,
+                    :errno=>APIError::INVALID_CUSTOMOP,:default=>0)
+                  retries = p.check(op['retries'],Fixnum,
+                    :errno=>APIError::INVALID_CUSTOMOP,:default=>0)
+
+                  case op['action']
+                  when 'send'
+                    p.check(op['file'],String,:errno=>APIError::INVALID_CUSTOMOP,
+                      :mandatory=>true)
+                    p.check(op['destination'],String,:errno=>APIError::INVALID_CUSTOMOP,
+                      :mandatory=>true)
+                    customops[macro.to_sym][micro.to_sym] << {
+                      :action => op['action'].to_sym,
+                      :name => "#{micro}-#{op['name']}",
+                      :file => op['file'],
+                      :destination => op['destination'],
+                      :timeout => timeout,
+                      :retries => retries,
+                      :scattering => scattering.to_sym,
+                      :target => operatio.to_sym
+                    }
+                  when 'run'
+                    p.check(op['file'],String,:errno=>APIError::INVALID_CUSTOMOP,
+                      :mandatory=>true)
+                    op['params'] = '' unless op['params']
+                    customops[macro.to_sym][micro.to_sym] << {
+                      :action => op['action'].to_sym,
+                      :name => "#{micro}-#{op['name']}",
+                      :file => op['file'],
+                      :params => op['params'],
+                      :timeout => timeout,
+                      :retries => retries,
+                      :scattering => scattering.to_sym,
+                      :target => operatio.to_sym
+                    }
+                  when 'exec'
+                    p.check(op['command'],String,:errno=>APIError::INVALID_CUSTOMOP,
+                      :mandatory=>true)
+                    customops[macro.to_sym][micro.to_sym] << {
+                      :action => op['action'].to_sym,
+                      :name => "#{micro}-#{op['name']}",
+                      :command => op['command'],
+                      :timeout => timeout,
+                      :retries => retries,
+                      :scattering => scattering.to_sym,
+                      :target => operatio.to_sym
+                    }
+                  end
+                end
+              end
+            end
+          end
+        end
 
         # Check Environment
         env = p.parse('environment',Hash,:mandatory=>true)
