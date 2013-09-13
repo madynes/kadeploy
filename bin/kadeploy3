@@ -43,8 +43,8 @@ class KadeployClient < ClientWorkflow
         :breakpoint_on_microstep => '',
         :custom_operations_file => nil,
         :custom_operations => nil,
-        :disable_bootloader_install => false,
-        :disable_disk_partitioning => false,
+        :disable_bootloader_install => nil,
+        :disable_disk_partitioning => nil,
         :reboot_classical_timeout => nil,
         :reboot_kexec_timeout => nil,
         :vlan => nil,
@@ -171,6 +171,9 @@ class KadeployClient < ClientWorkflow
     params[:reformat_tmp_partition] = options[:reformat_tmp] if options[:reformat_tmp]
     params[:timeout_reboot_classical] = options[:reboot_classical_timeout] if options[:reboot_classical_timeout]
     params[:timeout_reboot_kexec] = options[:reboot_kexec_timeout] if options[:reboot_kexec_timeout]
+    params[:disable_bootloader_install] = options[:disable_bootloader_install] if options[:disable_bootloader_install]
+    params[:disable_disk_partitioning] = options[:disable_disk_partitioning] if options[:disable_disk_partitioning]
+
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:debug] = options[:debug] if options[:debug]
 
