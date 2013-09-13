@@ -215,6 +215,9 @@ module Kadeploy
         context.ignore_nodes_deploying = p.parse('force',nil,:toggle=>true)
 
         # Check debug
+        context.verbose_level = p.parse('verbose_level',Fixnum,:range=>(1..5))
+
+        # Check debug
         context.debug = p.parse('debug',nil,:toggle=>true)
 
         # Loading OutputControl
