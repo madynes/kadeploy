@@ -24,9 +24,9 @@ class ParamsParser
     end
   end
 
-  def check(value, klass, opts={})
+  def check(value, klass, opts={}, &block)
     opts[:value] = value
-    parse(nil,klass,opts)
+    parse(nil,klass,opts,&block)
   end
 
   def parse(name, klass, opts={})

@@ -36,8 +36,8 @@ class KadeployClient < ClientWorkflow
         :key => nil,
         :reformat_tmp => nil,
         :pxe_profile => nil,
-        :pxe_upload_files => [],
         :pxe_profile_singularities => nil,
+        :pxe_files => [],
         :steps => [],
         :ignore_nodes_deploying => false,
         :breakpoint_on_microstep => '',
@@ -155,6 +155,10 @@ class KadeployClient < ClientWorkflow
 
     error('You must choose an environment') if options[:env_kind].empty?
 
+    if !options[:pxe_files].empty? and !options[:pxe_profile]
+      error('You must define a PXE boot profile if you want to push some files in the PXE repository')
+    end
+
     true
   end
 
@@ -173,7 +177,12 @@ class KadeployClient < ClientWorkflow
     params[:timeout_reboot_kexec] = options[:reboot_kexec_timeout] if options[:reboot_kexec_timeout]
     params[:disable_bootloader_install] = options[:disable_bootloader_install] if options[:disable_bootloader_install]
     params[:disable_disk_partitioning] = options[:disable_disk_partitioning] if options[:disable_disk_partitioning]
-
+    if options[:pxe_profile]
+      params[:pxe] = {}
+      params[:pxe][:profile] = options[:pxe_profile]
+      params[:pxe][:singularities] = options[:pxe_profile_singularities] if options[:pxe_profile_singularities]
+      params[:pxe][:files] = options[:pxe_files] unless options[:pxe_files].empty?
+    end
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:debug] = options[:debug] if options[:debug]
 
@@ -215,6 +224,9 @@ class KadeployClient < ClientWorkflow
       params[:ssh_authorized_keys] = options[:key]
       localfiles += get_localfiles(params[:ssh_authorized_keys])
     end
+
+    # Add the PXE files
+    localfiles += get_localfiles(options[:pxe_files]) unless options[:pxe_files].empty?
 
     # Serve local files throught HTTP(s)
     params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
