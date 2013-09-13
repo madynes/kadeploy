@@ -187,7 +187,7 @@ module Kadeploy
         # Multi-partitioned archives hack
         if context.environment.multipart
           params['block_device'] = context.environment.options['block_device']
-          params['deploy_part'] = context.environment.options['deploy_part']
+          params['deploy_partition'] = context.environment.options['deploy_part']
         end
 
         #The rights must be checked for each cluster if the node_list contains nodes from several clusters
@@ -195,12 +195,15 @@ module Kadeploy
           part = (
             p.parse('block_device',String,
               :default=>config.cluster_specific[cluster].block_device) \
-            + p.parse('deploy_part',String,:emptiable=>true,
-              :default=>config.cluster_specific[cluster].deploy_part)
+            + p.parse('deploy_partition',Fixnum,:emptiable=>true,
+              :default=>config.cluster_specific[cluster].deploy_part).to_s
           )
           kaerror(KadeployError::NO_RIGHT_TO_DEPLOY,part) \
             unless rights.granted?(context.user,nodes,part)
         end
+
+        # Check the boot partition
+        context.boot_part = p.parse('boot_partition',Fixnum)
 
         # Check rights on multipart environement
         if context.environment.multipart
