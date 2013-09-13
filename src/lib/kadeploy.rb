@@ -195,8 +195,8 @@ module Kadeploy
           part = (
             p.parse('block_device',String,
               :default=>config.cluster_specific[cluster].block_device) \
-            + p.parse('deploy_partition',Fixnum,:emptiable=>true,
-              :default=>config.cluster_specific[cluster].deploy_part).to_s
+            + p.parse('deploy_partition',String,:emptiable=>true,
+              :default=>config.cluster_specific[cluster].deploy_part)
           )
           kaerror(KadeployError::NO_RIGHT_TO_DEPLOY,part) \
             unless rights.granted?(context.user,nodes,part)
