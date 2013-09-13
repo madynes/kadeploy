@@ -133,14 +133,17 @@ module Kadeploy
           dns = nil
         end
 
-        # Check PXE
+        # Check PXE options
         p.parse('pxe',Hash) do |pxe|
           context.pxe_profile_msg = p.check(pxe['profile'],String)
-          # TODO: check singularities
-          context.pxe_profile_singularities = p.check(pxe['singularities'],String)
-          p.parse(pxe['files'],Array) do |files|
-            context.pxe_upload_files = files
+
+          p.check(pxe['singularities'],Hash) do |singularities|
+            p.check(singularities.keys,Array,:type=>:nodeset,
+              :errno=>APIError::INVALID_NODELIST)
+            context.pxe_profile_singularities = singularities
           end
+
+          context.pxe_upload_files = p.check(pxe['files'],Array)
         end
 
         # TODO: check custom operations

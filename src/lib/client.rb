@@ -143,7 +143,7 @@ class Client
   end
 
   def self.load_inputfile(file)
-    if file.is_a?(IO) or check_file(f)
+    if file.is_a?(IO) or check_file(file)
       file = File.new(file) unless file.is_a?(IO)
       file.readlines.collect{|v|v.chomp}.delete_if{|v|v=~/^\s*#.*$/ or v.empty?}
     else
@@ -897,7 +897,7 @@ class ClientWorkflow < Client
   end
 
   def self.load_file(file)
-    kind = (URI.parse(file)||'local')
+    kind = (URI.parse(file).scheme||'local')
     case kind
     when 'local'
       if check_file(file)
@@ -997,11 +997,12 @@ class ClientWorkflow < Client
   end
 
   def self.parse_pxe_pattern(opt,options)
-    opt.on("--set-pxe-pattern FILE", "Specify a file containing the substituation of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
+    opt.on("--set-pxe-pattern FILE", "Specify a file containing the substitution of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
       if (lines = load_inputfile(f))
+        options[:pxe_profile_singularities] = {}
         lines.each do |line|
           content = line.split(",")
-          options[:pxe_profile_singularities[content[0]]] = content[1].strip
+          options[:pxe_profile_singularities][content[0]] = content[1].strip
         end
       else
         return false
@@ -1010,9 +1011,9 @@ class ClientWorkflow < Client
   end
 
   def self.parse_pxe_files(opt,options)
-    opt.on("-x", "--upload-pxe-files FILES", Array, "Upload a list of files (file1,file2,file3) to the PXE kernels repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |fs|
+    opt.on("-x", "--upload-pxe-files FILES", Array, "Upload a list of files (file1,file2,file3) to the PXE repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |fs|
       fs.each do |file|
-        return false unless (filename = load_file(file))
+        return false unless (filename = load_file(File.expand_path(file)))
         options[:pxe_files] << filename
       end
     }
