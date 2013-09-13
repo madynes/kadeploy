@@ -19,7 +19,7 @@ module Kadeploy
     ret.verbose_level = nil
     ret.debug = false
     ret.key = String.new
-    ret.reformat_tmp = false
+    ret.reformat_tmp = nil
     ret.pxe_profile_msg = String.new
     ret.pxe_profile_singularities = nil
     ret.pxe_upload_files = Array.new
@@ -213,6 +213,9 @@ module Kadeploy
             end
           end
         end
+
+        # Check reformat tmp partition
+        context.reformat_tmp = p.parse('reformat_tmp_partition',String)
 
         # Check force
         context.ignore_nodes_deploying = p.parse('force',nil,:toggle=>true)
