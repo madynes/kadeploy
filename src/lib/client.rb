@@ -975,8 +975,8 @@ class ClientWorkflow < Client
   end
 
   def self.parse_deploy_part(opt,options)
-    opt.on("-p", "--partition-number NUMBER", /^\d+$/, "Specify the partition number to use") { |p|
-      options[:deploy_part] = p.to_i
+    opt.on("-p", "--partition-number NUMBER", /^\d*$/, "Specify the partition number to use") { |p|
+      options[:deploy_part] = p
     }
   end
 
