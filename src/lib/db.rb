@@ -187,7 +187,7 @@ module Database
         $stderr.puts "MySQL error (code): #{e.errno}"
         $stderr.puts "MySQL error (message): #{e.error}"
         $stderr.puts e.backtrace
-        raise KadeployError.new(KadeployError::DB_ERROR,nil,
+        raise KadeployError.new(APIError::DATABASE_ERROR,nil,
           "MySQL error ##{e.errno}: #{e.error.gsub(/\s+/," ").strip}")
       end
       return res

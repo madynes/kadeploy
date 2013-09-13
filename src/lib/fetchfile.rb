@@ -27,7 +27,7 @@ class FetchFile
       fetcher = HTTPFetchFile.new(path,errno,client)
     else
       raise KadeployError.new(
-        FetchFileError::UNKNOWN_PROTOCOL,nil,
+        APIError::INVALID_FILE,nil,
         "Unable to grab the file '#{path}', unknown protocol #{kind}"
       )
     end
@@ -143,11 +143,9 @@ class HTTPFetchFile < FetchFile
       resp, _ = HTTP.fetch_file(@path,dest,dir,nil)
       case resp
       when -1
-        error(FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,
-          "Tempfiles cannot be created")
+        error(APIError::CACHE_ERROR,"Tempfiles cannot be created")
       when -2
-        error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE,
-          "Environment file cannot be moved")
+        error(APIError::CACHE_ERROR,"File cannot be moved from tempfile")
       when 200
         nil
       else
