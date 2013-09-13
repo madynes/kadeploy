@@ -185,13 +185,9 @@ p c
     when :database
       envname = options[:env_name]
       username = nil
-      if options[:user]
-        username = options[:user]
-      else
-        username = USER
-      end
+      username = options[:user] if options[:user]
 
-      envs = get(api_path(nil,:envs),{:user=>USER})
+      envs = get(api_path(username,:envs),{:user=>USER})
       envs.select!{|en| en['name'] == envname}
       error("The environment '#{envname}' does not exist") if envs.size <= 0
       envs.sort_by!{|en| en['version']}
