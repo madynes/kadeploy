@@ -205,6 +205,10 @@ module Kadeploy
         # Check the boot partition
         context.boot_part = p.parse('boot_partition',Fixnum)
 
+        # Check disable options
+        context.disable_bootloader_install = p.parse('disable_bootloader_install',nil,:toggle=>true)
+        context.disable_disk_partitioning = p.parse('disable_disk_partitioning',nil,:toggle=>true)
+
         # Check rights on multipart environement
         if context.environment.multipart
           context.environment.options['partitions'].each do |part|
