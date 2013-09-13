@@ -802,9 +802,9 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   kadeploy_version=`#{kadeploy} -v`.split(" ").last[0..4]
   case
   when kadeploy_version=="3.1.5"
-    kadeploy_options='-V 4'
+    kadeploy_options='-V 4 -d'
   when (kadeploy_version=="3.1.6" || kadeploy_version=="3.1.7")
-    kadeploy_options='-V 5'
+    kadeploy_options='-V 5 -d'
   end
   $kadeploy="#{kadeploy} #{kadeploy_options}" 
   if $mode==Kanalyzemode::RESERVE
