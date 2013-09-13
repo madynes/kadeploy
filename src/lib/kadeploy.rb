@@ -215,6 +215,26 @@ module Kadeploy
         # Check reformat tmp partition
         context.reformat_tmp = p.parse('reformat_tmp_partition',String)
 
+        # Check reboot timeouts
+        p.parse('timeout_reboot_classical',String) do |timeout|
+          begin
+            eval("n=1; #{timeout}")
+          rescue Exception => e
+            kaerror(APIError::INVALID_OPTION,
+              "the timeout is not a valid expression (#{e.message})")
+          end
+          context.timeout_reboot_classical = timeout
+        end
+        p.parse('timeout_reboot_kexec',String) do |timeout|
+          begin
+            eval("n=1; #{timeout}")
+          rescue
+            kaerror(APIError::INVALID_OPTION,
+              "the timeout is not a valid expression (#{e.message})")
+          end
+          context.timeout_reboot_kexec= timeout
+        end
+
         # Check force
         context.ignore_nodes_deploying = p.parse('force',nil,:toggle=>true)
 

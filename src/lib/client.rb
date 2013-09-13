@@ -1040,6 +1040,12 @@ class ClientWorkflow < Client
       }
   end
 
+  def self.parse_timeout_reboot(opt,options)
+    opt.on("--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots (a ruby expression can be used, 'n' will be replaced by the number of nodes)") { |t|
+      options[:reboot_classical_timeout] = t
+    }
+  end
+
   def self.parse_wait(opt,options)
     opt.on("--[no-]wait", "Wait the end of the operation, set by default") { |v|
       options[:wait] = v

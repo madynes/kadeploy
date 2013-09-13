@@ -62,9 +62,7 @@ class KarebootClient < ClientWorkflow
       parse_pxe_pattern(opt,options)
       parse_pxe_files(opt,options)
       parse_env_version(opt,options)
-      opt.on("--reboot-classical-timeout V", /^\d+$/, "Overload the default timeout for classical reboots") { |t|
-        options[:reboot_classical_timeout] = t.to_i
-      }
+      parse_timeout_reboot(opt,options)
       parse_secure(opt,options)
     end
   end

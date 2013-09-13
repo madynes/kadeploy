@@ -106,15 +106,9 @@ class KadeployClient < ClientWorkflow
         options[:custom_operations] = load_custom_ops_file(file)
         return false unless options[:custom_operations]
       }
-      opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
-        if (t =~ /\A\d+\Z/) then
-          options[:reboot_classical_timeout] = t
-        else
-          error("A number is required for the reboot classical timeout")
-        end
-      }
-      opt.on("--reboot-kexec-timeout V", /^\d+$/, "Overload the default timeout for kexec reboots") { |t|
-        options[:reboot_kexec_timeout] = t.to_i
+      parse_timeout_reboot(opt,options)
+      opt.on("--reboot-kexec-timeout VALUE", "Overload the default timeout for kexec reboots (a ruby expression can be used, 'n' will be replaced by the number of nodes)") { |t|
+        options[:reboot_kexec_timeout] = t
       }
       opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
         s.split("&").each do |macrostep|
@@ -175,8 +169,11 @@ class KadeployClient < ClientWorkflow
     params[:block_device] = options[:block_device] if options[:block_device]
     params[:boot_partition] = options[:boot_part] if options[:boot_part]
     params[:reformat_tmp_partition] = options[:reformat_tmp] if options[:reformat_tmp]
+    params[:timeout_reboot_classical] = options[:reboot_classical_timeout] if options[:reboot_classical_timeout]
+    params[:timeout_reboot_kexec] = options[:reboot_kexec_timeout] if options[:reboot_kexec_timeout]
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:debug] = options[:debug] if options[:debug]
+
 
     env = nil
     case options[:env_kind]
