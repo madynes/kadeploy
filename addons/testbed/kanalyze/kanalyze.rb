@@ -801,9 +801,9 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
 #checks kadeploy command
   kadeploy_version=`#{kadeploy} -v`.split(" ").last[0..4]
   case
-  when kadeploy_version="3.1.5"
+  when kadeploy_version=="3.1.5"
     kadeploy_options='-V 4'
-  when (kadeploy_version="3.1.6" || kadeploy_version="3.1.7")
+  when (kadeploy_version=="3.1.6" || kadeploy_version=="3.1.7")
     kadeploy_options='-V 5'
   end
   $kadeploy="#{kadeploy} #{kadeploy_options}" 
