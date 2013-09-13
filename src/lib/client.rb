@@ -1105,9 +1105,10 @@ class ClientWorkflow < Client
   end
 
   def init_params(options)
-    super(options).merge({
-      :nodes => nodes(),
-    })
+    ret = super(options)
+    ret[:nodes] = nodes()
+    ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
+    ret
   end
 
   def run_workflow(options,params)

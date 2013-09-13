@@ -77,6 +77,18 @@ class ParamsParser
 
     error(errno,"must have a value in (#{opts[:values].join(',')})") if opts[:values] and !opts[:values].include?(param)
 
+    if klass == Fixnum
+      begin
+        param = param.to_i
+      rescue
+        error(errno,"must be numeric")
+      end
+    end
+
+    if opts[:range] and !opts[:range].include?(param)
+      error(errno,"must be in the range #{opts[:range].to_s}")
+    end
+
     case opts[:type]
     when :x509
       param = param.join("\n") if param.is_a?(Array)
