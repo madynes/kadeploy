@@ -76,8 +76,8 @@ module Kadeploy
 
   def deploy_init_resources(cexec)
     info = cexec.info
-    bind(:deploy,info,'output','/outputs')
-    bind(:deploy,info,'outputs','/outputs',info[:clusterlist])
+    bind(:deploy,info,'log','/logs')
+    bind(:deploy,info,'logs','/logs',info[:clusterlist])
     bind(:deploy,info,'state','/state')
     bind(:deploy,info,'status','/status')
     bind(:deploy,info,'error','/error')
@@ -446,16 +446,16 @@ module Kadeploy
         }
 
         if !error
-          outputs = !info[:output].empty?
-          if !outputs and info[:workflows]
+          logs = !info[:output].empty?
+          if !logs and info[:workflows]
             info[:workflows].each_value do |workflow|
               if !workflow.done? and !workflow.output.empty?
-                outputs = true
+                logs = true
                 break
               end
             end
           end
-          ret[:outputs] = outputs
+          ret[:logs] = logs
 
           ret[:debugs] = !info[:debugger].empty? if info[:debugger]
 
@@ -584,7 +584,7 @@ module Kadeploy
     end
   end
 
-  def deploy_get_outputs(cexec,wid,cluster=nil)
+  def deploy_get_logs(cexec,wid,cluster=nil)
     # check if already done
     workflow_get(:deploy,wid) do |info|
       break if !info[:done] and !info[:thread].alive? # error
@@ -593,14 +593,14 @@ module Kadeploy
       if info[:workflows] and info[:workflows][cluster]
         info[:workflows][cluster].output.pop unless info[:workflows][cluster].done?
       else
-        output = ''
-        output << info[:output].pop
+        log = ''
+        log << info[:output].pop
         if info[:workflows]
           info[:workflows].each_value do |workflow|
-            output << workflow.output.pop unless workflow.done?
+            log << workflow.output.pop unless workflow.done?
           end
         end
-        output
+        log
       end
     end
   end

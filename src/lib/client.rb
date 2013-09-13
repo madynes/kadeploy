@@ -1137,9 +1137,9 @@ p @resources['resource']
 
         yield(res) if block_given?
 
-        if res['outputs']
-          output = get(api_path('output'))
-          out += output.split("\n")
+        if res['logs']
+          log = get(api_path('log'))
+          out += log.split("\n")
         end
 
         if options[:debug] and res['debugs']
