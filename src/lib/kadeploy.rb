@@ -146,7 +146,9 @@ module Kadeploy
           context.pxe_upload_files = p.check(pxe['files'],Array)
         end
 
-        # TODO: check custom operations
+        # Check custom microsteps
+        context.custom_operations = p.parse('custom_operations',Hash,
+          :type=>:custom_ops,:errno=>APIError::INVALID_CUSTOMOP)
 
         # Check Environment
         env = p.parse('environment',Hash,:mandatory=>true)

@@ -23,12 +23,6 @@ require 'environment'
 require 'http'
 require 'httpd'
 require 'api'
-# For custom steps
-# TODO: find another way to do this
-require 'macrostep'
-require 'stepdeployenv'
-require 'stepbroadcastenv'
-require 'stepbootnewenv'
 
 require 'thread'
 require 'uri'
@@ -223,6 +217,27 @@ class Client
     end
   end
 
+  def self.load_custom_ops_file(file)
+    file = File.absolute_path(file)
+    return false unless check_file(file)
+
+    begin
+      config = YAML.load_file(file)
+    rescue ArgumentError
+      $stderr.puts "Invalid YAML file '#{file}'"
+      return false
+    rescue Errno::ENOENT
+      return true
+    end
+
+    unless config.is_a?(Hash)
+      $stderr.puts "Invalid file format '#{file}'"
+      return false
+    end
+
+    config
+  end
+
   def self.parse_machinefile(opt,options)
     opt.on("-f", "--file MACHINELIST", "A file containing a list of nodes (- means stdin)")  { |f|
       load_machinefile(options[:nodes], f)
@@ -258,184 +273,6 @@ class Client
     opt.on("--[no-]secure", "Use a secure connection to export files to the server") { |v|
       options[:secure] = v
     }
-  end
-
-  def self.load_custom_ops_file(file)
-    file = File.absolute_path(file)
-    return false unless check_file(file)
-
-    begin
-      config = YAML.load_file(file)
-    rescue ArgumentError
-      $stderr.puts "Invalid YAML file '#{file}'"
-      return false
-    rescue Errno::ENOENT
-      return true
-    end
-
-    unless config.is_a?(Hash)
-      $stderr.puts "Invalid file format '#{file}'"
-      return false
-    end
-    #example of line: macro_step,microstep@cmd1%arg%dir,cmd2%arg%dir,...,cmdN%arg%dir
-    ret = { :operations => {}, :overrides => {}}
-    customops = ret[:operations]
-    customover = ret[:overrides]
-
-    config.each_pair do |macro,micros|
-      unless micros.is_a?(Hash)
-        $stderr.puts "Invalid file format '#{file}'"
-        return false
-      end
-      unless check_macrostep_instance(macro)
-        error("[#{file}] Invalid macrostep '#{macro}'")
-        return false
-      end
-      customops[macro.to_sym] = {} unless customops[macro.to_sym]
-      micros.each_pair do |micro,operations|
-        unless operations.is_a?(Hash)
-          $stderr.puts "Invalid file format '#{file}'"
-          return false
-        end
-        unless check_microstep(micro)
-          error("[#{file}] Invalid microstep '#{micro}'")
-          return false
-        end
-        customops[macro.to_sym][micro.to_sym] = [] unless customops[macro.to_sym][micro.to_sym]
-        operations.each_pair do |operation,ops|
-          unless ['pre-ops','post-ops','substitute','override'].include?(operation)
-            error("[#{file}] Invalid operation '#{operation}'")
-            return false
-          end
-
-          if operation == 'override'
-            customover[macro.to_sym] = {} unless customover[macro.to_sym]
-            customover[macro.to_sym][micro.to_sym] = true
-            next
-          end
-
-          ops.each do |op|
-            unless op['name']
-              error("[#{file}] Operation #{operation}: 'name' field missing")
-              return false
-            end
-            unless op['action']
-              error("[#{file}] Operation #{operation}: 'action' field missing")
-              return false
-            end
-            unless ['exec','send','run'].include?(op['action'])
-              error("[#{file}] Invalid action '#{op['action']}'")
-              return false
-            end
-
-            scattering = op['scattering'] || 'tree'
-            timeout = op['timeout'] || 0
-            begin
-              timeout = Integer(timeout)
-            rescue ArgumentError
-              error("[#{file}] The field 'timeout' shoud be an integer")
-              return false
-            end
-            retries = op['retries'] || 0
-            begin
-              retries = Integer(retries)
-            rescue ArgumentError
-              error("[#{file}] The field 'retries' shoud be an integer")
-              return false
-            end
-
-            case op['action']
-            when 'send'
-              unless op['file']
-                error("[#{file}] Operation #{operation}: 'file' field missing")
-                return false
-              end
-              unless op['destination']
-                error("[#{file}] Operation #{operation}: 'destination' field missing")
-                return false
-              end
-              customops[macro.to_sym][micro.to_sym] << {
-                :action => op['action'].to_sym,
-                :name => "#{micro}-#{op['name']}",
-                :file => op['file'],
-                :destination => op['destination'],
-                :timeout => timeout,
-                :retries => retries,
-                :scattering => scattering.to_sym,
-                :target => operation.to_sym
-              }
-            when 'run'
-              unless op['file']
-                error("[#{file}] Operation #{operation}: 'file' field missing")
-                return false
-              end
-              op['params'] = '' unless op['params']
-              customops[macro.to_sym][micro.to_sym] << {
-                :action => op['action'].to_sym,
-                :name => "#{micro}-#{op['name']}",
-                :file => op['file'],
-                :params => op['params'],
-                :timeout => timeout,
-                :retries => retries,
-                :scattering => scattering.to_sym,
-                :target => operation.to_sym
-              }
-            when 'exec'
-              unless op['command']
-                error("[#{file}] Operation #{operation}: 'command' field missing")
-                return false
-              end
-              customops[macro.to_sym][micro.to_sym] << {
-                :action => op['action'].to_sym,
-                :name => "#{micro}-#{op['name']}",
-                :command => op['command'],
-                :timeout => timeout,
-                :retries => retries,
-                :scattering => scattering.to_sym,
-                :target => operation.to_sym
-              }
-            end
-          end
-        end
-      end
-    end
-    return ret
-  end
-
-  def self.check_macrostep_interface(name)
-    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep::Kadeploy
-    }
-    macrointerfaces.collect!{ |klass| klass.name.split('::').last }
-
-    return macrointerfaces.include?(name)
-  end
-
-  def self.check_macrostep_instance(name)
-    # Gathering a list of availables macrosteps
-    macrosteps = ObjectSpace.each_object(Class).select { |klass|
-      klass.ancestors.include?(Macrostep::Kadeploy)
-    }
-
-    # Do not consider rought step names as valid
-    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep::Kadeploy
-    }
-    macrointerfaces.each { |interface| macrosteps.delete(interface) }
-
-    macrosteps.collect!{ |klass| klass.step_name }
-
-    return macrosteps.include?("Kadeploy#{name}")
-  end
-
-  def self.check_microstep(name)
-    # Gathering a list of availables microsteps
-    microsteps = Microstep.instance_methods.select{
-      |microname| microname =~ /^ms_/
-    }
-    microsteps.collect!{ |microname| microname.to_s.sub(/^ms_/,'') }
-
-    return microsteps.include?(name)
   end
 
   def self.check_file(file)

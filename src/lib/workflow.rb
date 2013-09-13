@@ -420,72 +420,76 @@ module Workflow
     def load_custom_operations
       # Custom files
       if context[:execution].custom_operations
-        context[:execution].custom_operations[:operations].each_pair do |macro,micros|
-          micros.each_pair do |micro,entries|
-            @config[macro] = {} unless @config[macro]
-            @config[macro][:config] = {} unless @config[macro][:config]
-            @config[macro][:config][micro] = conf_task_default() unless @config[macro][:config][micro]
+        context[:execution].custom_operations[:operations].each_pair do |macrobase,micros|
+          @config.keys.select{|v| v =~ /^#{macrobase}/}.each do |macro|
+            micros.each_pair do |micro,entries|
+              @config[macro] = {} unless @config[macro]
+              @config[macro][:config] = {} unless @config[macro][:config]
+              @config[macro][:config][micro] = conf_task_default() unless @config[macro][:config][micro]
 
-            if context[:execution].custom_operations[:overrides][macro]
-              override = context[:execution].custom_operations[:overrides][macro][micro]
-            else
-              override = false
-            end
-
-            overriden = {}
-            entries.each do |entry|
-              target = nil
-              if entry[:target] == :'pre-ops'
-                @config[macro][:config][micro][:custom_pre] = [] unless @config[macro][:config][micro][:custom_pre]
-                target = @config[macro][:config][micro][:custom_pre]
-              elsif entry[:target] == :'post-ops'
-                @config[macro][:config][micro][:custom_post] = [] unless @config[macro][:config][micro][:custom_post]
-                target = @config[macro][:config][micro][:custom_post]
+              if context[:execution].custom_operations[:overrides][macro]
+                override = context[:execution].custom_operations[:overrides][macro][micro]
               else
-                @config[macro][:config][micro][:custom_sub] = [] unless @config[macro][:config][micro][:custom_sub]
-                target = @config[macro][:config][micro][:custom_sub]
+                override = false
               end
 
-              overriden[entry[:target]] = true if target.empty?
+              overriden = {}
+              entries.each do |entry|
+                target = nil
+                if entry[:target] == :'pre-ops'
+                  @config[macro][:config][micro][:custom_pre] = [] unless @config[macro][:config][micro][:custom_pre]
+                  target = @config[macro][:config][micro][:custom_pre]
+                elsif entry[:target] == :'post-ops'
+                  @config[macro][:config][micro][:custom_post] = [] unless @config[macro][:config][micro][:custom_post]
+                  target = @config[macro][:config][micro][:custom_post]
+                elsif entry[:target] == :sub
+                  @config[macro][:config][micro][:custom_sub] = [] unless @config[macro][:config][micro][:custom_sub]
+                  target = @config[macro][:config][micro][:custom_sub]
+                else
+                  raise
+                end
 
-              if !overriden[entry[:target]] and override
-                target.clear
-                overriden[entry[:target]] = true
-              end
+                overriden[entry[:target]] = true if target.empty?
 
-              if entry[:action] == :send
-                target << {
-                  :name => entry[:name],
-                  :action => :send,
-                  :file => entry[:file],
-                  :destination => entry[:destination],
-                  :filename => entry[:filename],
-                  :timeout => entry[:timeout],
-                  :retries => entry[:retries],
-                  :destination => entry[:destination],
-                  :scattering => entry[:scattering]
-                }
-              elsif entry[:action] == :exec
-                target << {
-                  :name => entry[:name],
-                  :action => :exec,
-                  :command => entry[:command],
-                  :timeout => entry[:timeout],
-                  :retries => entry[:retries],
-                  :scattering => entry[:scattering]
-                }
-              elsif entry[:action] == :run
-                target << {
-                  :name => entry[:name],
-                  :action => :run,
-                  :file => entry[:file],
-                  :params => entry[:params],
-                  :timeout => entry[:timeout],
-                  :retries => entry[:retries],
-                  :scattering => entry[:scattering]
-                }
-              else
-                error(APIError::INVALID_FILE,'Custom operations file')
+                if !overriden[entry[:target]] and override
+                  target.clear
+                  overriden[entry[:target]] = true
+                end
+
+                if entry[:action] == :send
+                  target << {
+                    :name => entry[:name],
+                    :action => :send,
+                    :file => entry[:file],
+                    :destination => entry[:destination],
+                    :filename => entry[:filename],
+                    :timeout => entry[:timeout],
+                    :retries => entry[:retries],
+                    :destination => entry[:destination],
+                    :scattering => entry[:scattering]
+                  }
+                elsif entry[:action] == :exec
+                  target << {
+                    :name => entry[:name],
+                    :action => :exec,
+                    :command => entry[:command],
+                    :timeout => entry[:timeout],
+                    :retries => entry[:retries],
+                    :scattering => entry[:scattering]
+                  }
+                elsif entry[:action] == :run
+                  target << {
+                    :name => entry[:name],
+                    :action => :run,
+                    :file => entry[:file],
+                    :params => entry[:params],
+                    :timeout => entry[:timeout],
+                    :retries => entry[:retries],
+                    :scattering => entry[:scattering]
+                  }
+                else
+                  error(APIError::INVALID_FILE,'Custom operations file')
+                end
               end
             end
           end
