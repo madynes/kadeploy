@@ -36,6 +36,112 @@ module Configuration
   CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
   KADEPLOY_PORT = 25300
 
+  def self.parse_custom_operation(cp,microname,opts={})
+    ret = {
+      :name => "#{microname}-#{cp.value('name',String)}",
+      :action => cp.value('action',String,nil,['exec','send','run'])
+    }
+    fileopts = nil
+    if opts[:check_files]
+      fileopts = { :type => 'file', :readable => true, :prefix => Config.dir() }
+    end
+
+    case ret[:action]
+    when 'exec'
+      ret[:command] = cp.value('command',String)
+      ret[:timeout] = cp.value('timeout',Fixnum,0)
+      ret[:retries] = cp.value('retries',Fixnum,0)
+      ret[:scattering] = cp.value('scattering',String,:tree)
+    when 'send'
+      ret[:file] = cp.value('file',String,nil,fileopts)
+      ret[:destination] = cp.value('destination',String)
+      ret[:timeout] = cp.value('timeout',Fixnum,0)
+      ret[:retries] = cp.value('retries',Fixnum,0)
+      ret[:scattering] = cp.value('scattering',String,:tree)
+    when 'run'
+      ret[:file] = cp.value('file',String,nil,fileopts)
+      ret[:params] = cp.value('params',String,'')
+      ret[:timeout] = cp.value('timeout',Fixnum,0)
+      ret[:retries] = cp.value('retries',Fixnum,0)
+      ret[:scattering] = cp.value('scattering',String,:tree)
+    end
+    ret[:action] = ret[:action].to_sym
+
+    ret
+  end
+
+  def self.parse_custom_operations(cp,microname,opts={})
+    ret = { :sub=>[], :pre=>[], :post=>[], :over=>nil }
+
+    cp.parse('substitute',false,Array) do |info|
+      unless info[:empty]
+        val = parse_custom_operation(cp,microname,opts)
+        val[:target] = :sub if opts[:set_target]
+        ret[:sub] << val
+      end
+    end
+    ret[:sub] = nil if ret[:sub].empty?
+
+    cp.parse('pre-ops',false,Array) do |info|
+      unless info[:empty]
+        val = parse_custom_operation(cp,microname,opts)
+        val[:target] = :'pre-ops' if opts[:set_target]
+        ret[:pre] << val
+      end
+    end
+    ret[:pre] = nil if ret[:pre].empty?
+
+    cp.parse('post-ops',false,Array) do |info|
+      unless info[:empty]
+        val = parse_custom_operation(cp,microname,opts)
+        val[:target] = :'post-ops' if opts[:set_target]
+        ret[:post] << val
+      end
+    end
+    ret[:post] = nil if ret[:post].empty?
+
+    ret[:over] = cp.value('override',[TrueClass,FalseClass],false)
+
+    ret
+  end
+
+  def self.check_macrostep_interface(name)
+    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+      klass.superclass == Macrostep::Kadeploy
+    }
+    macrointerfaces.collect!{ |klass| klass.name.split('::').last.gsub(/^Kadeploy/,'') }
+
+    return macrointerfaces.include?(name)
+  end
+
+  def self.check_macrostep_instance(name)
+    # Gathering a list of availables macrosteps
+    macrosteps = ObjectSpace.each_object(Class).select { |klass|
+      klass.ancestors.include?(Macrostep::Kadeploy)
+    }
+
+    # Do not consider rought step names as valid
+    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+      klass.superclass == Macrostep::Kadeploy
+    }
+    macrointerfaces.each { |interface| macrosteps.delete(interface) }
+
+    macrosteps.collect!{ |klass| klass.step_name }
+
+    return macrosteps.include?(name)
+  end
+
+  def self.check_microstep(name)
+    # Gathering a list of availables microsteps
+    microsteps = Microstep.instance_methods.select{
+      |microname| microname =~ /^ms_/
+    }
+    microsteps.collect!{ |microname| microname.to_s.sub(/^ms_/,'') }
+
+    return microsteps.include?(name)
+  end
+
+
   class Config
     public
 
@@ -69,7 +175,6 @@ module Configuration
     def self.dir()
       ENV['KADEPLOY_CONFIG_DIR']||'/etc/kadeploy3'
     end
-
 
     # Check the config of the Kadeploy tools
     #
@@ -979,38 +1084,6 @@ module Configuration
             microsteps = Microstep.instance_methods.select{ |name| name =~ /^ms_/ }
             microsteps.collect!{ |name| name.to_s.sub(/^ms_/,'') }
 
-            treatcustom = Proc.new do |info,microname,ret|
-              unless info[:empty]
-                op = {
-                  :name => "#{microname}-#{cp.value('name',String)}",
-                  :action => cp.value('action',String,nil,['exec','send','run'])
-                }
-                case op[:action]
-                when 'exec'
-                  op[:command] = cp.value('command',String)
-                  op[:timeout] = cp.value('timeout',Fixnum,0)
-                  op[:retries] = cp.value('retries',Fixnum,0)
-                  op[:scattering] = cp.value('scattering',String,:tree)
-                when 'send'
-                  op[:file] = cp.value('file',String,nil,
-                    { :type => 'file', :readable => true, :prefix => Config.dir() })
-                  op[:destination] = cp.value('destination',String)
-                  op[:timeout] = cp.value('timeout',Fixnum,0)
-                  op[:retries] = cp.value('retries',Fixnum,0)
-                  op[:scattering] = cp.value('scattering',String,:tree)
-                when 'run'
-                  op[:file] = cp.value('file',String,nil,
-                    { :type => 'file', :readable => true, :prefix => Config.dir() })
-                  op[:params] = cp.value('params',String,'')
-                  op[:timeout] = cp.value('timeout',Fixnum,0)
-                  op[:retries] = cp.value('retries',Fixnum,0)
-                  op[:scattering] = cp.value('scattering',String,:tree)
-                end
-                op[:action] = op[:action].to_sym
-                ret << op
-              end
-            end
-
             treatmacro = Proc.new do |macroname|
               insts = ObjectSpace.each_object(Class).select { |klass|
                 klass.ancestors.include?(Macrostep.const_get("Kadeploy#{macroname}"))
@@ -1025,23 +1098,8 @@ module Configuration
                       microconf = {} unless microconf
                       microname = cp.value('name',String,nil,microsteps)
 
-                      custom_sub = []
-                      cp.parse('substitute',false,Array) do |info3|
-                        treatcustom.call(info3,microname,custom_sub)
-                      end
-                      custom_sub = nil if custom_sub.empty?
-
-                      custom_pre = []
-                      cp.parse('pre-ops',false,Array) do |info3|
-                        treatcustom.call(info3,microname,custom_pre)
-                      end
-                      custom_pre = nil if custom_pre.empty?
-
-                      custom_post = []
-                      cp.parse('post-ops',false,Array) do |info3|
-                        treatcustom.call(info3,microname,custom_post)
-                      end
-                      custom_post = nil if custom_post.empty?
+                      ops = Configuration::parse_custom_operations(cp,microname,
+                        :check_files=>true)
 
                       microconf[microname.to_sym] = {
                         :timeout => cp.value('timeout',Fixnum,0),
@@ -1052,9 +1110,9 @@ module Configuration
                           'breakpoint',[TrueClass,FalseClass],false
                         ),
                         :retries => cp.value('retries',Fixnum,0),
-                        :custom_sub => custom_sub,
-                        :custom_pre => custom_pre,
-                        :custom_post => custom_post,
+                        :custom_sub => ops[:sub],
+                        :custom_pre => ops[:pre],
+                        :custom_post => ops[:post],
                       }
                     end
                   end

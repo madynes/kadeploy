@@ -23,6 +23,8 @@ class KadeployError < Exception
       "You do not have sufficient rights to perform the operation"
     when APIError::INVALID_ENVIRONMENT
       "Invalid environment specification"
+    when APIError::INVALID_CUSTOMOP
+      "Invalid custom operations specification"
     when APIError::INVALID_CLIENT
       "Invalid client's export"
     when APIError::INVALID_FILE
@@ -70,7 +72,8 @@ class APIError
   INVALID_FILE = 5
   INVALID_RIGHTS = 6
   INVALID_ENVIRONMENT = 7
-  INVALID_VLAN = 8
+  INVALID_CUSTOMOP = 8
+  INVALID_VLAN = 9
   EXISTING_ELEMENT = 10
   CONFLICTING_ELEMENTS = 11
   NOTHING_MODIFIED = 12

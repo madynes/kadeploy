@@ -2230,6 +2230,14 @@ Here is a example of a the custom operations file:
           - action: run
             name: my_custom_partitioning
             file: partitioning.sh
+    SendEnvironment:
+      reboot:
+        post-ops:
+          - action: send
+            file: hostname
+            destination: $KADEPLOY_ENV_EXTRACTION_DIR/etc/
+            retries: 1
+            scattering: chain
 \end{verbatim}
 \end{small}
 

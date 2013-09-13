@@ -176,7 +176,7 @@ class GrabFile
 
     # Custom files
     if cexec.custom_operations
-      cexec.custom_operations.each_pair do |macro,micros|
+      cexec.custom_operations[:operations].each_pair do |macro,micros|
         micros.each_pair do |micro,entries|
           entries.each do |entry|
             if entry[:action] == :send

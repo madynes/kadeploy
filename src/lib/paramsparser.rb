@@ -125,6 +125,45 @@ class ParamsParser
       if @config.common.vlan_hostname_suffix.empty? or @config.common.set_vlan_cmd.empty?
         error(APIError::INVALID_VLAN, "The VLAN management is disabled")
       end
+    when :custom_ops
+      ret = { :operations => {}, :overrides => {}}
+      customops = ret[:operations]
+      customover = ret[:overrides]
+
+      param.each_pair do |macro,micros|
+        error(errno,'Macrostep name must be a String') unless macro.is_a?(String)
+        error(errno,'Macrostep description must be a Hash') unless micros.is_a?(Hash)
+        error(APIError::INVALID_CUSTOMOP,"Invalid macrostep '#{macro}'") \
+          if !Configuration::check_macrostep_interface(macro) and \
+          !Configuration::check_macrostep_instance(macro)
+
+        customops[macro.to_sym] = {} unless customops[macro.to_sym]
+
+        micros.each_pair do |micro,operations|
+          error(errno,'Microstep name must be a String') unless micro.is_a?(String)
+          error(errno,"The microstep '#{micro}' is empty") unless operations
+          error(errno,'Microstep description must be a Hash') unless operations.is_a?(Hash)
+          error(errno,"Invalid microstep '#{micro}'") \
+            unless Configuration::check_microstep(micro)
+          cp = Configuration::Parser.new(operations)
+          begin
+            tmp = Configuration::parse_custom_operations(cp,micro,
+              :set_target=>true)
+          rescue ArgumentError => ae
+            error(errno,"#{macro}/#{micro}, #{ae.message}")
+          end
+
+          if tmp[:over]
+            customover[macro.to_sym] = {} unless customover[macro.to_sym]
+            customover[macro.to_sym][micro.to_sym] = true
+            tmp.delete[:over]
+          end
+
+          customops[macro.to_sym][micro.to_sym] = []
+          tmp.values.each{|v| customops[macro.to_sym][micro.to_sym] += v if v}
+        end
+      end
+      param = ret
     end
 
     yield(param) if block_given? and param
@@ -133,6 +172,7 @@ class ParamsParser
 
     param
   end
+
 end
 
 end
