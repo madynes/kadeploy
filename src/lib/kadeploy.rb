@@ -19,7 +19,7 @@ module Kadeploy
     ret.verbose_level = nil
     ret.debug = false
     ret.key = String.new
-    ret.reformat_tmp = false
+    ret.reformat_tmp = nil
     ret.pxe_profile_msg = String.new
     ret.pxe_profile_singularities = nil
     ret.pxe_upload_files = Array.new
@@ -187,7 +187,7 @@ module Kadeploy
         # Multi-partitioned archives hack
         if context.environment.multipart
           params['block_device'] = context.environment.options['block_device']
-          params['deploy_part'] = context.environment.options['deploy_part']
+          params['deploy_partition'] = context.environment.options['deploy_part']
         end
 
         #The rights must be checked for each cluster if the node_list contains nodes from several clusters
@@ -195,12 +195,15 @@ module Kadeploy
           part = (
             p.parse('block_device',String,
               :default=>config.cluster_specific[cluster].block_device) \
-            + p.parse('deploy_part',String,:emptiable=>true,
+            + p.parse('deploy_partition',String,:emptiable=>true,
               :default=>config.cluster_specific[cluster].deploy_part)
           )
           kaerror(KadeployError::NO_RIGHT_TO_DEPLOY,part) \
             unless rights.granted?(context.user,nodes,part)
         end
+
+        # Check the boot partition
+        context.boot_part = p.parse('boot_partition',Fixnum)
 
         # Check rights on multipart environement
         if context.environment.multipart
@@ -211,8 +214,14 @@ module Kadeploy
           end
         end
 
+        # Check reformat tmp partition
+        context.reformat_tmp = p.parse('reformat_tmp_partition',String)
+
         # Check force
         context.ignore_nodes_deploying = p.parse('force',nil,:toggle=>true)
+
+        # Check debug
+        context.verbose_level = p.parse('verbose_level',Fixnum,:range=>(1..5))
 
         # Check debug
         context.debug = p.parse('debug',nil,:toggle=>true)

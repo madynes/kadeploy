@@ -975,8 +975,8 @@ class ClientWorkflow < Client
   end
 
   def self.parse_deploy_part(opt,options)
-    opt.on("-p", "--partition-number NUMBER", /^\d+$/, "Specify the partition number to use") { |p|
-      options[:deploy_part] = p.to_i
+    opt.on("-p", "--partition-number NUMBER", /^\d*$/, "Specify the partition number to use") { |p|
+      options[:deploy_part] = p
     }
   end
 
@@ -1105,9 +1105,10 @@ class ClientWorkflow < Client
   end
 
   def init_params(options)
-    super(options).merge({
-      :nodes => nodes(),
-    })
+    ret = super(options)
+    ret[:nodes] = nodes()
+    ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
+    ret
   end
 
   def run_workflow(options,params)

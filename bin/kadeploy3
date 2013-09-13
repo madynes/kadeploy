@@ -34,7 +34,7 @@ class KadeployClient < ClientWorkflow
         :deploy_part => nil,
         :boot_part => nil,
         :key => nil,
-        :reformat_tmp => false,
+        :reformat_tmp => nil,
         :pxe_profile => nil,
         :pxe_upload_files => [],
         :pxe_profile_singularities => nil,
@@ -62,15 +62,13 @@ class KadeployClient < ClientWorkflow
       }
       parse_block_device(opt,options)
       opt.on("-c", "--boot-partition NUMBER", /^\d+$/, "Specify the number of the partition to boot on (use 0 to boot on the MBR)") { |c|
-p c
         options[:boot_part] = c.to_i
       }
       parse_env_name(opt,options){ options[:env_kind] = :database }
       parse_keyfile(opt,options)
       parse_deploy_part(opt,options)
       opt.on("-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (this filesystem need to be supported by the deployment environment)") { |t|
-        options[:reformat_tmp] = true
-        options[:reformat_tmp_fstype] = t
+        options[:reformat_tmp] = t
       }
       parse_user(opt,options)
       parse_vlan(opt,options)
@@ -173,8 +171,10 @@ p c
       :kind => options[:env_kind],
     }
 
-    params[:deploy_part] = options[:deploy_part] if options[:deploy_part]
+    params[:deploy_partition] = options[:deploy_part] if options[:deploy_part]
     params[:block_device] = options[:block_device] if options[:block_device]
+    params[:boot_partition] = options[:boot_part] if options[:boot_part]
+    params[:reformat_tmp_partition] = options[:reformat_tmp] if options[:reformat_tmp]
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:debug] = options[:debug] if options[:debug]
 

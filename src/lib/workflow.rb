@@ -212,8 +212,8 @@ module Workflow
         end
       end
 
-      if cexec.reformat_tmp and !context[:cluster].deploy_supported_fs.include?(cexec.reformat_tmp_fstype)
-        debug(0,"The filesystem '#{cexec.reformat_tmp_fstype}' is not supported by the deployment environment")
+      if cexec.reformat_tmp and !context[:cluster].deploy_supported_fs.include?(cexec.reformat_tmp)
+        debug(0,"The filesystem '#{cexec.reformat_tmp}' is not supported by the deployment environment")
         error(KadeployError::CONFLICTING_OPTIONS)
       end
 

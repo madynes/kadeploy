@@ -1697,7 +1697,7 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the format has been successfully performed, false otherwise
   def ms_format_tmp_part()
-    fstype = context[:execution].reformat_tmp_fstype
+    fstype = context[:execution].reformat_tmp
     if context[:common].mkfs_options.has_key?(fstype) then
       opts = context[:common].mkfs_options[fstype]
       tmp_part = get_block_device_str() + context[:cluster].tmp_part
