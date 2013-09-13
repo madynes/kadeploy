@@ -116,13 +116,13 @@ module Kadeploy
 
         # Check VLAN
         p.parse('vlan',String) do |vlan|
-          context.vlan = vlan
+          context.vlan_id = vlan
           dns = Resolv::DNS.new
           context.vlan_addr = {}
           context.nodelist.each do |hostname|
             host,domain = hostname.split('.',2)
             vlan_hostname = "#{host}#{config.common.vlan_hostname_suffix}"\
-              ".#{domain}".gsub!('VLAN_ID', context.vlan)
+              ".#{domain}".gsub!('VLAN_ID', context.vlan_id)
             begin
               context.vlan_addr = dns.getaddress(vlan_hostname).to_s
             rescue Resolv::ResolvError
