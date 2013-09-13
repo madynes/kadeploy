@@ -32,7 +32,7 @@ class ParamsParser
   def parse(name, klass, opts={})
     @curparam = name
     param = opts[:value] || @params[name]
-    errno = opts[:errno] || APIError::INVALID_CONTENT
+    errno = opts[:errno] || APIError::INVALID_OPTION
 
     if opts[:toggle]
       if @params.keys.include?(name) and !param.is_a?(FalseClass)
@@ -114,12 +114,12 @@ class ParamsParser
         if node = @config.common.nodes_desc.get_node_by_host(host)
           param.push(node.dup)
         else
-          error(KadeployError::NODE_NOT_EXIST,host)
+          error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
         end
       end
     when :vlan
       if @config.common.vlan_hostname_suffix.empty? or @config.common.set_vlan_cmd.empty?
-        error(KadeployError::VLAN_MGMT_DISABLED)
+        error(APIError::INVALID_VLAN, "The VLAN management is disabled")
       end
     end
 

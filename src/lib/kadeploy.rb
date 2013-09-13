@@ -126,7 +126,7 @@ module Kadeploy
             begin
               context.vlan_addr = dns.getaddress(vlan_hostname).to_s
             rescue Resolv::ResolvError
-              kaerror(KadeployError::NODE_NOT_EXIST,"DNS:#{vlan_hostname}")
+              kaerror(APIError::INVALID_VLAN,"Cannot resolv #{vlan_hostname}")
             end
           end
           dns.close
@@ -147,11 +147,9 @@ module Kadeploy
 
         # Check Environment
         env = p.parse('environment',Hash,:mandatory=>true)
-          #:errno=>KadeployError::NO_ENV_CHOSEN)
+        context.environment = Environment.new
 
         kind = p.check(env['kind'],String,:values=>['anonymous','database'])
-
-        context.environment = Environment.new
 
         case kind
         when 'anonymous'
@@ -162,7 +160,7 @@ module Kadeploy
             context.user,
             context.client
           ) then
-            kaerror(KadeployError::LOAD_ENV_FROM_DESC_ERROR)
+            kaerror(APIError::INVALID_ENVIRONMENT,'the environment cannot be loaded from the description you specified')
           end
           context.env_kind = :anon
         when 'database'
@@ -176,7 +174,7 @@ module Kadeploy
             env['user'] == context.user,
             env['user'].nil?
           ) then
-            kaerror(KadeployError::LOAD_ENV_FROM_DB_ERROR,"#{env['name']},#{env['version']}/#{env['user']}")
+            kaerror(APIError::INVALID_ENVIRONMENT,"the environment #{env['name']},#{env['version']}/#{env['user']} does not exist")
           end
           context.env_kind = :db
         else
@@ -198,7 +196,7 @@ module Kadeploy
             + p.parse('deploy_part',String,:emptiable=>true,
               :default=>config.cluster_specific[cluster].deploy_part)
           )
-          kaerror(KadeployError::NO_RIGHT_TO_DEPLOY,part) \
+          kaerror(APIError::INVALID_RIGHTS,"deployment on partition #{part}") \
             unless rights.granted?(context.user,nodes,part)
         end
 
@@ -206,7 +204,7 @@ module Kadeploy
         if context.environment.multipart
           context.environment.options['partitions'].each do |part|
             unless rights.granted?(context.user,context.nodes,part['device'])
-              kaerror(KadeployError::NO_RIGHT_TO_DEPLOY)
+              kaerror(APIError::INVALID_RIGHTS,"deployment on partition #{part['device']}")
             end
           end
         end

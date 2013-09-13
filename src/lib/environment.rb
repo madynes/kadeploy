@@ -193,19 +193,6 @@ class Environment
     @postinstall = []
     @id = description['id'] || -1
 
-    filemd5 = Proc.new do |f,kind|
-      except = nil
-      case kind
-      when 'tarball'
-        except = FetchFileError::INVALID_ENVIRONMENT_TARBALL
-      when 'preinstall'
-        except = FetchFileError::INVALID_PREINSTALL
-      when 'postinstall'
-        except = FetchFileError::INVALID_POSTINSTALL
-      end
-      FetchFile[f,except,client].checksum()
-    end
-
     begin
       cp = Configuration::Parser.new(description)
       @name = cp.value('name',String)
@@ -228,7 +215,7 @@ class Environment
 
         md5 = nil
         if get_checksum
-          md5 = filemd5.call(file,'tarball')
+          md5 = FetchFile[file,APIError::INVALID_FILE,client].checksum()
         else
           md5 = ''
         end
@@ -252,7 +239,7 @@ class Environment
           file = cp.value('archive',String)
           md5 = nil
           if get_checksum
-            md5 = filemd5.call(file,'preinstall')
+            md5 = FetchFile[file,APIError::INVALID_FILE,client].checksum()
           else
             md5 = ''
           end
@@ -273,7 +260,7 @@ class Environment
           file = cp.value('archive',String)
           md5 = nil
           if get_checksum
-            md5 = filemd5.call(file,'postinstall')
+            md5 = FetchFile[file,APIError::INVALID_FILE,client].checksum()
           else
             md5 = ''
           end

@@ -44,21 +44,21 @@ class GrabFile
     @cache.clean()
   end
 
-  def grab(path,version,user,priority,tag,errno,checksum=nil,opts={})
+  def grab(path,version,user,priority,tag,checksum=nil,opts={})
     return nil if !path or path.empty?
     cf = nil
     begin
-      fetcher = FetchFile[path,errno,@client]
+      fetcher = FetchFile[path,APIError::INVALID_FILE,@client]
 
       if fetcher.size > @cache.maxsize
-        error(FetchFileError::CACHE_FILE_TOO_BIG,
+        error(APIError::CACHE_ERROR,
           "Impossible to cache the file '#{path}', the file is too big for the cache")
       end
 
       if opts[:maxsize] and fetcher.size > opts[:maxsize]
-        error(opts[:maxsize_errno],
+        error(APIError::INVALID_FILE,
           "The #{tag} file '#{path}' is too big "\
-          "(#{opts[:maxsize]/(1024*1024)} MB is the max size)"
+          "(#{opts[:maxsize]/(1024*1024)} MB is the max allowed size)"
         )
       end
 
@@ -74,11 +74,11 @@ class GrabFile
         if checksum and !checksum.empty?
           # A file was already on the cache with the wrong checksum
           if hit
-            error(errno,"Checksum of the file '#{path}' does not match "\
+            error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
               "(an update is necessary)")
           # The file does not have the checksum specified in the database
           elsif !fetcher.uptodate?(checksum,0)
-            error(errno,"Checksum of the file '#{path}' does not match "\
+            error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
               "(an update is necessary)")
           end
         end
@@ -98,7 +98,7 @@ class GrabFile
     cf
   end
 
-  def self.grab(gfm,context,path,prio,tag,errno,opts={})
+  def self.grab(gfm,context,path,prio,tag,opts={})
     file = nil
     begin
       return if !path or path.empty?
@@ -121,7 +121,6 @@ class GrabFile
         user,
         Cache::PRIORITIES[prio],
         tag,
-        errno,
         opts[:md5],
         opts
       )
@@ -150,20 +149,18 @@ class GrabFile
     envprio = (env.recorded? ? :db : :anon)
     if env and tmp = env.tarball
       grab(gfm,context,tmp['file'],envprio,'tarball',
-        FetchFileError::INVALID_ENVIRONMENT_TARBALL,
         :md5=>tmp['md5'], :env => env
       )
     end
 
     # SSH key file
-    grab(gfm,context,cexec.key,:anon,'key',FetchFileError::INVALID_KEY)
+    grab(gfm,context,cexec.key,:anon,'key')
 
     # Preinstall archive
     if env and tmp = env.preinstall
       grab(gfm,context,tmp['file'],envprio,'preinstall',
-        FetchFileError::INVALID_PREINSTALL, :md5 => tmp['md5'], :env => env,
-        :maxsize => context[:common].max_preinstall_size,
-        :maxsize_errno => FetchFileError::PREINSTALL_TOO_BIG
+        :md5 => tmp['md5'], :env => env,
+        :maxsize => context[:common].max_preinstall_size
       )
     end
 
@@ -171,9 +168,8 @@ class GrabFile
     if env and env.postinstall
       env.postinstall.each do |f|
         grab(gfm,context,f['file'],envprio,'postinstall',
-          FetchFileError::INVALID_POSTINSTALL, :md5 => f['md5'], :env => env,
-          :maxsize => context[:common].max_postinstall_size,
-          :maxsize_errno => FetchFileError::POSTINSTALL_TOO_BIG
+          :md5 => f['md5'], :env => env,
+          :maxsize => context[:common].max_postinstall_size
         )
       end
     end
@@ -185,11 +181,9 @@ class GrabFile
           entries.each do |entry|
             if entry[:action] == :send
               entry[:filename] = File.basename(entry[:file].dup)
-              grab(gfm,context,entry[:file],:anon,'custom_file',
-                FetchFileError::INVALID_CUSTOM_FILE)
+              grab(gfm,context,entry[:file],:anon,'custom_file')
             elsif entry[:action] == :run
-              grab(gfm,context,entry[:file],:anon,'custom_file',
-                FetchFileError::INVALID_CUSTOM_FILE)
+              grab(gfm,context,entry[:file],:anon,'custom_file')
             end
           end
         end
@@ -205,7 +199,6 @@ class GrabFile
 
         cexec.pxe_upload_files.each do |pxefile|
           grab(gfmk,context,pxefile,:anon,'pxe',
-            FetchFileError::INVALID_PXE_FILE,
             :file => File.join(context[:common].cache[:netboot].directory,
               (
                 NetBoot.custom_prefix(

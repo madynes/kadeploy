@@ -151,12 +151,10 @@ module Workflow
 
         if kind == 'local'
           unless File.readable?(path)
-            debug(0,"The file '#{path}' is not readable on the server")
-            error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE)
+            error(APIError::INVALID_FILE,"The file '#{path}' is not readable on the server")
           end
         else
-          debug(0,"The file '#{path}' should have been cached")
-          error(FetchFileError::FILE_CANNOT_BE_MOVED_IN_CACHE)
+          error(APIError::CACHE_ERROR,"The file '#{path}' should have been cached")
         end
       end
     end
@@ -202,19 +200,16 @@ module Workflow
 
         # Without a dd image
         unless cexec.environment.image[:kind] == 'dd'
-          debug(0,"You can only deploy directly on block device when using a dd image")
-          error(KadeployError::CONFLICTING_OPTIONS)
+          error(APIError::INVALID,"You can only deploy directly on block device when using a dd image")
         end
         # Without specifying the partition to chainload on
         if cexec.boot_part.nil?
-          debug(0,"You must specify the partition to boot on when deploying directly on block device")
-          error(KadeployError::CONFLICTING_OPTIONS)
+          error(APIError::CONFLICTING_OPTIONS,"You must specify the partition to boot on when deploying directly on block device")
         end
       end
 
       if cexec.reformat_tmp and !context[:cluster].deploy_supported_fs.include?(cexec.reformat_tmp_fstype)
-        debug(0,"The filesystem '#{cexec.reformat_tmp_fstype}' is not supported by the deployment environment")
-        error(KadeployError::CONFLICTING_OPTIONS)
+        error(APIError::CONFLICTING_OPTIONS,"The filesystem '#{cexec.reformat_tmp_fstype}' is not supported by the deployment environment")
       end
 
 =begin
@@ -224,7 +219,7 @@ module Workflow
         # FSA archives unless the boot method is a GRUB PXE boot
         if !context[:common].pxe[:local].is_a?(NetBoot::GrubPXE) and cexec.pxe_profile_msg.empty?
           debug(0,"FSA archives can only be booted if GRUB is used to boot on the hard disk or you define a custom PXE boot method")
-          error(KadeployError::CONFLICTING_OPTIONS)
+          error(APIError::CONFLICTING_OPTIONS)
         end
       end
 =end
@@ -338,8 +333,7 @@ module Workflow
       end
 
       if @nodes.empty?
-        debug(0, 'All the nodes have been discarded ...')
-        error(KadeployError::NODES_DISCARDED,false)
+        error(APIError::CONFLICTING_OPTIONS,'All the nodes have been discarded ...')
       else
         @nodes.set_deployment_state(
           'deploying',
@@ -491,7 +485,7 @@ module Workflow
                   :scattering => entry[:scattering]
                 }
               else
-                error(FetchFileError::INVALID_CUSTOM_FILE)
+                error(APIError::INVALID_FILE,'Custom operations file')
               end
             end
           end

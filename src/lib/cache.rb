@@ -111,7 +111,7 @@ class CacheFile
   def save!(directory,opts={})
     if !opts[:norename] and @filename != File.basename(@file,EXT_FILE)
       directory = CacheFile.absolute_path(directory)
-      raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,
+      raise KadeployError.new(APIError::CACHE_ERROR,nil,
         "Cant save cache file '#{@filename}'") unless File.directory?(directory)
 
       newfile = File.join(directory,@filename) + EXT_FILE
@@ -174,13 +174,13 @@ class CacheFile
     begin
       file = File.expand_path(file)
     rescue ArgumentError
-      raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,"Invalid path '#{file}'")
+      raise KadeployError.new(APIError::CACHE_ERROR,nil,"Invalid path '#{file}'")
     end
     file
   end
 
   def self.readable?(file)
-    raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,"File '#{file}' is not readable") if !File.file?(file) or !File.readable?(file) or !File.readable_real?(file)
+    raise KadeployError.new(APIError::CACHE_ERROR,nil,"File '#{file}' is not readable") if !File.file?(file) or !File.readable?(file) or !File.readable_real?(file)
   end
 
   def self.load(file,meta,prefix)
@@ -268,8 +268,8 @@ class Cache
   # !!! maxsize in Bytes
   def initialize(directory, maxsize, idxmeth, tagfiles, prefix_base=PREFIX_BASE)
     directory = CacheFile.absolute_path(directory)
-    raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,"#{directory} is not a directory") unless File.directory?(directory)
-    raise KadeployError.new(FetchFileError::CACHE_INTERNAL_ERROR,nil,"Invalid cache size '#{maxsize}'") unless maxsize.is_a?(Fixnum) and maxsize > 0
+    raise KadeployError.new(APIError::CACHE_ERROR,nil,"#{directory} is not a directory") unless File.directory?(directory)
+    raise KadeployError.new(APIError::CACHE_ERROR,nil,"Invalid cache size '#{maxsize}'") unless maxsize.is_a?(Fixnum) and maxsize > 0
 
     @directory = directory
     @cursize = 0 # Bytes
@@ -315,13 +315,13 @@ class Cache
           if size and size > freesize
             if size > (freeable!() + freesize)
               raise KadeployError.new(
-                FetchFileError::CACHE_FULL,nil,
+                APIError::CACHE_FULL,nil,
                 "Impossible to cache the file '#{path}', the cache is full"
               )
             else
               unless free!(size)
                 raise KadeployError.new(
-                  FetchFileError::CACHE_FULL,nil,
+                  APIError::CACHE_FULL,nil,
                   "Impossible to cache the file '#{path}', the cache is full"
                 )
               end
@@ -332,7 +332,7 @@ class Cache
         if fpath
           if !@tagfiles and File.exists?(fpath)
             raise KadeployError.new(
-              FetchFileError::CACHE_INTERNAL_ERROR,nil,
+              APIError::CACHE_ERROR,nil,
               "Duplicate cache entries with the name '#{File.basename(path)}'"
             )
           end
@@ -343,8 +343,7 @@ class Cache
             file = tmp.path
           rescue
             raise KadeployError.new(
-              FetchFileError::TEMPFILE_CANNOT_BE_CREATED_IN_CACHE,nil,
-              "Tempfiles cannot be created"
+              APIError::CACHE_ERROR,nil,"Tempfiles cannot be created"
             )
           end
         end
@@ -358,7 +357,7 @@ class Cache
           ret.save(@directory,opts)
         else
           raise KadeployError.new(
-            FetchFileError::CACHE_FULL,nil,
+            APIError::CACHE_FULL,nil,
             "Impossible to cache the file '#{path}', the cache is full"
           )
         end
@@ -386,7 +385,7 @@ class Cache
         and (md5 and md5.call != ret.md5)
       then # The file has changed
         if ret.used?
-          raise KadeployError.new(FetchFileError::INVALID_MD5,nil,
+          raise KadeployError.new(APIError::CACHE_ERROR,nil,
             "The checksum of the (used) file '#{path}' does not match"
           )
         else
