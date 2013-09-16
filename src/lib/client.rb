@@ -1,7 +1,7 @@
 CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
 USER = `id -nu`.strip
 
-STATUS_UPDATE_DELAY = 2
+STATUS_UPDATE_DELAY = 1
 SLEEP_PITCH = 1
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 
@@ -824,7 +824,27 @@ class Client
         client.result(options,ret) if ret and !options[:dry_run]
       end
     end
+
+    status_thr = nil
+    if STDIN.tty? and !STDIN.closed?
+      status_thr = Thread.new do
+        last_status = Time.now
+        while true
+          STDIN.gets
+          if Time.now - last_status > STATUS_UPDATE_DELAY
+            $clients.each{|client| client.display_status()}
+            last_status = Time.now
+          end
+        end
+      end
+    end
+
     $threads.each { |thread| thread.join }
+
+    if status_thr
+      status_thr.kill
+      status_thr.join
+    end
 
     if $httpd and $httpd_thread
       $httpd.kill if $httpd_thread.alive?
@@ -845,6 +865,9 @@ class Client
         $stdout.puts "\nFail !"
       end
     end
+  end
+
+  def display_status(stats,starttime)
   end
 
   def self.parse_options()
@@ -873,6 +896,7 @@ class ClientWorkflow < Client
     super(name,server,port,secure,nodes)
     @wid = nil
     @resources = nil
+    @start_time = nil
   end
 
   def api_path(path=nil,kind=nil,*args)
@@ -1128,6 +1152,7 @@ class ClientWorkflow < Client
 
     @wid = ret['wid']
     @resources = ret['resources']
+    @start_time = Time.now.to_i
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
 p @resources['resource']
 
@@ -1170,6 +1195,7 @@ p @resources['resource']
 
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
+      @resources = nil
       delete(api_path()) if @wid
 
       res
@@ -1193,6 +1219,53 @@ p @resources['resource']
         debug res['nodes']['ko'].join("\n")
       end
     end
+  end
+
+  def display_status_cluster(stat,prefix='')
+    stat.each_pair do |macro,micros|
+      if micros.is_a?(Hash)
+        micros.each_pair do |micro,status|
+          if status.is_a?(Hash)
+            status['nodes'].each_pair do |state,nodes|
+              unless nodes.empty?
+                debug "#{prefix}  [#{macro.to_s}-#{micro.to_s}] ~#{status['time']}s (#{state.to_s})"
+                debug "#{prefix}     #{nodes.join("\n#{prefix}     ")}"
+              end
+            end
+          elsif status.is_a?(Array)
+            debug "#{prefix}  [#{macro.to_s}-#{micro.to_s}]"
+            debug "#{prefix}    #{status.join("\n#{prefix}    ")}"
+          end
+        end
+      elsif micros.is_a?(Array)
+        debug "#{prefix}  [#{macro.to_s}]"
+        debug "#{prefix}    #{micros.join("\n#{prefix}    ")}"
+      end
+    end
+  end
+
+  def display_status()
+    debug "---"
+    if !@wid
+      debug "#{self.class.operation()} did not start at the moment"
+    elsif @wid and !@resources
+      debug "#{self.class.operation()} status (#{Time.now.to_i - @start_time}s): done"
+    else
+      debug "#{self.class.operation()} status (#{Time.now.to_i - @start_time}s):"
+      stats = get(@resources['status'])
+
+      if stats.empty?
+        raise
+      elsif stats.size == 1
+        display_status_cluster(stats[stats.keys[0]])
+      else
+        stats.each_pair do |clname,stat|
+          debug "  [#{clname}]"
+          display_status_cluster(stat,'  ')
+        end
+      end
+    end
+    debug "---"
   end
 end
 

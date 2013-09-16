@@ -73,7 +73,7 @@ module Debug
     def free()
       @verbose_level = nil
       @output = nil
-      @file.free if @file
+      #@file.free if @file
       @file = nil
       @cluster_id = nil
       @lock = nil
