@@ -59,6 +59,8 @@ module Kadeploy
       :workflows => {},
       :threads => {},
       :cached_files => nil,
+      :outputfile => cexec.outputfile,
+      :loggerfile => cexec.loggerfile,
       :output => Debug::OutputControl.new(
         cexec.verbose_level || config.common.verbose_level,
         cexec.outputfile,
@@ -378,12 +380,13 @@ module Kadeploy
       output = info[:output]
 
       # Print debug
-      if clusters.size > 1
-        tmp = ''
-        workflows.each do |workflow|
-          tmp += "  #{Debug.prefix(workflow.context[:cluster].prefix)}: #{workflow.context[:cluster].name}\n"
+      if clusters.size > 1 and output
+        output.push(0,"---")
+        output.push(0,"Clusters involved in the deployment:")
+        workflows.each_value do |workflow|
+          output.push(0,"  #{Debug.prefix(workflow.context[:cluster].prefix)}: #{workflow.context[:cluster].name}")
         end
-        output.push(0,"\nClusters involved in the deployment:\n#{tmp}\n") if output
+        output.push(0,"---")
       end
 
       # Run every workflows
@@ -594,6 +597,11 @@ module Kadeploy
       info[:threads].clear if info[:threads]
       info.delete(:threads)
       #info[:thread] = nil
+
+      info[:outputfile].free if info[:outputfile]
+      info.delete(:outputfile)
+      info[:loggerfile].free if info[:loggerfile]
+      info.delete(:loggerfile)
 
       #info[:output].free if info[:output]
       #info.delete(:output)
