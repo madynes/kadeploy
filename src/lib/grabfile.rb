@@ -48,7 +48,7 @@ class GrabFile
     return nil if !path or path.empty?
     cf = nil
     begin
-      fetcher = FetchFile[path,APIError::INVALID_FILE,@client]
+      fetcher = FetchFile[path,@client]
 
       if fetcher.size > @cache.maxsize
         error(APIError::CACHE_ERROR,

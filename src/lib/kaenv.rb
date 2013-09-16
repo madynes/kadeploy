@@ -77,7 +77,7 @@ module Kaenv
           files.each do |oldf,newf|
             p.check(oldf,String,:mandatory=>true)
             kaerror(APIError::INVALID_FILE,"Invalid file name #{newf}") \
-              unless FetchFile[newf,APIError::INVALID_FILE,context.client]
+              unless FetchFile[newf,context.client]
             env[:update_files][oldf] = newf
           end
         end
@@ -201,9 +201,9 @@ module Kaenv
             tmp = f['file'].gsub(upfile[:old],'')
             f['file'] = upfile[:new]
             f['file'] = File.join(f['file'],tmp) unless tmp.empty?
-            FetchFile[f['file'],APIError::INVALID_FILE,cexec.client].size
+            FetchFile[f['file'],cexec.client].size
           else
-            md5 = FetchFile[f['file'],APIError::INVALID_FILE,cexec.client].checksum
+            md5 = FetchFile[f['file'],cexec.client].checksum
             kaerror(APIError::INVALID_FILE,"#{kind} md5") if !md5 or md5.empty?
             kaerror(APIError::NOTHING_MODIFIED) if f['md5'] and f['md5'] == md5
             f['md5'] = md5
