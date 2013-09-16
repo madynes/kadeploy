@@ -217,7 +217,7 @@ class Client
     end
   end
 
-  def self.load_custom_ops_file(file)
+  def self.load_custom_file(file)
     file = File.absolute_path(file)
     return false unless check_file(file)
 
