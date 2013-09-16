@@ -94,9 +94,9 @@ class Microstep < Automata::QueueTask
   def status
     {
       :nodes => {
-        :OK => @nodes_ok,
-        :KO => @nodes_ko,
-        :'**' => @nodes.diff(@nodes_ok).diff(@nodes_ko),
+        :OK => @nodes_ok.make_array_of_hostname,
+        :KO => @nodes_ko.make_array_of_hostname,
+        :'**' => @nodes.diff(@nodes_ok).diff(@nodes_ko).make_array_of_hostname,
       },
       :time => (Time.now.to_i - @timestart),
     }

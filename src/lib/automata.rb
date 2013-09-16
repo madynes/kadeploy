@@ -316,8 +316,8 @@ module Automata
           ret[task.name] = task.status
         end
       end
-      ret[:OK] = @nodes_ok unless @nodes_ok.empty?
-      ret[:KO] = @nodes_ko unless @nodes_ko.empty?
+      ret[:OK] = @nodes_ok.make_array_of_hostname unless @nodes_ok.empty?
+      ret[:KO] = @nodes_ko.make_array_of_hostname unless @nodes_ko.empty?
       ret
     end
 
