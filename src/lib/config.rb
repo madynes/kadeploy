@@ -105,6 +105,39 @@ module Configuration
     ret
   end
 
+  def self.parse_custom_macrostep(cp,macrobase,opts={})
+    ret = []
+
+    cp.parse(macrobase,true,Array) do |info|
+      name = cp.value('name',String)
+      raise ArgumentError.new("Unknown macrostep name '#{name}'") \
+        unless check_macro_instance(name)
+      ret << [
+        name,
+        cp.value('retries',Fixnum,0),
+        cp.value('timeout',Fixnum,0),
+      ]
+    end
+
+    ret
+  end
+
+  def self.parse_custom_macrosteps(cp,opts={})
+    ret = []
+
+    parse_macro = Proc.new do |macrobase|
+      cp.parse(macrobase,true,Hash) do |info|
+        ret << MacroStep.new(macrobase, parse_custom_macrostep(cp,macrobase,opts))
+      end
+    end
+
+    parse_macro.call('SetDeploymentEnv')
+    parse_macro.call('BroadcastEnv')
+    parse_macro.call('BootNewEnv')
+
+    ret
+  end
+
   def self.check_macrostep_interface(name)
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
       klass.superclass == Macrostep::Kadeploy

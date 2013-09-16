@@ -244,10 +244,13 @@ module Kadeploy
           context.timeout_reboot_kexec= timeout
         end
 
+        # Check custom automata
+        context.steps = p.parse('automata',Hash,:type=>:custom_automata)
+
         # Check force
         context.ignore_nodes_deploying = p.parse('force',nil,:toggle=>true)
 
-        # Check debug
+        # Check verbose level
         context.verbose_level = p.parse('verbose_level',Fixnum,:range=>(1..5))
 
         # Check debug

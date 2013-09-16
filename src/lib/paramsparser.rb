@@ -133,7 +133,7 @@ class ParamsParser
       param.each_pair do |macro,micros|
         error(errno,'Macrostep name must be a String') unless macro.is_a?(String)
         error(errno,'Macrostep description must be a Hash') unless micros.is_a?(Hash)
-        error(APIError::INVALID_CUSTOMOP,"Invalid macrostep '#{macro}'") \
+        error(errno,"Invalid macrostep '#{macro}'") \
           if !Configuration::check_macrostep_interface(macro) and \
           !Configuration::check_macrostep_instance(macro)
 
@@ -164,6 +164,13 @@ class ParamsParser
         end
       end
       param = ret
+    when :custom_automata
+      cp = Configuration::Parser.new(param)
+      begin
+        param = Configuration::parse_custom_macrosteps(cp)
+      rescue ArgumentError => ae
+        error(errno,"#{macrobase}, #{ae.message}")
+      end
     end
 
     yield(param) if block_given? and param

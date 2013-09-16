@@ -101,47 +101,26 @@ class KadeployClient < ClientWorkflow
         end
       }
       opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
-        options[:custom_operations] = load_custom_ops_file(file)
+        options[:custom_operations] = load_custom_file(file)
         return false unless options[:custom_operations]
       }
       parse_timeout_reboot(opt,options)
       opt.on("--reboot-kexec-timeout VALUE", "Overload the default timeout for kexec reboots (a ruby expression can be used, 'n' will be replaced by the number of nodes)") { |t|
         options[:reboot_kexec_timeout] = t
       }
-      opt.on("--force-steps STRING", "Undocumented, for administration purpose only") { |s|
+      opt.on("--force-steps STRING", /^SetDeploymentEnv\|(?:\w+:\d+:\d+,?)&BroadcastEnv\|(?:\w+:\d+:\d+,?)&BootNewEnv\|(?:\w+:\d+:\d+,?)$/,"Undocumented, for administration purpose only") { |s|
+        options[:automata] = {}
         s.split("&").each do |macrostep|
           macroname = macrostep.split("|")[0]
-          unless check_macrostep_interface(macroname)
-            error("Invalid macrostep kind '#{macroname}'")
-            return false
-          end
-          instances = macrostep.split("|")[1]
-          insts = []
+          options[:automata][macroname] = []
 
-          instances.split(",").each do |instance|
-            inst_name = instance.split(":")[0]
-            unless check_macrostep_instance(inst_name)
-              error("Invalid macrostep instance '#{inst_name}'")
-              return false
-            end
-            inst_retries = instance.split(":")[1]
-            begin
-              inst_retries = Integer(inst_retries)
-            rescue ArgumentError
-              error("The number of retries '#{inst_retries}' is not an integer")
-              return false
-            end
-            inst_timeout = instance.split(":")[2]
-            begin
-              inst_timeout = Integer(inst_timeout)
-            rescue ArgumentError
-              error("The timeout '#{inst_timeout}' is not an integer")
-              return false
-            end
-
-            insts << [inst_name, inst_retries, inst_timeout]
+          macrostep.split("|")[1].split(",").each do |instance|
+            options[:automata][macroname] << {
+              :name => instance.split(":")[0],
+              :retries => instance.split(":")[1].to_i,
+              :timeout => instance.split(":")[2].to_i,
+            }
           end
-          options[:steps].push(MacroStep.new(macroname, insts))
         end
       }
       parse_secure(opt,options)
@@ -182,6 +161,7 @@ class KadeployClient < ClientWorkflow
       params[:pxe][:files] = options[:pxe_files] unless options[:pxe_files].empty?
     end
     params[:custom_operations] = options[:custom_operations] if options[:custom_operations]
+    params[:automata] = options[:automata] if options[:automata]
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:debug] = options[:debug] if options[:debug]
 
