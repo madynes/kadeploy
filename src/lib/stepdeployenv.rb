@@ -4,13 +4,13 @@ require 'macrostep'
 module Kadeploy
 
 module Macrostep
-  class KadeploySetDeploymentEnv < Kadeploy
+  class DeploySetDeploymentEnv < Deploy
     def load_config()
       super()
     end
   end
 
-  class KadeploySetDeploymentEnvUntrusted < KadeploySetDeploymentEnv
+  class DeploySetDeploymentEnvUntrusted < DeploySetDeploymentEnv
     def steps()
       [
         [ :switch_pxe, "prod_to_deploy_env", "" ],
@@ -27,7 +27,7 @@ module Macrostep
     end
   end
 
-  class KadeploySetDeploymentEnvKexec < KadeploySetDeploymentEnv
+  class DeploySetDeploymentEnvKexec < DeploySetDeploymentEnv
     def steps()
       [
         [ :set_vlan, "DEFAULT" ],
@@ -51,7 +51,7 @@ module Macrostep
     end
   end
 
-  class KadeploySetDeploymentEnvUntrustedCustomPreInstall < KadeploySetDeploymentEnv
+  class DeploySetDeploymentEnvUntrustedCustomPreInstall < DeploySetDeploymentEnv
     def steps()
       [
         [ :switch_pxe, "prod_to_deploy_env" ],
@@ -64,7 +64,7 @@ module Macrostep
     end
   end
 
-  class KadeploySetDeploymentEnvProd < KadeploySetDeploymentEnv
+  class DeploySetDeploymentEnvProd < DeploySetDeploymentEnv
     def steps()
       [
         [ :check_nodes, "prod_env_booted" ],
@@ -75,7 +75,7 @@ module Macrostep
     end
   end
 
-  class KadeploySetDeploymentEnvNfsroot < KadeploySetDeploymentEnv
+  class DeploySetDeploymentEnvNfsroot < DeploySetDeploymentEnv
     def steps()
       [
         [ :switch_pxe, "prod_to_nfsroot_env" ],
@@ -92,7 +92,7 @@ module Macrostep
     end
   end
 
-  class KadeploySetDeploymentEnvDummy < KadeploySetDeploymentEnv
+  class DeploySetDeploymentEnvDummy < DeploySetDeploymentEnv
     def steps()
       [
         [ :dummy ],

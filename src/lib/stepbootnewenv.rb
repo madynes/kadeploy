@@ -4,13 +4,13 @@ require 'macrostep'
 module Kadeploy
 
 module Macrostep
-  class KadeployBootNewEnv < Kadeploy
+  class DeployBootNewEnv < Deploy
     def load_config()
       super()
     end
   end
 
-  class KadeployBootNewEnvKexec < KadeployBootNewEnv
+  class DeployBootNewEnvKexec < DeployBootNewEnv
     # Get the name of the deployment partition
     #
     # Arguments
@@ -80,7 +80,7 @@ module Macrostep
     end
   end
 
-  class KadeployBootNewEnvPivotRoot < KadeployBootNewEnv
+  class DeployBootNewEnvPivotRoot < DeployBootNewEnv
     def start!
       debug(0, "#{self.class.name} is not yet implemented")
       kill()
@@ -88,7 +88,7 @@ module Macrostep
     end
   end
 
-  class KadeployBootNewEnvClassical < KadeployBootNewEnv
+  class DeployBootNewEnvClassical < DeployBootNewEnv
     def steps()
       [
         [ :switch_pxe, "deploy_to_deployed_env" ],
@@ -100,7 +100,7 @@ module Macrostep
     end
   end
 
-  class KadeployBootNewEnvHardReboot < KadeployBootNewEnv
+  class DeployBootNewEnvHardReboot < DeployBootNewEnv
     def steps()
       [
         [ :switch_pxe, "deploy_to_deployed_env" ],
@@ -111,7 +111,7 @@ module Macrostep
     end
   end
 
-  class KadeployBootNewEnvDummy < KadeployBootNewEnv
+  class DeployBootNewEnvDummy < DeployBootNewEnv
     def steps()
       [
         [ :dummy ],

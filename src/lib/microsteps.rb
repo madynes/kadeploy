@@ -28,7 +28,7 @@ class Microstep < Automata::QueueTask
     @runthread = nil
     @current_operation = nil
     @waitreboot_threads = ThreadGroup.new
-    @timestart = Time.now
+    @timestart = Time.now.to_i
     @done = false
   end
 

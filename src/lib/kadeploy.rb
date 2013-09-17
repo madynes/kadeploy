@@ -372,7 +372,7 @@ module Kadeploy
           (config.common.log_to_db ? context[:database] : nil)
         )
 
-        workflow = Workflow::Kadeploy.new(nodeset,context.dup)
+        workflow = Workflow::Deploy.new(nodeset,context.dup)
 
         workflows[cluster] = workflow
       end
@@ -675,9 +675,10 @@ module Kadeploy
   def deploy_get_error(cexec,wid)
     workflow_get(:deploy,wid) do |info|
       break if info[:done] or info[:thread].alive?
-      # TODO: join each workflow thread
       begin
         info[:thread].join
+        info[:threads].each_value{|thr| thr.join unless thr.alive?} if info[:threads]
+        nil
       rescue Exception => e
         deploy_free(info)
         raise e
