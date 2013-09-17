@@ -138,9 +138,9 @@ module Configuration
 
   def self.check_macrostep_interface(name)
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep::Kadeploy
+      klass.superclass == Macrostep::Deploy
     }
-    macrointerfaces.collect!{ |klass| klass.name.split('::').last.gsub(/^Kadeploy/,'') }
+    macrointerfaces.collect!{ |klass| klass.name.split('::').last.gsub(/^Deploy/,'') }
 
     return macrointerfaces.include?(name)
   end
@@ -148,12 +148,12 @@ module Configuration
   def self.check_macrostep_instance(name)
     # Gathering a list of availables macrosteps
     macrosteps = ObjectSpace.each_object(Class).select { |klass|
-      klass.ancestors.include?(Macrostep::Kadeploy)
+      klass.ancestors.include?(Macrostep::Deploy)
     }
 
     # Do not consider rought step names as valid
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep::Kadeploy
+      klass.superclass == Macrostep::Deploy
     }
     macrointerfaces.each { |interface| macrosteps.delete(interface) }
 
@@ -1117,9 +1117,9 @@ module Configuration
 
             treatmacro = Proc.new do |macroname|
               insts = ObjectSpace.each_object(Class).select { |klass|
-                klass.ancestors.include?(Macrostep.const_get("Kadeploy#{macroname}"))
+                klass.ancestors.include?(Macrostep.const_get("Deploy#{macroname}"))
               } unless macroname.empty?
-              insts.collect!{ |klass| klass.name.sub(/^Kadeploy::Macrostep::Kadeploy#{macroname}/,'') }
+              insts.collect!{ |klass| klass.name.sub(/^Kadeploy::Macrostep::Deploy#{macroname}/,'') }
               macroinsts = []
               cp.parse(macroname,true,Array) do |info|
                 unless info[:empty]

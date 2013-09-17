@@ -1044,8 +1044,8 @@ p @resources['resource']
 
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
-      @resources = nil
       delete(api_path()) if @wid
+      @resources = nil
 
       res
     else

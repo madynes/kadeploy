@@ -912,7 +912,7 @@ module Nodes
       args << (Time.now.to_i - purge)
 
       res = db.run_query(
-        "SELECT hostname FROM nodes WHERE state='deploying' AND #{nodelist} AND date > ?",
+        "SELECT hostname FROM nodes WHERE state LIKE '%ing' AND #{nodelist} AND date > ?",
         *args
       )
 
@@ -936,7 +936,7 @@ module Nodes
     # * user: user name
     # Output
     # * return true if the state has been correctly modified, false otherwise
-    def set_deployment_state(state, env_id, db, user)
+    def set_state(state, env_id, db, user)
       return if @set.empty?
       args,nodelist = generic_where_nodelist()
       date = Time.now.to_i

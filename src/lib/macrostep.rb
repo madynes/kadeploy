@@ -6,7 +6,7 @@ require 'debug'
 module Kadeploy
 
 module Macrostep
-  class Kadeploy < Automata::TaskedTaskManager
+  class Macrostep < Automata::TaskedTaskManager
     attr_reader :output, :logger, :tasks
     include Printer
 
@@ -28,14 +28,6 @@ module Macrostep
 
     def microclass
       ::Kadeploy::Microstep
-    end
-
-    def steps
-      raise 'Should be reimplemented'
-    end
-
-    def self.step_name()
-      name.split('::').last.gsub(/^Kadeploy/,'')
     end
 
     def step_name()
@@ -146,82 +138,6 @@ module Macrostep
       end
     end
 
-    def load_tasks
-      @tasks = steps()
-      cexec = context[:execution]
-
-      # Deploy on block device
-      if cexec.block_device and !cexec.block_device.empty? \
-        and (!cexec.deploy_part or cexec.deploy_part.empty?)
-        delete_task(:create_partition_table)
-        delete_task(:format_deploy_part)
-        delete_task(:format_tmp_part)
-        delete_task(:format_swap_part)
-      end
-
-      delete_task(:decompress_environment) if !context[:cluster].decompress_environment and cexec.environment.image[:kind] != 'fsa'
-
-      if ['dd','fsa'].include?(cexec.environment.image[:kind])
-        delete_task(:format_deploy_part)
-        # mount deploy part after send_environemnt
-        delete_task(:mount_deploy_part) if self.class.superclass == KadeploySetDeploymentEnv
-      else
-        # mount deploy part after format_deploy_part
-        delete_task(:mount_deploy_part) if self.class.superclass == KadeployBroadcastEnv
-      end
-
-      # The filesystem is not supported by the deployment kernel
-      unless context[:cluster].deploy_supported_fs.include?(cexec.environment.filesystem)
-        delete_task(:mount_deploy_part)
-        delete_task(:umount_deploy_part)
-        delete_task(:manage_admin_post_install)
-        delete_task(:manage_user_post_install)
-        delete_task(:check_kernel_files)
-        delete_task(:send_key)
-        delete_task(:install_bootloader)
-      end
-
-      # Multi-partitioned environment
-      if cexec.environment.multipart
-        delete_task(:format_tmp_part)
-        delete_task(:format_swap_part)
-      end
-
-      if !cexec.key or cexec.key.empty?
-        delete_task(:send_key_in_deploy_env)
-        delete_task(:send_key)
-      end
-
-      delete_task(:create_partition_table) if cexec.disable_disk_partitioning
-
-      delete_task(:format_tmp_part) unless cexec.reformat_tmp
-
-      delete_task(:format_swap_part) \
-        if context[:cluster].swap_part.nil? \
-        or context[:cluster].swap_part == 'none' \
-        or cexec.environment.environment_kind != 'linux'
-
-      delete_task(:install_bootloader) \
-        if context[:common].pxe[:local].is_a?(NetBoot::GrubPXE)  \
-        or cexec.disable_bootloader_install
-
-      delete_task(:manage_admin_pre_install) \
-        if cexec.environment.preinstall.nil? \
-        and context[:cluster].admin_pre_install.nil?
-
-      delete_task(:manage_admin_post_install) if context[:cluster].admin_post_install.nil?
-
-      delete_task(:manage_user_post_install) if cexec.environment.postinstall.nil?
-
-      delete_task(:set_vlan) if cexec.vlan.nil?
-
-      # Do not reformat deploy partition
-      if !cexec.deploy_part.nil? and cexec.deploy_part != ""
-        part = cexec.deploy_part.to_i
-        delete_task(:format_swap_part) if part == context[:cluster].swap_part.to_i
-        delete_task(:format_tmp_part) if part == context[:cluster].tmp_part.to_i
-      end
-    end
 
     def create_task(idx,subidx,nodes,nsid,context)
       taskval = get_task(idx,subidx)
@@ -288,16 +204,108 @@ module Macrostep
 
     def start!()
       @start_time = Time.now.to_i
-      debug(1,
-        "Performing a #{step_name} step",
-        nsid
-      )
+      debug(1,"Performing a #{step_name} step",nsid)
       log("step#{idx+1}",step_name,nodes)
       log("timeout_step#{idx+1}", context[:local][:timeout] || 0, nodes)
     end
 
     def done!()
       @start_time = nil
+    end
+
+    def self.step_name()
+      raise
+    end
+
+    def load_tasks
+      raise
+    end
+
+    def steps
+      raise 'Should be reimplemented'
+    end
+  end
+
+  class Deploy < Macrostep
+    def self.step_name()
+      name.split('::').last.gsub(/^Deploy/,'')
+    end
+
+    def load_tasks
+      @tasks = steps()
+      cexec = context[:execution]
+
+      # Deploy on block device
+      if cexec.block_device and !cexec.block_device.empty? \
+        and (!cexec.deploy_part or cexec.deploy_part.empty?)
+        delete_task(:create_partition_table)
+        delete_task(:format_deploy_part)
+        delete_task(:format_tmp_part)
+        delete_task(:format_swap_part)
+      end
+
+      delete_task(:decompress_environment) if !context[:cluster].decompress_environment and cexec.environment.image[:kind] != 'fsa'
+
+      if ['dd','fsa'].include?(cexec.environment.image[:kind])
+        delete_task(:format_deploy_part)
+        # mount deploy part after send_environemnt
+        delete_task(:mount_deploy_part) if self.class.superclass == DeploySetDeploymentEnv
+      else
+        # mount deploy part after format_deploy_part
+        delete_task(:mount_deploy_part) if self.class.superclass == DeployBroadcastEnv
+      end
+
+      # The filesystem is not supported by the deployment kernel
+      unless context[:cluster].deploy_supported_fs.include?(cexec.environment.filesystem)
+        delete_task(:mount_deploy_part)
+        delete_task(:umount_deploy_part)
+        delete_task(:manage_admin_post_install)
+        delete_task(:manage_user_post_install)
+        delete_task(:check_kernel_files)
+        delete_task(:send_key)
+        delete_task(:install_bootloader)
+      end
+
+      # Multi-partitioned environment
+      if cexec.environment.multipart
+        delete_task(:format_tmp_part)
+        delete_task(:format_swap_part)
+      end
+
+      if !cexec.key or cexec.key.empty?
+        delete_task(:send_key_in_deploy_env)
+        delete_task(:send_key)
+      end
+
+      delete_task(:create_partition_table) if cexec.disable_disk_partitioning
+
+      delete_task(:format_tmp_part) unless cexec.reformat_tmp
+
+      delete_task(:format_swap_part) \
+        if context[:cluster].swap_part.nil? \
+        or context[:cluster].swap_part == 'none' \
+        or cexec.environment.environment_kind != 'linux'
+
+      delete_task(:install_bootloader) \
+        if context[:common].pxe[:local].is_a?(NetBoot::GrubPXE)  \
+        or cexec.disable_bootloader_install
+
+      delete_task(:manage_admin_pre_install) \
+        if cexec.environment.preinstall.nil? \
+        and context[:cluster].admin_pre_install.nil?
+
+      delete_task(:manage_admin_post_install) if context[:cluster].admin_post_install.nil?
+
+      delete_task(:manage_user_post_install) if cexec.environment.postinstall.nil?
+
+      delete_task(:set_vlan) if cexec.vlan.nil?
+
+      # Do not reformat deploy partition
+      if !cexec.deploy_part.nil? and cexec.deploy_part != ""
+        part = cexec.deploy_part.to_i
+        delete_task(:format_swap_part) if part == context[:cluster].swap_part.to_i
+        delete_task(:format_tmp_part) if part == context[:cluster].tmp_part.to_i
+      end
     end
   end
 end
