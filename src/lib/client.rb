@@ -151,7 +151,7 @@ class Client
       uri = URI(File.absolute_path(srcfile))
       uri.scheme = 'server'
       uri.send(:set_host, '')
-      FetchFile[uri.to_s,APIError::INVALID_ENVIRONMENT].grab(tmpfile.path)
+      FetchFile[uri.to_s].grab(tmpfile.path)
       tmpfile.close
       uri = nil
     rescue KadeployError => ke

@@ -215,7 +215,7 @@ class Environment
 
         md5 = nil
         if get_checksum
-          md5 = FetchFile[file,APIError::INVALID_FILE,client].checksum()
+          md5 = FetchFile[file,client].checksum()
         else
           md5 = ''
         end
@@ -239,7 +239,7 @@ class Environment
           file = cp.value('archive',String)
           md5 = nil
           if get_checksum
-            md5 = FetchFile[file,APIError::INVALID_FILE,client].checksum()
+            md5 = FetchFile[file,client].checksum()
           else
             md5 = ''
           end
@@ -260,7 +260,7 @@ class Environment
           file = cp.value('archive',String)
           md5 = nil
           if get_checksum
-            md5 = FetchFile[file,APIError::INVALID_FILE,client].checksum()
+            md5 = FetchFile[file,client].checksum()
           else
             md5 = ''
           end
