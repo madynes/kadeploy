@@ -39,7 +39,7 @@ class KadeployClient < ClientWorkflow
         :pxe_profile_singularities => nil,
         :pxe_files => [],
         :steps => [],
-        :ignore_nodes_deploying => false,
+        :force => false,
         :breakpoint_on_microstep => '',
         :custom_operations => nil,
         :disable_bootloader_install => nil,
@@ -77,16 +77,13 @@ class KadeployClient < ClientWorkflow
       parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
-      opt.on("--ignore-nodes-deploying", "Allow to deploy even on the nodes tagged as \"currently deploying\" (use this only if you know what you do)") {
-        options[:ignore_nodes_deploying] = true
-      }
       opt.on("--disable-bootloader-install", "Disable the automatic installation of a bootloader for a Linux based environnment") {
         options[:disable_bootloader_install] = true
       }
       opt.on("--disable-disk-partitioning", "Disable the disk partitioning") {
         options[:disable_disk_partitioning] = true
       }
-      opt.on("--breakpoint MICROSTEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
+      opt.on("--breakpoint STEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
         tmp = m.split(':',2)
         if check_macrostep_instance(tmp[0])
           if check_microstep(tmp[1])
@@ -209,8 +206,6 @@ class KadeployClient < ClientWorkflow
 
     # Serve local files throught HTTP(s)
     params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
-
-    params[:force] = options[:ignore_nodes_deploying] if options[:ignore_nodes_deploying]
 
     # Launch the workflow
     run_workflow(options,params)

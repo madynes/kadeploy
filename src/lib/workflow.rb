@@ -315,8 +315,8 @@ module Workflow
       debug(0, "Launching a deployment on #{@nodes.to_s_fold}")
 
       # Check nodes deploying
-      unless context[:execution].ignore_nodes_deploying
-        _,to_discard = @nodes.check_nodes_in_deployment(
+      unless context[:execution].force
+        _,to_discard = @nodes.check_nodes_used(
           context[:database],
           context[:common].purge_deployment_timer
         )

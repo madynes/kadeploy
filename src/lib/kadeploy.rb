@@ -24,7 +24,7 @@ module Kadeploy
     ret.pxe_profile_singularities = nil
     ret.pxe_upload_files = Array.new
     ret.steps = Array.new
-    ret.ignore_nodes_deploying = false
+    ret.force = false
     ret.breakpoint = nil
     ret.breakpointed = false
     ret.custom_operations = nil
@@ -250,7 +250,7 @@ module Kadeploy
         context.steps = p.parse('automata',Hash,:type=>:custom_automata)
 
         # Check force
-        context.ignore_nodes_deploying = p.parse('force',nil,:toggle=>true)
+        context.force = p.parse('force',nil,:toggle=>true)
 
         # Check verbose level
         context.verbose_level = p.parse('verbose_level',Fixnum,:range=>(1..5))

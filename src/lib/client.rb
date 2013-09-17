@@ -914,6 +914,12 @@ class ClientWorkflow < Client
     }
   end
 
+  def self.parse_force(opt,options)
+    opt.on("--[no-]force", "Allow to deploy even on the nodes tagged as currently used (use this only if you know what you do)") {
+      options[:force] = true
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -924,6 +930,7 @@ class ClientWorkflow < Client
         :wid_file => nil,
         :script => nil,
         :wait => true,
+        :force => false,
       }
     )
   end
@@ -941,6 +948,7 @@ class ClientWorkflow < Client
       parse_verbose(opt,options)
       parse_wid(opt,options)
       parse_wait(opt,options)
+      parse_force(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -974,8 +982,11 @@ class ClientWorkflow < Client
 
   def init_params(options)
     ret = super(options)
+
     ret[:nodes] = nodes()
     ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
+    ret[:force] = options[:force] if options[:force]
+
     ret
   end
 

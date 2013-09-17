@@ -906,7 +906,7 @@ module Nodes
     # * purge: period after what the data in the nodes table can be pruged (ie. there is no running deployment on the nodes)
     # Output
     # * return an array that contains two NodeSet ([0] is the good nodes set and [1] is the bad nodes set)
-    def check_nodes_in_deployment(db, purge)
+    def check_nodes_used(db, purge)
       bad_nodes = NodeSet.new
       args,nodelist = generic_where_nodelist()
       args << (Time.now.to_i - purge)
