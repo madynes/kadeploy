@@ -6,6 +6,7 @@ require 'httpd'
 require 'api'
 require 'authentication'
 require 'paramsparser'
+require 'kaworkflow'
 require 'kadeploy'
 require 'kareboot'
 require 'kapower'
@@ -21,6 +22,7 @@ module Kadeploy
 AUTOCLEAN_THRESHOLD = 21600 # 6h
 
 class KadeployServer
+  include Kaworkflow
   include Kadeploy
   include Kareboot
   include Kapower
@@ -233,7 +235,7 @@ class KadeployServer
     [:deploy,:reboot,:power].each do |kind|
       @httpd.bind([:POST,:GET],
         API.path(kind),:filter,:object=>self,:method=>:launch,
-        :args=>[1],:static=>[kind]
+        :args=>[1],:static=>[[kind,:work]]
       )
     end
 
@@ -269,12 +271,45 @@ class KadeployServer
     options
   end
 
-  def run_method(meth,*args)
+  # Returns the method name and args list depending on the param kind
+  # for sample: kind = [:deploy,:work], meth = :my_method, args = [1,2,3]
+  # if the method :deploy_my_method exists, returns [ :deploy_my_method, [1,2,3] ]
+  # else if the method :work_my_method exists, returns [ :work_my_method, [:deploy,1,2,3] ]
+  # else throws a NoMethodError exception
+  def get_method(kind,meth,args=[])
+    if kind.is_a?(Array)
+      name = nil
+      before = []
+      kind.each do |k|
+        if respond_to?(:"#{k}_#{meth}")
+          name = k
+          break
+        end
+        before << k
+      end
+      raise NoMethodError.new("undefined method [#{kind.join(',')}]_#{meth} for #{self.inspect}:#{self.class.name}","_#{meth}") unless name
+      before += args
+      [:"#{name}_#{meth}",before]
+    else
+      [:"#{kind}_#{meth}",args]
+    end
+  end
+
+  # Run the specified method, kind defaults to 'work' if no method is found
+  def run_wmethod(kind,meth,*args)
+    raise unless kind.is_a?(Symbol)
+    run_method([kind,:work],meth,*args)
+  end
+
+  # Run the specified method depending on kind (kind_meth)
+  def run_method(kind,meth,*args)
+    name = nil
     begin
-      send(meth.to_sym,*args)
+      name,args = get_method(kind,meth,args)
+      send(name,*args)
     rescue ArgumentError => e
       # if the problem is that the method is called with the wrong nb of args
-      if e.backtrace[0].split(/\s+/)[-1] =~ /#{meth.to_s}/ \
+      if name and e.backtrace[0].split(/\s+/)[-1] =~ /#{get_method(kind,meth)[0]}/ \
       and e.message =~ /wrong number of arguments/
         error_not_found!
       else
@@ -282,7 +317,7 @@ class KadeployServer
       end
     rescue NoMethodError => e
     # if the problem is that the method does not exists
-      if e.name.to_sym == meth.to_sym
+      if (name and e.name.to_sym == get_method(kind,meth)[0]) or (e.name.to_sym == :"_#{meth}")
         error_not_found!
       else
         raise e
@@ -306,20 +341,29 @@ class KadeployServer
     end
 
     # prepare the treatment
-    options = send(:"#{kind}_prepare",params[:params],query)
+    options = run_method(kind,:prepare,params[:params],query)
     authenticate!(params[:request],options)
-    ok,msg = send(:"#{kind}_rights?",options,query,params[:names],*args)
+    ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
     error_unauthorized!(msg) unless ok
 
     if query == :create
-      options.info = send(:"#{kind}_init_info",options) if respond_to?(:"#{kind}_init_info")
-      send(:"#{kind}_init_resources",options) if respond_to?(:"#{kind}_init_resources")
+      begin
+        get_method(kind,:init_info)
+        options.info = run_method(kind,:init_info,options)
+      rescue
+      end
+
+      begin
+        get_method(kind,:init_resources)
+        run_method(kind,:init_resources,options)
+      rescue
+      end
     end
 
-    meth = "#{kind}_#{query}"
+    meth = query.to_s
     meth << "_#{params[:names].join('_')}" if params[:names]
 
-    run_method(meth.to_sym,options,*args) unless options.dry_run
+    run_method(kind,meth,options,*args) unless options.dry_run
   end
 
   def workflow_create(kind,wid,info)
@@ -336,7 +380,7 @@ class KadeployServer
         @workflows_info[kind][wid] = info
         bind(kind,info,'resource') do |httpd,path|
           httpd.bind([:GET,:DELETE],path,:filter,:object=>self,:method =>:launch,
-            :args=>[1,3,5,7],:static=>[kind],:name=>[2,4,6]
+            :args=>[1,3,5,7],:static=>[[kind,:work]],:name=>[2,4,6]
           )
         end
       end
@@ -399,8 +443,8 @@ class KadeployServer
                 to_clean << wid
               end
             elsif !info[:thread].alive? # Dead workflow
-              deploy_kill(info)
-              deploy_free(info)
+              run_wmethod(kind,:kill,info)
+              run_wmethod(kind,:free,info)
               if (Time.now - info[:start_time]) > AUTOCLEAN_THRESHOLD
                 to_clean << wid
               end
@@ -409,7 +453,7 @@ class KadeployServer
         end
 
         to_clean.each do |wid|
-          send(:"#{kind}_delete",nil,wid)
+          run_wmethod(kind,:delete,nil,wid)
         end
         to_clean.clear
         to_clean = nil

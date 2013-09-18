@@ -117,8 +117,8 @@ module Workflow
         end
       end
 
-      if cexec.pxe_upload_files and !cexec.pxe_upload_files.empty?
-        cexec.pxe_upload_files.each do |pxefile|
+      if cexec.pxe and cexec.pxe[:files] and !cexec.pxe[:files].empty?
+        cexec.pxe[:files].each do |pxefile|
           check_file(pxefile)
         end
       end
@@ -219,8 +219,7 @@ module Workflow
       else
         @nodes.set_state(
           self.class.operation('ing'),
-          (context[:execution].load_env_kind == 'file' ?
-            -1 : context[:execution].environment.id),
+          context[:execution].environment.id,
           context[:database],
           context[:user]
         )
@@ -506,7 +505,7 @@ module Workflow
       if cexec.environment.image[:kind] == 'fsa'
         # Since no bootloader is installed with FSA, we do not allow to install
         # FSA archives unless the boot method is a GRUB PXE boot
-        if !context[:common].pxe[:local].is_a?(NetBoot::GrubPXE) and cexec.pxe_profile_msg.empty?
+        if !context[:common].pxe[:local].is_a?(NetBoot::GrubPXE) and cexec.pxe[:profile].empty?
           debug(0,"FSA archives can only be booted if GRUB is used to boot on the hard disk or you define a custom PXE boot method")
           error(APIError::CONFLICTING_OPTIONS)
         end

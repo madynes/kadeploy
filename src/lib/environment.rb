@@ -191,7 +191,7 @@ class Environment
     @user = user
     @preinstall = nil
     @postinstall = []
-    @id = description['id'] || -1
+    @id = -1
 
     begin
       cp = Configuration::Parser.new(description)

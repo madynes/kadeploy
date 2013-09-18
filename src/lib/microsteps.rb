@@ -1307,7 +1307,7 @@ class Microstep < Automata::QueueTask
   # * pxe_profile_msg (opt): string containing the pxe profile
   # Output
   # * return true if the operation has been performed correctly, false otherwise
-  def ms_switch_pxe(step, pxe_profile_msg = "")
+  def ms_switch_pxe(step, pxe_profile = "")
     get_nodes = lambda do |check_vlan|
       @nodes.set.collect do |node|
         n = { :hostname => node.hostname }
@@ -1350,25 +1350,25 @@ class Microstep < Automata::QueueTask
         :custom,
         get_nodes.call(false),
         context[:cluster].pxe_header,
-        pxe_profile_msg,
+        pxe_profile,
         context[:execution].true_user,
         context[:deploy_id]||context[:reboot_id],
-        context[:execution].pxe_profile_singularities
+        context[:execution].pxe[:singularities]
       ) then
         failed_microstep("Cannot perform the set_pxe_for_custom operation")
         return false
       end
     when "deploy_to_deployed_env"
       nodes = get_nodes.call(true)
-      if context[:execution].pxe_profile_msg != ""
+      if context[:execution].pxe and context[:execution].pxe[:profile]
         unless context[:common].pxe[:dhcp].boot(
           :custom,
           nodes,
           context[:cluster].pxe_header,
-          context[:execution].pxe_profile_msg,
+          context[:execution].pxe[:profile],
           context[:execution].true_user,
           context[:deploy_id]||context[:reboot_id],
-          context[:execution].pxe_profile_singularities
+          context[:execution].pxe[:singularities]
         ) then
           failed_microstep("Cannot perform the set_pxe_for_custom operation")
           return false

@@ -193,11 +193,11 @@ class GrabFile
 
     # Custom PXE files
     begin
-      if cexec.pxe_profile_msg and !cexec.pxe_upload_files.empty?
+      if cexec.pxe and cexec.pxe[:profile] and cexec.pxe[:files] and !cexec.pxe[:files].empty?
         gfmk = self.new(context[:common].cache[:netboot], context[:output],
           744, cexec.client)
 
-        cexec.pxe_upload_files.each do |pxefile|
+        cexec.pxe[:files].each do |pxefile|
           grab(gfmk,context,pxefile,:anon,'pxe',
             :file => File.join(context[:common].cache[:netboot].directory,
               (
