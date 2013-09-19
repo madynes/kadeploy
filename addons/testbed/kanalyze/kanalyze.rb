@@ -576,13 +576,17 @@ def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,wid_file)
       hashes["0"].update(kastat_method(expname,env,kadeploy_version,iter,nok,nko,wid_file))
     end #end case
   end#end if $kastat
+  grep = 0
+  if $grep != ""
+    nodes.each do |node|
+      grep += 1 if open(File.join(envcondir,node+".typescript")).grep(/#{$grep}/).size > 0
+    end
+  end
   hashes.each do |key,h|
     if(h["step1"] && h["step2"] && h["step3"])
       h["branch"]=key
+      h["grep"]=grep
       $stats.store(run_id+"-"+expname+"-"+key,h)
-    end
-    if h["success"]==0
-
     end
   end
 end
@@ -844,6 +848,7 @@ def load_cmdline_options
   $kastat=false
   $dir="."
   $cluster=""
+  $grep=""
   $walltime=0
   $mode=Kanalyzemode::RESERVE
   nodescount=2
@@ -862,6 +867,7 @@ def load_cmdline_options
     opts.on("-y", "--yaml-file FILE", "YAML file containing the instructions for the test") { |f| $expfile=f }
     opts.on("-C", "--check", "Checks the nodes connecting to them with SSH (not enabled by default)") { |c| $check=c }
     opts.on("-N", "--name NAME", "Name of the test run") { |n| name=n }
+    opts.on("-g", "--grep-pattern PATTERN", "Grep pattern in all consoles at the end of each deployments") { |g| $grep=g }
     opts.separator "Reserve mode options: #{$0} -y EXPFILE [--reservemode][options]"
     opts.on("--reservemode","Launches Kanalyze in reserve mode (enabled by default)") {|l| $mode=Kanalyzemode::RESERVE}
     opts.on("--best","Uses the most possible nodes") {|b| $best=true}
