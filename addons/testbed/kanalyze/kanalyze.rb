@@ -799,9 +799,9 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
  end 
 
 #checks the exp name
-  if $mode==Kanalyzemode::TEST
-    if $exps[exp]
-      $current_exp=$exps[exp]
+  if $mode==Kanalyzemode::TEST && exp
+    if  $exps[exp.to_i]
+      $exp_rank=exp.to_i
     else
       exit_error("The experiment #{exp} is not in the YAML file")
     end
@@ -861,7 +861,7 @@ def load_cmdline_options
   exps = Array.new
   kadeploy = KADEPLOY_BIN
   progname = File::basename($PROGRAM_NAME)
-  exp=0
+  exp=nil
   $best=false
   $filenode =""
   $expfile=""
@@ -908,7 +908,7 @@ def load_cmdline_options
   end
 
   opts.parse!(ARGV)
-  check_args(name,$expfile,nodes,keyfile,kadeploy,nodescount.to_i,exp.to_i)
+  check_args(name,$expfile,nodes,keyfile,kadeploy,nodescount.to_i,exp)
 end
 
 def run_test(exp)
@@ -921,7 +921,7 @@ def run_test(exp)
   puts "  Start to iterate" if $verbose
 
   exp['times'].times do |i|
-    puts "  Iteration ##{i}" if $verbose
+    puts "\n  Iteration ##{i}" if $verbose
     testname = "test-#{i}"
     testdir = File.join(expdir,testname)
     puts "    Creating #{testname} dir '#{testdir}'" if $verbose
