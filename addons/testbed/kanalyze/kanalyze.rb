@@ -291,6 +291,7 @@ def check_exp(exps)
   yaml_error("root should be a YAML Array") unless exps.is_a?(Array)
   versions=Array.new
   git=Array.new
+  custom=Array.new
   deployments=0
   exps.each do |exp|
     check_field('name',exp['name'])
@@ -308,6 +309,9 @@ def check_exp(exps)
     deployments+=exp['times']
     if exp['git']
       git.push(exp['git'])
+    end
+    if exp['custom']
+      custom.push(exp['custom'])
     end
     if exp['version']
       versions.push(exp['version'])
@@ -617,8 +621,11 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
   envcondir , envresultfile , envdebugfile  , envconbugdir = gen_logs_dir(workdir, env, simultid)
 
   cmd = "#{$kadeploy} #{node_list} -e \"#{env}\" -o #{ok} -n #{ko}"
+  cmd += " --set-custom-operations #{exp['custom']} " if exp['custom']
+  cmd += " --ignore-nodes-deploying " 
   cmd += " #{automata_opt}" if automata_opt and !automata_opt.empty?
-  cmd += " -k #{$key} " if $key
+  cmd += " -k"
+  cmd+=" #{$key}" if $key!=""
   cmd += " --write-workflow-id #{wid_file.path}"
 
   cmd += " | sed 's/.*/(#{simultid}) &/'" if simultid
@@ -751,7 +758,6 @@ end
 def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
 
   $exps=Array.new
-  $current_exp=""
   $nodes=Array.new
   $key=String.new
   $name=String.new
