@@ -234,7 +234,8 @@ module Rights
       end
     end
 
-    def granted?(user,nodes=nil,parts=nil)
+    # if parts.empty? => check if some rights on nodes
+    def granted?(user,nodes,parts=nil)
       raise unless nodes
       user,nodes,parts = prepare(user,nodes,parts)
       rights = get(user,nodes)
@@ -242,14 +243,16 @@ module Rights
       parts = ['*'] unless parts
 
       if rights.is_a?(Array)
-        rights[0] == '*' or rights.sort == parts.sort
+        parts[0].empty? or rights[0] == '*' or rights.sort == parts.sort
       elsif rights.is_a?(Hash)
-        if nodes
-          rights.each do |n,p|
-            return false if p[0] != '*' and parts.sort != p.sort
+        if nodes.sort == rights.keys.sort
+          unless parts[0].empty?
+            rights.each do |n,p|
+              return false if p[0] != '*' and parts.sort != p.sort
+            end
           end
           true
-        else # the user do not have rights on all nodes
+        else
           false
         end
       else

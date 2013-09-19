@@ -3,8 +3,11 @@ module Kadeploy
 module Kaworkflow
   WORKFLOW_STATUS_CHECK_PITCH=1
 
-  def work_init_exec_context()
+  def work_init_exec_context(kind)
     ret = init_exec_context()
+    ret.info = nil
+    ret.database = nil
+    ret.rights = nil
     ret.nodes = nil
     ret.nodelist = nil
     ret.steps = []
@@ -90,12 +93,18 @@ module Kaworkflow
       # Check database
       context.database = database_handler()
 
-      parse_params(params) do |p|
+      # Check rights
+      context.rights = rights_handler(context.database)
 
+      parse_params(params) do |p|
         # Check nodelist
         context.nodes = p.parse('nodes',Array,:mandatory=>true,
           :type=>:nodeset, :errno=>APIError::INVALID_NODELIST)
         context.nodelist = context.nodes.make_array_of_hostname
+
+        # Check existing rights on nodes by cluster
+        kaerror(APIError::INVALID_RIGHTS) \
+          unless context.rights.granted?(context.user,context.nodes,'')
 
         # Check custom microsteps
         context.custom_operations = p.parse('custom_operations',Hash,

@@ -20,7 +20,7 @@ class KadeployError < Exception
     when APIError::INVALID_NODELIST
       "Invalid node list"
     when APIError::INVALID_RIGHTS
-      "You do not have sufficient rights to perform the operation"
+      "You do not have sufficient rights to perform the operation on all the nodes"
     when APIError::INVALID_ENVIRONMENT
       "Invalid environment specification"
     when APIError::INVALID_CUSTOMOP
