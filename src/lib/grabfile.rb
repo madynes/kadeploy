@@ -146,8 +146,8 @@ class GrabFile
     env = cexec.environment
 
     # Env tarball
-    envprio = (env.recorded? ? :db : :anon)
     if env and tmp = env.tarball
+      envprio = (env.recorded? ? :db : :anon)
       grab(gfm,context,tmp['file'],envprio,'tarball',
         :md5=>tmp['md5'], :env => env
       )

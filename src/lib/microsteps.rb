@@ -398,7 +398,7 @@ class Microstep < Automata::QueueTask
     node_set.set.each { |node|
       if (node.cmd.instance_variable_get("@#{kind}_#{level}") == nil) then
         set_node(node, :stderr => "#{level}_#{kind} command is not provided")
-        debug(3, "      /!\ No #{level} #{kind} command is defined for these nodes /!\ ")
+        debug(3, " ! No #{level} #{kind} command is defined for #{node.hostname}",false)
         no_command_provided_nodes.push(node)
         to_remove.push(node)
       end
@@ -1583,11 +1583,11 @@ class Microstep < Automata::QueueTask
   # Perform a power operation on the current set of nodes_ok
   def ms_power(operation, level)
     case operation
-    when "on"
+    when :on
       escalation_cmd_wrapper("power_on", level)
-    when "off"
+    when :off
       escalation_cmd_wrapper("power_off", level)
-    when "status"
+    when :status
       parallel_get_power_status()
     end
     return true

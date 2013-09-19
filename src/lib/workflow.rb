@@ -7,6 +7,7 @@ require 'macrostep'
 require 'stepdeployenv'
 require 'stepbroadcastenv'
 require 'stepbootnewenv'
+require 'steppower'
 require 'md5'
 require 'http'
 require 'error'
@@ -219,7 +220,7 @@ module Workflow
       else
         @nodes.set_state(
           self.class.operation('ing'),
-          context[:execution].environment.id,
+          (context[:execution].environment ? context[:execution].environment.id : nil),
           context[:database],
           context[:user]
         )
@@ -415,12 +416,7 @@ module Workflow
     def load_tasks()
       @tasks = [ [], [], [] ]
 
-      macrosteps = nil
-      if context[:execution].steps and !context[:execution].steps.empty?
-        macrosteps = context[:execution].steps
-      else
-        macrosteps = context[:cluster].workflow_steps
-      end
+      macrosteps = load_macrosteps()
 
       # Custom preinstalls hack
       if context[:execution].environment.preinstall
@@ -511,6 +507,46 @@ module Workflow
         end
       end
 =end
+    end
+  end
+
+  class Power < Workflow
+    def self.opname(suffix='')
+      "power operation"
+    end
+
+    def self.operation(suffix='')
+      "power#{suffix}"
+    end
+
+    def load_macrosteps()
+      if context[:execution].steps and !context[:execution].steps.empty?
+        context[:execution].steps
+      else
+        step = nil
+        case context[:execution].operation
+        when :on
+          step = [['On',0,0]]
+        when :off
+          step = [['Off',0,0]]
+        when :status
+          step = [['Status',0,0]]
+        else
+          raise
+        end
+        [Configuration::MacroStep.new('Power',step)]
+      end
+    end
+
+    def load_tasks()
+      @tasks = [[ ]]
+      macrosteps = load_macrosteps()
+      macrosteps[0].get_instances.each do |instance|
+        @tasks[0] << [ instance[0].to_sym ]
+      end
+    end
+
+    def check_config()
     end
   end
 end

@@ -328,8 +328,8 @@ module Kaworkflow
           cexec.user,
           context[:wid],
           Time.now,
-          "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}",
-          context[:execution].env_kind == :anon,
+          (context[:execution].environment ? "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}" : nil),
+          (context[:execution].environment and context[:execution].environment.id < 0),
           cexec.loggerfile,
           (config.common.log_to_db ? context[:database] : nil)
         )
@@ -397,6 +397,8 @@ module Kaworkflow
       end
 
       info[:done] = true
+
+      yield(info) if block_given?
 
       # Clean everything
       run_wmethod(kind,:free,info)
