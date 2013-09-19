@@ -1369,7 +1369,6 @@ if $mode==Kanalyzemode::TEST
   FileUtils.mkdir_p($statsdir)
   if $exp_rank.nil?
     $exps.each do |exp|
-      kareboot_prod($nodes)
       run_test(exp)
     end
   else
