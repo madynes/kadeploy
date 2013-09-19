@@ -400,8 +400,7 @@ end
 
 
 def count_lines(filename)
-  count = `(wc -l #{filename} 2>/dev/null || echo 0) | cut -f 1 -d" "`
-  return count.to_i
+  return File.exists?(ok) ? IO.readlines(ok).size : 0 
 end
 
 def gen_logs_dir(workdir,env,simult)
