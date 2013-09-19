@@ -34,11 +34,17 @@ class KanodesClient < Client
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-d", "--get-nodes-state", "Get the deployment state of the nodes") {
+      opt.on("-s", "--get-nodes-state", "Get the deployment state of the nodes") {
         options[:operation] = :get_state
       }
-      opt.on("-s", "--get-deployments-status", "Get the status of running deployments") {
-        options[:operation] = :get_status
+      opt.on("-d", "--get-deployments-status", "Get the status of running deployments") {
+        options[:operation] = :get_status_deploy
+      }
+      opt.on("-r", "--get-reboots-status", "Get the status of running reboot operations") {
+        options[:operation] = :get_status_reboot
+      }
+      opt.on("-p", "--get-powers-status", "Get the status of running power operations") {
+        options[:operation] = :get_status_power
       }
       parse_machinefile(opt,options)
       parse_machine(opt,options)
@@ -49,13 +55,13 @@ class KanodesClient < Client
   end
 
   def self.check_options(options)
-    unless [:get_state,:get_status].include?(options[:operation])
+    unless [:get_state,:get_status_deploy,:get_status_reboot,:get_status_power].include?(options[:operation])
       error("You must choose an operation")
       return false
     end
 
     case options[:operation]
-    when :get_status
+    when :get_status_deploy,:get_status_reboot,:get_status_power
       if !options[:nodes].empty?
         error('Node list is useless when gathering deployment statuses')
         return false
@@ -78,8 +84,12 @@ class KanodesClient < Client
     when :get_state
       path = api_path()
       params[:nodes] = nodes() if nodes()
-    when :get_status
+    when :get_status_deploy
       path = api_path(options[:wid],:deploy)
+    when :get_status_reboot
+      path = api_path(options[:wid],:reboot)
+    when :get_status_power
+      path = api_path(options[:wid],:power)
     else
       raise
     end
