@@ -139,21 +139,54 @@ def kadeploy(nodes,env,vlan)
   bin=KADEPLOY_BIN
   begin
     tmpfile=cmd('mktemp')
+    tmpkofile=cmd('mktemp')
     i=0
+    node_list = String.new
+    nodes.each { |node|
+      node_list += " -m #{node}"
+    }
     begin
-      node_list = String.new
-      nodes.each { |node|
-        node_list += " -m #{node}"
-      }
-      cmd("#{bin} #{node_list} -e #{env} -k --vlan #{vlan} -o #{tmpfile}")
+      command="#{bin} #{node_list} -e #{env} -k -o #{tmpfile} -n #{tmpkofile}"
+      command+=" --vlan #{vlan}" if vlan
+      command+=" --ignore-nodes-deploying "
+      cmd(command)
       deployed_nodes=File.read(tmpfile).split("\n").uniq
       i+=1
       puts deployed_nodes.sort
       puts $nodes.sort
-    end while deployed_nodes.sort != nodes.sort and i<KADEPLOY_RETRIES
+      if File.exist?(tmpkofile)
+        nodes=IO.read(tmpkofile).split("\n").uniq
+        nodes.each { |node|
+          node_list += " -m #{node}"
+        }
+      end
+    end while nodes.size>0 and i<KADEPLOY_RETRIES
   ensure
     cmd("rm -f #{tmpfile}") if tmpfile
+    cmd("rm -f #{tmpkofile}") if tmpkofile
   end
+end
+
+def kadeploy(nodes,env,vlan,retries=KADEPLOY_RETRIES)
+  return if retries == 0
+  bin=KADEPLOY_BIN
+  oktmpfile=cmd('mktemp')
+  kotmpfile=cmd('mktemp')
+  node_list = String.new
+  nodes.each { |node|
+    node_list += " -m #{node.chomp}"
+  }
+  command="#{bin} #{node_list} -e #{env} -k -o #{oktmpfile} -n #{kotmpfile}"
+  command+=" --vlan #{vlan}" if vlan
+  command+=" --ignore-nodes-deploying " 
+  cmd(command)
+  if File.size?(kotmpfile)
+    no_deployed_nodes=File.read(kotmpfile).split("\n")
+    kadeploy(no_deployed_nodes,env,vlan,retries-1) if no_deployed_nodes.size > 0
+    cmd("rm -f #{kotmpfile}")
+  end
+  cmd("rm -f #{oktmpfile}") if File.exist?(oktmpfile)
+  cmd("rm -f #{kotmpfile}") if File.exist?(kotmpfile)
 end
 
 def kabootstrap(nodefile,repo_kind,commit,version)
