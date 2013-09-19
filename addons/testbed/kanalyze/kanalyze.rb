@@ -999,22 +999,11 @@ if $mode==Kanalyzemode::INSTALL
     command="scp -r #{frontend}:#{remote_statsdir} #{frontend}:#{remote_expdir} #{$savedir}"
     CommonG5K.cmd(command)
   end
+  generate_stats
 end
 
-if $mode==Kanalyzemode::TEST
-  puts "Creating directory '#{$savedir}'" if $verbose
-  FileUtils.mkdir_p($savedir)
 
-  $statsdir=File.join($savedir,"stats")
-  puts "Creating stats directory '#{$statsdir}'" if $verbose
-  FileUtils.mkdir_p($statsdir)
-  if $current_exp.nil?
-    $exps.each do |exp|
-      run_test(exp)
-    end
-  else
-    run_test($current_exp) 
-  end
+def generate_stats
   rscript= <<RSCRIPT
 library(ggplot2)
 
@@ -1064,6 +1053,7 @@ names3=as.vector(t(data["step3"]))
 
 experiments=as.vector(t(data["expname"]))
 success=as.vector(t(data["success"]))
+grep=as.vector(t(data["grep"]))
 run_ids_success=as.vector(t(data["id"]))
 iters=as.vector(t(data["iter"]))
 
@@ -1148,6 +1138,26 @@ graph=graph+scale_fill_discrete(name="Kadeploy Versions")
 graph<-graph+ylab("Time (s)")+xlab("Versions")+ggtitle(paste("Times of step 3 for different versions of Kadeploy"))
 graph<-graph+theme(axis.text.x = element_text(angle = 90))
 ggsave(file=paste("pictures/boxplot3-per-kadeploy.jpeg",sep=""),dpi=300)
+RSCRIPT
+
+  if $grep != ""
+    rscript=rscript+ <<RSCRIPT
+groups=paste(experiments,iters)
+fra=data.frame(groups,success,experiments)
+colnames(fra) <- c("groups", "nb", "experiments")
+fra$type<-'success'
+frb=data.frame(groups,grep,experiments)
+colnames(frb) <- c("groups", "nb", "experiments")
+frb$type<-'grep #{$grep}'
+fr <- rbind(fra,frb)
+graph<-ggplot(fr,aes(x=groups,y=nb,fill=type))+geom_bar(data=subset(fr,type=='success'),stat="identity",alpha=.5)+geom_bar(data=subset(fr,type=='grep #{$grep}'),stat="identity",alpha=.5)
+graph=graph+scale_fill_discrete(name="Experiments")
+graph<-graph+ylab("Success Rate (%)")+xlab("Runs")+ggtitle(paste("Success rate of different test runs"))
+graph<-graph+theme(axis.text.x = element_text(angle = 90))
+ggsave(file=paste("pictures/success.jpeg",sep=""),dpi=300)
+RSCRIPT
+  else
+    rscript=rscript+ <<RSCRIPT
 
 groups=paste(experiments,iters)
 fr=data.frame(groups,success,experiments)
@@ -1158,6 +1168,7 @@ graph<-graph+ylab("Success Rate (%)")+xlab("Runs")+ggtitle(paste("Success rate o
 graph<-graph+theme(axis.text.x = element_text(angle = 90))
 ggsave(file=paste("pictures/success.jpeg",sep=""),dpi=300)
 RSCRIPT
+  end
 
 rscript_micro= <<RSCRIPT_M
 #MICROSTEPS
@@ -1336,3 +1347,22 @@ File::open(makefile,"w") do |f|
 puts "Done, statistics are available in '#{$savedir}'"
 
 end
+
+if $mode==Kanalyzemode::TEST
+  puts "Creating directory '#{$savedir}'" if $verbose
+  FileUtils.mkdir_p($savedir)
+
+  $statsdir=File.join($savedir,"stats")
+  puts "Creating stats directory '#{$statsdir}'" if $verbose
+  FileUtils.mkdir_p($statsdir)
+  if $exp_rank.nil?
+    $exps.each do |exp|
+      kareboot_prod($nodes)
+      run_test(exp)
+    end
+  else
+    run_test($exps[$exp_rank]) 
+  end
+  generate_stats
+end
+
