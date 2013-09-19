@@ -20,17 +20,18 @@ module Kaworkflow
     ret.outputfile = nil
     ret.logger = nil
     ret.loggerfile = nil
-###
-    ret.pxe = nil
-    ret.client = nil
-    ret.environment = nil
-    ret.env_kind = nil
-    ret.block_device = nil
-    ret.deploy_part = nil
-    ret.key = nil
-    ret.boot_part = nil
-    ret.vlan_id = nil
-    ret.vlan_addr = nil
+    if [:deploy,:reboot].include?(kind)
+      ret.pxe = nil
+      ret.client = nil
+      ret.environment = nil
+      ret.env_kind = nil
+      ret.block_device = nil
+      ret.deploy_part = nil
+      ret.key = nil
+      ret.boot_part = nil
+      ret.vlan_id = nil
+      ret.vlan_addr = nil
+    end
     ret
   end
 
@@ -132,96 +133,97 @@ module Kaworkflow
           context.loggerfile = Debug::FileOutput.new(config.common.log_to_file)
         end
 
-###
-        # Check client
-        context.client = p.parse('client',String,:type=>:client)
+        if [:deploy,:reboot].include?(kind)
+          # Check client
+          context.client = p.parse('client',String,:type=>:client)
 
-        # authorized_keys file
-        context.key = p.parse('ssh_authorized_keys',String)
+          # authorized_keys file
+          context.key = p.parse('ssh_authorized_keys',String)
 
-        # Check VLAN
-        p.parse('vlan',String) do |vlan|
-          context.vlan_id = vlan
-          dns = Resolv::DNS.new
-          context.vlan_addr = {}
-          context.nodelist.each do |hostname|
-            host,domain = hostname.split('.',2)
-            vlan_hostname = "#{host}#{config.common.vlan_hostname_suffix}"\
-              ".#{domain}".gsub!('VLAN_ID', context.vlan_id)
+          # Check VLAN
+          p.parse('vlan',String) do |vlan|
+            context.vlan_id = vlan
+            dns = Resolv::DNS.new
+            context.vlan_addr = {}
+            context.nodelist.each do |hostname|
+              host,domain = hostname.split('.',2)
+              vlan_hostname = "#{host}#{config.common.vlan_hostname_suffix}"\
+                ".#{domain}".gsub!('VLAN_ID', context.vlan_id)
+              begin
+                context.vlan_addr = dns.getaddress(vlan_hostname).to_s
+              rescue Resolv::ResolvError
+                kaerror(APIError::INVALID_VLAN,"Cannot resolv #{vlan_hostname}")
+              end
+            end
+            dns.close
+            dns = nil
+          end
+
+          # Check PXE options
+          p.parse('pxe',Hash) do |pxe|
+            context.pxe[:profile] = p.check(pxe['profile'],String)
+
+            p.check(pxe['singularities'],Hash) do |singularities|
+              p.check(singularities.keys,Array,:type=>:nodeset,
+                :errno=>APIError::INVALID_NODELIST)
+              context.pxe[:singularities] = singularities
+            end
+
+            context.pxe[:files] = p.check(pxe['files'],Array)
+          end
+
+          # Check partition
+          context.block_device = p.parse('block_device',String)
+          if context.block_device
+            context.deploy_part = p.parse('deploy_partition',String,:emptiable=>true)
+          else
+            context.block_device = ''
+            context.deploy_part = p.parse('deploy_partition',String,:default=>'')
+          end
+
+          # Check Database Environment
+          env = p.parse('environment',Hash)
+          if env
+            context.environment = Environment.new
+            p.check(env['name'],String,:mandatory=>true)
+
+            type = p.check(env['kind'],String,:values=>['anonymous','database'],
+              :mandatory=>true)
+            if type == 'database'
+              p.check(env['user'],String,:mandatory=>true,
+                :errno=>APIError::INVALID_ENVIRONMENT)
+              unless context.environment.load_from_db(
+                context.database,
+                env['name'],
+                env['version'],
+                env['user'],
+                env['user'] == context.user,
+                env['user'].nil?
+              ) then
+                kaerror(APIError::INVALID_ENVIRONMENT,"the environment #{env['name']},#{env['version']} of #{env['user']} does not exist")
+              end
+            end
+          end
+
+          # Check reboot timeouts
+          p.parse('timeout_reboot_classical',String) do |timeout|
             begin
-              context.vlan_addr = dns.getaddress(vlan_hostname).to_s
-            rescue Resolv::ResolvError
-              kaerror(APIError::INVALID_VLAN,"Cannot resolv #{vlan_hostname}")
+              eval("n=1; #{timeout}")
+            rescue Exception => e
+              kaerror(APIError::INVALID_OPTION,
+                "the timeout is not a valid expression (#{e.message})")
             end
+            context.timeout_reboot_classical = timeout
           end
-          dns.close
-          dns = nil
-        end
-
-        # Check PXE options
-        p.parse('pxe',Hash) do |pxe|
-          context.pxe[:profile] = p.check(pxe['profile'],String)
-
-          p.check(pxe['singularities'],Hash) do |singularities|
-            p.check(singularities.keys,Array,:type=>:nodeset,
-              :errno=>APIError::INVALID_NODELIST)
-            context.pxe[:singularities] = singularities
-          end
-
-          context.pxe[:files] = p.check(pxe['files'],Array)
-        end
-
-        # Check partition
-        context.block_device = p.parse('block_device',String)
-        if context.block_device
-          context.deploy_part = p.parse('deploy_partition',String,:emptiable=>true)
-        else
-          context.block_device = ''
-          context.deploy_part = p.parse('deploy_partition',String,:default=>'')
-        end
-
-        # Check Database Environment
-        env = p.parse('environment',Hash)
-        if env
-          context.environment = Environment.new
-          p.check(env['name'],String,:mandatory=>true)
-
-          kind = p.check(env['kind'],String,:values=>['anonymous','database'],
-            :mandatory=>true)
-          if kind == 'database'
-            p.check(env['user'],String,:mandatory=>true,
-              :errno=>APIError::INVALID_ENVIRONMENT)
-            unless context.environment.load_from_db(
-              context.database,
-              env['name'],
-              env['version'],
-              env['user'],
-              env['user'] == context.user,
-              env['user'].nil?
-            ) then
-              kaerror(APIError::INVALID_ENVIRONMENT,"the environment #{env['name']},#{env['version']} of #{env['user']} does not exist")
+          p.parse('timeout_reboot_kexec',String) do |timeout|
+            begin
+              eval("n=1; #{timeout}")
+            rescue
+              kaerror(APIError::INVALID_OPTION,
+                "the timeout is not a valid expression (#{e.message})")
             end
+            context.timeout_reboot_kexec= timeout
           end
-        end
-
-        # Check reboot timeouts
-        p.parse('timeout_reboot_classical',String) do |timeout|
-          begin
-            eval("n=1; #{timeout}")
-          rescue Exception => e
-            kaerror(APIError::INVALID_OPTION,
-              "the timeout is not a valid expression (#{e.message})")
-          end
-          context.timeout_reboot_classical = timeout
-        end
-        p.parse('timeout_reboot_kexec',String) do |timeout|
-          begin
-            eval("n=1; #{timeout}")
-          rescue
-            kaerror(APIError::INVALID_OPTION,
-              "the timeout is not a valid expression (#{e.message})")
-          end
-          context.timeout_reboot_kexec= timeout
         end
       end
 

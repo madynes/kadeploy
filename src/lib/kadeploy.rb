@@ -8,7 +8,7 @@ module Kadeploy
 
 module Kadeploy
   def deploy_init_exec_context()
-    ret = work_init_exec_context()
+    ret = work_init_exec_context(:deploy)
     ret.reformat_tmp = nil
     ret.disable_bootloader_install = false
     ret.disable_disk_partitioning = false
