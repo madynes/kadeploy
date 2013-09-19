@@ -92,6 +92,7 @@ module Kanalyzemode
   RESERVE=0
   INSTALL=1
   TEST=2
+  RESCUE_STATS=3
 end
 
 
@@ -773,9 +774,9 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   date=(Time.now.year.to_s+"-"+Time.now.mon.to_s+"-"+Time.now.day.to_s)+"-"
   $name=(name!="" ? name+"-" : "")+date+Time.now.to_s.split(" ")[3].split(":").join("-")
 
-
+  if $mode != Kanalyzemode::RESCUE_STATS
 #checks the yaml file
-    if yaml_file.empty?
+    if yaml_file.empty? 
       exit_error "You have to specify a YAML test file"
     end
     if !File.exist?(yaml_file)
@@ -788,6 +789,7 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
       exit_error("file '#{yaml_file}' should use YAML format")
     end
     check_exp($exps)
+ end 
 
 #checks the exp name
   if $mode==Kanalyzemode::TEST
@@ -804,13 +806,13 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   end
 
 #checks the nodes file
-   if $mode!=Kanalyzemode::RESERVE 
+   if $mode!=Kanalyzemode::RESERVE && $mode!=Kanalyzemode::RESCUE_STATS
     if $filenode.empty? && nodes.empty?
       $stderr.puts "No nodes specified. Using $OAR_FILE_NODES"
       $filenode=`echo $OAR_FILE_NODES`.chomp
     end
     if !File.exists?($filenode)
-      if($filenode==`echo $OAR_FILE_NODES`.chomp)
+      if $filenode==`echo $OAR_FILE_NODES`.chomp 
         exit_error "You have to reserve some nodes to run "+$scriptname
       else
         exit_error "The file #{$filenode} does not exist"
@@ -893,6 +895,9 @@ def load_cmdline_options
     opts.separator "Test mode options: #{$0} --testmode -y EXPFILE [options]"
     opts.on("--testmode","Launches Kanalyze in test mode (reservation and frontend installation must be done)") {|l| $mode=Kanalyzemode::TEST}
     opts.on("-e", "--experiment EXP","Number of the experiment to run") {|e| exp=e}
+    opts.separator "Rebuild stats from a directory"
+    opts.on("--statmode","Rebuild stats") {|l| $mode=Kanalyzemode::RESCUE_STATS }
+    opts.on("-r", "--rebuid-dir DIR","Directory to an old exp") {|d| $dir=d }
   end
 
   opts.parse!(ARGV)
@@ -1353,6 +1358,32 @@ if $mode==Kanalyzemode::TEST
   else
     run_test($exps[$exp_rank]) 
   end
+  generate_stats
+end
+
+if $mode==Kanalyzemode::RESCUE_STATS
+  $statsdir=File.join($dir,"stats")
+  Dir.foreach($dir) do |c| 
+    next if c == '.' or c == '..' or c == "stats"
+    outFile = YAML.load_file(File.join($dir,c,"results"))
+    outFile.each { |exp| 
+      $nodes = exp['nodes']['list']
+      f = File.new('toto', "w")
+      f.write(exp['widf'])
+      f.close
+      hashes={}
+      hashes["0"]={}
+      hashes["0"].update(kastat_method(exp['name'],exp['env'],exp['kadeploy']['version'],exp['iter'],exp['nodes']['ok'],exp['nodes']['ko'],f))
+      hashes.each do |key,h|
+        if(h["step1"] && h["step2"] && h["step3"])
+          h["branch"]=key
+          h["grep"]=grep
+          $stats.store(exp['iter'].to_s+"-"+exp['name']+"-"+key,h)
+        end
+      end
+      store_stats(exp['name'],$dir, exp['iter'])
+    }
+  end 
   generate_stats
 end
 
