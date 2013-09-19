@@ -231,6 +231,8 @@ module Kaworkflow
       raise
     end
 
+    context.info = run_wmethod(kind,:init_info,context) if operation == :create
+
     context
   end
 
@@ -260,6 +262,7 @@ module Kaworkflow
   def work_create(kind,cexec)
     info = cexec.info
     workflow_create(kind,info[:wid],info)
+    run_wmethod(kind,:init_resources,cexec)
 
     info[:thread] = Thread.new do
       context = {
