@@ -167,6 +167,14 @@ def kadeploy(nodes,env,vlan)
   end
 end
 
+def kareboot_prod(nodes)
+  node_list = String.new
+  nodes.each { |node|
+    node_list += " -m #{node.chomp}"
+  }
+  cmd("kareboot3 #{node_list} -r env_recorded --env-name squeeze-x64-prod -p 2")
+end
+
 def kabootstrap(nodefile,repo_kind,commit,version)
     frontend=nil
     ret=nil
