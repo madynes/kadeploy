@@ -233,7 +233,7 @@ class KadeployServer
     #@httpd.bind([:GET],'/nodes',:method,:object=>self,:method=>:get_nodes)
 
     [:deploy,:reboot,:power].each do |kind|
-      @httpd.bind([:POST,:GET],
+      @httpd.bind([:POST,:PUT,:GET],
         API.path(kind),:filter,:object=>self,:method=>:launch,
         :args=>[1],:static=>[[kind,:work]]
       )

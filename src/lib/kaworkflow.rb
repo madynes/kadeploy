@@ -89,7 +89,7 @@ module Kaworkflow
     parse_params_default(params,context)
 
     case operation
-    when :create
+    when :create, :modify
       # Check database
       context.database = database_handler()
 
@@ -238,7 +238,7 @@ module Kaworkflow
 
   def work_rights?(kind,cexec,operation,names,wid=nil,*args)
     case operation
-    when :create
+    when :create,:modify
     when :get
       if wid and names
         workflow_get(kind,wid) do |info|
@@ -401,6 +401,10 @@ module Kaworkflow
     end
 
     { :wid => info[:wid], :resources => info[:resources] }
+  end
+
+  def work_modify(*args)
+    error_invalid!
   end
 
   def work_get(kind,cexec,wid=nil)
