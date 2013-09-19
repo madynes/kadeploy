@@ -666,15 +666,22 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
   
   add_stats(expname,envdebugfile,env,run_id,iter,nbok,nbko,envcondir,nodes,wid_file)
 
-  return (nbko == 0), bnok, bnko, envresultfile, wid_file unless $check
+  return (nbko == 0), nbok, nbko, envresultfile, wid_file unless ($check or exp['between_xp'] != nil)
 
   $stderr.puts "      Check for undeployed nodes"
   if nbko > 0
     should_be_redeployed = []
     IO.readlines(ko).each { |node|
-      $stderr.puts "### KO[#{node.chomp}]"
+      $stderr.puts "      KO[#{node.chomp}]"
+      should_be_redeployed << node	
     }
-  CommonG5K.kadeploy($nodes,ENVIRONMENT,`kavlan -V`.chomp)    
+    if exp['between_xp'] == "reboot"
+      CommonG5K.kareboot_prod($nodes)
+    elsif exp['between_xp'] == "redeploy_nook"
+      CommonG5K.kadeploy(should_be_redeployed,env,nil)    
+    elsif exp['between_xp'] == "redeploy_all"
+      CommonG5K.kadeploy($nodes,env,nil)
+    end
   end
   if (nbok > 0 && nbko == 0) then
     deployed_nodes = Array.new
