@@ -135,25 +135,26 @@ module CommonG5K
     puts 'done' if $verbose
   end
 
-def kadeploy(nodes,env,vlan)
+def kadeploy(nodes,env,vlan,retries=KADEPLOY_RETRIES)
+  return if retries == 0
   bin=KADEPLOY_BIN
-  begin
-    tmpfile=cmd('mktemp')
-    i=0
-    begin
-      node_list = String.new
-      nodes.each { |node|
-        node_list += " -m #{node}"
-      }
-      cmd("#{bin} #{node_list} -e #{env} -k --vlan #{vlan} -o #{tmpfile}")
-      deployed_nodes=File.read(tmpfile).split("\n").uniq
-      i+=1
-      puts deployed_nodes.sort
-      puts $nodes.sort
-    end while deployed_nodes.sort != nodes.sort and i<KADEPLOY_RETRIES
-  ensure
-    cmd("rm -f #{tmpfile}") if tmpfile
+  oktmpfile=cmd('mktemp')
+  kotmpfile=cmd('mktemp')
+  node_list = String.new
+  nodes.each { |node|
+    node_list += " -m #{node.chomp}"
+  }
+  command="#{bin} #{node_list} -e #{env} -k -o #{oktmpfile} -n #{kotmpfile}"
+  command+=" --vlan #{vlan}" if vlan
+  command+=" --ignore-nodes-deploying " 
+  cmd(command)
+  if File.size?(kotmpfile)
+    no_deployed_nodes=File.read(kotmpfile).split("\n")
+    kadeploy(no_deployed_nodes,env,vlan,retries-1) if no_deployed_nodes.size > 0
+    cmd("rm -f #{kotmpfile}")
   end
+  cmd("rm -f #{oktmpfile}") if File.exist?(oktmpfile)
+  cmd("rm -f #{kotmpfile}") if File.exist?(kotmpfile)
 end
 
 def kabootstrap(nodefile,repo_kind,commit,version)
