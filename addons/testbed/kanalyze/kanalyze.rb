@@ -470,10 +470,14 @@ def kastat_method(expname,env,kadeploy_version,iter,nok,nko,wid_file)
     h["kadeploy"]=kadeploy_version
     h["iter"]=iter
     h["id"]=expname+"-"+iter.to_s+"-"+env
-    h["success"]=nok*100/(nok+nko)
+
+    if nok+nko == 0
+    	h["success"]=0
+    else
+    	h["success"]=nok*100/(nok+nko)
+    end
 
     workflow_id=IO.read(wid_file.path)
-    
     str=`#{KASTAT_BIN} -d -m #{$nodes[0]} -f step1 -f step2 -f step3 -f step1_duration -f step2_duration -f step3_duration -w #{workflow_id}`
     str=str.split("\n").last
 
