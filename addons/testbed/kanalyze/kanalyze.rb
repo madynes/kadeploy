@@ -358,7 +358,7 @@ def gen_macro(type,macro)
   end
 end
 
-def add_result(kind, env , result, time, ok, ko)
+def add_result(kind, env , result, time, ok, ko, wid_file, name, iter)
   h = Hash.new
   h["kadeploy"] = {}
   h["kadeploy"]["version"] = `#{$kadeploy} -v`.split(" ")[3]
@@ -369,6 +369,9 @@ def add_result(kind, env , result, time, ok, ko)
   h["testname"] = $name
   h["time"] = time
   h["status"] = result
+  h["widf"] = IO.read(wid_file.path).strip
+  h["name"] = name
+  h["iter"] = iter
   h["nodes"] = {}
   h["nodes"]["list"] = $nodes.clone
   h["nodes"]["ok"] = ok.to_i
@@ -495,7 +498,7 @@ def kastat_method(expname,env,kadeploy_version,iter,nok,nko,wid_file)
     return h
 end
 
-def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,wid_file)
+def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,envcondir,nodes,wid_file)
 
   hashes={}
   branch="0"#branch (nodeset) of the current line
@@ -605,11 +608,11 @@ def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,wid_file)
   end
 end
 
-def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , run_id, iter)
-  $stderr.puts("\n### Launch[#{$name}/#{env}#{(simultid ? "(#{simultid})" : '')}]") if $verbose
-  ok_file = Tempfile.new("blackboxtests-ok")
+def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , run_id, iter, exp)
+  $stderr.puts("    Launch[#{$name}/#{env}#{(simultid ? "(#{simultid})" : '')}]") if $verbose
+  ok_file = Tempfile.new("kanalyze-ok")
   ok = ok_file.path
-  ko_file = Tempfile.new("blackboxtests-ko")
+  ko_file = Tempfile.new("kanalyze-ko")
   ko = ko_file.path
 
   node_list = String.new
@@ -667,19 +670,22 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
     exit!(1)
   end
 
+  nbok = File.exists?(ok) ? IO.readlines(ok).size : 0 
+  nbko = File.exists?(ko) ? IO.readlines(ko).size : 0
+  
+  add_stats(expname,envdebugfile,env,run_id,iter,nbok,nbko,envcondir,nodes,wid_file)
 
-  add_stats(expname,envdebugfile,env,run_id,iter,count_lines(ok),count_lines(ko),wid_file)
+  return (nbko == 0), bnok, bnko, envresultfile, wid_file unless $check
 
-  wid_file.unlink
-
-  return (count_lines(ko) == 0), count_lines(ok), count_lines(ko),envresultfile unless $check
-  if (count_lines(ko) > 0) then
+  $stderr.puts "      Check for undeployed nodes"
+  if nbko > 0
+    should_be_redeployed = []
     IO.readlines(ko).each { |node|
       $stderr.puts "### KO[#{node.chomp}]"
     }
   CommonG5K.kadeploy($nodes,ENVIRONMENT,`kavlan -V`.chomp)    
   end
-  if (count_lines(ko) == 0) then
+  if (nbok > 0 && nbko == 0) then
     deployed_nodes = Array.new
     IO.readlines(ok).each { |node|
       deployed_nodes.push(node.chomp)
@@ -697,25 +703,25 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
         no_errors = false
       end
     }
-    return no_errors, count_lines(ok), count_lines(ko),envresultfile
+    return no_errors, nbok, nbko, envresultfile, wid_file
   else
-    return false, count_lines(ok), count_lines(ko),envresultfile
+    return false, nbok, nbko, envresultfile, wid_file
   end
 end
 
-def test_dummy(expname,macrosteps , env , widf , workdir , run_id, iter)
+def test_dummy(expname,macrosteps , env , widf , workdir , run_id, iter, exp)
   start = Time.now.to_i
-     res, nok, nko, envresultfile = _test_deploy(expname,$nodes,macrosteps, env , widf ,nil , workdir , run_id,iter)
+  res, nok, nko, envresultfile, wid_file = _test_deploy(expname,$nodes,macrosteps, env , widf ,nil , workdir , run_id, iter, exp)
   time = Time.now.to_i - start
   if res then
-    add_result("seq", env , "ok", time, nok, nko)
+    add_result("seq", env , "ok", time, nok, nko, wid_file, expname, iter)
   else
-    add_result("seq", env , "ko", time, nok, nko)
+    add_result("seq", env , "ko", time, nok, nko, wid_file, expname, iter)
   end
   store_results(envresultfile)
 end
 
-def test_simultaneous_deployments(expname,macrosteps, env , simult , widf , workdir , run_id,iter)
+def test_simultaneous_deployments(expname,macrosteps, env , simult , widf , workdir , run_id, iter, exp)
   start = Time.now.to_i
   nodes_hash = Hash.new
   (0...simult).to_a.each { |n|
@@ -729,7 +735,7 @@ def test_simultaneous_deployments(expname,macrosteps, env , simult , widf , work
   envresultfile=String.new
   (0...simult).to_a.each { |n|
     tid = Thread.new {
-      r, o, k ,envresultfile = _test_deploy(expname,nodes_hash[n], macrosteps, env, widf, "#{simult}:#{n}" , workdir , run_id, iter)
+      r, o, k ,envresultfile, wid_file = _test_deploy(expname,nodes_hash[n], macrosteps, env, widf, "#{simult}:#{n}" , workdir , run_id, iter, exp)
       tid_hash_result[tid] = [r, o, k]
     }
     tid_array << tid
@@ -747,20 +753,21 @@ def test_simultaneous_deployments(expname,macrosteps, env , simult , widf , work
   }
   time = Time.now.to_i - start
   if result then
-    add_result("simult-#{simult}", env, "ok", time, nodes_ok, nodes_ko)
+    add_result("simult-#{simult}", env, "ok", time, nodes_ok, nodes_ko, wid_file, expname, iter)
   else
-    add_result("simult-#{simult}", env, "ko", time, nodes_ok, nodes_ko)
+    add_result("simult-#{simult}", env, "ko", time, nodes_ok, nodes_ko, wid_file, expname, iter)
+    outFile.puts($results.to_yaml)
   end
   store_results(envresultfile)
 end
 
-def test_env(workdir,expname,run_id,macrosteps,env,iter,simult=nil)
+def test_env(workdir,expname,run_id,macrosteps,env,iter,exp,simult=nil)
 
     puts "    Testing environment '#{env}'#{(simult ? " simult \##{simult}" : '')}" if $verbose
     if(!simult)
-      test_dummy(expname,macrosteps,env,nil,workdir,run_id,iter)
+      test_dummy(expname,macrosteps,env,nil,workdir,run_id,iter, exp)
     else
-      test_simultaneous_deployments(expname,macrosteps,env,simult,nil,workdir,run_id,iter)
+      test_simultaneous_deployments(expname,macrosteps,env,simult,nil,workdir,run_id,iter, exp)
     end
 
 end
@@ -940,10 +947,10 @@ def run_test(exp)
           simuldir = File.join(envdir,"simult-#{simult}")
           puts "    Creating simult-#{simult} dir '#{simuldir}'" if $verbose
           FileUtils.mkdir_p(testdir) 
-          test_env(simuldir,exp['name'],run_id,macrosteps,env,i,simult)
+          test_env(simuldir,exp['name'],run_id,macrosteps,env,i,exp,simult)
         end
       else
-        test_env(envdir,exp['name'],run_id,macrosteps,env,i)
+        test_env(envdir,exp['name'],run_id,macrosteps,env,i,exp)
       end
     end
   end
