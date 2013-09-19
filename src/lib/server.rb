@@ -291,7 +291,11 @@ class KadeployServer
       before += args
       [:"#{name}_#{meth}",before]
     else
-      [:"#{kind}_#{meth}",args]
+      if respond_to?(:"#{kind}_#{meth}")
+        [:"#{kind}_#{meth}",args]
+      else
+        raise NoMethodError.new("undefined method #{kind}_#{meth} for #{self.inspect}:#{self.class.name}","#{kind}_#{meth}")
+      end
     end
   end
 
