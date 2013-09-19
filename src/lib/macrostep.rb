@@ -34,6 +34,14 @@ module Macrostep
       self.class.step_name
     end
 
+    def macroname()
+      if context[:local][:parent] and context[:local][:parent].class.respond_to?(:operation)
+        "#{context[:local][:parent].class.operation.capitalize}/#{step_name}"
+      else
+        step_name
+      end
+    end
+
     def load_config()
       super()
       new_tasks = tasks.dup
@@ -122,7 +130,7 @@ module Macrostep
       delete = lambda do |arr,index|
         if arr[index][0] == taskname
           arr.delete_at(index)
-          debug(5, " * Bypassing the step #{step_name}-#{taskname.to_s}",nsid)
+          debug(5, " * Bypassing the step #{macroname}-#{taskname.to_s}",nsid)
         end
       end
 
@@ -157,13 +165,13 @@ module Macrostep
 
     def break!(task,nodeset)
       debug(2,"*** Breakpoint on #{task.name.to_s} reached for #{nodeset.to_s_fold}",task.nsid)
-      debug(1,"Step #{step_name} breakpointed",task.nsid)
+      debug(1,"Step #{macroname} breakpointed",task.nsid)
       log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
     end
 
     def success!(task,nodeset)
       debug(1,
-        "End of step #{step_name} after #{Time.now.to_i - @start_time}s",
+        "End of step #{macroname} after #{Time.now.to_i - @start_time}s",
         task.nsid
       )
       log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
@@ -172,7 +180,7 @@ module Macrostep
     def fail!(task,nodeset)
       debug(2,"!!! The nodes #{nodeset.to_s_fold} failed on step #{task.name.to_s}",task.nsid)
       debug(1,
-        "Step #{step_name} failed for #{nodeset.to_s_fold} "\
+        "Step #{macroname} failed for #{nodeset.to_s_fold} "\
         "after #{Time.now.to_i - @start_time}s",
         task.nsid
       )
@@ -204,7 +212,7 @@ module Macrostep
 
     def start!()
       @start_time = Time.now.to_i
-      debug(1,"Performing a #{step_name} step",nsid)
+      debug(1,"Performing a #{macroname} step",nsid)
       log("step#{idx+1}",step_name,nodes)
       log("timeout_step#{idx+1}", context[:local][:timeout] || 0, nodes)
     end
@@ -306,6 +314,16 @@ module Macrostep
         delete_task(:format_swap_part) if part == context[:cluster].swap_part.to_i
         delete_task(:format_tmp_part) if part == context[:cluster].tmp_part.to_i
       end
+    end
+  end
+
+  class Power < Macrostep
+    def self.step_name()
+      name.split('::').last.gsub(/^Power/,'')
+    end
+
+    def load_tasks
+      @tasks = steps()
     end
   end
 end

@@ -251,7 +251,7 @@ module Debug
         "step1_duration" => 0,
         "step2_duration" => 0,
         "step3_duration" => 0,
-        "env" => env,
+        "env" => env||'',
         "anonymous_env" => anonymous_env,
         "md5" => String.new,
         "success" => false,

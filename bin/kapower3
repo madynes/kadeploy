@@ -25,7 +25,7 @@ class KapowerClient < ClientWorkflow
     global_load_options().merge(
       {
         :operation => nil,
-        :level => :soft,
+        :level => nil,
       }
     )
   end
@@ -54,12 +54,45 @@ class KapowerClient < ClientWorkflow
       return false
     end
 
+    unless [:on,:off,:status].include?(options[:operation])
+      error("Invalid operation #{options[:operation]}")
+      return false
+    end
+
+    if options[:level] and options[:operation] == :status
+      error("Specifying the level is useless with the status operation")
+      return false
+    end
+
     true
   end
 
   def run(options)
-    raise 'Not implemented yet !'
+    params = init_params(options)
+
+    case options[:operation]
+    when :on, :off
+      params[:status] = options[:operation]
+      params[:level] = options[:level] if options[:level]
+      run_workflow(options,params,:put)
+    when :status
+p params
+      run_workflow(options,params,:get)
+    else
+      raise
+    end
   end
+
+  #def result(options,res)
+  #  case options[:operation]
+  #  when :on, :off
+  #    super(options,res)
+  #  when :status
+  #    debug res
+  #  else
+  #    raise
+  #  end
+  #end
 end
 
 end
