@@ -1158,33 +1158,40 @@ class Microstep < Automata::QueueTask
   end
 
   def self.load_deploy_context(vals={:env=>{},:parts=>{}})
-    {
+    ret = {
       'KADEPLOY_CLUSTER' => vals[:cluster],
-      'KADEPLOY_ENV' => vals[:env][:name],
-      'KADEPLOY_ENV_KERNEL' => vals[:env][:kernel],
-      'KADEPLOY_ENV_INITRD' => vals[:env][:initrd],
-      'KADEPLOY_ENV_KERNEL_PARAMS' => vals[:env][:kernel_params],
-      'KADEPLOY_ENV_HYPERVISOR' => vals[:env][:hypervisor],
-      'KADEPLOY_ENV_HYPERVISOR_PARAMS' => vals[:env][:hypervisor_params],
-      'KADEPLOY_OS_KIND' => vals[:env][:kind],
       'KADEPLOY_DEPLOY_PART' => vals[:deploy_part],
       'KADEPLOY_BLOCK_DEVICE' => vals[:block_device],
       'KADEPLOY_DEPLOY_PART_NUM' => vals[:parts][:deploy],
       'KADEPLOY_SWAP_PART_NUM' => vals[:parts][:swap],
       'KADEPLOY_PROD_PART_NUM' => vals[:parts][:prod],
       'KADEPLOY_TMP_PART_NUM' => vals[:parts][:tmp],
-      'KADEPLOY_ENV_EXTRACTION_DIR' => vals[:extractdir],
       'KADEPLOY_PREPOST_EXTRACTION_DIR' => vals[:prepostdir],
       'KADEPLOY_TMP_DIR' => vals[:tmpdir],
-      'KADEPLOY_PART_TYPE' => vals[:parttype],
-      'KADEPLOY_FS_TYPE' => vals[:fstype],
     }
+    if vals[:env]
+      ret['KADEPLOY_ENV'] = vals[:env][:name]
+      ret['KADEPLOY_ENV_KERNEL'] = vals[:env][:kernel]
+      ret['KADEPLOY_ENV_INITRD'] = vals[:env][:initrd]
+      ret['KADEPLOY_ENV_KERNEL_PARAMS'] = vals[:env][:kernel_params]
+      ret['KADEPLOY_ENV_HYPERVISOR'] = vals[:env][:hypervisor]
+      ret['KADEPLOY_ENV_HYPERVISOR_PARAMS'] = vals[:env][:hypervisor_params]
+      ret['KADEPLOY_OS_KIND'] = vals[:env][:kind]
+    end
+    ret['KADEPLOY_PART_TYPE'] = vals[:parttype] if vals[:parttype]
+    ret['KADEPLOY_FS_TYPE'] = vals[:fstype] if vals[:fstype]
+    ret['KADEPLOY_ENV_EXTRACTION_DIR'] = vals[:extractdir] if vals[:extractdir]
+
+    ret
   end
 
   def deploy_context
-    self.class.load_deploy_context({
-      :cluster => context[:cluster].name,
-      :env => {
+    env = nil
+    extractdir = nil
+    parttype = nil
+    fstype = nil
+    if context[:execution].environment
+      env = {
         :name => context[:execution].environment.name,
         :kind => context[:execution].environment.environment_kind,
         :kernel => context[:execution].environment.kernel,
@@ -1192,7 +1199,14 @@ class Microstep < Automata::QueueTask
         :kernel_params => get_kernel_params(),
         :hypervisor => context[:execution].environment.hypervisor,
         :hypervisor_params => context[:execution].environment.hypervisor_params,
-      },
+      }
+      extractdir = context[:common].environment_extraction_dir
+      parttype = context[:execution].environment.fdisk_type
+      fstype = context[:execution].environment.filesystem
+    end
+    self.class.load_deploy_context({
+      :cluster => context[:cluster].name,
+      :env => env,
       :deploy_part => get_deploy_part_str(),
       :block_device => get_block_device_str(),
       :parts => {
@@ -1201,11 +1215,11 @@ class Microstep < Automata::QueueTask
         :prod => context[:cluster].prod_part,
         :tmp => context[:cluster].tmp_part,
       },
-      :extractdir => context[:common].environment_extraction_dir,
+      :extractdir => extractdir,
       :prepostdir => context[:common].rambin_path,
       :tmpdir => '/tmp',
-      :parttype => context[:execution].environment.fdisk_type,
-      :fstype => context[:execution].environment.filesystem
+      :parttype => parttype,
+      :fstype => fstype,
     })
   end
 
