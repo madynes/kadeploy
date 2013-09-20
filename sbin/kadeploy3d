@@ -116,6 +116,10 @@ OptionParser.new do |opts|
   opts.on("-S", "--no-dh-seeds", "Do not generate seeds for DH algorithm (use default ones)") do
     $generate_dh_seeds = false
   end
+
+  opts.on("", "--debug", "Run with ruby debug mode") do
+    $DEBUG = true
+  end
 end.parse!
 
 
