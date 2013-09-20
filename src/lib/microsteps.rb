@@ -137,7 +137,7 @@ class Microstep < Automata::QueueTask
 
   # Get the identifier that allow to contact a node (hostname|ip)
   def get_nodeid(node,vlan=false)
-    if vlan and !context[:execution].vlan.nil?
+    if vlan and !context[:execution].vlan_id.nil?
       ret = context[:execution].vlan_addr[node.hostname]
     else
       if context[:cluster].use_ip_to_deploy
@@ -1311,7 +1311,7 @@ class Microstep < Automata::QueueTask
     get_nodes = lambda do |check_vlan|
       @nodes.set.collect do |node|
         n = { :hostname => node.hostname }
-        if check_vlan && (context[:execution].vlan != nil)
+        if check_vlan && !context[:execution].vlan_id.nil?
           n[:ip] = context[:execution].vlan_addr[node.hostname]
         else
           n[:ip] = node.ip
@@ -2069,7 +2069,7 @@ class Microstep < Automata::QueueTask
     list = String.new
     @nodes.make_array_of_hostname.each { |hostname| list += " -m #{hostname}" }
 
-    vlan_id = context[:execution].vlan unless vlan_id
+    vlan_id = context[:execution].vlan_id unless vlan_id
     cmd = context[:common].set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", vlan_id).gsub("USER", context[:execution].true_user)
 
     unless command(cmd) then

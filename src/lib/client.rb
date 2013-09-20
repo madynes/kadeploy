@@ -59,16 +59,16 @@ class Client
     )
   end
 
-  def self.error(msg='',abrt = true)
+  def self.error(msg='',abrt=true,code=1)
     unless $killing
       $stderr.puts msg if msg and !msg.empty?
       self.kill
-      exit!(1) if abrt
+      exit!(code) if abrt
     end
   end
 
-  def error(msg='',abrt = true)
-    self.class.error(debug(msg,false),abrt)
+  def error(msg='',abrt=true,code=1)
+    self.class.error(debug(msg,false),abrt,code)
   end
 
   def self.kill()
@@ -434,7 +434,7 @@ class Client
     begin
       HTTP::Client::get(host,port,path,@secure,nil,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -446,7 +446,7 @@ class Client
     begin
       HTTP::Client::post(host,port,path,data,@secure,content_type,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -458,7 +458,7 @@ class Client
     begin
       HTTP::Client::put(host,port,path,data,@secure,content_type,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -474,7 +474,7 @@ class Client
     begin
       HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -1065,7 +1065,7 @@ p @resources['resource']
 
       # Fail
       if res['nodes']['ko'] and !res['nodes']['ko'].empty?
-        debug "The #{self.class.operation().downcase} operation failed on nodes"
+        debug "The #{self.class.operation().downcase} failed on nodes"
         debug res['nodes']['ko'].join("\n")
       end
     end
