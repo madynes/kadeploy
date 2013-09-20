@@ -37,15 +37,41 @@ class KaconsoleClient < Client
   end
 
   def self.check_options(options)
-    if !options[:node] or options[:node].empty?
+    if !options[:nodes] or options[:nodes].empty?
       error("You must choose one node")
+      return false
+    end
+
+    if options[:nodes] and options[:nodes].size > 1
+      error("You can only choose one node")
       return false
     end
     true
   end
 
   def run(options)
-    raise 'Not implemented yet !'
+    params = init_params(options)
+
+    get(File.join(api_path(),options[:nodes][0]),params)
+  end
+
+  def result(options,ret)
+    # TODO: kill the console when the user loose the rights
+    # @killed -> check rights on nodes
+    @killed = false
+
+    pid = fork {
+      exec(ret['command'])
+    }
+
+    ret_wait = 0
+    while (not @killed)
+      ret_wait = Process.waitpid(pid, Process::WNOHANG)
+      @killed = true if ret_wait == pid
+      sleep(1)
+    end
+
+    Process.kill("SIGKILL", pid) if ret_wait != pid
   end
 end
 

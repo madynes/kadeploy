@@ -17,6 +17,8 @@ module API
         '/nodes'
       when :rights
         '/rights'
+      when :console
+        '/console'
       else
         raise
     end
