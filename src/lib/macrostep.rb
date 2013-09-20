@@ -36,7 +36,7 @@ module Macrostep
 
     def macroname()
       if context[:local][:parent] and context[:local][:parent].class.respond_to?(:operation)
-        "#{context[:local][:parent].class.operation.capitalize}/#{step_name}"
+        "#{context[:local][:parent].class.operation.capitalize}[#{step_name}]"
       else
         step_name
       end
@@ -319,6 +319,7 @@ module Macrostep
 
   class Power < Macrostep
     def self.step_name()
+p name
       name.split('::').last.gsub(/^Power/,'')
     end
 

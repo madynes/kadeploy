@@ -107,9 +107,12 @@ module Kaworkflow
         kaerror(APIError::INVALID_RIGHTS) \
           unless context.rights.granted?(context.user,context.nodes,'')
 
+        # Check custom breakpoint
+        context.breakpoint = p.parse('breakpoint',String,:type=>:breakpoint,:kind=>kind)
+
         # Check custom microsteps
         context.custom_operations = p.parse('custom_operations',Hash,
-          :type=>:custom_ops,:errno=>APIError::INVALID_CUSTOMOP)
+          :type=>:custom_ops,:kind=>kind,:errno=>APIError::INVALID_CUSTOMOP)
 
         # Check custom automata
         context.steps = p.parse('automata',Hash,:type=>:custom_automata)

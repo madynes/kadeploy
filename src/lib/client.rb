@@ -63,7 +63,7 @@ class Client
     unless $killing
       $stderr.puts msg if msg and !msg.empty?
       self.kill
-      exit!(code) if abrt
+      exit!(code||1) if abrt
     end
   end
 
@@ -920,6 +920,12 @@ class ClientWorkflow < Client
     }
   end
 
+  def self.parse_breakpoint(opt,options)
+    opt.on("--breakpoint STEP", /^\w+:\w+$/, "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |s|
+      options[:breakpoint] = s
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -931,6 +937,7 @@ class ClientWorkflow < Client
         :script => nil,
         :wait => true,
         :force => false,
+        :breakpoint => nil,
       }
     )
   end
@@ -949,6 +956,7 @@ class ClientWorkflow < Client
       parse_wid(opt,options)
       parse_wait(opt,options)
       parse_force(opt,options)
+      parse_breakpoint(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -987,6 +995,7 @@ class ClientWorkflow < Client
     ret[:debug] = options[:debug] if options[:debug]
     ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
     ret[:force] = options[:force] if options[:force]
+    ret[:breakpoint] = options[:breakpoint] if options[:breakpoint]
 
     ret
   end

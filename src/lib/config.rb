@@ -111,7 +111,7 @@ module Configuration
     cp.parse(macrobase,true,Array) do |info|
       name = cp.value('name',String)
       raise ArgumentError.new("Unknown macrostep name '#{name}'") \
-        unless check_macrostep_instance(name)
+        unless check_macrostep_instance(name,:deploy)
       ret << [
         name,
         cp.value('retries',Fixnum,0),
@@ -136,25 +136,32 @@ module Configuration
     ret
   end
 
-  def self.check_macrostep_interface(name)
+  def self.check_macrostep_interface(name,kind)
+    kind = kind.to_s.capitalize
+    klassbase = ::Kadeploy::Macrostep.const_get(kind)
     macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep::Deploy
+      klass.superclass == klassbase
     }
-    macrointerfaces.collect!{ |klass| klass.name.split('::').last.gsub(/^Deploy/,'') }
+    macrointerfaces.collect!{ |klass| klass.name.split('::').last.gsub(/^#{kind}/,'') }
 
     return macrointerfaces.include?(name)
   end
 
-  def self.check_macrostep_instance(name)
+  def self.check_macrostep_instance(name,kind)
     # Gathering a list of availables macrosteps
+    klassbase = ::Kadeploy::Macrostep.const_get(kind.to_s.capitalize)
     macrosteps = ObjectSpace.each_object(Class).select { |klass|
-      klass.ancestors.include?(Macrostep::Deploy)
+      klass.ancestors.include?(klassbase)
     }
 
     # Do not consider rought step names as valid
-    macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
-      klass.superclass == Macrostep::Deploy
-    }
+    if kind == :deploy
+      macrointerfaces = ObjectSpace.each_object(Class).select { |klass|
+        klass.superclass == klassbase
+      }
+    else
+      macrointerfaces = [klassbase]
+    end
     macrointerfaces.each { |interface| macrosteps.delete(interface) }
 
     macrosteps.collect!{ |klass| klass.step_name }
