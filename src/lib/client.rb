@@ -984,6 +984,7 @@ class ClientWorkflow < Client
     ret = super(options)
 
     ret[:nodes] = nodes()
+    ret[:debug] = options[:debug] if options[:debug]
     ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
     ret[:force] = options[:force] if options[:force]
 

@@ -160,7 +160,6 @@ class KadeployClient < ClientWorkflow
     params[:custom_operations] = options[:custom_operations] if options[:custom_operations]
     params[:automata] = options[:automata] if options[:automata]
     params[:vlan] = options[:vlan] if options[:vlan]
-    params[:debug] = options[:debug] if options[:debug]
 
 
     env = nil
