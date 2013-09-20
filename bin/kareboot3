@@ -110,6 +110,7 @@ class KarebootClient < ClientWorkflow
 
     params[:deploy_partition] = options[:deploy_part] if options[:deploy_part]
     params[:block_device] = options[:block_device] if options[:block_device]
+    params[:timeout_reboot_classical] = options[:reboot_classical_timeout] if options[:reboot_classical_timeout]
     if options[:pxe_profile]
       params[:pxe] = {}
       params[:pxe][:profile] = options[:pxe_profile]

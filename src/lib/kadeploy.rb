@@ -12,7 +12,6 @@ module Kadeploy
     ret.reformat_tmp = nil
     ret.disable_bootloader_install = false
     ret.disable_disk_partitioning = false
-    ret.timeout_reboot_classical = nil
     ret.timeout_reboot_kexec = nil
     ret
   end
@@ -84,6 +83,17 @@ module Kadeploy
 
         # Check reformat tmp partition
         context.reformat_tmp = p.parse('reformat_tmp_partition',String)
+
+        # Check kexec timeout
+        p.parse('timeout_reboot_kexec',String) do |timeout|
+          begin
+            eval("n=1; #{timeout}")
+          rescue
+            kaerror(APIError::INVALID_OPTION,
+              "the timeout is not a valid expression (#{e.message})")
+          end
+          context.timeout_reboot_kexec = timeout
+        end
       end
     when :get
     when :delete
