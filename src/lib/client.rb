@@ -920,6 +920,13 @@ class ClientWorkflow < Client
     }
   end
 
+  def self.parse_custom_ops(opt,options)
+    opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
+      options[:custom_operations] = load_custom_file(file)
+      return false unless options[:custom_operations]
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -931,6 +938,7 @@ class ClientWorkflow < Client
         :script => nil,
         :wait => true,
         :force => false,
+        :custom_operations => nil,
       }
     )
   end
@@ -949,6 +957,7 @@ class ClientWorkflow < Client
       parse_wid(opt,options)
       parse_wait(opt,options)
       parse_force(opt,options)
+      parse_custom_ops(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -987,6 +996,7 @@ class ClientWorkflow < Client
     ret[:debug] = options[:debug] if options[:debug]
     ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
     ret[:force] = options[:force] if options[:force]
+    ret[:custom_operations] = options[:custom_operations] if options[:custom_operations]
 
     ret
   end
