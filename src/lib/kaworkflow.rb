@@ -31,6 +31,7 @@ module Kaworkflow
       ret.boot_part = nil
       ret.vlan_id = nil
       ret.vlan_addr = nil
+      ret.timeout_reboot_classical = nil
     end
     ret
   end
@@ -208,7 +209,7 @@ module Kaworkflow
             end
           end
 
-          # Check reboot timeouts
+          # Check reboot timeout
           p.parse('timeout_reboot_classical',String) do |timeout|
             begin
               eval("n=1; #{timeout}")
@@ -217,15 +218,6 @@ module Kaworkflow
                 "the timeout is not a valid expression (#{e.message})")
             end
             context.timeout_reboot_classical = timeout
-          end
-          p.parse('timeout_reboot_kexec',String) do |timeout|
-            begin
-              eval("n=1; #{timeout}")
-            rescue
-              kaerror(APIError::INVALID_OPTION,
-                "the timeout is not a valid expression (#{e.message})")
-            end
-            context.timeout_reboot_kexec= timeout
           end
         end
       end
