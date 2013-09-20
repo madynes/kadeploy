@@ -8,7 +8,7 @@ module Kadeploy
 
 module Kadeploy
   def deploy_init_exec_context()
-    ret = work_init_exec_context()
+    ret = work_init_exec_context(:deploy)
     ret.reformat_tmp = nil
     ret.disable_bootloader_install = false
     ret.disable_disk_partitioning = false
@@ -29,9 +29,6 @@ module Kadeploy
 
     case operation
     when :create
-      #Rights check
-      rights = rights_handler(context.database)
-
       parse_params(params) do |p|
         # Check Anonymous Environment
         if context.environment and !context.environment.id
@@ -53,10 +50,10 @@ module Kadeploy
           part = context.environment.options['block_device'] + \
             context.environment.options['deploy_part']
           kaerror(APIError::INVALID_RIGHTS,"deployment on partition #{part}") \
-            unless rights.granted?(context.user,nodes,part)
+            unless context.rights.granted?(context.user,nodes,part)
         end
 
-        #The rights must be checked for each cluster if the node_list contains nodes from several clusters
+        # Check rights on the deploy partition on nodes by cluster
         # TODO: use context.block_device and context.deploy_part
         context.nodes.group_by_cluster.each_pair do |cluster, nodes|
           part = (
@@ -66,7 +63,7 @@ module Kadeploy
               :default=>config.cluster_specific[cluster].deploy_part)
           )
           kaerror(APIError::INVALID_RIGHTS,"deployment on partition #{part}") \
-            unless rights.granted?(context.user,nodes,part)
+            unless context.rights.granted?(context.user,nodes,part)
         end
 
         # Check the boot partition
@@ -79,7 +76,7 @@ module Kadeploy
         # Check rights on multipart environement
         if context.environment.multipart
           context.environment.options['partitions'].each do |par|
-            unless rights.granted?(context.user,context.nodes,par['device'])
+            unless context.rights.granted?(context.user,context.nodes,par['device'])
               kaerror(APIError::INVALID_RIGHTS,"deployment on partition #{par['device']}")
             end
           end

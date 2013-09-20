@@ -991,13 +991,13 @@ class ClientWorkflow < Client
     ret
   end
 
-  def run_workflow(options,params)
+  def run_workflow(options,params,submit_method=:post)
     if !options[:wait] and !$files.empty?
       error("Cannot use --no-wait since some files have to be exported to the server:\n  #{$files.collect{|f|f.path}.join("\n  ")}")
     end
 
     # Launch the operation
-    ret = post(api_path(),params)
+    ret = send(submit_method,api_path(),params)
     return if options[:dry_run]
 
     @wid = ret['wid']

@@ -453,17 +453,16 @@ module Automata
 
       success = true
 
-      if timeout and timeout > 0
-        while ((Time.now - timestart) < timeout) and (thr.alive?)
-          task.cleaner.join if task.cleaner and !task.cleaner.alive?
-          sleep(TIMER_CKECK_PITCH)
-        end
-        if thr.alive?
-          thr.kill
-          task.kill(false)
-          success = false
-          timeout!(task)
-        end
+      while ((!timeout or timeout <= 0) or ((Time.now - timestart) < timeout)) \
+      and (thr.alive?)
+        task.cleaner.join if task.cleaner and !task.cleaner.alive?
+        sleep(TIMER_CKECK_PITCH)
+      end
+      if thr.alive?
+        thr.kill
+        task.kill(false)
+        success = false
+        timeout!(task)
       end
       thr.join
 

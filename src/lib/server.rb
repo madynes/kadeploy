@@ -233,7 +233,7 @@ class KadeployServer
     #@httpd.bind([:GET],'/nodes',:method,:object=>self,:method=>:get_nodes)
 
     [:deploy,:reboot,:power].each do |kind|
-      @httpd.bind([:POST,:GET],
+      @httpd.bind([:POST,:PUT,:GET],
         API.path(kind),:filter,:object=>self,:method=>:launch,
         :args=>[1],:static=>[[kind,:work]]
       )
@@ -350,23 +350,8 @@ class KadeployServer
     ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
     error_unauthorized!(msg) unless ok
 
-    if query == :create
-      begin
-        get_method(kind,:init_info)
-        options.info = run_method(kind,:init_info,options)
-      rescue
-      end
-
-      begin
-        get_method(kind,:init_resources)
-        run_method(kind,:init_resources,options)
-      rescue
-      end
-    end
-
     meth = query.to_s
     meth << "_#{params[:names].join('_')}" if params[:names]
-
     run_method(kind,meth,options,*args) unless options.dry_run
   end
 
