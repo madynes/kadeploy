@@ -320,8 +320,8 @@ class KadeployServer
         raise e
       end
     rescue NoMethodError => e
-    # if the problem is that the method does not exists
-      if (name and e.name.to_sym == get_method(kind,meth)[0]) or (e.name.to_sym == :"_#{meth}")
+      # if the problem is that the method does not exists
+      if (name and e.name and e.name.to_sym == get_method(kind,meth)[0]) or (e.name and e.name.to_sym == :"_#{meth}")
         error_not_found!
       else
         raise e

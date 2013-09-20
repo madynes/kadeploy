@@ -37,6 +37,8 @@ class KadeployError < Exception
       "Some elements already exists and are conflicting"
     when APIError::CONFLICTING_OPTIONS
       "Some options are conflicting"
+    when APIError::MISSING_OPTION
+      "Some options are missing"
     when APIError::NOTHING_MODIFIED
       "No element has been modified"
     when APIError::DATABASE_ERROR
@@ -45,6 +47,8 @@ class KadeployError < Exception
       "Something went wront with the cache system"
     when APIError::CACHE_FULL
       "The cache is full"
+    when APIError::DESTRUCTIVE_ENVIRONMENT
+      "Cannot reboot since the last deployed environment was destructive"
     else
       ""
     end
@@ -76,11 +80,13 @@ class APIError
   INVALID_VLAN = 9
   EXISTING_ELEMENT = 10
   CONFLICTING_ELEMENTS = 11
-  CONFLICTING_OPTIONS = 12
+  MISSING_OPTION = 12
+  CONFLICTING_OPTIONS = 13
   NOTHING_MODIFIED = 13
   DATABASE_ERROR = 20
   CACHE_ERROR = 21
   CACHE_FULL = 22
+  DESTRUCTIVE_ENVIRONMENT = 30
 end
 
 end

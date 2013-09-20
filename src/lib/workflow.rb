@@ -7,6 +7,7 @@ require 'macrostep'
 require 'stepdeployenv'
 require 'stepbroadcastenv'
 require 'stepbootnewenv'
+require 'stepreboot'
 require 'steppower'
 require 'md5'
 require 'http'
@@ -253,7 +254,7 @@ module Workflow
       log('success', false, nodeset)
       @logger.error(nodeset,context[:states])
       debug(1,
-        "Deployment failed for #{nodeset.to_s_fold} "\
+        "#{self.class.opname().capitalize} failed for #{nodeset.to_s_fold} "\
         "after #{Time.now.to_i - @start_time}s",
         task.nsid
       )
@@ -382,6 +383,9 @@ module Workflow
       end
     end
 
+    def check_config()
+    end
+
     def self.operation(suffix='')
       raise
     end
@@ -389,11 +393,6 @@ module Workflow
     def load_tasks()
       raise
     end
-
-    def check_config()
-      raise
-    end
-
   end
 
   class Deploy < Workflow
@@ -488,7 +487,7 @@ module Workflow
         end
         # Without specifying the partition to chainload on
         if cexec.boot_part.nil?
-          error(APIError::CONFLICTING_OPTIONS,"You must specify the partition to boot on when deploying directly on block device")
+          error(APIError::MISSING_OPTION,"You must specify the partition to boot on when deploying directly on block device")
         end
       end
 
@@ -545,8 +544,75 @@ module Workflow
         @tasks[0] << [ instance[0].to_sym ]
       end
     end
+  end
+
+  class Reboot < Workflow
+    def self.opname(suffix='')
+      "reboot"
+    end
+
+    def self.operation(suffix='')
+      "reboot#{suffix}"
+    end
+
+    def load_macrosteps()
+      step = nil
+      case context[:execution].operation
+      when :simple
+        step = [['Simple',0,0]]
+      when :set_pxe
+        step = [['SetPXE',0,0]]
+      when :deploy_env
+        step = [['DeployEnv',0,0]]
+      when :recorded_env
+        step = [['RecordedEnv',0,0]]
+      else
+        raise
+      end
+      [Configuration::MacroStep.new('Reboot',step)]
+    end
+
+    def load_tasks()
+      @tasks = [[ ]]
+      macrosteps = load_macrosteps()
+      macrosteps[0].get_instances.each do |instance|
+        @tasks[0] << [ instance[0].to_sym ]
+      end
+    end
 
     def check_config()
+      cexec = context[:execution]
+      case cexec.operation
+      when :set_pxe
+        if !cexec.pxe or !cexec.pxe[:profile] or cexec.pxe[:profile].empty?
+          error(APIError::MISSING_OPTION,"You must specify a PXE boot profile when rebooting using set_pxe")
+        end
+      when :recorded_env
+        if !cexec.environment or cexec.environment.id < 0
+          error(APIError::MISSING_OPTION,"You must specify an environment when rebooting using recorded_env")
+        end
+        if !cexec.deploy_part or cexec.deploy_part.empty?
+          error(APIError::MISSING_OPTION,"You must specify a partition when rebooting using recorded_env")
+        end
+      end
+    end
+
+
+    def success!(task,nodeset)
+      super(task,nodeset)
+      case context[:execution].operation
+      when :deploy_env
+        @nodes_ok.set_state('deploy_env',nil,
+          context[:database],context[:user])
+      when :recorded_env
+        if context[:execution].deploy_part == context[:cluster].prod_part
+          @nodes_ok.set_state('prod_env',context[:execution].environment,
+            context[:database],context[:user])
+        else
+          @nodes_ok.set_state('recorded_env',context[:execution].environment,
+            context[:database],context[:user])
+        end
+      end
     end
   end
 end

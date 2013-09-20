@@ -76,7 +76,6 @@ class KapowerClient < ClientWorkflow
       params[:level] = options[:level] if options[:level]
       run_workflow(options,params,:put)
     when :status
-p params
       run_workflow(options,params,:get)
     else
       raise
