@@ -101,6 +101,13 @@ class ParamsParser
 
       error(APIError::INVALID_CLIENT, 'Secure connection is mandatory for the client fileserver') \
         if @config.common.secure_client and param.scheme.downcase == 'http'
+    when :node
+      error(APIError::INVALID_NODELIST,"Must be a single node") if Nodes::REGEXP_NODELIST =~ param
+
+      # Get the node
+      unless param = @config.common.nodes_desc.get_node_by_host(param)
+        error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
+      end
     when :nodeset
       # Get hostlist
       hosts = []

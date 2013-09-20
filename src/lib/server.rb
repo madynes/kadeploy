@@ -14,6 +14,7 @@ require 'kaenv'
 require 'kastat'
 require 'karights'
 require 'kanodes'
+require 'kaconsole'
 require 'window'
 require 'rights'
 require 'http'
@@ -30,6 +31,7 @@ class KadeployServer
   include Kastat
   include Karights
   include Kanodes
+  include Kaconsole
 
   attr_reader :host, :port, :secure, :cert, :private_key, :logfile, :config, :window_managers, :httpd
 
@@ -244,12 +246,14 @@ class KadeployServer
       :rights => [(1..3)],
       :nodes => [1],
       :stats => [(1..1)], # !!!
+      :console => [1],
     }
     names = {
       :envs => [(4..-1)],
       :rights => [(4..-1)],
       :nodes => [(2..-1)],
       :stats => [(2..-1)], # !!!
+      :console => [(2..-1)],
     }
 
     [:envs,:rights].each do |kind|
@@ -259,7 +263,7 @@ class KadeployServer
       )
     end
 
-    [:nodes,:stats].each do |kind|
+    [:nodes,:stats,:console].each do |kind|
       @httpd.bind([:GET],API.path(kind),:filter,
         :object=>self,:method=>:launch,
         :args=>args[kind],:static=>[kind],:name=>names[kind]
@@ -294,7 +298,7 @@ class KadeployServer
       if respond_to?(:"#{kind}_#{meth}")
         [:"#{kind}_#{meth}",args]
       else
-        raise NoMethodError.new("undefined method #{kind}_#{meth} for #{self.inspect}:#{self.class.name}","#{kind}_#{meth}")
+        raise NoMethodError.new("undefined method #{kind}_#{meth} for #{self.inspect}:#{self.class.name}","_#{meth}")
       end
     end
   end
