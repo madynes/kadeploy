@@ -111,9 +111,6 @@ module Kaworkflow
         context.custom_operations = p.parse('custom_operations',Hash,
           :type=>:custom_ops,:errno=>APIError::INVALID_CUSTOMOP)
 
-        # Check custom automata
-        context.steps = p.parse('automata',Hash,:type=>:custom_automata)
-
         # Check force
         context.force = p.parse('force',nil,:toggle=>true)
 

@@ -520,22 +520,18 @@ module Workflow
     end
 
     def load_macrosteps()
-      if context[:execution].steps and !context[:execution].steps.empty?
-        context[:execution].steps
+      step = nil
+      case context[:execution].operation
+      when :on
+        step = [['On',0,0]]
+      when :off
+        step = [['Off',0,0]]
+      when :status
+        step = [['Status',0,0]]
       else
-        step = nil
-        case context[:execution].operation
-        when :on
-          step = [['On',0,0]]
-        when :off
-          step = [['Off',0,0]]
-        when :status
-          step = [['Status',0,0]]
-        else
-          raise
-        end
-        [Configuration::MacroStep.new('Power',step)]
+        raise
       end
+      [Configuration::MacroStep.new('Power',step)]
     end
 
     def load_tasks()

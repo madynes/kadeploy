@@ -84,6 +84,9 @@ module Kadeploy
 
         # Check reformat tmp partition
         context.reformat_tmp = p.parse('reformat_tmp_partition',String)
+
+        # Check custom automata
+        context.steps = p.parse('automata',Hash,:type=>:custom_automata)
       end
     when :get
     when :delete
