@@ -40,7 +40,6 @@ class KadeployClient < ClientWorkflow
         :pxe_files => [],
         :steps => [],
         :force => false,
-        :breakpoint_on_microstep => '',
         :custom_operations => nil,
         :disable_bootloader_install => nil,
         :disable_disk_partitioning => nil,
@@ -82,20 +81,6 @@ class KadeployClient < ClientWorkflow
       }
       opt.on("--disable-disk-partitioning", "Disable the disk partitioning") {
         options[:disable_disk_partitioning] = true
-      }
-      opt.on("--breakpoint STEP", "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |m|
-        tmp = m.split(':',2)
-        if check_macrostep_instance(tmp[0])
-          if check_microstep(tmp[1])
-            options[:breakpoint_on_microstep] = m
-          else
-            error("The microstep #{tmp[1]} for the breakpoint entry is invalid")
-            return false
-          end
-        else
-          error("The macrostep #{tmp[0]} for the breakpoint entry is invalid")
-          return false
-        end
       }
       opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
         options[:custom_operations] = load_custom_file(file)
