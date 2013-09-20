@@ -319,7 +319,6 @@ module Macrostep
 
   class Power < Macrostep
     def self.step_name()
-p name
       name.split('::').last.gsub(/^Power/,'')
     end
 
