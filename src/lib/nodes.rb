@@ -942,17 +942,19 @@ module Nodes
       date = Time.now.to_i
       env_id = env_id || -1
       case state
-      when "deploying"
+      when 'deploying','rebooting','powering'
         db.run_query("DELETE FROM nodes WHERE #{nodelist}",*args)
 
         @set.each { |node|
           db.run_query(
-            "INSERT INTO nodes (hostname, state, env_id, date, user) VALUES (?,'deploying',?,?,?)",
+            "INSERT INTO nodes (hostname, state, env_id, date, user) VALUES (?,'#{state}',?,?,?)",
              node.hostname,env_id,date,user
           )
         }
-      when "deployed"
-        db.run_query("UPDATE nodes SET state='deployed' WHERE #{nodelist}",*args) unless args.empty?
+      when 'deployed','rebooted','powered'
+        db.run_query("UPDATE nodes SET state='#{state}' WHERE #{nodelist}",*args) unless args.empty?
+      when 'deploy_failed','reboot_failed','power_failed'
+        db.run_query("UPDATE nodes SET state='#{state}' WHERE #{nodelist}",*args)  unless args.empty?
       when "prod_env"
         db.run_query("UPDATE nodes SET state='prod_env' WHERE #{nodelist}",*args) unless args.empty?
       when "recorded_env"
@@ -970,10 +972,8 @@ module Nodes
           )
         }
         #db.run_query("UPDATE nodes SET state='aborted' WHERE #{nodelist}",*args) unless args.empty?
-      when "deploy_failed"
-        db.run_query("UPDATE nodes SET state='deploy_failed' WHERE #{nodelist}",*args)  unless args.empty?
       else
-        return false
+        raise
       end
       return true
     end
