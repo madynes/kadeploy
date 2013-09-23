@@ -169,7 +169,7 @@ class KarebootClient < ClientWorkflow
       end
     end
 
-    params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
+    params[:client] = http_export_files(localfiles,options[:secure]) if localfiles and !localfiles.empty?
 
     run_workflow(options,params)
   end
