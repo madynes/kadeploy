@@ -5,6 +5,7 @@ $kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
 $:.unshift($kadeploy_libs)
 
 require 'optparse'
+require 'optparse/time'
 require 'yaml'
 require 'client'
 
@@ -17,6 +18,21 @@ end
 module Kadeploy
 
 class KastatClient < Client
+  FIELDS = ['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error']
+
+  def print_headers(fields,sep)
+    debug "##{fields.join("#{sep}#")}"
+  end
+
+  def print_stats(res,fields,sep)
+    i = 0
+    res.each do |line|
+      print_headers(fields||FIELDS,sep) if i % 10 == 0
+      debug line.join(sep)
+      i += 1
+    end
+  end
+
   def self.operation()
     'Stats operation'
   end
@@ -25,13 +41,15 @@ class KastatClient < Client
     global_load_options().merge(
       {
         :operation => nil,
-        :date_min => 0,
-        :date_max => 0,
-        :min_retries => 0,
-        :min_rate => 0,
+        :date_min => nil,
+        :date_max => nil,
+        :min_retries => nil,
+        :min_failure_rate => nil,
+        :limit => nil,
         :steps => [],
-        :fields => [],
-        :workflow_id => nil,
+        :fields => nil,
+        :separator=>',',
+        :wid => nil,
       }
     )
   end
@@ -39,64 +57,72 @@ class KastatClient < Client
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-a", "--list-min-retries NB", "Print the statistics about the nodes that need several attempts") { |n|
-        options[:operation] = :list_retries
-        begin
-          options[:min_retries] = n.to_i
-        rescue
-          error("Invalid number of minimum retries, ignoring the option")
-          return false
-        end
+      opt.on("-a", "--list-all", "Print all the information") {
+        options[:operation] = :all
       }
-      opt.on("-b", "--list-failure-rate", "Print the failure rate for the nodes") { |n|
-        options[:operation] = :list_failure_rate
+      opt.on("-b", "--list-retries NB", /^\d+$/, "Print the statistics about the nodes that need at least NB attempts to perform specific steps") { |n|
+        options[:operation] = :retries
+        options[:min_retries] = n.to_i
       }
-      opt.on("-c", "--list-min-failure-rate RATE", "Print the nodes which have a minimum failure-rate of RATE (0 <= RATE <= 100)") { |r|
-        options[:operation] = :list_min_failure_rate
-        begin
-          options[:min_rate] = r.to_i
-          raise unless (0..100).include?(options[:min_rate])
-        rescue
-          error("Invalid number for the minimum failure rate, ignoring the option")
-          return false
-        end
+      opt.on("-c", "--failure-rate [RATE]", Float, "Print the nodes which have a minimum failure-rate of RATE 1 (0 <= RATE <= 1)") { |r|
+        options[:operation] = :failure_rates
+        options[:min_failure_rate] = r.to_f if r
       }
-      opt.on("-d", "--list-all", "Print all the information") {
-        options[:operation] = :list_all
-      }
-      opt.on("-f", "--field FIELD", "Only print the given fields (user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
-        options[:fields] << f
-      }
-      opt.on("-l", "--last", "Only print the most recent information of selected machines") {
-        options[:operation] = :list_last
+      parse_machinefile(opt,options)
+      opt.on("-F", "--fields FIELDS", Array, "Only print the selected fields (wid,user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
+        options[:fields] = f
       }
       parse_machine(opt,options)
-      opt.on("-s", "--step STEP", "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
+      opt.on("-s", "--retry-step STEP", "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
         options[:steps] << s
       }
       opt.on("-w", "--workflow-id ID", "Get the stats of a specific deployment") { |w|
-        options[:operation] = :print_workflow
-        options[:workflow_id] = w
+        options[:wid] = w
       }
-      opt.on("-x", "--date-min DATE", "Get the stats from this date (yyyy:mm:dd:hh:mm:ss)") { |d|
+      opt.on("-x", "--date-min TIME", Time, "Get the stats from this date (yyyy-mm-dd hh:mm:ss)") { |d|
         options[:date_min] = d
       }
-      opt.on("-y", "--date-max DATE", "Get the stats to this date") { |d|
+      opt.on("-y", "--date-max TIME", Time, "Get the stats to this date (yyyy-mm-dd hh:mm:ss)") { |d|
         options[:date_max] = d
+      }
+      opt.on("", "--limit N", /^\d+$/, "Print a maximal number of N results") {|n|
+        options[:limit] = n
+      }
+      opt.on("", "--sort VALS", Array, "Sort the result on some specific fields (default: start)") { |s|
+        options[:sort] = s
+      }
+      opt.on("", "--separator SEP", "Use the given separator to display the fields of the result") { |s|
+        options[:separator] = s
       }
     end
   end
 
   def self.check_options(options)
-    if !options[:node] or options[:node].empty?
-      error("You must choose one node")
-      return false
-    end
     true
   end
 
   def run(options)
-    raise 'Not implemented yet !'
+    params = init_params(options)
+    params[:kind] = options[:operation] if options[:operation]
+    params[:nodes] = options[:nodes] if options[:nodes]
+    params[:fields] = options[:fields] if options[:fields]
+    params[:limit] = options[:limit] if options[:limit]
+    params[:sort] = options[:sort] if options[:sort]
+    params[:date_min] = options[:date_min].httpdate if options[:date_min]
+    params[:date_max] = options[:date_max].httpdate if options[:date_max]
+    params[:wid] = options[:wid] if options[:wid]
+    params[:min_failure_rate] = options[:min_failure_rate] if options[:min_failure_rate]
+
+    get(api_path(),params)
+  end
+
+  def result(options,ret)
+    case options[:operation]
+    when :all
+      print_stats(ret,options[:fields],options[:separator])
+    when :failure_rates
+      print_stats(ret.to_a,['hostname','success_rate'],options[:separator])
+    end
   end
 end
 
