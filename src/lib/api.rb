@@ -9,13 +9,13 @@ module API
         '/reboot'
       when :power
         '/power'
-      when :stats
+      when :stat, :stats
         '/stats'
-      when :envs
+      when :env, :envs
         '/environments'
-      when :nodes
+      when :node, :nodes
         '/nodes'
-      when :rights
+      when :right, :rights
         '/rights'
       else
         raise
@@ -28,6 +28,33 @@ module API
 
   def self.ppath(kind,prefix,*args)
     File.join(prefix,base(kind),*args)
+  end
+
+  def self.wid_prefix(kind)
+    case kind
+      when :deploy
+        'D-'
+      when :reboot
+        'R-'
+      when :power
+        'P-'
+      else
+        raise
+    end
+  end
+end
+
+class CSV
+  def initialize(str)
+    @str = str
+  end
+
+  def free
+    @str = nil
+  end
+
+  def to_s
+    @str
   end
 end
 

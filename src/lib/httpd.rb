@@ -9,6 +9,7 @@ require 'zlib'
 require 'stringio'
 require 'json'
 require 'yaml'
+require 'api'
 
 if RUBY_VERSION < "2.0"
   # Monkey patch to remove DH encryption related warnings
@@ -237,7 +238,8 @@ module HTTPd
         begin
           request_handler = RequestHandler.new(request)
 
-          res = handle(request,response,request_handler)
+          ret = handle(request,response,request_handler)
+          res = ret
 
           # No caching
           response['ETag'] = nil
@@ -245,24 +247,29 @@ module HTTPd
           response['Pragma'] = 'no-cache'
 
           response.status = 200
-          if res.is_a?(String)
+          if ret.is_a?(String)
             response['Content-Type'] = 'text/plain'
-          elsif res.nil?
+          elsif ret.nil?
             res = ''
             response['Content-Type'] = 'text/plain'
-          elsif res.is_a?(TrueClass)
+          elsif ret.is_a?(TrueClass)
             res = 'true'
             response['Content-Type'] = 'text/plain'
-          elsif res.is_a?(File)
-            st = res.stat
+          elsif ret.is_a?(File)
+            st = ret.stat
             response['ETag'] = sprintf("\"%x-%x-%x\"",st.ino,st.size,
               st.mtime.to_i)
             response['Last-Modified'] = st.mtime.httpdate
             response['Content-Type'] = 'application/octet-stream'
+          elsif ret.is_a?(CSV)
+            response['Content-Type'] = 'text/csv'
+            res = ret.to_s
+            ret.free
           else
             response['Content-Type'],response['Content-Encoding'],res = \
-              request_handler.output(res)
+              request_handler.output(ret)
           end
+          ret = nil
         rescue HTTPError => e
           res = e.message
           response.status = e.code
@@ -355,7 +362,7 @@ module HTTPd
       @params = {}
 
       begin
-        @obj.send(name,params,*args)#,&proc{request})
+        return @obj.send(name,params,*args)#,&proc{request})
       rescue ArgumentError => e
       # if the problem is that the method is called with the wrong nb of args
         if e.backtrace[0].split(/\s+/)[-1] =~ /#{name}/ \
@@ -431,7 +438,7 @@ module HTTPd
       #  @method = (prefix.to_s + '_' + suffix.join('_')).to_sym
       #end
 
-      super(request, response, request_handler)
+      return super(request, response, request_handler)
     end
   end
 
@@ -443,9 +450,9 @@ module HTTPd
 
     def handle(request, response, request_handler)
       if @content.is_a?(ContentBinding)
-        @content[get_method(request)]
+        return @content[get_method(request)]
       else
-        @content
+        return @content
       end
     end
   end
