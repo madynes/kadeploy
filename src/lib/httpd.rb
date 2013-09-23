@@ -9,6 +9,7 @@ require 'zlib'
 require 'stringio'
 require 'json'
 require 'yaml'
+require 'csv'
 
 if RUBY_VERSION < "2.0"
   # Monkey patch to remove DH encryption related warnings
@@ -78,6 +79,7 @@ module HTTPd
       :json => 'application/json',
       :yaml => 'application/x-yaml',
     }
+    attr_accessor :accept, :encoding
     def initialize(request)
       @request = request
       @body = @request.body
@@ -88,7 +90,14 @@ module HTTPd
       if @accept and (@accept & TYPES.values).empty?
         raise HTTPError.new(406,'Not Acceptable',@accept.join(', '))
       end
+    end
 
+    def free()
+      @request = nil
+      @body = nil
+      @uri = nil
+      @accept = nil
+      @encoding = nil
     end
 
     def self.parse_header_list(val)
@@ -221,6 +230,7 @@ module HTTPd
       else
         raise
       end
+      @run_thread = nil
       # class_eval "alias :\"do_#{m.to_s.upcase}\", :do_METHOD"
     end
 
@@ -232,12 +242,46 @@ module HTTPd
       request.request_method.upcase.to_sym
     end
 
+    def kill()
+      @run_thread.kill if @run_thread
+    end
+
+    def treatment(req,resp)
+      request_handler = RequestHandler.new(req)
+      ret = nil
+      @run_thread = Thread.new{ ret = handle(req,resp,request_handler) }
+
+      sock = Thread.current[:WEBrickSocket]
+      while @run_thread.alive? do
+        if IO.select([sock], nil, nil, 1) and sock.eof?
+        # The client disconnected
+          kill()
+          request_handler.free
+          request_handler = nil
+          raise WEBrick::HTTPStatus::EOFError
+        end
+      end
+      @run_thread.join
+      @run_thread = nil
+
+      if IO.select([sock], nil, nil, 0) and sock.eof?
+      # The client disconnected
+        request_handler.free
+        request_handler = nil
+        ret.free if ret.respond_to?(:free)
+        ret = nil
+        raise WEBrick::HTTPStatus::EOFError
+      end
+
+      [ret,request_handler]
+    end
+
     def do_METHOD(request, response)
+      ret = nil
       if @allowed.include?(get_method(request))
         begin
-          request_handler = RequestHandler.new(request)
-
-          res = handle(request,response,request_handler)
+          ret,request_handler = treatment(request,response)
+          res = ret
 
           # No caching
           response['ETag'] = nil
@@ -245,24 +289,38 @@ module HTTPd
           response['Pragma'] = 'no-cache'
 
           response.status = 200
-          if res.is_a?(String)
+          if ret.is_a?(String)
             response['Content-Type'] = 'text/plain'
-          elsif res.nil?
+          elsif ret.nil?
             res = ''
             response['Content-Type'] = 'text/plain'
-          elsif res.is_a?(TrueClass)
+          elsif ret.is_a?(TrueClass)
             res = 'true'
             response['Content-Type'] = 'text/plain'
-          elsif res.is_a?(File)
-            st = res.stat
+          elsif ret.is_a?(File)
+            st = ret.stat
             response['ETag'] = sprintf("\"%x-%x-%x\"",st.ino,st.size,
               st.mtime.to_i)
             response['Last-Modified'] = st.mtime.httpdate
             response['Content-Type'] = 'application/octet-stream'
+          elsif ret.is_a?(CompressedCSV)
+            # Do not respond if client do not accept gzip
+            ret.close unless ret.closed?
+            if !request_handler.encoding or request_handler.encoding.include?('gzip')
+              response['Content-Type'] = 'text/csv'
+              response['Content-Encoding'] = ret.algorithm
+              res = ret.file
+            else
+              ret.free
+              raise HTTPError.new(406,'Not Acceptable','Content-Encoding: gzip')
+            end
           else
             response['Content-Type'],response['Content-Encoding'],res = \
-              request_handler.output(res)
+              request_handler.output(ret)
           end
+          request_handler.free
+          request_handler = nil
+          ret = nil
         rescue HTTPError => e
           res = e.message
           response.status = e.code
@@ -355,7 +413,7 @@ module HTTPd
       @params = {}
 
       begin
-        @obj.send(name,params,*args)#,&proc{request})
+        return @obj.send(name,params,*args)#,&proc{request})
       rescue ArgumentError => e
       # if the problem is that the method is called with the wrong nb of args
         if e.backtrace[0].split(/\s+/)[-1] =~ /#{name}/ \
@@ -431,7 +489,7 @@ module HTTPd
       #  @method = (prefix.to_s + '_' + suffix.join('_')).to_sym
       #end
 
-      super(request, response, request_handler)
+      return super(request, response, request_handler)
     end
   end
 
@@ -443,9 +501,9 @@ module HTTPd
 
     def handle(request, response, request_handler)
       if @content.is_a?(ContentBinding)
-        @content[get_method(request)]
+        return @content[get_method(request)]
       else
-        @content
+        return @content
       end
     end
   end

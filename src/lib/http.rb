@@ -135,6 +135,8 @@ module HTTP
               res = JSON::load(body)
             elsif response['Content-Type'] == 'application/x-yaml'
               res = YAML::load(body)
+            elsif response['Content-Type'] == 'text/csv'
+              res = body
             elsif response['Content-Type'] == 'text/plain'
               res = body
             else

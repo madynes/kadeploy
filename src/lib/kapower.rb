@@ -8,10 +8,6 @@ module Kapower
     ret
   end
 
-  def power_init_info(cexec)
-    work_init_info(:power,cexec,'P-')
-  end
-
   def power_prepare(params,operation=:create)
     context = work_prepare(:power,params,operation)
 

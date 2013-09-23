@@ -1,3 +1,5 @@
+require 'db'
+
 module Kadeploy
 
 module Rights
@@ -280,7 +282,7 @@ module Rights
     def db_nodelist(nodes,field='node')
       tmp = nodes.dup
       tmp << '*'
-      ["(#{(["(#{field} = ? )"] * (nodes.size + 1)).join(' OR ')})", tmp]
+      Database::where_nodelist(nodes,field)
     end
 
     def db_partlist(parts,nodes=nil,partfield='part',nodefield='node')

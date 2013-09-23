@@ -4,6 +4,7 @@ require 'nodes'
 
 require 'openssl'
 require 'uri'
+require 'time'
 
 module Kadeploy
 
@@ -75,7 +76,18 @@ class ParamsParser
     error(errno,"cannot be empty") \
       if param.respond_to?(:empty?) and param.empty? and !opts[:emptiable]
 
-    error(errno,"must have a value in (#{opts[:values].join(',')})") if opts[:values] and !opts[:values].include?(param)
+    if opts[:values]
+      if param.is_a?(Array)
+        # Check if Array1 includes Array2
+        error(errno,"must have a value in (#{opts[:values].join(',')})") unless (param-opts[:values]).empty?
+      else
+        error(errno,"must have a value in (#{opts[:values].join(',')})") unless opts[:values].include?(param)
+      end
+    end
+
+    if opts[:regexp] and !param =~ opts[:regexp]
+      error(errno,"must be like #{opts[:regexp]}")
+    end
 
     if opts[:range] and !opts[:range].include?(param)
       error(errno,"must be in the range #{opts[:range].to_s}")
@@ -170,6 +182,12 @@ class ParamsParser
         param = Configuration::parse_custom_macrosteps(cp)
       rescue ArgumentError => ae
         error(errno,ae.message)
+      end
+    when :date
+      begin
+        param = Time.parse(param)
+      rescue
+        error("Invalid date '#{param}', please use RFC 2616 notation")
       end
     end
 
