@@ -43,6 +43,9 @@ class KanodesClient < Client
       opt.on("-r", "--get-reboots-status", "Get the status of running reboot operations") {
         options[:operation] = :get_status_reboot
       }
+      opt.on("-o", "--get-all-status", "Get the status of all running operations") {
+        options[:operation] = :get_status_all
+      }
       opt.on("-p", "--get-powers-status", "Get the status of running power operations") {
         options[:operation] = :get_status_power
       }
@@ -55,13 +58,13 @@ class KanodesClient < Client
   end
 
   def self.check_options(options)
-    unless [:get_state,:get_status_deploy,:get_status_reboot,:get_status_power].include?(options[:operation])
+    unless [:get_state,:get_status_deploy,:get_status_reboot,:get_status_power,:get_status_all].include?(options[:operation])
       error("You must choose an operation")
       return false
     end
 
     case options[:operation]
-    when :get_status_deploy,:get_status_reboot,:get_status_power
+    when :get_status_deploy,:get_status_reboot,:get_status_power,:get_status_all
       if !options[:nodes].empty?
         error('Node list is useless when gathering deployment statuses')
         return false
@@ -90,11 +93,24 @@ class KanodesClient < Client
       path = api_path(options[:wid],:reboot)
     when :get_status_power
       path = api_path(options[:wid],:power)
+    when :get_status_all
+      path = []
+      path << api_path(options[:wid],:deploy)
+      path << api_path(options[:wid],:reboot)
+      path << api_path(options[:wid],:power)
     else
       raise
     end
 
-    get(path,params,:yaml,false)
+    if path.is_a?(Array)
+      ret = []
+      path.each do |p|
+        ret += get(p,params)
+      end
+      ret.to_yaml
+    else
+      get(path,params,:yaml,false)
+    end
   end
 
   def result(options,ret)
