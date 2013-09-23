@@ -921,7 +921,7 @@ class ClientWorkflow < Client
   end
 
   def self.parse_breakpoint(opt,options)
-    opt.on("--breakpoint STEP", /^\w+:\w+$/, "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |s|
+    opt.on("--breakpoint STEP", /^\w+(?::\w+)?$/, "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |s|
       options[:breakpoint] = s
     }
   end

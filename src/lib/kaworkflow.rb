@@ -358,7 +358,7 @@ module Kaworkflow
       workflows.each_value{ |wf| info[:threads][wf] = wf.run! }
 
       # Wait for cleaners to be started
-      workflows.each_value{ |wf| sleep(0.2) until (wf.cleaner) }
+      workflows.each_value{ |wf| sleep(0.2) until (wf.cleaner or wf.done?) }
 
       # Wait for operation to end
       dones = []

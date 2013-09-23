@@ -130,22 +130,35 @@ module Workflow
       super()
       macrosteps = load_macrosteps()
 
+      brk = nil
+      brk = context[:execution].breakpoint if context[:execution].breakpoint
+      breaked = nil
+
       macrosteps.each do |macro|
         macro.get_instances.each do |instance|
+          breakpoint = false
+          conf = {}
+          breakpoint = instance[4]  if instance.size >= 5
+          conf = instance[5] if instance.size >= 6 and instance[5]
+          if brk and brk[0] and ((brk[0] == instance[0].to_s) or (brk[0] == macro.name))
+            if brk[1] # Check breakpoint on microstep
+              conf[brk[1].to_sym] = {}
+              conf[brk[1].to_sym][:breakpoint] = true
+            else # Check breakpoint on macrostep
+              breakpoint = true
+            end
+            breaked = true
+          end
+          # Config the macrostep
           instsym = instance[0].to_sym
           conf_task(instsym, {:retries => instance[1],:timeout => instance[2]})
           conf_task(instsym, {:raisable => instance[3]}) if instance.size >= 4
-          conf_task(instsym, {:breakpoint => instance[4]}) if instance.size >= 5
-          conf_task(instsym, {:config => instance[5]}) if instance.size >= 6
+          conf_task(instsym, {:breakpoint => breakpoint})
+          conf_task(instsym, {:config => conf})
         end
       end
 
-      if context[:execution].breakpoint
-        macro,micro = context[:execution].breakpoint.split(':')
-        @config[macro.to_sym][:config] = {} unless @config[macro.to_sym][:config]
-        @config[macro.to_sym][:config][micro.to_sym] = {} unless @config[macro.to_sym][:config][micro.to_sym]
-        @config[macro.to_sym][:config][micro.to_sym][:breakpoint] = true
-      end
+      error(APIError::INVALID_OPTION,"The step '#{brk[0]}:#{brk[1]}' is not used during the operation") if brk and !breaked
 
       check_config()
     end
