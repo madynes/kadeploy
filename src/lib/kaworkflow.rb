@@ -472,8 +472,10 @@ module Kaworkflow
             }
             info[:workflows].each_value do |workflow|
               status = workflow.status
-              ok = status[:OK].make_array_of_hostname rescue []
-              ko = status[:KO].make_array_of_hostname rescue []
+              ok = []
+              ok += status[:OK].make_array_of_hostname if status[:OK].is_a?(Nodes::NodeSet)
+              ko = []
+              ko += status[:KO].make_array_of_hostname if status[:KO].is_a?(Nodes::NodeSet)
               nodes = workflow.nodes.make_array_of_hostname
               nodes.each do |node|
                 if ok.include?(node)
