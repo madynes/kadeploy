@@ -12,6 +12,8 @@ require 'yaml'
 module Kadeploy
 
 module HTTP
+  HTTP_TIMEOUT = 120
+
   public
   # Fetch a file over HTTP
   #
@@ -106,6 +108,7 @@ module HTTP
           client.verify_mode = OpenSSL::SSL::VERIFY_NONE
         end
         client.set_debug_output($debug_http) if $debug_http
+        client.read_timeout = HTTP_TIMEOUT
         yield(client)
       rescue Errno::ECONNREFUSED
         error("Connection atempt refused by the server")
