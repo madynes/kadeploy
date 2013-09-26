@@ -59,16 +59,16 @@ class Client
     )
   end
 
-  def self.error(msg='',abrt = true)
+  def self.error(msg='',abrt=true,code=1)
     unless $killing
       $stderr.puts msg if msg and !msg.empty?
       self.kill
-      exit!(1) if abrt
+      exit!(code||1) if abrt
     end
   end
 
-  def error(msg='',abrt = true)
-    self.class.error(debug(msg,false),abrt)
+  def error(msg='',abrt=true,code=1)
+    self.class.error(debug(msg,false),abrt,code)
   end
 
   def self.kill()
@@ -434,7 +434,7 @@ class Client
     begin
       HTTP::Client::get(host,port,path,@secure,nil,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -446,7 +446,7 @@ class Client
     begin
       HTTP::Client::post(host,port,path,data,@secure,content_type,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -458,7 +458,7 @@ class Client
     begin
       HTTP::Client::put(host,port,path,data,@secure,content_type,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -474,7 +474,7 @@ class Client
     begin
       HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse)
     rescue HTTP::ClientError => e
-      error(e.message)
+      error(e.message,true,e.code)
     end
   end
 
@@ -920,6 +920,19 @@ class ClientWorkflow < Client
     }
   end
 
+  def self.parse_breakpoint(opt,options)
+    opt.on("--breakpoint STEP", /^\w+(?::\w+)?$/, "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |s|
+      options[:breakpoint] = s
+    }
+  end
+
+  def self.parse_custom_ops(opt,options)
+    opt.on("--custom-steps FILE", "Add some custom operations defined in a file") { |file|
+      options[:custom_operations] = load_custom_file(file)
+      return false unless options[:custom_operations]
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -931,6 +944,8 @@ class ClientWorkflow < Client
         :script => nil,
         :wait => true,
         :force => false,
+        :breakpoint => nil,
+        :custom_operations => nil,
       }
     )
   end
@@ -949,6 +964,8 @@ class ClientWorkflow < Client
       parse_wid(opt,options)
       parse_wait(opt,options)
       parse_force(opt,options)
+      parse_breakpoint(opt,options)
+      parse_custom_ops(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -987,6 +1004,8 @@ class ClientWorkflow < Client
     ret[:debug] = options[:debug] if options[:debug]
     ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
     ret[:force] = options[:force] if options[:force]
+    ret[:breakpoint] = options[:breakpoint] if options[:breakpoint]
+    ret[:custom_operations] = options[:custom_operations] if options[:custom_operations]
 
     ret
   end
@@ -1065,7 +1084,7 @@ p @resources['resource']
 
       # Fail
       if res['nodes']['ko'] and !res['nodes']['ko'].empty?
-        debug "The #{self.class.operation().downcase} operation failed on nodes"
+        debug "The #{self.class.operation().downcase} failed on nodes"
         debug res['nodes']['ko'].join("\n")
       end
     end

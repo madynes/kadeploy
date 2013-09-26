@@ -125,8 +125,29 @@ class ParamsParser
       if @config.common.vlan_hostname_suffix.empty? or @config.common.set_vlan_cmd.empty?
         error(APIError::INVALID_VLAN, "The VLAN management is disabled")
       end
+    when :breakpoint
+      ret = []
+      raise unless opts[:kind]
+      if param =~ /^(\w+)(?::(\w+))?$/
+        if Configuration::check_macrostep_instance(Regexp.last_match(1),opts[:kind]) or Configuration::check_macrostep_interface(Regexp.last_match(1),opts[:kind])
+          ret[0] = Regexp.last_match(1)
+        else
+          error(errno,"Invalid macrostep name '#{Regexp.last_match(1)}'")
+        end
+        if Regexp.last_match(2) and !Regexp.last_match(2).empty?
+          if Configuration::check_microstep(Regexp.last_match(2))
+            ret[1] = Regexp.last_match(2)
+          else
+            error(errno,"Invalid microstep name '#{Regexp.last_match(2)}'")
+          end
+        end
+        param = ret
+      else
+        error(errno,'The breakpoint should be specified as macrostep_name:microstep_name or macrostep_name')
+      end
     when :custom_ops
       ret = { :operations => {}, :overrides => {}}
+      raise unless opts[:kind]
       customops = ret[:operations]
       customover = ret[:overrides]
 
@@ -134,8 +155,8 @@ class ParamsParser
         error(errno,'Macrostep name must be a String') unless macro.is_a?(String)
         error(errno,'Macrostep description must be a Hash') unless micros.is_a?(Hash)
         error(errno,"Invalid macrostep '#{macro}'") \
-          if !Configuration::check_macrostep_interface(macro) and \
-          !Configuration::check_macrostep_instance(macro)
+          if !Configuration::check_macrostep_interface(macro,opts[:kind]) and \
+          !Configuration::check_macrostep_instance(macro,opts[:kind])
 
         customops[macro.to_sym] = {} unless customops[macro.to_sym]
 

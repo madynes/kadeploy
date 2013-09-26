@@ -36,7 +36,7 @@ module Macrostep
 
     def macroname()
       if context[:local][:parent] and context[:local][:parent].class.respond_to?(:operation)
-        "#{context[:local][:parent].class.operation.capitalize}/#{step_name}"
+        "#{context[:local][:parent].class.operation.capitalize}[#{step_name}]"
       else
         step_name
       end
@@ -306,7 +306,7 @@ module Macrostep
 
       delete_task(:manage_user_post_install) if cexec.environment.postinstall.nil?
 
-      delete_task(:set_vlan) if cexec.vlan.nil?
+      delete_task(:set_vlan) if cexec.vlan_id.nil?
 
       # Do not reformat deploy partition
       if !cexec.deploy_part.nil? and cexec.deploy_part != ""
@@ -324,6 +324,20 @@ module Macrostep
 
     def load_tasks
       @tasks = steps()
+    end
+  end
+
+  class Reboot < Macrostep
+    def self.step_name()
+      name.split('::').last.gsub(/^Reboot/,'')
+    end
+
+    def load_tasks
+      @tasks = steps()
+      cexec = context[:execution]
+      delete_task(:set_vlan) if cexec.vlan_id.nil?
+      delete_task(:send_key_in_deploy_env) if !cexec.key or cexec.key.empty?
+      delete_task(:check_nodes) if self.class == RebootRecordedEnv and cexec.deploy_part != context[:cluster].prod_part
     end
   end
 end

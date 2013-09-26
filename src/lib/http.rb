@@ -81,11 +81,16 @@ module HTTP
   end
 
   class ClientError < Exception
+    attr_reader :code
+    def initialize(msg,code=nil)
+      super(msg)
+      @code = code
+    end
   end
 
   class Client
-    def self.error(msg='')
-      raise ClientError.new(msg)
+    def self.error(msg='',code=nil)
+      raise ClientError.new(msg,code)
     end
 
     def self.path_params(path,params)
@@ -147,7 +152,7 @@ module HTTP
           case response.code.to_i
           when 400
             if response['X-Application-Error-Code']
-              error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{body}")
+              error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{body}",(response['X-Application-Error-Code'].to_i rescue 1))
             else
               error(
                 "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\

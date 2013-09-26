@@ -53,7 +53,7 @@ class KarebootClient < ClientWorkflow
       parse_keyfile(opt,options)
       parse_op_level(opt,options)
       parse_deploy_part(opt,options)
-      opt.on("-r", "--reboot-kind REBOOT_KIND", ['set_pxe', 'simple_reboot', 'deploy_env', 'env_recorded'], "Specify the reboot kind (set_pxe, simple_reboot, deploy_env, env_recorded)") { |k|
+      opt.on("-r", "--reboot-kind REBOOT_KIND", ['set_pxe', 'simple', 'deploy_env', 'recorded_env'], "Specify the reboot kind (set_pxe, simple, deploy_env, recorded_env)") { |k|
         options[:operation] = k.strip.downcase.to_sym
       }
       parse_user(opt,options)
@@ -75,19 +75,21 @@ class KarebootClient < ClientWorkflow
       return false
     end
 
+    error("invalid operation #{options[:operation]}") unless [:set_pxe,:simple,:deploy_env,:recorded_env].include?(options[:operation])
+
     case options[:operation]
     when :set_pxe
       if !options[:pxe_profile] or options[:pxe_profile].empty?
         error("The set_pxe reboot must be used with the -w option")
         return false
       end
-    when :env_recorded
+    when :recorded_env
       if !options[:env_name] or options[:env_name].empty?
-        error("An environment must be specified must be with the env_recorded kind of reboot")
+        error("An environment must be specified must be with the recorded_env kind of reboot")
         return false
       end
       unless options[:deploy_part]
-        error("A partition number must be specified must be with the env_recorded kind of reboot")
+        error("A partition number must be specified must be with the recorded_env kind of reboot")
         return false
       end
     end
@@ -101,7 +103,74 @@ class KarebootClient < ClientWorkflow
   end
 
   def run(options)
-    raise 'Not implemented yet !'
+    params = init_params(options)
+
+    params[:kind] = options[:operation]
+    params[:level] = options[:level] if options[:level]
+
+    params[:deploy_partition] = options[:deploy_part] if options[:deploy_part]
+    params[:block_device] = options[:block_device] if options[:block_device]
+    if options[:pxe_profile]
+      params[:pxe] = {}
+      params[:pxe][:profile] = options[:pxe_profile]
+      params[:pxe][:singularities] = options[:pxe_profile_singularities] if options[:pxe_profile_singularities]
+      params[:pxe][:files] = options[:pxe_files] unless options[:pxe_files].empty?
+    end
+    params[:vlan] = options[:vlan] if options[:vlan]
+    params[:check_destructive] = options[:check_demolishing] if options[:check_demolishing]
+
+    localfiles = nil
+    if options[:env_name]
+      envname = options[:env_name]
+      username = nil
+      username = options[:user] if options[:user]
+
+      envs = get(api_path(username,:envs),{:user=>USER})
+      envs.select!{|en| en['name'] == envname}
+      error("The environment '#{envname}' does not exist") if envs.size <= 0
+      envs.sort_by!{|en| en['version']}
+
+      if options[:env_version]
+        envs.select!{|en| en['version'] == options[:env_version]}
+        error("The environment '#{envname}' does not exist in version #{options[:env_version]}") if envs.size <= 0
+        env = envs.first
+      else
+        env = envs.last
+      end
+      params[:environment] = {
+        :kind => :database,
+        :user => env['user'],
+        :name => env['name'],
+        :version => env['version'],
+      }
+      localfiles = get_localfiles(env)
+    end
+
+    # Check if the environment contains local files
+
+    if options[:key]
+      params[:ssh_authorized_keys] = options[:key]
+      tmp = get_localfiles(params[:ssh_authorized_keys])
+      if localfiles
+        localfiles += tmp
+      else
+        localfiles = tmp
+      end
+    end
+
+    # Add the PXE files
+    unless options[:pxe_files].empty?
+      tmp = get_localfiles(options[:pxe_files])
+      if localfiles
+        localfiles += tmp
+      else
+        localfiles = tmp
+      end
+    end
+
+    params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
+
+    run_workflow(options,params)
   end
 end
 

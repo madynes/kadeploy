@@ -107,9 +107,12 @@ module Kaworkflow
         kaerror(APIError::INVALID_RIGHTS) \
           unless context.rights.granted?(context.user,context.nodes,'')
 
+        # Check custom breakpoint
+        context.breakpoint = p.parse('breakpoint',String,:type=>:breakpoint,:kind=>kind)
+
         # Check custom microsteps
         context.custom_operations = p.parse('custom_operations',Hash,
-          :type=>:custom_ops,:errno=>APIError::INVALID_CUSTOMOP)
+          :type=>:custom_ops,:kind=>kind,:errno=>APIError::INVALID_CUSTOMOP)
 
         # Check force
         context.force = p.parse('force',nil,:toggle=>true)
@@ -352,7 +355,7 @@ module Kaworkflow
       workflows.each_value{ |wf| info[:threads][wf] = wf.run! }
 
       # Wait for cleaners to be started
-      workflows.each_value{ |wf| sleep(0.2) until (wf.cleaner) }
+      workflows.each_value{ |wf| sleep(0.2) until (wf.cleaner or wf.done?) }
 
       # Wait for operation to end
       dones = []
