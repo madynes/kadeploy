@@ -288,7 +288,7 @@ module Debug
     def error(nodeset,states)
       nodeset.set.each do |node|
         state = states.get(node.hostname)
-        node.last_cmd_stderr = "state[:macro]}-#{state[:micro]}: #{node.last_cmd_stderr}"
+        node.last_cmd_stderr = "#{state[:macro]}-#{state[:micro]}: #{node.last_cmd_stderr}"
         @nodes[node.hostname]["error"] = node.last_cmd_stderr
       end
     end
