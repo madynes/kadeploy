@@ -2,7 +2,7 @@ require 'httpd'
 
 module Kadeploy
 
-module Kaenv
+module Kaenvs
   def envs_init_exec_context()
     ret = init_exec_context()
     ret.database = nil

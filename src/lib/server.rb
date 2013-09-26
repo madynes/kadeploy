@@ -10,8 +10,8 @@ require 'kaworkflow'
 require 'kadeploy'
 require 'kareboot'
 require 'kapower'
-require 'kaenv'
-require 'kastat'
+require 'kaenvs'
+require 'kastats'
 require 'karights'
 require 'kanodes'
 require 'window'
@@ -26,8 +26,8 @@ class KadeployServer
   include Kadeploy
   include Kareboot
   include Kapower
-  include Kaenv
-  include Kastat
+  include Kaenvs
+  include Kastats
   include Karights
   include Kanodes
 
