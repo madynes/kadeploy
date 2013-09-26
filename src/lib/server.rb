@@ -173,9 +173,30 @@ class KadeployServer
     ret.user = nil
     ret.secret_key = nil
     ret.cert = nil
+    ret.database = database_handler()
+    ret.rights = rights_handler(ret.database)
     ret.info = nil
     ret.dry_run = nil
     ret
+  end
+
+  def free_exec_context(context)
+    context.database.disconnect if context.database
+    context.database = nil
+    context.secret_key = nil
+    context.cert = nil
+    context.rights = nil
+    context.info = nil
+    context.dry_run = nil
+    context
+  end
+
+  def wipe_exec_context(context)
+    context.marshal_dump.keys.each do |name|
+      obj = context.send(name.to_sym)
+      obj.free if obj.respond_to?(:free)
+      context.delete_field(name)
+    end
   end
 
   def parse_params_default(params,context)
@@ -350,25 +371,39 @@ class KadeployServer
 
     # prepare the treatment
     options = run_method(kind,:prepare,params[:params],query)
-    authenticate!(params[:request],options)
-
-    # Only check rights if the method 'kind'_rights? is defined
-    check_rights = nil
     begin
-      get_method(kind,:'rights?')
-      check_rights = true
-    rescue
-      check_rights = false
-    end
-    if check_rights
-      ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
-      error_unauthorized!(msg) unless ok
-    end
+      authenticate!(params[:request],options)
 
-    # Run the treatment
-    meth = query.to_s
-    meth << "_#{params[:names].join('_')}" if params[:names]
-    run_method(kind,meth,options,*args) unless options.dry_run
+      # Only check rights if the method 'kind'_rights? is defined
+      check_rights = nil
+      begin
+        get_method(kind,:'rights?')
+        check_rights = true
+      rescue
+        check_rights = false
+      end
+      if check_rights
+        ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
+        error_unauthorized!(msg) unless ok
+      end
+
+      # Run the treatment
+      meth = query.to_s
+      meth << "_#{params[:names].join('_')}" if params[:names]
+
+      run_method(kind,meth,options,*args) unless options.dry_run
+    ensure
+      if options
+        begin
+          get_method(kind,:free_exec_context)
+          run_method(kind,:free_exec_context,options)
+        rescue
+          free_exec_context(options)
+          wipe_exec_context(options)
+        end
+        options = nil
+      end
+    end
   end
 
   def workflow_create(kind,wid,info)

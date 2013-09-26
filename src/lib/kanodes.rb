@@ -3,7 +3,6 @@ module Kadeploy
 module Kanodes
   def nodes_init_exec_context()
     ret = init_exec_context()
-    ret.database = nil
     ret.nodes = nil
     ret.list = nil
     ret
@@ -11,11 +10,6 @@ module Kanodes
 
   def nodes_prepare(params,operation=:get)
     context = nodes_init_exec_context()
-    parse_params_default(params,context)
-
-    context.database = database_handler()
-
-    # Check user/key
     parse_params_default(params,context)
 
     parse_params(params) do |p|

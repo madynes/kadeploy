@@ -15,9 +15,6 @@ module Kareboot
   def reboot_prepare(params,operation=:create)
     context = work_prepare(:reboot,params,operation)
 
-    # Check user
-    parse_params_default(params,context)
-
     case operation
     when :create
       parse_params(params) do |p|

@@ -8,8 +8,6 @@ module Kaworkflow
   def work_init_exec_context(kind)
     ret = init_exec_context()
     ret.info = nil
-    ret.database = nil
-    ret.rights = nil
     ret.nodes = nil
     ret.nodelist = nil
     ret.steps = []
@@ -38,6 +36,13 @@ module Kaworkflow
     ret
   end
 
+  def work_free_exec_context(kind,context)
+    context = free_exec_context(context)
+    context.outputfile = nil
+    context.loggerfile = nil
+    context
+  end
+
   def work_init_info(kind,cexec)
     {
       :wid => uuid(API.wid_prefix(kind)),
@@ -50,7 +55,7 @@ module Kaworkflow
       :clusterlist => cexec.nodes.group_by_cluster.keys,
       :nodes => cexec.nodes,
       :state => Nodes::NodeState.new(),
-      :database => cexec.database,
+      :database => database_handler(),
       :workflows => {},
       :threads => {},
       :outputfile => cexec.outputfile,
@@ -88,18 +93,10 @@ module Kaworkflow
 
   def work_prepare(kind,params,operation=:create)
     context = run_wmethod(kind,:init_exec_context)
-
-    # Check user
     parse_params_default(params,context)
 
     case operation
     when :create, :modify
-      # Check database
-      context.database = database_handler()
-
-      # Check rights
-      context.rights = rights_handler(context.database)
-
       parse_params(params) do |p|
         # Check nodelist
         context.nodes = p.parse('nodes',Array,:mandatory=>true,
@@ -263,7 +260,7 @@ module Kaworkflow
     info[:thread] = Thread.new do
       context = {
         :wid => info[:wid].dup,
-        :user => cexec.user,
+        :user => info[:user],
         #:nodelist => cexec.nodelist,
         #:nodes => cexec.nodes,
         :states => info[:state],
@@ -274,7 +271,7 @@ module Kaworkflow
         :common => config.common,
         :cluster => nil,
 
-        :database => cexec.database,
+        :database => info[:database],
 
         :windows => @window_managers,
         :output => info[:output],

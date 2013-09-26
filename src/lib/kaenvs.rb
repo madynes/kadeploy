@@ -5,7 +5,6 @@ module Kadeploy
 module Kaenvs
   def envs_init_exec_context()
     ret = init_exec_context()
-    ret.database = nil
     ret.client = nil
     ret.username = nil
     ret.environment = nil
@@ -15,11 +14,6 @@ module Kaenvs
 
   def envs_prepare(params,operation)
     context = envs_init_exec_context()
-
-    # Check database
-    context.database = database_handler()
-
-    # Check user/key
     parse_params_default(params,context)
 
     case operation

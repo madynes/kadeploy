@@ -5,8 +5,6 @@ module Kadeploy
 module Karights
   def rights_init_exec_context()
     ret = init_exec_context()
-    ret.database = nil
-    ret.rights = nil
     ret.nodes = nil
     ret.partitions = nil
     ret.username = nil
@@ -15,11 +13,6 @@ module Karights
 
   def rights_prepare(params,operation)
     context = rights_init_exec_context()
-
-    context.database = database_handler()
-    context.rights = rights_handler(context.database)
-
-    # Check user/key
     parse_params_default(params,context)
 
     parse_params(params) do |p|

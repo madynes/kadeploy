@@ -2,15 +2,8 @@ module Kadeploy
 
 module Kaconsole
   def console_prepare(params,operation=:get)
-    context = nodes_init_exec_context()
+    context = init_exec_context()
     parse_params_default(params,context)
-
-    context.database = database_handler()
-    context.rights = rights_handler(context.database)
-
-    # Check user/key
-    parse_params_default(params,context)
-
     context
   end
 

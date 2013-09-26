@@ -5,7 +5,6 @@ module Kadeploy
 module Kastats
   def stats_init_exec_context()
     ret = init_exec_context()
-    ret.database = nil
     ret.nodes = nil
     ret.kind = nil
     ret.filters = {}
@@ -16,11 +15,6 @@ module Kastats
 
   def stats_prepare(params,operation=:get)
     context = stats_init_exec_context()
-    parse_params_default(params,context)
-
-    context.database = database_handler()
-
-    # Check user/key
     parse_params_default(params,context)
 
     parse_params(params) do |p|

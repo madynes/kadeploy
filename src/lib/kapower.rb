@@ -10,8 +10,6 @@ module Kapower
 
   def power_prepare(params,operation=:create)
     context = work_prepare(:power,params,operation)
-
-    # Check user
     parse_params_default(params,context)
 
     case operation
@@ -39,8 +37,6 @@ module Kapower
     if !wid and cexec.nodes
       # TODO: do it a better way
       #->power_prepare(cexec,:modify)
-      cexec.database = database_handler()
-      cexec.rights = rights_handler(cexec.database)
       cexec.info = run_wmethod(:power,:init_info,cexec)
       kaerror(APIError::INVALID_RIGHTS) \
         unless cexec.rights.granted?(cexec.user,cexec.nodes,'')
