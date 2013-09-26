@@ -14,11 +14,6 @@ module Kaconsole
     context
   end
 
-  def console_rights?(cexec,operation,names,*args)
-    #return cexec.rights.granted?(cexec.user,[args[0]],'')
-    true
-  end
-
   def console_get(cexec,node)
     # TODO: kill the console when the user loose the rights
     if cexec.rights.granted?(cexec.user,[node],'')

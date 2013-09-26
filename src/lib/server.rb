@@ -351,9 +351,21 @@ class KadeployServer
     # prepare the treatment
     options = run_method(kind,:prepare,params[:params],query)
     authenticate!(params[:request],options)
-    ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
-    error_unauthorized!(msg) unless ok
 
+    # Only check rights if the method 'kind'_rights? is defined
+    check_rights = nil
+    begin
+      get_method(kind,:'rights?')
+      check_rights = true
+    rescue
+      check_rights = false
+    end
+    if check_rights
+      ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
+      error_unauthorized!(msg) unless ok
+    end
+
+    # Run the treatment
     meth = query.to_s
     meth << "_#{params[:names].join('_')}" if params[:names]
     run_method(kind,meth,options,*args) unless options.dry_run

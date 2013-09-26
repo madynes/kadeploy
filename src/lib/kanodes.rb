@@ -29,15 +29,6 @@ module Kanodes
     context
   end
 
-  def nodes_rights?(cexec,operation,names,*args)
-    true
-  end
-
-  #def nodes_get_status(workflow_id=nil)
-  #  []
-  #end
-  #alias_method :get_element_nodes_status, :nodes_get_status
-
   def nodes_get(cexec,node=nil)
     nodes = []
     nodes << node if node

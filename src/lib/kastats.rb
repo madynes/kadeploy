@@ -41,17 +41,9 @@ module Kastats
       context.filters[:wid] = p.parse('wid',String)
       context.filters[:min_retries] = p.parse('min_retries',String,:regexp=>/^\d+$/)
       context.filters[:step_retries] = p.parse('step_retries',Array,:values=>['1','2','3'])
-      # when by == nil -> all
-      # wid = ...
-      # min_failure_rate, min_retries
-      # limit -> limit number, last -> sort_by_date+limit=1
     end
 
     context
-  end
-
-  def stats_rights?(cexec,operation,names,*args)
-    true
   end
 
   def stats_get(cexec,operation=nil)
