@@ -243,13 +243,13 @@ class KadeployServer
       :envs => [(1..3)],
       :rights => [(1..3)],
       :nodes => [1],
-      :stats => [(1..1)], # !!!
+      :stats => [(1..1)],
     }
     names = {
       :envs => [(4..-1)],
       :rights => [(4..-1)],
       :nodes => [(2..-1)],
-      :stats => [(2..-1)], # !!!
+      :stats => [(2..-1)],
     }
 
     [:envs,:rights].each do |kind|

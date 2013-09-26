@@ -1,3 +1,5 @@
+require 'stats'
+
 module Kadeploy
 
 module Kastats
@@ -5,11 +7,15 @@ module Kastats
     ret = init_exec_context()
     ret.database = nil
     ret.nodes = nil
+    ret.kind = nil
+    ret.filters = {}
+    ret.options = {}
+    ret.fields = nil
     ret
   end
 
   def stats_prepare(params,operation=:get)
-    context = nodes_init_exec_context()
+    context = stats_init_exec_context()
     parse_params_default(params,context)
 
     context.database = database_handler()
@@ -22,6 +28,23 @@ module Kastats
       context.nodes = p.parse('nodes',Array,:type=>:nodeset,
         :errno=>APIError::INVALID_NODELIST)
       context.nodes = context.nodes.make_array_of_hostname if context.nodes
+
+      context.kind = p.parse('kind',String,:values=>['all','failure_rates'],:default=>'all')
+      context.fields = p.parse('fields',Array,:values=>['deploy_id','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'], :default=>['deploy_id','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'])
+
+      context.options[:sort] = p.parse('sort',Array,:values=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'],:default=>['start'])
+      context.options[:limit] = p.parse('limit',String,:regexp=>/^\d+|\d+,\d+$/)
+      context.options[:failure_rate] = p.parse('min_failure_rate',String,:regexp=>/^0?\.\d+|1(?:\.0)?$/) # float between 0 and 1
+
+      context.filters[:date_min] = p.parse('date_min',String,:type=>:date)
+      context.filters[:date_max] = p.parse('date_max',String,:type=>:date)
+      context.filters[:wid] = p.parse('wid',String)
+      context.filters[:min_retries] = p.parse('min_retries',String,:regexp=>/^\d+$/)
+      context.filters[:step_retries] = p.parse('step_retries',Array,:values=>['1','2','3'])
+      # when by == nil -> all
+      # wid = ...
+      # min_failure_rate, min_retries
+      # limit -> limit number, last -> sort_by_date+limit=1
     end
 
     context
@@ -31,7 +54,16 @@ module Kastats
     true
   end
 
-  def stats_get(cexec)
+  def stats_get(cexec,operation=nil)
+    if operation
+      if ['deploy','reboot','power'].include?(operation.strip)
+        operation = operation.to_sym
+      else
+        error_not_found!
+      end
+    end
+
+    Stats.send(:"list_#{cexec.kind}",cexec.database,operation,cexec.filters,cexec.options,cexec.fields)
   end
 end
 

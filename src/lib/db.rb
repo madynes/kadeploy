@@ -3,6 +3,10 @@ require 'mysql'
 module Kadeploy
 
 module Database
+  def self.where_nodelist(nodes,field='node')
+    ["(#{(["(#{field} = ? )"] * nodes.size).join(' OR ')})", nodes] if nodes and !nodes.empty?
+  end
+
   class DbFactory
 
     # Factory for the methods to access the database
@@ -83,6 +87,13 @@ module Database
       @content = content || []
       @affected_rows = affected_rows || 0
 
+      @cache_hash = nil
+    end
+
+    def free
+      @fields = nil
+      @content = nil
+      @affected_rows = nil
       @cache_hash = nil
     end
 

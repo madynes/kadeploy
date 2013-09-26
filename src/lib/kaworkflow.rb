@@ -1,3 +1,5 @@
+require 'api'
+
 module Kadeploy
 
 module Kaworkflow
@@ -35,9 +37,9 @@ module Kaworkflow
     ret
   end
 
-  def work_init_info(kind,cexec,prefix='')
+  def work_init_info(kind,cexec)
     {
-      :wid => uuid(prefix),
+      :wid => uuid(API.wid_prefix(kind)),
       :user => cexec.user,
       :start_time => Time.now,
       :end_time => nil,

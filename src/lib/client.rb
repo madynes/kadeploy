@@ -704,7 +704,7 @@ class Client
     end
   end
 
-  def display_status(stats,starttime)
+  def display_status()
   end
 
   def self.parse_options()

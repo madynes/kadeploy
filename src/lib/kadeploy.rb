@@ -17,10 +17,6 @@ module Kadeploy
     ret
   end
 
-  def deploy_init_info(cexec)
-    work_init_info(:deploy,cexec,'D-')
-  end
-
   def deploy_prepare(params,operation=:create)
     context = work_prepare(:deploy,params,operation)
 
