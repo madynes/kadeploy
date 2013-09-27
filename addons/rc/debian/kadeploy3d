@@ -24,6 +24,7 @@ PIDFILE=/var/run/$NAME.pid
 DAEMON_ARGS="--pidfile $PIDFILE --detach"
 SCRIPTNAME=/etc/init.d/$NAME
 DAEMON_USER=deploy
+LOGDIR=/var/log/kadeploy3
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
@@ -84,6 +85,21 @@ do_stop()
 	return "$RETVAL"
 }
 
+do_reload()
+{
+  RELOADFILE=$LOGDIR/reload.log
+  rm -f $RELOADFILE
+  touch $RELOADFILE
+  chown $DAEMON_USER $RELOADFILE
+  killproc -p "$PIDFILE" "$DAEMON" -HUP
+  while [ ! -s $RELOADFILE ]
+  do
+    sleep 1
+  done
+  sed '1d' $RELOADFILE >&2
+  [ "$(sed '1q' $RELOADFILE)" = "0" ]
+}
+
 case "$1" in
   start)
 	log_action_begin_msg "Starting $DESC"
@@ -111,7 +127,7 @@ case "$1" in
 		case "$?" in
 			0) log_action_end_msg 0 ;;
 			1) log_action_end_msg 1 ;; # Old process is still running
-			*) log_action_end_msg 1;; # log_daemon_msg "An error occured, probably a configuration issue, please check your syslog file." ;; # Failed to start
+			*) log_action_end_msg 1 ;; # log_daemon_msg "An error occured, probably a configuration issue, please check your syslog file." ;; # Failed to start
 		esac
 		;;
 	  *)
@@ -120,13 +136,36 @@ case "$1" in
 		;;
 	esac
 	;;
+  reload|force-reload)
+	log_action_begin_msg "Reloading $DESC"
+  do_reload
+	case "$?" in
+		0) log_action_end_msg 0 ;;
+		*)
+      case "$1" in
+      reload) log_action_end_msg 1 ;;
+      force-reload)
+	      log_action_begin_msg "Restarting $DESC"
+	      do_stop
+	      case "$?" in
+	        0|1)
+	      	  do_start
+	      	  case "$?" in
+	      	  	0) log_action_end_msg 0 ;;
+	      	  	*) log_action_end_msg 1 ;;
+	      	  esac
+	      	;;
+	        *) log_end_msg 1 ;; # Failed to stop
+	      esac
+      ;;
+	    esac
+  esac
+  ;;
   status)
         status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
         ;;
   *)
-	echo "Usage: $SCRIPTNAME {start|stop|restart|status}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload|status}" >&2
 	exit 3
 	;;
 esac
-
-:

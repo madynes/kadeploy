@@ -10,6 +10,7 @@ SSH_KEY=File.join($kadeploy_config_directory,'keys/id_deploy')
 
 LOGFILE_DEBUG='output.log'
 LOGFILE_ERROR='error.log'
+LOGFILE_RELOAD='reload.log'
 
 AUTOCLEAN_PITCH = 300
 
@@ -37,13 +38,39 @@ Signal::trap("TERM") do
   exit!(1)
 end
 
+#require 'stringio'
+
 # Reload the service & logfiles rotation (syslogd)
 Signal::trap("HUP") do
+  stderr = $stderr
+  #$stderr = File.open(File.join($kadeploy_logdir,'reload.log'),'w')
+  $stderr = StringIO.new
   $kadeploy_logfiles.each_value do |io|
     if io
       filename = File.readlink(File.join("/proc/self/fd/#{io.fileno}"))
       io.reopen(filename,'a+')
     end
+  end
+  file = File.open(File.join($kadeploy_logdir,LOGFILE_RELOAD),'w')
+  begin
+    STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
+    $kadeploy.reload_config()
+    file.puts '0'
+  rescue Exception => e
+    STDERR.puts "[#{Time.now.to_s}] Failed to reload configuration files !"
+    if e.is_a?(Kadeploy::KadeployError)
+      file.puts '1'
+      error("#{Kadeploy::KadeployError.to_msg(e.errno)}"\
+        "#{(e.message and !e.message.empty? ? ': ' + e.message : '')}",false)
+    else
+      file.puts '2'
+      error(e.message,false)
+    end
+    file.write($stderr.string)
+  ensure
+    file.close unless file.closed?
+    $stderr.close unless $stderr.closed?
+    $stderr = stderr
   end
 end
 
