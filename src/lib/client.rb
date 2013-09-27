@@ -1120,17 +1120,19 @@ p @resources['resource']
     elsif @wid and !@resources
       debug "#{self.class.operation()} status (#{Time.now.to_i - @start_time}s): done"
     else
-      debug "#{self.class.operation()} status (#{Time.now.to_i - @start_time}s):"
       stats = get(@resources['status'])
 
       if stats.empty?
-        raise
-      elsif stats.size == 1
-        display_status_cluster(stats[stats.keys[0]])
+        debug "#{self.class.operation()} did not start at the moment"
       else
-        stats.each_pair do |clname,stat|
-          debug "  [#{clname}]"
-          display_status_cluster(stat,'  ')
+        debug "#{self.class.operation()} status (#{Time.now.to_i - @start_time}s):"
+        if stats.size == 1
+          display_status_cluster(stats[stats.keys[0]])
+        else
+          stats.each_pair do |clname,stat|
+            debug "  [#{clname}]"
+            display_status_cluster(stat,'  ')
+          end
         end
       end
     end
