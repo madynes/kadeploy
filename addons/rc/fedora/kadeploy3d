@@ -51,15 +51,18 @@ case "$1" in
         start
 	;;
   stop)
-       	stop
+        stop
 	;;
   status)
-	status -p ${pidfile} $kadeploy3d
+	      status -p ${pidfile} $kadeploy3d
         RETVAL=$?
-        ;;
+  ;;
+  reload)
+        # ...
+  ;;
   restart)
-	stop
-	start
+	      stop
+	      start
 	;;
   *)
     	echo $"Usage: $prog {start|stop|restart}"

@@ -45,6 +45,13 @@ Signal::trap("HUP") do
       io.reopen(filename,'a+')
     end
   end
+  begin
+    $stdout.puts "[#{Time.now.to_s}] Reloading configuration files"
+    $kadeploy.reload_config()
+  rescue Kadeploy::KadeployError => ke
+    error("#{Kadeploy::KadeployError.to_msg(ke.errno)}"\
+      "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}",false)
+  end
 end
 
 

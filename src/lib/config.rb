@@ -72,7 +72,7 @@ module Configuration
 
     attr_reader :common, :clusters, :caches, :static
 
-    def initialize(config=nil,caches=true)
+    def initialize(config=nil,caches=nil)
       if config.nil?
         sanity_check()
         # Common
@@ -94,7 +94,11 @@ module Configuration
         res = res && CommandsConfig.new.load(@common)
 
         # Caches
-        @caches = load_caches() if caches
+        if caches
+          @caches = caches
+        else
+          @caches = load_caches()
+        end
 
         @common.freeze
         @clusters.freeze
@@ -108,14 +112,6 @@ module Configuration
         @clusters = config.clusters.duplicate
         @caches = config.caches
         @static = config.static
-      end
-    end
-
-    def ==(config)
-      if config.is_a?(self.class)
-        static_values == config.static_values
-      else
-        false
       end
     end
 

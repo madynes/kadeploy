@@ -102,6 +102,9 @@ case "$1" in
 		2) log_action_end_msg 1 ;;
 	esac
 	;;
+  reload)
+	log_action_begin_msg "Reloading $DESC"
+  # ....
   restart)
 	log_action_begin_msg "Restarting $DESC"
 	do_stop
