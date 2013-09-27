@@ -230,7 +230,6 @@ module HTTPd
       else
         raise
       end
-      @run_thread = nil
       # class_eval "alias :\"do_#{m.to_s.upcase}\", :do_METHOD"
     end
 
@@ -243,16 +242,16 @@ module HTTPd
     end
 
     def kill()
-      @run_thread.kill if @run_thread
+      Thread.current[:run_thr].kill if Thread.current[:run_thr]
     end
 
     def treatment(req,resp)
       request_handler = RequestHandler.new(req)
       ret = nil
-      @run_thread = Thread.new{ ret = handle(req,resp,request_handler) }
+      Thread.current[:run_thr] = Thread.new{ ret = handle(req,resp,request_handler) }
 
       sock = Thread.current[:WEBrickSocket]
-      while @run_thread.alive? do
+      while Thread.current[:run_thr].alive? do
         if IO.select([sock], nil, nil, 1) and sock.eof?
         # The client disconnected
           kill()
@@ -261,8 +260,8 @@ module HTTPd
           raise WEBrick::HTTPStatus::EOFError
         end
       end
-      @run_thread.join
-      @run_thread = nil
+      Thread.current[:run_thr].join
+      Thread.current[:run_thr] = nil
 
       if IO.select([sock], nil, nil, 0) and sock.eof?
       # The client disconnected
