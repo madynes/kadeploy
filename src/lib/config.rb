@@ -72,19 +72,21 @@ module Configuration
 
     attr_reader :common, :clusters, :caches, :static
 
-    def initialize(config=nil,caches=true)
+    def initialize(config=nil,caches=nil)
       if config.nil?
         sanity_check()
-        # Common
-        @common = CommonConfig.new
-        @static = @common.load
-        res = (!@static.nil? and @static != false)
 
+        version = nil
         begin
-          @common.version = File.read(VERSION_FILE).strip
+          version = File.read(VERSION_FILE).strip
         rescue Errno::ENOENT
           raise ArgumentError.new("File not found '#{VERSION_FILE}'")
         end
+
+        # Common
+        @common = CommonConfig.new(version)
+        @static = @common.load
+        res = (!@static.nil? and @static != false)
 
         # Clusters
         @clusters = ClustersConfig.new
@@ -94,10 +96,12 @@ module Configuration
         res = res && CommandsConfig.new.load(@common)
 
         # Caches
-        @caches = load_caches() if caches
+        if caches
+          @caches = caches
+        else
+          @caches = load_caches()
+        end
 
-        @common.freeze
-        @clusters.freeze
         @static.freeze
         @caches.freeze if @caches
 
@@ -108,14 +112,6 @@ module Configuration
         @clusters = config.clusters.duplicate
         @caches = config.caches
         @static = config.static
-      end
-    end
-
-    def ==(config)
-      if config.is_a?(self.class)
-        static_values == config.static_values
-      else
-        false
       end
     end
 
@@ -191,44 +187,44 @@ module Configuration
       File.join($kadeploy_config_directory, "server_conf.yml")
     end
 
-    attr_accessor :cache
-    attr_accessor :verbose_level
-    attr_accessor :pxe
-    attr_accessor :db_kind
-    attr_accessor :deploy_db_host
-    attr_accessor :deploy_db_name
-    attr_accessor :deploy_db_login
-    attr_accessor :deploy_db_passwd
-    attr_accessor :rights_kind
-    attr_accessor :nodes
-    attr_accessor :taktuk_connector
-    attr_accessor :taktuk_tree_arity
-    attr_accessor :taktuk_outputs_size
-    attr_accessor :taktuk_auto_propagate
-    attr_accessor :tarball_dest_dir
-    attr_accessor :kadeploy_tcp_buffer_size
-    attr_accessor :max_preinstall_size
-    attr_accessor :max_postinstall_size
-    attr_accessor :ssh_port
-    attr_accessor :test_deploy_env_port
-    attr_accessor :environment_extraction_dir
-    attr_accessor :log_to_db
-    attr_accessor :dbg_to_file
-    attr_accessor :dbg_to_file_level
-    attr_accessor :purge_deployment_timer
-    attr_accessor :rambin_path
-    attr_accessor :mkfs_options
-    attr_accessor :bt_tracker_ip
-    attr_accessor :bt_download_timeout
-    attr_accessor :almighty_env_users
-    attr_accessor :version
-    attr_accessor :async_end_of_deployment_hook
-    attr_accessor :async_end_of_reboot_hook
-    attr_accessor :async_end_of_power_hook
-    attr_accessor :vlan_hostname_suffix
-    attr_accessor :set_vlan_cmd
-    attr_accessor :kastafior
-    attr_accessor :secure_client
+    attr_reader :cache
+    attr_reader :verbose_level
+    attr_reader :pxe
+    attr_reader :db_kind
+    attr_reader :deploy_db_host
+    attr_reader :deploy_db_name
+    attr_reader :deploy_db_login
+    attr_reader :deploy_db_passwd
+    attr_reader :rights_kind
+    attr_reader :nodes
+    attr_reader :taktuk_connector
+    attr_reader :taktuk_tree_arity
+    attr_reader :taktuk_outputs_size
+    attr_reader :taktuk_auto_propagate
+    attr_reader :tarball_dest_dir
+    attr_reader :kadeploy_tcp_buffer_size
+    attr_reader :max_preinstall_size
+    attr_reader :max_postinstall_size
+    attr_reader :ssh_port
+    attr_reader :test_deploy_env_port
+    attr_reader :environment_extraction_dir
+    attr_reader :log_to_db
+    attr_reader :dbg_to_file
+    attr_reader :dbg_to_file_level
+    attr_reader :purge_deployment_timer
+    attr_reader :rambin_path
+    attr_reader :mkfs_options
+    attr_reader :bt_tracker_ip
+    attr_reader :bt_download_timeout
+    attr_reader :almighty_env_users
+    attr_reader :version
+    attr_reader :async_end_of_deployment_hook
+    attr_reader :async_end_of_reboot_hook
+    attr_reader :async_end_of_power_hook
+    attr_reader :vlan_hostname_suffix
+    attr_reader :set_vlan_cmd
+    attr_reader :kastafior
+    attr_reader :secure_client
 
     # Constructor of CommonConfig
     #
@@ -236,7 +232,8 @@ module Configuration
     # * nothing
     # Output
     # * nothing
-    def initialize
+    def initialize(version=nil)
+      @version = version
       @nodes = Nodes::NodeSet.new
       @cache = {}
       @pxe = {}
@@ -689,10 +686,10 @@ module Configuration
             'conf_file',String,nil,{
               :type => 'file', :readable => true, :prefix => Config.dir()})
 
-          conf = self[clname] = ClusterSpecificConfig.new
+          conf = self[clname] = ClusterSpecificConfig.new(
+            cp.value('prefix',String,''))
           return false unless conf.load(clname,clfile)
 
-          conf.prefix = cp.value('prefix',String,'')
 
           cp.parse('nodes',true,Array) do |info|
             name = cp.value('name',String)
@@ -796,45 +793,45 @@ module Configuration
   class ClusterSpecificConfig
     include ConfigFile
 
-    attr_accessor :name
-    attr_accessor :deploy_kernel
-    attr_accessor :deploy_kernel_args
-    attr_accessor :deploy_initrd
-    attr_accessor :deploy_supported_fs
-    attr_accessor :kexec_repository
-    attr_accessor :block_device
-    attr_accessor :deploy_part
-    attr_accessor :prod_part
-    attr_accessor :tmp_part
-    attr_accessor :swap_part
-    attr_accessor :workflow_steps   #Array of MacroStep
-    attr_accessor :timeout_reboot_classical
-    attr_accessor :timeout_reboot_kexec
-    attr_accessor :cmd_soft_reboot
-    attr_accessor :cmd_hard_reboot
-    attr_accessor :cmd_very_hard_reboot
-    attr_accessor :cmd_console
-    attr_accessor :cmd_soft_power_off
-    attr_accessor :cmd_hard_power_off
-    attr_accessor :cmd_very_hard_power_off
-    attr_accessor :cmd_soft_power_on
-    attr_accessor :cmd_hard_power_on
-    attr_accessor :cmd_very_hard_power_on
-    attr_accessor :cmd_power_status
-    attr_accessor :cmd_sendenv
-    attr_accessor :decompress_environment
-    attr_accessor :group_of_nodes #Hashtable (key is a command name)
-    attr_accessor :partitioning_script
-    attr_accessor :bootloader_script
-    attr_accessor :prefix
-    attr_accessor :drivers
-    attr_accessor :pxe_header
-    attr_accessor :kernel_params
-    attr_accessor :nfsroot_kernel
-    attr_accessor :nfsroot_params
-    attr_accessor :admin_pre_install
-    attr_accessor :admin_post_install
-    attr_accessor :use_ip_to_deploy
+    attr_reader :name
+    attr_reader :deploy_kernel
+    attr_reader :deploy_kernel_args
+    attr_reader :deploy_initrd
+    attr_reader :deploy_supported_fs
+    attr_reader :kexec_repository
+    attr_reader :block_device
+    attr_reader :deploy_part
+    attr_reader :prod_part
+    attr_reader :tmp_part
+    attr_reader :swap_part
+    attr_reader :workflow_steps   #Array of MacroStep
+    attr_reader :timeout_reboot_classical
+    attr_reader :timeout_reboot_kexec
+    attr_reader :cmd_soft_reboot
+    attr_reader :cmd_hard_reboot
+    attr_reader :cmd_very_hard_reboot
+    attr_reader :cmd_console
+    attr_reader :cmd_soft_power_off
+    attr_reader :cmd_hard_power_off
+    attr_reader :cmd_very_hard_power_off
+    attr_reader :cmd_soft_power_on
+    attr_reader :cmd_hard_power_on
+    attr_reader :cmd_very_hard_power_on
+    attr_reader :cmd_power_status
+    attr_reader :cmd_sendenv
+    attr_reader :decompress_environment
+    attr_reader :group_of_nodes #Hashtable (key is a command name)
+    attr_reader :partitioning_script
+    attr_reader :bootloader_script
+    attr_reader :prefix
+    attr_reader :drivers
+    attr_reader :pxe_header
+    attr_reader :kernel_params
+    attr_reader :nfsroot_kernel
+    attr_reader :nfsroot_params
+    attr_reader :admin_pre_install
+    attr_reader :admin_post_install
+    attr_reader :use_ip_to_deploy
 
     # Constructor of ClusterSpecificConfig
     #
@@ -842,7 +839,8 @@ module Configuration
     # * nothing
     # Output
     # * nothing
-    def initialize
+    def initialize(prefix=nil)
+      @prefix = prefix
       @workflow_steps = []
       @deploy_kernel_args = ""
       @deploy_supported_fs = []

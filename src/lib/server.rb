@@ -71,14 +71,27 @@ class KadeployServer
   def kill
   end
 
-  def load_config()
+  def load_config(caches=nil)
     ret = nil
     begin
-      ret = Configuration::Config.new()
+      ret = Configuration::Config.new(nil,caches)
     rescue KadeployError, ArgumentError => e
       kaerror(APIError::BAD_CONFIGURATION,e.message)
     end
     ret
+  end
+
+  def reload_config()
+    @config_lock.synchronize do
+      newconfig = load_config(@config.caches)
+      if @config.static_values == newconfig.static_values
+        oldconfig = @config
+        @config = newconfig
+        oldconfig.free
+      else
+        kaerror(APIError::BAD_CONFIGURATION,'Some static parameters were modified, please restart the server')
+      end
+    end
   end
 
   def cfg()
