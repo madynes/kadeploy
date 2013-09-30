@@ -56,6 +56,19 @@ module Nodes
     attr_accessor :power_off_very_hard
     attr_accessor :power_status
 
+    def initialize()
+      @reboot_soft = nil
+      @reboot_hard = nil
+      @reboot_very_hard = nil
+      @console = nil
+      @power_on_soft = nil
+      @power_on_hard = nil
+      @power_on_very_hard = nil
+      @power_off_soft = nil
+      @power_off_hard = nil
+      @power_off_very_hard = nil
+      @power_status = nil
+    end
 
     def free
       @reboot_soft = nil
@@ -69,6 +82,15 @@ module Nodes
       @power_off_hard = nil
       @power_off_very_hard = nil
       @power_status = nil
+    end
+
+    def self.generate(cmd,node)
+      if cmd
+        ret = cmd.dup
+        ret.gsub!('HOSTNAME_FQDN', node.hostname)
+        ret.gsub!('HOSTNAME_SHORT', node.hostname.split('.')[0])
+        ret
+      end
     end
   end
 
@@ -92,12 +114,12 @@ module Nodes
     # * cmd: instance of NodeCmd
     # Output
     # * nothing
-    def initialize(hostname, ip, cluster, cmd)
+    def initialize(hostname, ip, cluster)
       @hostname = hostname
       @ip = ip
       @cluster = cluster
       @state = "OK"
-      @cmd = cmd
+      @cmd = NodeCmd.new
       @current_step = nil
       @last_cmd_exit_status = nil
       @last_cmd_stdout = nil
@@ -153,7 +175,7 @@ module Nodes
     # Output
     # * return a duplicated instance of Node
     def dup
-      n = Node.new(nil, nil, nil, nil)
+      n = Node.new(nil, nil, nil)
       n.hostname = @hostname.clone if @hostname != nil
       n.ip = @ip.clone if @ip != nil
       n.cluster = @cluster.clone if @cluster != nil
