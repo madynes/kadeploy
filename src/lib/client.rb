@@ -205,6 +205,7 @@ class Client
     if (param == "-")
       file = STDIN
     else
+      return false unless check_file(param)
       file = File.new(param)
     end
 
