@@ -252,7 +252,7 @@ module HTTPd
 
       sock = Thread.current[:WEBrickSocket]
       while Thread.current[:run_thr].alive? do
-        if IO.select([sock], nil, nil, 1) and sock.eof?
+        if IO.select([sock], nil, nil, 0.5) and sock.eof?
         # The client disconnected
           kill()
           request_handler.free
