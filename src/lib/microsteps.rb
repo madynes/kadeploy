@@ -396,7 +396,7 @@ class Microstep < Automata::QueueTask
     no_command_provided_nodes = Nodes::NodeSet.new
     to_remove = Array.new
     node_set.set.each { |node|
-      if (node.cmd.instance_variable_get("@#{kind}_#{level}") == nil) then
+      if !node.cmd.instance_variable_get("@#{kind}_#{level}") and !context[:cluster].instance_variable_get("@cmd_#{kind}_#{level}")
         set_node(node, :stderr => "#{level}_#{kind} command is not provided")
         debug(3, " ! No #{level} #{kind} command is defined for #{node.hostname}",false)
         no_command_provided_nodes.push(node)
@@ -494,17 +494,18 @@ class Microstep < Automata::QueueTask
             node = nil
             if entry.is_a?(String) then
               node = initial_node_set.get_node_by_host(entry)
-              cmd = node.cmd.instance_variable_get("@#{kind}_#{level}")
             elsif entry.is_a?(Array) then
               node = initial_node_set.get_node_by_host(entry[0])
-              cmd = replace_groups_in_command(node.cmd.instance_variable_get("@#{kind}_#{level}"), entry)
             else
               raise "Invalid entry in array"
             end
+            cmd = node.cmd.instance_variable_get("@#{kind}_#{level}")
+            cmd = context[:cluster].instance_variable_get("@cmd_#{kind}_#{level}") unless cmd
+            cmd = Nodes::NodeCmd.generate(cmd,node)
+            cmd = replace_groups_in_command(cmd, entry) if entry.is_a?(Array)
             #We directly transmit the --no-wait parameter to the power_on/power_off commands
             if (kind == "power_on") || (kind == "power_off") then
-              
-      cmd += " --no-wait" if (not context[:execution].wait)
+              cmd += " --no-wait" if (not context[:execution].wait)
             end
             pr.add(cmd, node)
           end
@@ -539,16 +540,17 @@ class Microstep < Automata::QueueTask
 
     if bad_nodes.empty? then
       if no_command_provided_nodes.empty? then
+        bad_nodes.free(false)
+        no_command_provided_nodes.free(false)
         return nil
       else
+        bad_nodes.free(false)
         return no_command_provided_nodes
       end
     else
-      if no_command_provided_nodes.empty? then
-        return bad_nodes
-      else
-        return no_command_provided_nodes.add(bad_nodes)
-      end
+      bad_nodes.add(no_command_provided_nodes) unless no_command_provided_nodes.empty?
+      no_command_provided_nodes.free(false)
+      return bad_nodes
     end
   end
 
@@ -569,29 +571,32 @@ class Microstep < Automata::QueueTask
     end
     node_set.linked_copy(initial_node_set)
 
-    bad_nodes = Nodes::NodeSet.new
     map = Array.new
     map.push("soft")
     map.push("hard")
     map.push("very_hard")
     index = map.index(level)
     finished = false
-      
+
     while ((index < map.length) && (not finished))
       bad_nodes = _escalation_cmd_wrapper(kind, map[index], node_set, initial_node_set)
-      if (bad_nodes != nil) then
+      if bad_nodes
         node_set.delete
         index = index + 1
-          if (index < map.length) then
-            bad_nodes.move(node_set)
-          else
-            @nodes_ko.add(bad_nodes)
-          end
+        if index < map.length
+          bad_nodes.move(node_set)
+        else
+          @nodes_ko.add(bad_nodes)
+        end
       else
         finished = true
       end
+      bad_nodes.free(false) if bad_nodes
     end
+
     map.clear
+    map = nil
+    node_set.free(false)
     node_set = nil
     initial_node_set = nil
   end

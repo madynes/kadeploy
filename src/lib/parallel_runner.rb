@@ -101,17 +101,13 @@ module Kadeploy
       @execs.each_pair do |node,exec|
         status = (expects[:status] ? expects[:status] : ['0'])
 
-        unless status.include?(node.last_cmd_exit_status)
+        if !status.include?(node.last_cmd_exit_status)
           bad << node
-          next
-        end
-
-        if expects[:output] and node.last_cmd_stdout.split("\n")[0] != expects[:output]
+        elsif expects[:output] and node.last_cmd_stdout.split("\n")[0] != expects[:output]
           bad << node
-          next
+        else
+          good << node
         end
-
-        good << node
 
         # to be removed
         nodeset = Nodes::NodeSet.new
