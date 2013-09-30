@@ -28,7 +28,6 @@ module Kapower
           :errno=>APIError::INVALID_NODELIST)
         context.nodelist = context.nodes.make_array_of_hostname if context.nodes
       end
-      context.info = run_wmethod(:power,:init_info,context)
       context.operation = :status
     end
 
