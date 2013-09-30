@@ -703,9 +703,7 @@ module Configuration
                 for i in (0 ... hostnames.to_a.length)
                   tmpname = hostnames[i]
                   commonconfig.nodes.push(Nodes::Node.new(
-                    tmpname, addresses[i], clname, generate_commands(
-                      tmpname, self[clname]
-                    )
+                    tmpname, addresses[i], clname
                   ))
                 end
               else
@@ -719,8 +717,7 @@ module Configuration
                 commonconfig.nodes.push(Nodes::Node.new(
                     name,
                     address,
-                    clname,
-                    generate_commands(name, self[clname])
+                    clname
                 ))
               rescue ArgumentError
                 raise ArgumentError.new(Parser.errmsg(
@@ -744,50 +741,6 @@ module Configuration
         return true
       end
     end
-
-    def generate_commands(hostname, cluster)
-      cmd = Nodes::NodeCmd.new
-      if cluster then
-        cmd.reboot_soft = replace_hostname(cluster.cmd_soft_reboot, hostname)
-        cmd.reboot_hard = replace_hostname(cluster.cmd_hard_reboot, hostname)
-        cmd.reboot_very_hard = replace_hostname(cluster.cmd_very_hard_reboot, hostname)
-        cmd.console = replace_hostname(cluster.cmd_console, hostname)
-        cmd.power_on_soft = replace_hostname(cluster.cmd_soft_power_on, hostname)
-        cmd.power_on_hard = replace_hostname(cluster.cmd_hard_power_on, hostname)
-        cmd.power_on_very_hard = replace_hostname(cluster.cmd_very_hard_power_on, hostname)
-        cmd.power_off_soft = replace_hostname(cluster.cmd_soft_power_off, hostname)
-        cmd.power_off_hard = replace_hostname(cluster.cmd_hard_power_off, hostname)
-        cmd.power_off_very_hard = replace_hostname(cluster.cmd_very_hard_power_off, hostname)
-        cmd.power_status = replace_hostname(cluster.cmd_power_status, hostname)
-        return cmd
-      else
-        $stderr.puts "Missing specific config file for the cluster #{cluster}"
-        raise
-      end
-    end
-
-    # Replace the substrings HOSTNAME_FQDN and HOSTNAME_SHORT in a string by a value
-    #
-    # Arguments
-    # * str: string in which the HOSTNAME_FQDN and HOSTNAME_SHORT values must be replaced
-    # * hostname: value used for the replacement
-    # Output
-    # * return the new string
-    def replace_hostname(str, hostname)
-      if (str != nil) then
-        cmd_to_expand = str.clone # we must use this temporary variable since sub() modify the strings
-        save = str
-        while cmd_to_expand.sub!("HOSTNAME_FQDN", hostname) != nil  do
-          save = cmd_to_expand
-        end
-        while cmd_to_expand.sub!("HOSTNAME_SHORT", hostname.split(".")[0]) != nil  do
-          save = cmd_to_expand
-        end
-        return save
-      else
-        return nil
-      end
-    end
   end
 
   class ClusterSpecificConfig
@@ -807,16 +760,16 @@ module Configuration
     attr_reader :workflow_steps   #Array of MacroStep
     attr_reader :timeout_reboot_classical
     attr_reader :timeout_reboot_kexec
-    attr_reader :cmd_soft_reboot
-    attr_reader :cmd_hard_reboot
-    attr_reader :cmd_very_hard_reboot
+    attr_reader :cmd_reboot_soft
+    attr_reader :cmd_reboot_hard
+    attr_reader :cmd_reboot_very_hard
     attr_reader :cmd_console
-    attr_reader :cmd_soft_power_off
-    attr_reader :cmd_hard_power_off
-    attr_reader :cmd_very_hard_power_off
-    attr_reader :cmd_soft_power_on
-    attr_reader :cmd_hard_power_on
-    attr_reader :cmd_very_hard_power_on
+    attr_reader :cmd_power_off_soft
+    attr_reader :cmd_power_off_hard
+    attr_reader :cmd_power_off_very_hard
+    attr_reader :cmd_power_on_soft
+    attr_reader :cmd_power_on_hard
+    attr_reader :cmd_power_on_very_hard
     attr_reader :cmd_power_status
     attr_reader :cmd_sendenv
     attr_reader :decompress_environment
@@ -944,11 +897,11 @@ module Configuration
 
               case name
                 when 'soft'
-                  @cmd_soft_reboot = cmd
+                  @cmd_reboot_soft = cmd
                 when 'hard'
-                  @cmd_hard_reboot = cmd
+                  @cmd_reboot_hard = cmd
                 when 'very_hard'
-                  @cmd_very_hard_reboot = cmd
+                  @cmd_reboot_very_hard = cmd
               end
             end
           end
@@ -964,11 +917,11 @@ module Configuration
 
               case name
                 when 'soft'
-                  @cmd_soft_power_on = cmd
+                  @cmd_power_on_soft = cmd
                 when 'hard'
-                  @cmd_hard_power_on = cmd
+                  @cmd_power_on_hard = cmd
                 when 'very_hard'
-                  @cmd_very_hard_power_on = cmd
+                  @cmd_power_on_very_hard = cmd
               end
             end
           end
@@ -984,11 +937,11 @@ module Configuration
 
               case name
                 when 'soft'
-                  @cmd_soft_power_off = cmd
+                  @cmd_power_off_soft = cmd
                 when 'hard'
-                  @cmd_hard_power_off = cmd
+                  @cmd_power_off_hard = cmd
                 when 'very_hard'
-                  @cmd_very_hard_power_off = cmd
+                  @cmd_power_off_very_hard = cmd
               end
             end
           end
