@@ -1370,8 +1370,8 @@ class Microstep < Automata::QueueTask
         get_nodes.call(false),
         context[:cluster].pxe_header,
         pxe_profile,
-        context[:execution].true_user,
-        context[:deploy_id]||context[:reboot_id],
+        context[:execution].user,
+        context[:wid],
         context[:execution].pxe[:singularities]
       ) then
         failed_microstep("Cannot perform the set_pxe_for_custom operation")
@@ -1385,8 +1385,8 @@ class Microstep < Automata::QueueTask
           nodes,
           context[:cluster].pxe_header,
           context[:execution].pxe[:profile],
-          context[:execution].true_user,
-          context[:deploy_id]||context[:reboot_id],
+          context[:execution].user,
+          context[:wid],
           context[:execution].pxe[:singularities]
         ) then
           failed_microstep("Cannot perform the set_pxe_for_custom operation")
@@ -2089,7 +2089,7 @@ class Microstep < Automata::QueueTask
     @nodes.make_array_of_hostname.each { |hostname| list += " -m #{hostname}" }
 
     vlan_id = context[:execution].vlan_id unless vlan_id
-    cmd = context[:common].set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", vlan_id).gsub("USER", context[:execution].true_user)
+    cmd = context[:common].set_vlan_cmd.gsub("NODES", list).gsub("VLAN_ID", vlan_id).gsub("USER", context[:execution].user)
 
     unless command(cmd) then
       failed_microstep("Cannot set the VLAN")

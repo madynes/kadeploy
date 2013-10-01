@@ -169,6 +169,7 @@ module Kaworkflow
 
           # Check PXE options
           p.parse('pxe',Hash) do |pxe|
+            context.pxe = {}
             context.pxe[:profile] = p.check(pxe['profile'],String)
 
             p.check(pxe['singularities'],Hash) do |singularities|
