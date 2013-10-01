@@ -8,10 +8,6 @@ module Kareboot
     ret
   end
 
-  def reboot_init_info(cexec)
-    work_init_info(:reboot,cexec,'R-')
-  end
-
   def reboot_prepare(params,operation=:create)
     context = work_prepare(:reboot,params,operation)
 
