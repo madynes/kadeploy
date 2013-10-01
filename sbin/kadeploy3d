@@ -2,7 +2,7 @@
 
 $kadeploy_logdir=ENV['KADEPLOY3_LOGDIR']||'/var/log/kadeploy3'
 $kadeploy_logfiles = {}
-$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/lib'
 $kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 
 SSH_KEY=File.join($kadeploy_config_directory,'keys/id_deploy')
@@ -82,7 +82,7 @@ Signal::trap("HUP") do
 end
 
 
-require 'server'
+require 'kadeploy3/server'
 
 require 'thread'
 require 'fileutils'

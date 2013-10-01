@@ -9,7 +9,7 @@ $httpd_thread = nil
 $killing = false
 $debug_http = nil
 
-require 'common'
+require 'kadeploy3/common'
 
 require 'thread'
 require 'uri'
