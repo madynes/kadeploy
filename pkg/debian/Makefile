@@ -24,7 +24,7 @@ DEPLOY_USER=deploy
 DEB_TEMPLATE_CLIENT=kadeploy-client
 DEB_TEMPLATE_SERVER=kadeploy-server
 DEB_TEMPLATE_COMMON=kadeploy-common
-SRC=$(KADEPLOY_ROOT)/src
+SRC=$(KADEPLOY_ROOT)/lib
 BIN=$(KADEPLOY_ROOT)/bin
 SBIN=$(KADEPLOY_ROOT)/sbin
 CONF=$(KADEPLOY_ROOT)/conf
@@ -33,6 +33,10 @@ DB=$(KADEPLOY_ROOT)/db
 TEST=$(KADEPLOY_ROOT)/test
 MAN=$(KADEPLOY_ROOT)/man
 SCRIPTS=$(KADEPLOY_ROOT)/scripts
+LIBS_PATH=\/usr\/local\/kadeploy3
+SED_LIBS=/KADEPLOY3_LIBS/ s/$(LIBS_PATH)/$(LIBS_PATH)$(SUFFIX)/g
+CONFIGS_PATH=\/etc\/kadeploy3
+SED_CONFIGS=/KADEPLOY3_CONFIG_DIR/ s/$(CONFIGS_PATH)/$(CONFIGS_PATH)$(SUFFIX)/g
 
 SUFFIX = ""
 ifdef DEV
@@ -63,9 +67,8 @@ install_log:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/kadeploy.log
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/kadeploy.debug
 install_src:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/lib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src/lib
-	#@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/contrib/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src/contrib
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/kadeploy3/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/
+	@sed "$(SED_CONFIGS)" -i $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/*.rb
 
 install_conf_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf.yml $(DEB_ROOT_CLIENT)/etc/kadeploy3$(SUFFIX)/client_conf.yml
@@ -86,27 +89,21 @@ install_conf_common:
 
 install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kaconsole3 $(DEB_ROOT_CLIENT)/usr/bin/kaconsole3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kaconsole3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kadeploy3 $(DEB_ROOT_CLIENT)/usr/bin/kadeploy3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kaenv3 $(DEB_ROOT_CLIENT)/usr/bin/kaenv3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kaenv3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kanodes3 $(DEB_ROOT_CLIENT)/usr/bin/kanodes3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kanodes3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kapower3 $(DEB_ROOT_CLIENT)/usr/bin/kapower3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kapower3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kareboot3 $(DEB_ROOT_CLIENT)/usr/bin/kareboot3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kareboot3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kastat3 $(DEB_ROOT_CLIENT)/usr/bin/kastat3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/bin/kastat3$(SUFFIX)
+	@sed "$(SED_LIBS)" $(DEB_ROOT_CLIENT)/usr/bin/ka* -i
 
 install_sbin_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/kadeploy3d $(DEB_ROOT_SERVER)/usr/sbin/kadeploy3d$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_SERVER)/usr/sbin/kadeploy3d$(SUFFIX)
+	@sed "$(SED_LIBS)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
 
 install_sbin_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/karights3 $(DEB_ROOT_CLIENT)/usr/sbin/karights3$(SUFFIX)
-	@sed "s/\/etc\/kadeploy3/\/etc\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_CLIENT)/usr/sbin/karights3$(SUFFIX)
+	@sed "$(SED_LIBS)" $(DEB_ROOT_CLIENT)/usr/sbin/ka* -i
 
 install_kastafior:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(ADDONS)/kastafior/kastafior $(DEB_ROOT_SERVER)/usr/bin/kastafior$(SUFFIX)
@@ -161,8 +158,8 @@ tree_server:
 
 tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src/lib
+	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib
+	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/db
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/test
 	#@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src/contrib
