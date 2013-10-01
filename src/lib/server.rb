@@ -348,14 +348,14 @@ class KadeployServer
         end
         before << k
       end
-      raise NoMethodError.new("undefined method [#{kind.join(',')}]_#{meth} for #{self.inspect}:#{self.class.name}","_#{meth}") unless name
+      raise NoMethodError.new("undefined method [#{kind.join(',')}]_#{meth} for #{self}","_#{meth}") unless name
       before += args
       [:"#{name}_#{meth}",before]
     else
       if respond_to?(:"#{kind}_#{meth}")
         [:"#{kind}_#{meth}",args]
       else
-        raise NoMethodError.new("undefined method #{kind}_#{meth} for #{self.inspect}:#{self.class.name}","_#{meth}")
+        raise NoMethodError.new("undefined method #{kind}_#{meth} for #{self}","_#{meth}")
       end
     end
   end
