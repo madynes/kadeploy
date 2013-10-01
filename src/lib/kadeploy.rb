@@ -32,7 +32,7 @@ module Kadeploy
 
           unless context.environment.load_from_desc(
             env,
-            config.common.almighty_env_users,
+            cexec.almighty_users,
             context.user,
             context.client
           ) then
@@ -53,9 +53,9 @@ module Kadeploy
         context.nodes.group_by_cluster.each_pair do |cluster, nodes|
           part = (
             p.parse('block_device',String,
-              :default=>config.cluster_specific[cluster].block_device) \
+              :default=>context.config.clusters[cluster].block_device) \
             + p.parse('deploy_partition',String,:emptiable=>true,
-              :default=>config.cluster_specific[cluster].deploy_part)
+              :default=>context.config.clusters[cluster].deploy_part)
           )
           kaerror(APIError::INVALID_RIGHTS,"deployment on partition #{part}") \
             unless context.rights.granted?(context.user,nodes,part)

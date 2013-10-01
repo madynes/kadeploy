@@ -140,7 +140,7 @@ class GrabFile
     cexec = context[:execution]
 
     gfm = self.new(
-      context[:common].cache[:global], context[:output], 640, cexec.client
+      context[:caches][:global], context[:output], 640, cexec.client
     )
 
     env = cexec.environment
@@ -194,12 +194,12 @@ class GrabFile
     # Custom PXE files
     begin
       if cexec.pxe and cexec.pxe[:profile] and cexec.pxe[:files] and !cexec.pxe[:files].empty?
-        gfmk = self.new(context[:common].cache[:netboot], context[:output],
+        gfmk = self.new(context[:caches][:netboot], context[:output],
           744, cexec.client)
 
         cexec.pxe[:files].each do |pxefile|
           grab(gfmk,context,pxefile,:anon,'pxe',
-            :file => File.join(context[:common].cache[:netboot].directory,
+            :file => File.join(context[:caches][:netboot].directory,
               (
                 NetBoot.custom_prefix(
                   cexec.user,

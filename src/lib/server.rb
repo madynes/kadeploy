@@ -33,24 +33,25 @@ class KadeployServer
   include Kanodes
   include Kaconsole
 
-  attr_reader :host, :port, :secure, :cert, :private_key, :logfile, :config, :window_managers, :httpd
+  attr_reader :host, :port, :secure, :cert, :private_key, :logfile, :window_managers, :httpd
 
   def initialize()
     @config = load_config()
-    @host = @config.common.kadeploy_server
-    @port = @config.common.kadeploy_server_port
-    @secure = @config.common.secure_server
-    @private_key = @config.common.private_key
-    @cert = @config.common.cert
-    @logfile = @config.common.log_to_file
+    @config_lock = Mutex.new
+    @host = @config.static[:host]
+    @port = @config.static[:port]
+    @secure = @config.static[:secure]
+    @private_key = @config.static[:private_key]
+    @cert = @config.static[:cert]
+    @logfile = @config.static[:logfile]
     check_database()
     @window_managers = {
       :reboot => WindowManager.new(
-        @config.common.reboot_window,
-        @config.common.reboot_window_sleep_time
+        @config.static[:reboot_window],
+        @config.static[:reboot_window_sleep_time]
       ),
       :check => WindowManager.new(
-        @config.common.nodes_check_window,
+        @config.static[:nodes_check_window],
         1
       ),
     }
@@ -70,31 +71,60 @@ class KadeployServer
   def kill
   end
 
-  def load_config()
+  def load_config(caches=nil)
     ret = nil
     begin
-      ret = Configuration::Config.new(false)
+      ret = Configuration::Config.new(nil,caches)
     rescue KadeployError, ArgumentError => e
       kaerror(APIError::BAD_CONFIGURATION,e.message)
     end
     ret
   end
 
-  def database_handler()
-    db = Database::DbFactory.create(@config.common.db_kind)
-    unless db.connect(
-      @config.common.deploy_db_host,
-      @config.common.deploy_db_login,
-      @config.common.deploy_db_passwd,
-      @config.common.deploy_db_name
-    ) then
-      kaerror(APIError::DATABASE_ERROR,'Cannot connect to the database')
+  def reload_config()
+    @config_lock.synchronize do
+      newconfig = load_config(@config.caches)
+      if @config.static_values == newconfig.static_values
+        oldconfig = @config
+        @config = newconfig
+        oldconfig.free
+      else
+        kaerror(APIError::BAD_CONFIGURATION,'Some static parameters were modified, please restart the server')
+      end
     end
-    db
+  end
+
+  def cfg()
+    @config_lock.synchronize do
+      if block_given?
+        yield(@config)
+      else
+        @config
+      end
+    end
+  end
+
+  def duplicate_config()
+    cfg().duplicate()
+  end
+
+  def database_handler()
+    cfg() do |conf|
+      db = Database::DbFactory.create(conf.common.db_kind)
+      unless db.connect(
+        conf.common.deploy_db_host.dup,
+        conf.common.deploy_db_login.dup,
+        conf.common.deploy_db_passwd.dup,
+        conf.common.deploy_db_name.dup
+      ) then
+        kaerror(APIError::DATABASE_ERROR,'Cannot connect to the database')
+      end
+      db
+    end
   end
 
   def rights_handler(db)
-    Rights::Factory.create(config.common.rights_kind,db)
+    Rights::Factory.create(cfg.common.rights_kind.dup,db)
   end
 
   def check_database()
@@ -175,6 +205,7 @@ class KadeployServer
     ret.cert = nil
     ret.database = database_handler()
     ret.rights = rights_handler(ret.database)
+    ret.almighty_users = cfg.common.almighty_env_users.dup
     ret.info = nil
     ret.dry_run = nil
     ret
@@ -182,6 +213,8 @@ class KadeployServer
 
   def free_exec_context(context)
     context.database.disconnect if context.database
+    context.almighty_users.clear if context.almighty_users
+    context.almighty_users = nil
     context.database = nil
     context.secret_key = nil
     context.cert = nil
@@ -195,6 +228,7 @@ class KadeployServer
     context.marshal_dump.keys.each do |name|
       obj = context.send(name.to_sym)
       obj.free if obj.respond_to?(:free)
+      obj.clear if obj.respond_to?(:clear)
       context.delete_field(name)
     end
   end
@@ -210,15 +244,17 @@ class KadeployServer
   end
 
   def parse_params(params)
-    parser = ParamsParser.new(params,@config)
+    parser = nil
+    cfg(){ |conf| parser = ParamsParser.new(params,conf) }
     yield(parser)
+    parser.free
     parser = nil
   end
 
   def authenticate!(request,options)
     # Authentication with certificate
-    if config.common.auth[:cert] and options.cert
-      ok,msg = config.common.auth[:cert].auth!(
+    if cfg.static[:auth][:cert] and options.cert
+      ok,msg = cfg.static[:auth][:cert].auth!(
         HTTPd.get_sockaddr(request), :cert => options.cert)
       error_unauthorized!("Authentication failed: #{msg}") unless ok
       # TODO: necessary ?
@@ -227,8 +263,8 @@ class KadeployServer
       #    "only almighty user can be authenticated with the secret key")
       #end
     # Authentication by secret key
-    elsif config.common.auth[:secret_key] and options.secret_key
-      ok,msg = config.common.auth[:secret_key].auth!(
+    elsif cfg.static[:auth][:secret_key] and options.secret_key
+      ok,msg = cfg.static[:auth][:secret_key].auth!(
         HTTPd.get_sockaddr(request), :key => options.secret_key)
       error_unauthorized!("Authentication failed: #{msg}") unless ok
       # TODO: necessary ?
@@ -237,20 +273,20 @@ class KadeployServer
       #    "only almighty user can be authenticated with the secret key")
       #end
     # Authentication with Ident
-    elsif config.common.auth[:ident]
-      ok,msg = config.common.auth[:ident].auth!(
+    elsif cfg.static[:auth][:ident]
+      ok,msg = cfg.static[:auth][:ident].auth!(
         HTTPd.get_sockaddr(request), :user => options.user, :port => @httpd.port)
       error_unauthorized!("Authentication failed: #{msg}") unless ok
     else
       error_unauthorized!("Authentication failed: valid methods are "\
-        "#{config.common.auth.keys.collect{|k| k.to_s}.join(', ')}")
+        "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
     end
   end
 
   def config_httpd_bindings(httpd)
     # GET
     @httpd = httpd
-    @httpd.bind([:GET],'/version',:content,{:version => @config.common.version})
+    @httpd.bind([:GET],'/version',:content,{:version => cfg.common.version.dup})
     @httpd.bind([:GET],'/info',:method,:object=>self,:method=>:get_users_info)
     @httpd.bind([:GET],'/clusters',:method,:object=>self,:method=>:get_clusters)
     #@httpd.bind([:GET],'/nodes',:method,:object=>self,:method=>:get_nodes)
@@ -502,19 +538,19 @@ class KadeployServer
   end
 
   def get_nodes(*args)
-    @config.common.nodes_desc.make_array_of_hostname
+    cfg.common.nodes.make_array_of_hostname
   end
 
   def get_clusters(*args)
-    @config.cluster_specific.keys
+    cfg.clusters.keys.dup
   end
 
   def get_users_info(*args)
     ret = {}
 
-    ret[:pxe] = @config.common.pxe[:dhcp].class.name.split('::').last
+    ret[:pxe] = cfg.common.pxe[:dhcp].class.name.split('::').last
     ret[:supported_fs] = {}
-    @config.cluster_specific.each_pair do |cluster,conf|
+    cfg.clusters.each_pair do |cluster,conf|
       ret[:supported_fs][cluster] = conf.deploy_supported_fs
     end
     ret[:vars] = Microstep.load_deploy_context().keys.sort

@@ -1069,10 +1069,10 @@ class Microstep < Automata::QueueTask
       failed_microstep("The torrent file (#{torrent}) has not been created")
       return false
     end
-    if context[:common].kadeploy_disable_cache then
+    if !context[:caches][:global] then
       seed_pid = Bittorrent::launch_seed(torrent, File.dirname(file))
     else
-      seed_pid = Bittorrent::launch_seed(torrent, context[:common].cache[:global].directory)
+      seed_pid = Bittorrent::launch_seed(torrent, context[:caches][:global].directory)
     end
     if (seed_pid == -1) then
       failed_microstep("The seed of #{torrent} has not been launched")
