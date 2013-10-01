@@ -6,7 +6,6 @@ require 'uri'
 
 #Kadeploy libs
 require 'db'
-require 'md5'
 require 'http'
 require 'debug'
 require 'configparser'

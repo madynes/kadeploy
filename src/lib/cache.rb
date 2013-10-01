@@ -3,12 +3,12 @@ require 'pathname'
 require 'thread'
 require 'fileutils'
 require 'digest'
+require 'digest/md5'
 require 'uri'
 require 'yaml'
 
 #Kadeploy3 libs
 require 'error'
-require 'md5'
 require 'execute'
 
 module Kadeploy
@@ -231,7 +231,7 @@ class CacheFile
   def refresh!()
     @mtime = File.mtime(@file) #if local_path?()
     @atime = Time.now
-    @md5 = MD5::get_md5_sum(@file) if @priority != 0
+    @md5 = Digest::MD5.file(@file).hexdigest! if @priority != 0
     @size = File.size(@file)
     @filename = self.class.filename(@prefix,@path,@version,@user,@md5,@priority,@tag,@uuid)
   end

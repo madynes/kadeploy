@@ -1,9 +1,9 @@
 require 'uri'
 require 'fileutils'
 require 'base64'
+require 'digest/md5'
 
 require 'http'
-require 'md5'
 require 'error'
 
 module Kadeploy
@@ -69,7 +69,7 @@ class ServerFetchFile < FetchFile
 
   def checksum
     if File.readable?(@path)
-      MD5::get_md5_sum(@path)
+      Digest::MD5.file(@path).hexdigest!
     else
       error("Unable to grab the file #{@path}")
     end

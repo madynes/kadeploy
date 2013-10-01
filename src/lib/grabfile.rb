@@ -2,7 +2,6 @@
 require 'debug'
 require 'nodes'
 require 'cache'
-require 'md5'
 require 'http'
 require 'error'
 require 'netboot'
