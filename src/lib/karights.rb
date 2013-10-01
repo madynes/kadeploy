@@ -1,5 +1,3 @@
-require 'rights'
-
 module Kadeploy
 
 module Karights

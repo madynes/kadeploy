@@ -1,17 +1,7 @@
-#Ruby libs
 require 'tempfile'
 require 'pathname'
 require 'yaml'
 require 'uri'
-
-#Kadeploy libs
-require 'db'
-require 'http'
-require 'debug'
-require 'configparser'
-require 'grabfile'
-require 'fetchfile'
-require 'error'
 
 module Kadeploy
 
@@ -141,10 +131,6 @@ class Environment
     @multipart = nil
     @options = nil
     @recorded = nil
-  end
-
-  def debug(msg)
-    #Debug::distant_client_error(msg,client)
   end
 
   def error(errno,msg)

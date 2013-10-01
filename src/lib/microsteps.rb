@@ -1,15 +1,3 @@
-#Kadeploy libs
-require 'debug'
-require 'nodes'
-require 'automata'
-require 'parallel_ops'
-require 'parallel_runner'
-require 'netboot'
-require 'cache'
-require 'bittorrent'
-require 'port_scanner'
-
-#Ruby libs
 require 'fileutils'
 require 'socket'
 require 'tempfile'

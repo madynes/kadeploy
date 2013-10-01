@@ -9,7 +9,6 @@ require 'zlib'
 require 'stringio'
 require 'json'
 require 'yaml'
-require 'csv'
 
 if RUBY_VERSION < "2.0"
   # Monkey patch to remove DH encryption related warnings

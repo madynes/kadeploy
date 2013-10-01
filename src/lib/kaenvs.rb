@@ -1,5 +1,3 @@
-require 'httpd'
-
 module Kadeploy
 
 module Kaenvs

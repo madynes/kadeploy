@@ -2,10 +2,8 @@
 
 
 $kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
-
 $:.unshift($kadeploy_libs)
 
-require 'optparse'
 require 'client'
 
 Signal.trap("INT") do

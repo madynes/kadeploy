@@ -1,5 +1,3 @@
-require 'execute'
-
 module Kadeploy
 
 module TakTuk

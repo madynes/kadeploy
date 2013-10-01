@@ -1,8 +1,3 @@
-#Kadelpoy libs
-require 'automata'
-require 'netboot'
-require 'debug'
-
 module Kadeploy
 
 module Macrostep

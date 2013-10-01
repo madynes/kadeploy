@@ -1,13 +1,3 @@
-#Kadeploy libs
-require 'debug'
-require 'nodes'
-require 'cache'
-require 'http'
-require 'error'
-require 'netboot'
-require 'fetchfile'
-
-#Ruby libs
 require 'thread'
 require 'uri'
 require 'fileutils'

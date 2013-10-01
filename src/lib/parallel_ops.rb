@@ -1,7 +1,3 @@
-#Contrib libs
-require 'taktuk'
-
-#Ruby libs
 require 'yaml'
 require 'socket'
 

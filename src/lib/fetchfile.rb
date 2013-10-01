@@ -3,9 +3,6 @@ require 'fileutils'
 require 'base64'
 require 'digest/md5'
 
-require 'http'
-require 'error'
-
 module Kadeploy
 
 class FetchFile

@@ -1,9 +1,5 @@
 require 'uri'
 
-require 'grabfile'
-require 'workflow'
-require 'kaworkflow'
-
 module Kadeploy
 
 module Kadeploy

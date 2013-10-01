@@ -1,7 +1,3 @@
-require 'db'
-require 'api'
-require 'csv'
-
 module Kadeploy
 
 module Stats

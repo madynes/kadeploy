@@ -1,4 +1,3 @@
-require 'drb/drb'
 require 'thread'
 
 module Kadeploy

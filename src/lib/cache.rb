@@ -1,4 +1,3 @@
-#Ruby libs
 require 'pathname'
 require 'thread'
 require 'fileutils'
@@ -6,10 +5,6 @@ require 'digest'
 require 'digest/md5'
 require 'uri'
 require 'yaml'
-
-#Kadeploy3 libs
-require 'error'
-require 'execute'
 
 module Kadeploy
 

@@ -1,5 +1,3 @@
-require 'stats'
-
 module Kadeploy
 
 module Kastats

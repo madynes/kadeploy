@@ -1,8 +1,3 @@
-
-#Kadeploy libs
-require 'nodes'
-
-#Ruby libs
 require 'thread'
 
 module Kadeploy

@@ -1,10 +1,3 @@
-CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
-USER = `id -nu`.strip
-
-STATUS_UPDATE_DELAY = 1
-SLEEP_PITCH = 1
-R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
-
 $kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 
 $kadeploy_logdir = nil
@@ -16,16 +9,11 @@ $httpd_thread = nil
 $killing = false
 $debug_http = nil
 
-require 'configparser'
-require 'port_scanner'
-require 'fetchfile'
-require 'environment'
-require 'http'
-require 'httpd'
-require 'api'
+require 'common'
 
 require 'thread'
 require 'uri'
+require 'optparse'
 require 'net/http'
 require 'net/https'
 require 'timeout'
@@ -34,6 +22,12 @@ require 'yaml'
 
 
 module Kadeploy
+CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
+USER = `id -nu`.strip
+STATUS_UPDATE_DELAY = 1
+SLEEP_PITCH = 1
+R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
+
 
 class Client
   attr_reader :name, :nodes

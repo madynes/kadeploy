@@ -1,5 +1,3 @@
-require 'api'
-
 module Kadeploy
 
 module Kaworkflow

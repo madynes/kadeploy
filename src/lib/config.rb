@@ -1,19 +1,3 @@
-#Kadeploy libs
-require 'environment'
-require 'nodes'
-require 'debug'
-require 'error'
-require 'configparser'
-require 'macrostep'
-require 'stepdeploy'
-require 'stepreboot'
-require 'steppower'
-require 'microsteps'
-require 'netboot'
-require 'grabfile'
-require 'authentication'
-
-#Ruby libs
 require 'optparse'
 require 'ostruct'
 require 'fileutils'
@@ -23,12 +7,7 @@ require 'yaml'
 
 module Kadeploy
 
-R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
-R_HTTP = /^http[s]?:\/\//
-
 module Configuration
-  USER = `id -nu`.chomp
-  CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
   KADEPLOY_PORT = 25300
 
   module ConfigFile

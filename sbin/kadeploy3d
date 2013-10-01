@@ -1,6 +1,5 @@
 #!/usr/bin/ruby -w
 
-
 $kadeploy_logdir=ENV['KADEPLOY3_LOGDIR']||'/var/log/kadeploy3'
 $kadeploy_logfiles = {}
 $kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/src/lib'
@@ -83,14 +82,12 @@ Signal::trap("HUP") do
 end
 
 
+require 'server'
+
 require 'thread'
 require 'fileutils'
 require 'json'
 require 'optparse'
-
-require 'server'
-require 'httpd'
-require 'config'
 
 
 def clean()

@@ -1,5 +1,3 @@
-require 'db'
-
 module Kadeploy
 
 module Rights

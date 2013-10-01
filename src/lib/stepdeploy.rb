@@ -1,6 +1,3 @@
-require 'debug'
-require 'macrostep'
-
 module Kadeploy
 
 module Macrostep

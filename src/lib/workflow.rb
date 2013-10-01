@@ -1,18 +1,3 @@
-#Kadeploy libs
-require 'debug'
-require 'nodes'
-require 'automata'
-require 'config'
-require 'macrostep'
-require 'stepdeploy'
-require 'stepreboot'
-require 'steppower'
-require 'http'
-require 'error'
-require 'grabfile'
-require 'window'
-
-#Ruby libs
 require 'thread'
 require 'uri'
 require 'tempfile'

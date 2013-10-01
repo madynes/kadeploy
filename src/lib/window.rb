@@ -1,9 +1,3 @@
-#Kadeploy libs
-require 'debug'
-require 'nodes'
-require 'error'
-
-#Ruby libs
 require 'thread'
 require 'uri'
 require 'tempfile'

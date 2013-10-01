@@ -1,10 +1,6 @@
 require 'thread'
 require 'timeout'
 
-require 'nodes'
-
-#Thread::abort_on_exception = true
-
 module Kadeploy
 
 module Automata

@@ -1,3 +1,5 @@
+module Kadeploy
+
 class CompressedCSV
   attr_reader :file, :gz, :algorithm
 
@@ -52,3 +54,4 @@ class CompressedCSV
   end
 end
 
+end
