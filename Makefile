@@ -59,9 +59,6 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/parted-sample $(DESTDIR)/etc/kadeploy3
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/fdisk-sample $(DESTDIR)/etc/kadeploy3
 
-install_conf_common:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DESTDIR)/etc/kadeploy3
-
 install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/* $(DESTDIR)/usr/bin
 
@@ -120,7 +117,7 @@ tree_common:
 	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 
-install_common: tree_common install_conf_common install_src install_test install_db install_man
+install_common: tree_common install_src install_test install_db install_man
 
 install_client: tree_client install_conf_client install_bin
 

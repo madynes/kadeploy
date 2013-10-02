@@ -83,10 +83,6 @@ install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/parted-sample $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/partitioning/fdisk-sample $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 
-install_conf_common:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(CONF)/load_kadeploy_env $(DEB_ROOT_COMMON)/etc/kadeploy3$(SUFFIX)/load_kadeploy_env
-	@sed "s/\/kadeploy3/\/kadeploy3$(SUFFIX)/g" -i $(DEB_ROOT_COMMON)/etc/kadeploy3$(SUFFIX)/load_kadeploy_env
-
 install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kaconsole3 $(DEB_ROOT_CLIENT)/usr/bin/kaconsole3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kadeploy3 $(DEB_ROOT_CLIENT)/usr/bin/kadeploy3$(SUFFIX)
@@ -194,7 +190,7 @@ endif
 	@$(MAKE) build-clean
 
 
-package_common: build-clean build tree_common install_conf_common install_src install_test install_db_script install_man
+package_common: build-clean build tree_common install_src install_test install_db_script install_man
 	#@mkdir -p $(DEB_ROOT_COMMON)
 	#@cp -rf $(DEB_TEMPLATE_COMMON)/* $(DEB_ROOT_COMMON)
 	@mkdir -p $(DEB_ROOT_COMMON)/DEBIAN

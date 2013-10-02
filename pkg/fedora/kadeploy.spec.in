@@ -54,7 +54,6 @@ rm -rf $RPM_BUILD_ROOT
 %doc License.txt
 /usr/local/kadeploy3
 %dir /etc/kadeploy3
-/etc/kadeploy3/load_kadeploy_env
 %doc %attr(0444,root,root) /usr/local/man/man1/kadeploy3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kareboot3.1
 %doc %attr(0444,root,root) /usr/local/man/man1/kaenv3.1
