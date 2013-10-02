@@ -7,14 +7,18 @@ introduction do
     paragraph 'X-Application-Error-Code, ...'
     paragraph 'Kadeploy Error numbers'
   end
+  section "Output type and encoding" do
+    paragraph 'Accept: json/yaml and Accept-Encoding: gzip'
+  end
+  section "Global parameters" do
+    paragraph ':user -> mandatory'
+  end
   section 'Workflow based operations' do
+    paragraph 'specific resources: /output, /debug (as timestamp|message), ...'
   end
   section 'Exporting files for the server','file_export' do
     paragraph 'local://, server://, http://'
   end
   section "API path notation" do
-  end
-  section "Global parameters" do
-    paragraph ':user -> mandatory, ?pretty'
   end
 end
