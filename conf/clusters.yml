@@ -1,9 +1,9 @@
---- 
-clusters: 
-- name: g5kdev-cluster
-  conf_file: ./cluster_conf-g5kdev-cluster.yml
-  nodes: 
+---
+clusters:
+- name: sample-cluster
+  conf_file: sample-cluster.yml
+  nodes:
   - address: 172.16.160.2
-    name: vm-001
+    name: node-1
   - address: 172.16.160.3
-    name: vm-002
+    name: node-2

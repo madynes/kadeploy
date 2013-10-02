@@ -1,10 +1,10 @@
 ---
-default: nancy
+default: site1
 servers:
-- name: nancy
+- name: site1
   port: 25300
-  hostname: frontend.nancy.grid5000.fr
+  hostname: frontend.site1.testbed.lan
   secure: true
-- name: rennes
+- name: site2
   port: 25300
-  hostname: frontend.rennes.grid5000.fr
+  hostname: frontend.site2.testbed.lan
