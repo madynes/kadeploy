@@ -7,6 +7,7 @@ $clients = []
 $httpd = nil
 $httpd_thread = nil
 $killing = false
+$debug_mode = nil
 $debug_http = nil
 
 require 'kadeploy3/common'
@@ -82,7 +83,8 @@ class Client
         $httpd.kill if $httpd
       end
 
-      $debug_http.close if $debug_http and $debug_http != $stdout
+      $debug_mode.close if $debug_mode and $debug_mode != $stdout and !$debug_mode.closed?
+      $debug_http.close if $debug_http and $debug_http != $stdout and !$debug_http.closed?
 
       $files.each do |file|
         file.close unless file.closed?
@@ -349,7 +351,7 @@ class Client
     end
   end
 
-  def debug(msg='',print=true)
+  def debug(msg='',print=true,io=$stdout)
     if @name
       tmp = ''
       msg.each_line do |line|
@@ -359,7 +361,7 @@ class Client
     end
 
     if print
-      $stdout.puts msg
+      io.puts msg
     else
       msg
     end
@@ -574,9 +576,9 @@ class Client
       opt.on("-M","--multi-server", "Activate the multi-server mode") {
         options[:multi_server] = true
       }
-      opt.on("-H", "--[no-]debug-http", "Debug HTTP communications with the server (can be redirected to the fd 3)") { |v|
+      opt.on("-H", "--[no-]debug-http", "Debug HTTP communications with the server (can be redirected to the fd #4)") { |v|
         if v
-          $debug_http = IO.new(3) rescue $stdout unless $debug_http
+          $debug_http = IO.new(4) rescue $stdout unless $debug_http
         end
       }
       opt.on("-S","--server STRING", "Specify the Kadeploy server to use") { |s|
@@ -687,6 +689,7 @@ class Client
       file.close unless file.closed?
     end
 
+    $debug_mode.close if $debug_mode and $debug_mode != $stdout and !$debug_mode.closed?
     $debug_http.close if $debug_http and $debug_http != $stdout and !$debug_http.closed?
 
     if options[:script]
@@ -812,8 +815,11 @@ class ClientWorkflow < Client
   end
 
   def self.parse_debug(opt,options)
-    opt.on("-d", "--[no-]debug-mode", "Activate the debug mode") { |v|
+    opt.on("-d", "--[no-]debug-mode", "Activate the debug mode  (can be redirected to the fd #3)") { |v|
       options[:debug] = v
+      if v
+        $debug_mode = IO.new(3) rescue $stdout unless $debug_mode
+      end
     }
   end
 
@@ -1042,7 +1048,14 @@ p @resources['resource']
           dbg = dbg.split("\n")
           dbg.delete_if{|line| line.empty?}
           dbg.collect!{|line| "#{line.split('|')[0]}|[dbg] #{line.split('|')[1]}" rescue "[dbg] #{line}"}
-          out += dbg
+          if $debug_mode and $debug_mode != $stdout
+            dbg.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
+            dbg.collect!{|line| line.split("|")[1] rescue line }
+            debug(dbg.join("\n"),true,$debug_mode)
+          else
+            out += dbg
+          end
+          dbg.clear
         end
 
         unless out.empty?
