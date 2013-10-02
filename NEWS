@@ -29,6 +29,9 @@
 * Client configuration file (doc sec/3)
   - The connection to a specific server can be secure or not
 
+!! Database update !!
+* The Kadeploy3 database have to be updated with the script db/update-3.2.sql
+
 
 ## New in 3.1.7 ##
 == User interface ==
