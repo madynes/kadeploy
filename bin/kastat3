@@ -41,40 +41,40 @@ class KastatClient < Client
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-a", "--all", "Print all the information") {
+      add_opt(opt,"-a", "--all", "Print all the information") {
         options[:kind] = :all
       }
-      opt.on("-b", "--failure-rate [RATE]", /^0?\.\d+|1(?:\.0)?$/, "Print the nodes which have a minimum failure-rate of RATE 1 (0 <= RATE <= 1)") { |r|
+      add_opt(opt,"-b", "--failure-rate [RATE]", /^0?\.\d+|1(?:\.0)?$/, "Print the nodes which have a minimum failure-rate of RATE 1 (0 <= RATE <= 1)") { |r|
         options[:kind] = :failure_rates
         options[:min_failure_rate] = r.to_f if r
       }
       parse_machinefile(opt,options)
-      opt.on("-F", "--fields FIELDS", Array, "Only print the selected fields (wid,user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
+      add_opt(opt,"-F", "--fields FIELDS", Array, "Only print the selected fields (wid,user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
         options[:fields] = f
       }
       parse_machine(opt,options)
-      opt.on("-o", "--operation OP", ['deploy','reboot','power'], "Only print statistics about a specific operation") { |n|
+      add_opt(opt,"-o", "--operation OP", ['deploy','reboot','power'], "Only print statistics about a specific operation") { |n|
         options[:operation] = n
       }
-      opt.on("-r", "--min-retries NB", /^\d+$/, "Print the statistics about the nodes that need at least NB attempts to perform specific steps") { |n|
+      add_opt(opt,"-r", "--min-retries NB", /^\d+$/, "Print the statistics about the nodes that need at least NB attempts to perform specific steps") { |n|
         options[:min_retries] = n.to_i
       }
-      opt.on("-s", "--retry-steps STEPS", Array, "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
+      add_opt(opt,"-s", "--retry-steps STEPS", Array, "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
         options[:step_retries] = s
       }
-      opt.on("-w", "--workflow-id ID", "Get the stats of a specific deployment") { |w|
+      add_opt(opt,"-w", "--workflow-id ID", "Get the stats of a specific deployment") { |w|
         options[:wid] = w
       }
-      opt.on("-x", "--date-min TIME", Time, "Get the stats from this date (yyyy-mm-dd hh:mm:ss)") { |d|
+      add_opt(opt,"-x", "--date-min TIME", Time, "Get the stats from this date (yyyy-mm-dd hh:mm:ss)") { |d|
         options[:date_min] = d
       }
-      opt.on("-y", "--date-max TIME", Time, "Get the stats to this date (yyyy-mm-dd hh:mm:ss)") { |d|
+      add_opt(opt,"-y", "--date-max TIME", Time, "Get the stats to this date (yyyy-mm-dd hh:mm:ss)") { |d|
         options[:date_max] = d
       }
-      opt.on("", "--limit N", /^\d+$/, "Print a maximal number of N results") {|n|
+      add_opt(opt,"", "--limit N", /^\d+$/, "Print a maximal number of N results") {|n|
         options[:limit] = n
       }
-      opt.on("", "--sort VALS", Array, "Sort the result on some specific fields (default: start)") { |s|
+      add_opt(opt,"", "--sort VALS", Array, "Sort the result on some specific fields (default: start)") { |s|
         options[:sort] = s
       }
     end

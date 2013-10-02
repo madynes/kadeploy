@@ -236,38 +236,38 @@ class Client
   end
 
   def self.parse_machinefile(opt,options)
-    opt.on("-f", "--file MACHINELIST", "A file containing a list of nodes (- means stdin)")  { |f|
+    add_opt(opt,"-f", "--file MACHINELIST", "A file containing a list of nodes (- means stdin)")  { |f|
       load_machinefile(options[:nodes], f)
     }
   end
 
   def self.parse_machine(opt,options)
-    opt.on("-m", "--machine MACHINE", "The node to run on") { |m|
+    add_opt(opt,"-m", "--machine MACHINE", "The node to run on") { |m|
       load_machine(options[:nodes], m)
     }
   end
 
   def self.parse_user(opt,options)
-    opt.on("-u", "--user USERNAME", /^\w+$/, "Specify the user") { |u|
+    add_opt(opt,"-u", "--user USERNAME", /^\w+$/, "Specify the user") { |u|
       options[:user] = u
     }
   end
 
   def self.parse_env_name(opt,options)
-    opt.on("-e", "--env-name ENVNAME", "Name of the recorded environment") { |n|
+    add_opt(opt,"-e", "--env-name ENVNAME", "Name of the recorded environment") { |n|
       options[:env_name] = n
       yield(n)
     }
   end
 
   def self.parse_env_version(opt,options)
-    opt.on("--env-version NUMBER", /^\d+$/, "Version number of the recorded environment") { |n|
+    add_opt(opt,"--env-version NUMBER", /^\d+$/, "Version number of the recorded environment") { |n|
       options[:env_version] = n.to_i
     }
   end
 
   def self.parse_secure(opt,options)
-    opt.on("--[no-]secure", "Use a secure connection to export files to the server") { |v|
+    add_opt(opt,"--[no-]secure", "Use a secure connection to export files to the server") { |v|
       options[:secure] = v
     }
   end
@@ -499,6 +499,37 @@ class Client
     nodelist
   end
 
+  def self.term_size()
+    if ENV['COLUMNS']
+      ENV['COLUMNS'].to_i rescue 80
+    else
+      if !(size = `stty size`.strip).empty?
+        size.split(' ')[1].to_i
+      else
+        80
+      end
+    end
+  end
+
+  def self.print_optdesc(str,indentsize)
+    return str.dup if term_size() <= 0
+    ret = ''
+    tmp = nil
+    str.split(' ').each do |val|
+      if tmp.nil?
+        tmp = val
+      elsif tmp.size + val.size + indentsize + 1 > term_size()
+        ret << tmp
+        ret << "\n#{([' ']*indentsize).join}"
+        tmp = val
+      else
+        tmp << " #{val}"
+      end
+    end
+    ret << tmp if tmp and !tmp.empty?
+    ret
+  end
+
   def self.print_arraystr(arr,prefix=nil)
     ret = ''
     prefix = prefix || ''
@@ -565,6 +596,14 @@ class Client
     }
   end
 
+  def self.add_opt(opt,*args,&block)
+    desc = args.last
+    tmp = print_optdesc(desc,opt.summary_width+opt.summary_indent.size+1)
+    desc.clear
+    desc << tmp
+    opt.on(*args,&block)
+  end
+
   def self.global_parse_options()
     options = load_options()
     opts = OptionParser::new do |opt|
@@ -574,24 +613,24 @@ class Client
       opt.separator "Contact: #{CONTACT_EMAIL}"
       opt.separator ""
       opt.separator "Generic options:"
-      opt.on("-v", "--version", "Get the server's version") {
+      add_opt(opt,"-v", "--version", "Get the server's version") {
         options[:get_version] = true
       }
-      opt.on("-I", "--server-info", "Get information about the server's configuration") {
+      add_opt(opt,"-I", "--server-info", "Get information about the server's configuration") {
         options[:get_users_info] = true
       }
-      opt.on("-M","--multi-server", "Activate the multi-server mode") {
+      add_opt(opt,"-M","--multi-server", "Activate the multi-server mode") {
         options[:multi_server] = true
       }
-      opt.on("-H", "--[no-]debug-http", "Debug HTTP communications with the server (can be redirected to the fd #4)") { |v|
+      add_opt(opt,"-H", "--[no-]debug-http", "Debug HTTP communications with the server (can be redirected to the fd #4)") { |v|
         if v
           $debug_http = IO.new(4) rescue $stdout unless $debug_http
         end
       }
-      opt.on("-S","--server STRING", "Specify the Kadeploy server to use") { |s|
+      add_opt(opt,"-S","--server STRING", "Specify the Kadeploy server to use") { |s|
         options[:chosen_server] = s
       }
-      opt.on("","--[no-]dry-run", "Perform a dry run") { |v|
+      add_opt(opt,"","--[no-]dry-run", "Perform a dry run") { |v|
         options[:dry_run] = v
       }
       opt.separator ""
@@ -795,34 +834,34 @@ class ClientWorkflow < Client
   end
 
   def self.parse_okfile(opt,options)
-    opt.on("-o", "--output-ok-nodes FILENAME", "File that will contain the nodes on which the operation has been correctly performed")  { |f|
+    add_opt(opt,"-o", "--output-ok-nodes FILENAME", "File that will contain the nodes on which the operation has been correctly performed")  { |f|
       options[:nodes_ok_file] = f
       load_outputfile(f)
     }
   end
 
   def self.parse_kofile(opt,options)
-    opt.on("-n", "--output-ko-nodes FILENAME", "File that will contain the nodes on which the operation has not been correctly performed")  { |f|
+    add_opt(opt,"-n", "--output-ko-nodes FILENAME", "File that will contain the nodes on which the operation has not been correctly performed")  { |f|
       options[:nodes_ko_file] = f
       load_outputfile(f)
     }
   end
 
   def self.parse_keyfile(opt,options)
-    opt.on("-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use ~/.ssh/authorized_keys") { |f|
+    add_opt(opt,"-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use ~/.ssh/authorized_keys") { |f|
       options[:key] =  ''
       load_keyfile(f,options[:key])
     }
   end
 
   def self.parse_op_level(opt,options)
-    opt.on("-l", "--op-level VALUE", ['soft','hard','very_hard'], "Operation\'s level (soft, hard, very_hard)") { |l|
+    add_opt(opt,"-l", "--op-level VALUE", ['soft','hard','very_hard'], "Operation\'s level (soft, hard, very_hard)") { |l|
       options[:level] = l.downcase
     }
   end
 
   def self.parse_debug(opt,options)
-    opt.on("-d", "--[no-]debug-mode", "Activate the debug mode  (can be redirected to the fd #3)") { |v|
+    add_opt(opt,"-d", "--[no-]debug-mode", "Activate the debug mode  (can be redirected to the fd #3)") { |v|
       options[:debug] = v
       if v
         $debug_mode = IO.new(3) rescue $stdout unless $debug_mode
@@ -831,32 +870,32 @@ class ClientWorkflow < Client
   end
 
   def self.parse_verbose(opt,options)
-    opt.on("-V", "--verbose-level VALUE", /^[0-5]$/, "Verbose level (between 0 to 5)") { |d|
+    add_opt(opt,"-V", "--verbose-level VALUE", /^[0-5]$/, "Verbose level (between 0 to 5)") { |d|
       options[:verbose_level] = d.to_i
     }
   end
 
   def self.parse_block_device(opt,options)
-    opt.on("-b", "--block-device BLOCKDEVICE", /^[\w\/]+$/, "Specify the block device to use") { |b|
+    add_opt(opt,"-b", "--block-device BLOCKDEVICE", /^[\w\/]+$/, "Specify the block device to use") { |b|
       options[:block_device] = b
       options[:deploy_part] = '' unless options[:deploy_part]
     }
   end
 
   def self.parse_deploy_part(opt,options)
-    opt.on("-p", "--partition-number NUMBER", /^\d*$/, "Specify the partition number to use") { |p|
+    add_opt(opt,"-p", "--partition-number NUMBER", /^\d*$/, "Specify the partition number to use") { |p|
       options[:deploy_part] = p
     }
   end
 
   def self.parse_vlan(opt,options)
-    opt.on("--vlan VLANID", "Set the VLAN") { |id|
+    add_opt(opt,"--vlan VLANID", "Set the VLAN") { |id|
       options[:vlan] = id
     }
   end
 
   def self.parse_pxe_profile(opt,options)
-    opt.on("-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
+    add_opt(opt,"-w", "--set-pxe-profile FILE", "Set the PXE profile (use with caution)") { |f|
       if check_file(f)
         options[:pxe_profile] = File.read(f)
       else
@@ -866,7 +905,7 @@ class ClientWorkflow < Client
   end
 
   def self.parse_pxe_pattern(opt,options)
-    opt.on("--set-pxe-pattern FILE", "Specify a file containing the substitution of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
+    add_opt(opt,"--set-pxe-pattern FILE", "Specify a file containing the substitution of a pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)") { |f|
       if (lines = load_inputfile(f))
         options[:pxe_profile_singularities] = {}
         lines.each do |line|
@@ -880,7 +919,7 @@ class ClientWorkflow < Client
   end
 
   def self.parse_pxe_files(opt,options)
-    opt.on("-x", "--upload-pxe-files FILES", Array, "Upload a list of files (file1,file2,file3) to the PXE repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |fs|
+    add_opt(opt,"-x", "--upload-pxe-files FILES", Array, "Upload a list of files (file1,file2,file3) to the PXE repository. Those files will then be available with the prefix FILES_PREFIX-- ") { |fs|
       fs.each do |file|
         return false unless (filename = load_file(File.expand_path(file)))
         options[:pxe_files] << filename
@@ -889,14 +928,14 @@ class ClientWorkflow < Client
   end
 
   def self.parse_wid(opt,options)
-    opt.on("--write-workflow-id FILE", "Write the workflow id in a file") { |f|
+    add_opt(opt,"--write-workflow-id FILE", "Write the workflow id in a file") { |f|
       options[:wid_file] = f
       load_outputfile(f)
     }
   end
 
   def self.parse_scriptfile(opt,options)
-      opt.on("-s", "--script FILE", "Execute a script at the end of the operation") { |f|
+      add_opt(opt,"-s", "--script FILE", "Execute a script at the end of the operation") { |f|
       if check_file(f)
         if File.stat(f).executable?
           options[:script] = File.expand_path(f)
@@ -911,31 +950,31 @@ class ClientWorkflow < Client
   end
 
   def self.parse_timeout_reboot(opt,options)
-    opt.on("--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots (a ruby expression can be used, 'n' will be replaced by the number of nodes)") { |t|
+    add_opt(opt,"--reboot-classical-timeout VALUE", "Overload the default timeout for classical reboots (a ruby expression can be used, 'n' will be replaced by the number of nodes)") { |t|
       options[:reboot_classical_timeout] = t
     }
   end
 
   def self.parse_wait(opt,options)
-    opt.on("--[no-]wait", "Wait the end of the operation, set by default") { |v|
+    add_opt(opt,"--[no-]wait", "Wait the end of the operation, set by default") { |v|
       options[:wait] = v
     }
   end
 
   def self.parse_force(opt,options)
-    opt.on("--[no-]force", "Allow to deploy even on the nodes tagged as currently used (use this only if you know what you do)") {
+    add_opt(opt,"--[no-]force", "Allow to deploy even on the nodes tagged as currently used (use this only if you know what you do)") {
       options[:force] = true
     }
   end
 
   def self.parse_breakpoint(opt,options)
-    opt.on("--breakpoint STEP", /^\w+(?::\w+)?$/, "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |s|
+    add_opt(opt,"--breakpoint STEP", /^\w+(?::\w+)?$/, "Set a breakpoint just before lauching the given micro-step, the syntax is macrostep:microstep (use this only if you know what you do)") { |s|
       options[:breakpoint] = s
     }
   end
 
   def self.parse_custom_ops(opt,options)
-    opt.on("--custom-steps FILE", "Add some custom operations defined in a file") { |file|
+    add_opt(opt,"--custom-steps FILE", "Add some custom operations defined in a file") { |file|
       options[:custom_operations] = load_custom_file(file)
       return false unless options[:custom_operations]
     }

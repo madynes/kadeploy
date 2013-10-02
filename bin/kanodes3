@@ -31,24 +31,24 @@ class KanodesClient < Client
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-s", "--get-nodes-state", "Get the deployment state of the nodes") {
+      add_opt(opt,"-s", "--get-nodes-state", "Get the deployment state of the nodes") {
         options[:operation] = :get_state
       }
-      opt.on("-d", "--get-deployments-status", "Get the status of running deployments") {
+      add_opt(opt,"-d", "--get-deployments-status", "Get the status of running deployments") {
         options[:operation] = :get_status_deploy
       }
-      opt.on("-r", "--get-reboots-status", "Get the status of running reboot operations") {
+      add_opt(opt,"-r", "--get-reboots-status", "Get the status of running reboot operations") {
         options[:operation] = :get_status_reboot
       }
-      opt.on("-o", "--get-all-status", "Get the status of all running operations") {
+      add_opt(opt,"-o", "--get-all-status", "Get the status of all running operations") {
         options[:operation] = :get_status_all
       }
-      opt.on("-p", "--get-powers-status", "Get the status of running power operations") {
+      add_opt(opt,"-p", "--get-powers-status", "Get the status of running power operations") {
         options[:operation] = :get_status_power
       }
       parse_machinefile(opt,options)
       parse_machine(opt,options)
-      opt.on("-w", "--workflow-id WID", "Specify a workflow id (to be used with the get_status option). If no wid is specified, the information of all the running deployments will be returned.") { |w|
+      add_opt(opt,"-w", "--workflow-id WID", "Specify a workflow id (to be used with the get_status option). If no wid is specified, the information of all the running deployments will be returned.") { |w|
         options[:wid] = w
       }
     end

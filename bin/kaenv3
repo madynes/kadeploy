@@ -64,18 +64,18 @@ class KaenvsClient < Client
   def self.parse_options()
     global_parse_options() do |opt,options|
       opt.separator "General options:"
-      opt.on("-a", "--add ENVFILE", "Add an environment") { |f|
+      add_opt(opt,"-a", "--add ENVFILE", "Add an environment") { |f|
         options[:operation] = :add
         load_envfile(options[:env_desc],f)
       }
-      opt.on("-d", "--delete ENVNAME", "Delete an environment") { |n|
+      add_opt(opt,"-d", "--delete ENVNAME", "Delete an environment") { |n|
         options[:env_name] = n
         options[:operation] = :delete
       }
-      opt.on("-l", "--list", "List environments") {
+      add_opt(opt,"-l", "--list", "List environments") {
         options[:operation] = :list
       }
-      opt.on("-m", "--files-to-move FILES", "Files to move (src1::dst1,src2::dst2,...)") { |f|
+      add_opt(opt,"-m", "--files-to-move FILES", "Files to move (src1::dst1,src2::dst2,...)") { |f|
         if /\A.+::.+(,.+::.+)*\Z/ =~f then
           f.split(",").each do |src_dst|
             tmp = src_dst.split("::",2)
@@ -86,41 +86,41 @@ class KaenvsClient < Client
           return false
         end
       }
-      opt.on("-p", "--print ENVNAME", "Print an environment") { |n|
+      add_opt(opt,"-p", "--print ENVNAME", "Print an environment") { |n|
         options[:env_name] = n
         options[:operation] = :print
       }
-      opt.on("-s", "--all-versions", "Apply the operation on all the versions of the environment") {
+      add_opt(opt,"-s", "--all-versions", "Apply the operation on all the versions of the environment") {
         options[:all_versions] = true
       }
-      opt.on("-t", "--visibility-tag TAG", ['public','private','shared'], "Set the visibility tag (private, shared, public)") { |v|
+      add_opt(opt,"-t", "--visibility-tag TAG", ['public','private','shared'], "Set the visibility tag (private, shared, public)") { |v|
         options[:visibility_tag] = v
       }
       parse_user(opt,options)
       parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
-      opt.on("--toggle-destructive-tag ENVNAME", "Toggle the destructive tag on an environment") { |n|
+      add_opt(opt,"--toggle-destructive-tag ENVNAME", "Toggle the destructive tag on an environment") { |n|
         options[:env_name] = n
         options[:operation] = :'toggle-destructive-tag'
       }
-      opt.on("--set-visibility-tag ENVNAME", "Set the visibility tag on an environment") { |n|
+      add_opt(opt,"--set-visibility-tag ENVNAME", "Set the visibility tag on an environment") { |n|
         options[:env_name] = n
         options[:operation] = :'set-visibility-tag'
       }
-      opt.on("--update-image-checksum ENVNAME", "Update the checksum of the environment image") { |n|
+      add_opt(opt,"--update-image-checksum ENVNAME", "Update the checksum of the environment image") { |n|
         options[:env_name] = n
         options[:operation] = :'update-image-checksum'
       }
-      opt.on("--update-preinstall-checksum ENVNAME", "Update the checksum of the environment preinstall") { |n|
+      add_opt(opt,"--update-preinstall-checksum ENVNAME", "Update the checksum of the environment preinstall") { |n|
         options[:env_name] = n
         options[:operation] = :'update-preinstall-checksum'
       }
-      opt.on("--update-postinstalls-checksum ENVNAME", "Update the checksum of the environment postinstalls") { |n|
+      add_opt(opt,"--update-postinstalls-checksum ENVNAME", "Update the checksum of the environment postinstalls") { |n|
         options[:env_name] = n
         options[:operation] = :'update-postinstalls-checksum'
       }
-      opt.on("--move-files", "Move the files of the environments (for administrators only)") { |n|
+      add_opt(opt,"--move-files", "Move the files of the environments (for administrators only)") { |n|
         options[:operation] = :'move-files'
       }
       parse_secure(opt,options)

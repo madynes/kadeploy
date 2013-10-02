@@ -43,14 +43,14 @@ class KarebootClient < ClientWorkflow
     global_parse_options() do |opt,options|
       opt.separator "General options:"
       parse_block_device(opt,options)
-      opt.on("-c", "--check-destructive-tag", "Check if some nodes was deployed with an environment that have the destructive tag") {
+      add_opt(opt,"-c", "--check-destructive-tag", "Check if some nodes was deployed with an environment that have the destructive tag") {
         options[:check_demolishing] = true
       }
       parse_env_name(opt,options){ options[:env_kind] = :database }
       parse_keyfile(opt,options)
       parse_op_level(opt,options)
       parse_deploy_part(opt,options)
-      opt.on("-r", "--reboot-kind REBOOT_KIND", ['set_pxe', 'simple', 'deploy_env', 'recorded_env'], "Specify the reboot kind (set_pxe, simple, deploy_env, recorded_env)") { |k|
+      add_opt(opt,"-r", "--reboot-kind REBOOT_KIND", ['set_pxe', 'simple', 'deploy_env', 'recorded_env'], "Specify the reboot kind (set_pxe, simple, deploy_env, recorded_env)") { |k|
         options[:operation] = k.strip.downcase.to_sym
       }
       parse_user(opt,options)

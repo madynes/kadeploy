@@ -31,13 +31,13 @@ class KapowerClient < ClientWorkflow
     global_parse_options() do |opt,options|
       opt.separator "General options:"
       parse_op_level(opt,options)
-      opt.on("--off", "Shutdown the nodes") {
+      add_opt(opt,"--off", "Shutdown the nodes") {
         options[:operation] = :off
       }
-      opt.on("--on", "Power on the nodes") {
+      add_opt(opt,"--on", "Power on the nodes") {
         options[:operation] = :on
       }
-      opt.on("--status", "Get the status of the nodes") {
+      add_opt(opt,"--status", "Get the status of the nodes") {
         options[:operation] = :status
       }
     end

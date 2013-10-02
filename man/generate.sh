@@ -27,7 +27,7 @@ do
   for file in ${BASEDIR}/$BINDIR/* ${BASEDIR}/$SBINDIR/*
   do
     echo Generate man for $(basename $file)
-    KADEPLOY3_LIBS=${BASEDIR}/lib/ help2man --no-info \
+    KADEPLOY3_LIBS=${BASEDIR}/lib/ COLUMNS=0 help2man --no-info \
       --version-string=$VERSION --include $TEMPLATE \
       $file > ${dir}/$(basename $file).$kind
   done
