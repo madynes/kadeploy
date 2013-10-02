@@ -26,7 +26,7 @@ module Kastats
       end
 
       context.kind = p.parse('kind',String,:values=>['all','failure_rates'],:default=>'all')
-      context.fields = p.parse('fields',Array,:values=>['deploy_id','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'], :default=>['deploy_id','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'])
+      context.fields = p.parse('fields',Array,:values=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'], :default=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'])
 
       context.options[:sort] = p.parse('sort',Array,:values=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'],:default=>['start'])
       context.options[:limit] = p.parse('limit',String,:regexp=>/^\d+|\d+,\d+$/)

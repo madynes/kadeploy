@@ -203,7 +203,7 @@ module Debug
     # * config: instance of Config
     # * db: database handler
     # * user: username
-    # * deploy_id: deployment id
+    # * wid: deployment id
     # * start: start time
     # * env: environment name
     # * anonymous_env: anonymous environment or not
@@ -228,15 +228,15 @@ module Debug
     #
     # Arguments
     # * user: username
-    # * deploy_id: deployment id
+    # * wid: deployment id
     # * start: start time
     # * env: environment name
     # * anonymous_env: anonymous environment or not
     # Output
     # * returns an Hash instance
-    def create_node_infos(user, deploy_id, start, env, anonymous_env)
+    def create_node_infos(user, wid, start, env, anonymous_env)
       {
-        "deploy_id" => deploy_id,
+        "wid" => wid,
         "user" => user,
         "step1" => String.new,
         "step2" => String.new,
@@ -333,7 +333,7 @@ module Debug
       @nodes.each_pair { |hostname, node_infos|
         @database.run_query(
          "INSERT INTO log ( \
-          deploy_id, \
+          wid, \
           user, \
           hostname, \
           step1, \
@@ -355,7 +355,7 @@ module Debug
           success, \
           error) \
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-          node_infos["deploy_id"],
+          node_infos["wid"],
           node_infos["user"],
           hostname,
           node_infos["step1"],
@@ -389,7 +389,7 @@ module Debug
     def dump_to_file
       out = []
       @nodes.each_pair do |hostname, node_infos|
-        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
+        str = node_infos["wid"].to_s + "," + hostname + "," + node_infos["user"] + ","
         str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
         str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
         str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
