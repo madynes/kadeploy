@@ -45,6 +45,7 @@ Signal::trap("HUP") do
   # In this file, the first line is the return code (0 if successfull)
   # The following lines are representing the error message if there is an error
   stderr = $stderr
+  $stderr = StringIO.new
   # The config parser writes error messages on $stderr, since we want to
   # write the return code as the first line of the reload file, and since
   # to know if there is an error or not we have to launch the config parser,
@@ -52,6 +53,7 @@ Signal::trap("HUP") do
   # That's why we are using a StringIO object in order to be able to store the
   # error message that are written on $stderr and then write this message in the
   # reload file AFTER the return code
+
   $kadeploy_logfiles.each_value do |io|
     if io
       filename = File.readlink(File.join("/proc/self/fd/#{io.fileno}"))
