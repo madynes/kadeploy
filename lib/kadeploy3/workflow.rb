@@ -263,16 +263,13 @@ module Workflow
 
       @logger.dump
 
-      if context[:async] and !context[:common].async_end_of_deployment_hook.empty?
-        cmd = context[:common].async_end_of_deployment_hook
-        Execute[cmd.gsub('WORKFLOW_ID',context[:deploy_id])].run!.wait
+      if hook = context[:common].send(:"end_of_#{self.class.operation}_hook")
+        Execute[hook.dup.gsub('WORKFLOW_ID',context[:wid])].run!.wait
       end
 
       nodes_ok = Nodes::NodeSet.new
       @nodes_ok.linked_copy(nodes_ok)
       @nodes_brk.linked_copy(nodes_ok)
-
-      context[:client].generate_files(nodes_ok, @nodes_ko) if context[:client]
     end
 
     def retry!(task)
