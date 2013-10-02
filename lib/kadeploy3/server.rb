@@ -569,8 +569,20 @@ class KadeployServer
     ret = {}
 
     ret[:pxe] = cfg.common.pxe[:dhcp].class.name.split('::').last
+    ret[:automata] = {}
     ret[:supported_fs] = {}
     cfg.clusters.each_pair do |cluster,conf|
+      ret[:automata][cluster] = {}
+      conf.workflow_steps.each do |steps|
+        ret[:automata][cluster][steps.name] = []
+        steps.to_a.each do |step|
+          ret[:automata][cluster][steps.name] << {
+            'name' => step[0],
+            'retries' => step[1],
+            'timeout' => step[2],
+          }
+        end
+      end
       ret[:supported_fs][cluster] = conf.deploy_supported_fs
     end
     ret[:vars] = Microstep.load_deploy_context().keys.sort

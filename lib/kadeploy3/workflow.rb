@@ -117,7 +117,7 @@ module Workflow
       breaked = nil
 
       macrosteps.each do |macro|
-        macro.get_instances.each do |instance|
+        macro.to_a.each do |instance|
           breakpoint = false
           conf = {}
           breakpoint = instance[4]  if instance.size >= 5
@@ -411,7 +411,7 @@ module Workflow
 
       # Custom preinstalls hack
       if context[:execution].environment.preinstall
-        instances = macrosteps[0].get_instances
+        instances = macrosteps[0].to_a
         # use same values the first instance is using
         tmp = [
           'SetDeploymentEnvUntrustedCustomPreInstall',
@@ -423,12 +423,12 @@ module Workflow
       end
 
       # SetDeploymentEnv step
-      macrosteps[0].get_instances.each do |instance|
+      macrosteps[0].to_a.each do |instance|
         @tasks[0] << [ instance[0].to_sym ]
       end
 
       # BroadcastEnv step
-      macrosteps[1].get_instances.each do |instance|
+      macrosteps[1].to_a.each do |instance|
         @tasks[1] << [ instance[0].to_sym ]
       end
 
@@ -443,7 +443,7 @@ module Workflow
           debug(0,msg)
         end
       end
-      macrosteps[2].get_instances.each do |instance|
+      macrosteps[2].to_a.each do |instance|
         # Kexec hack for non-linux envs
         if (context[:execution].environment.environment_kind != 'linux')
           setclassical.call(
@@ -528,7 +528,7 @@ module Workflow
     def load_tasks()
       @tasks = [[ ]]
       macrosteps = load_macrosteps()
-      macrosteps[0].get_instances.each do |instance|
+      macrosteps[0].to_a.each do |instance|
         @tasks[0] << [ instance[0].to_sym ]
       end
     end
@@ -563,7 +563,7 @@ module Workflow
     def load_tasks()
       @tasks = [[ ]]
       macrosteps = load_macrosteps()
-      macrosteps[0].get_instances.each do |instance|
+      macrosteps[0].to_a.each do |instance|
         @tasks[0] << [ instance[0].to_sym ]
       end
     end

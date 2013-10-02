@@ -329,6 +329,13 @@ class Client
       print = Proc.new do |res,prefix|
         $stdout.puts "#{prefix if prefix}Kadeploy server configuration:"
         $stdout.puts "#{prefix if prefix}  Custom PXE boot method: #{res['pxe']}"
+        $stdout.puts "#{prefix if prefix}  Automata configuration:"
+        res['automata'].each_pair do |clname,macros|
+          $stdout.puts "#{prefix if prefix}    #{clname}:"
+          macros.each_pair do |name,steps|
+            $stdout.puts "#{prefix if prefix}      #{name}: #{steps.collect{|s| s.values.join(',')}.join('; ')}"
+          end
+        end
         $stdout.puts "#{prefix if prefix}  Deployment environment:"
         $stdout.puts "#{prefix if prefix}    Supported file systems:"
         res['supported_fs'].each_pair do |clname,fslist|

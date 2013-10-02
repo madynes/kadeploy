@@ -1128,7 +1128,7 @@ module Configuration
 
           n=1
           tmptime = eval(code)
-          @workflow_steps[0].get_instances.each do |macroinst|
+          @workflow_steps[0].to_a.each do |macroinst|
             if [
               'SetDeploymentEnvUntrusted',
               'SetDeploymentEnvNfsroot',
@@ -1140,7 +1140,7 @@ module Configuration
               )
             end
           end
-          @workflow_steps[2].get_instances.each do |macroinst|
+          @workflow_steps[2].to_a.each do |macroinst|
             if [
               'BootNewEnvClassical',
               'BootNewEnvHardReboot',
@@ -1168,7 +1168,7 @@ module Configuration
 
           n=1
           tmptime = eval(code)
-          @workflow_steps[0].get_instances.each do |macroinst|
+          @workflow_steps[0].to_a.each do |macroinst|
             if macroinst[0] == 'SetDeploymentEnvKexec' and tmptime > macroinst[2]
             then
               raise ArgumentError.new(Parser.errmsg(
@@ -1177,7 +1177,7 @@ module Configuration
               )
             end
           end
-          @workflow_steps[2].get_instances.each do |macroinst|
+          @workflow_steps[2].to_a.each do |macroinst|
             if macroinst[0] == 'BootNewEnvKexec' and tmptime > macroinst[2]
             then
               raise ArgumentError.new(Parser.errmsg(
@@ -1292,51 +1292,14 @@ module Configuration
 
   class MacroStep
     attr_accessor :name
-    @array_of_instances = nil #specify the instances by order of use, if the first one fails, we use the second, and so on
-    @current = nil
 
-    # Constructor of MacroStep
-    #
-    # Arguments
-    # * name: name of the macro-step (SetDeploymentEnv, BroadcastEnv, BootNewEnv)
-    # * array_of_instances: array of [instance_name, instance_max_retries, instance_timeout]
-    # Output
-    # * nothing 
-    def initialize(name, array_of_instances)
+    def initialize(name, instances)
       @name = name
-      @array_of_instances = array_of_instances
-      @current = 0
+      @instances = instances
     end
 
-    # Select the next instance implementation for a macro step
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return true if a next instance exists, false otherwise
-    def use_next_instance
-      if (@array_of_instances.length > (@current + 1)) then
-        @current += 1
-        return true
-      else
-        return false
-      end
-    end
-
-    # Get the current instance implementation of a macro step
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * return an array: [0] is the name of the instance, 
-    #                    [1] is the number of retries available for the instance
-    #                    [2] is the timeout for the instance
-    def get_instance
-      return @array_of_instances[@current]
-    end
-
-    def get_instances
-      return @array_of_instances
+    def to_a
+      return @instances
     end
   end
 
