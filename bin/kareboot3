@@ -3,13 +3,13 @@
 $kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/lib'
 $:.unshift($kadeploy_libs)
 
-require 'kadeploy3/client'
-
 Signal.trap("INT") do
   $stdout.puts "\nSIGINT trapped"
   Kadeploy::KarebootClient.kill() rescue nil
   exit!(1)
 end
+
+require 'kadeploy3/client'
 
 module Kadeploy
 
