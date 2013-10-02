@@ -2181,6 +2181,7 @@ When writing a script for an admin pre-install, an admin/user post-install or so
 \item \texttt{KADEPLOY\_OS\_KIND} : the kind of operating system being deployed (the value of the \emph{environment\_kind} field of the environment description)
 \item \texttt{KADEPLOY\_PART\_TYPE} : the MSDOS partition type of the deployment partition (the value of the \emph{fdisk\_type} field of the environment description)
 \item \texttt{KADEPLOY\_FS\_TYPE} : the filesystem format of the deployment partition (the value of the \emph{filesystem} field of the environment description)
+\item \texttt{KADEPLOY\_FS\_TYPE\_TMP} : the filesystem format of the tmp partition (if the tmp partition is reformated with the option --reformat-tmp)
 \end{itemize}
 
 \section{Build a custom pre-install}\label{sec:custom-preinstall}

@@ -1173,6 +1173,7 @@ class Microstep < Automata::QueueTask
     end
     ret['KADEPLOY_PART_TYPE'] = vals[:parttype] if vals[:parttype]
     ret['KADEPLOY_FS_TYPE'] = vals[:fstype] if vals[:fstype]
+    ret['KADEPLOY_FS_TYPE_TMP'] = vals[:fstype_tmp] if vals[:fstype_tmp]
     ret['KADEPLOY_ENV_EXTRACTION_DIR'] = vals[:extractdir] if vals[:extractdir]
 
     ret
@@ -1213,6 +1214,7 @@ class Microstep < Automata::QueueTask
       :tmpdir => '/tmp',
       :parttype => parttype,
       :fstype => fstype,
+      :fstype_tmp => context[:execution].reformat_tmp,
     })
   end
 
