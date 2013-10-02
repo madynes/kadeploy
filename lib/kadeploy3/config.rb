@@ -197,9 +197,9 @@ module Configuration
     attr_reader :bt_download_timeout
     attr_reader :almighty_env_users
     attr_reader :version
-    attr_reader :async_end_of_deployment_hook
-    attr_reader :async_end_of_reboot_hook
-    attr_reader :async_end_of_power_hook
+    attr_reader :end_of_deploy_hook
+    attr_reader :end_of_reboot_hook
+    attr_reader :end_of_power_hook
     attr_reader :vlan_hostname_suffix
     attr_reader :set_vlan_cmd
     attr_reader :kastafior
@@ -358,7 +358,7 @@ module Configuration
               static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
             end
           end
-          if static[:auth].empty?
+          if static[:auth] and static[:auth].empty?
             raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
           end
         end
@@ -580,11 +580,14 @@ module Configuration
         end
 
         cp.parse('hooks') do
-          @async_end_of_deployment_hook = cp.value(
+          @end_of_deploy_hook = cp.value(
             'end_of_deployment',String,''
           )
-          @async_end_of_reboot_hook = cp.value('end_of_reboot',String,'')
-          @async_end_of_power_hook = cp.value('end_of_power',String,'')
+          @end_of_deploy_hook = nil if @end_of_deploy_hook.empty?
+          @end_of_reboot_hook = cp.value('end_of_reboot',String,'')
+          @end_of_reboot_hook = nil if @end_of_reboot_hook.empty?
+          @end_of_power_hook = cp.value('end_of_power',String,'')
+          @end_of_power_hook = nil if @end_of_power_hook.empty?
         end
 
         cp.parse('external',true) do
