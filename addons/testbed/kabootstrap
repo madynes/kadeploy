@@ -27,7 +27,7 @@ DEB_REPOSITORY    = 'http://apt.grid5000.fr/kadeploy'
 GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPOSITORY = 'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
 DEPENDANCIES      = ['libmysql-ruby1.8','ruby1.8']
-BUILD_DEPENDANCIES = ['git','make','docbook2x']
+BUILD_DEPENDANCIES = ['git','make','docbook2x','help2man']
 
 if g5k?
   G5K_API         = 'https://api.grid5000.fr/2.0'
@@ -66,7 +66,6 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 # Update path for devel
 UPDATE_PATH_CHECK = {
   'common' => {
-    'src' => 'kadeploy_server.rb',
     'lib' => 'environment.rb',
   },
   'client' => {
@@ -407,11 +406,11 @@ def cfg_kadeploy_conf()
         'mkfs' => [
           {
             'fstype' => 'ext2',
-            'args' => '-b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index',
           },
           {
             'fstype' => 'ext3',
-            'args' => '-b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index',
           },
         ],
         'taktuk' => {
@@ -1332,7 +1331,7 @@ def cfg_sql()
   ") ENGINE=MyISAM  DEFAULT CHARSET=utf8;\n"\
   + # table log
   "CREATE TABLE IF NOT EXISTS #{CFG_SQL_DB}.`log` (\n"\
-  "  `deploy_id` varchar(41) NOT NULL,\n"\
+  "  `wid` varchar(41) NOT NULL,\n"\
   "  `hostname` varchar(256) NOT NULL,\n"\
   "  `step1` varchar(45) NOT NULL,\n"\
   "  `step2` varchar(45) NOT NULL,\n"\
@@ -1770,7 +1769,7 @@ end
 def get_open_port()
   tmp=`netstat -l -n`
   usedports=[]
-  tmp.each do |line|
+  tmp.each_line do |line|
     if line =~ /^\w+\s+\d+\s+\d+\s+.+:([-_\.\w]+)\s+.+:.+\s+\w*$/
       usedports << Regexp.last_match(1) unless usedports.include?(Regexp.last_match(1))
     end
@@ -3394,8 +3393,8 @@ sshgw.ssh(servername,'root') do |session|
       msg('Remove the temporary directory',MSG_INFO)
       sexec(session,"rm -Rf #{tmpdir}")
 
-      msg('Remove scm and build packages',MSG_INFO)
-      apt_remove(session,BUILD_DEPENDANCIES)
+      #msg('Remove scm and build packages',MSG_INFO)
+      #apt_remove(session,BUILD_DEPENDANCIES)
     else
       msg('Installing Kadeploy server/client',MSG_INFO)
       apt_install(session,['kadeploy-server','kadeploy-client'],server)
@@ -3507,7 +3506,7 @@ sshgw.ssh(servername,'root') do |session|
       msg("Creating local permanent tunnel to #{}:22 on localhost:#{UPDATE_FORWARD_PORT}",MSG_INFO)
       ssh_tunnel_create(session,22,$srchost,UPDATE_FORWARD_PORT)
 
-      tmp = sexec(session,'mktemp -d')
+      tmp = sexec(session,'mktemp -d')[0]
       msg('can\'t create temp directory',MSG_ERROR,true) if !tmp or tmp.empty?
       msg("Mounting #{$update_paths[UPDATE_DIR_VAR]} in #{tmp} with sshfs",MSG_INFO)
       sexec(session,"sshfs #{SSH_OPTIONS} -o allow_other -p #{UPDATE_FORWARD_PORT} #{ENV['USER']}@localhost:#{$update_paths[UPDATE_DIR_VAR]} #{tmp}")
