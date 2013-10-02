@@ -98,7 +98,7 @@ module Stats
 
     if operation
       ret << ' AND ' unless ret.empty?
-      ret << db_field(table,'deploy_id',"like '#{API.wid_prefix(operation)}%'")
+      ret << db_field(table,'wid',"like '#{API.wid_prefix(operation)}%'")
     end
 
     if filters[:date_min]
@@ -116,7 +116,7 @@ module Stats
     if filters[:wid]
       ret << ' AND ' unless ret.empty?
       args << filters[:wid]
-      ret << db_field(table,'deploy_id','= ?')
+      ret << db_field(table,'wid','= ?')
     end
 
     if filters[:min_retries]
