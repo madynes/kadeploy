@@ -204,6 +204,7 @@ module Configuration
     attr_reader :set_vlan_cmd
     attr_reader :kastafior
     attr_reader :secure_client
+    attr_reader :autoclean_threshold
 
     # Constructor of CommonConfig
     #
@@ -589,6 +590,8 @@ module Configuration
           @end_of_power_hook = cp.value('end_of_power',String,'')
           @end_of_power_hook = nil if @end_of_power_hook.empty?
         end
+
+        @autoclean_threshold = cp.value('autoclean_threshold',Fixnum,60*6).abs # 6h
 
         cp.parse('external',true) do
           cp.parse('taktuk',true) do

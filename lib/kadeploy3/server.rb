@@ -41,7 +41,6 @@ require 'ostruct'
 
 
 module Kadeploy
-AUTOCLEAN_THRESHOLD = 21600 # 6h
 
 class KadeployServer
   include Kaworkflow
@@ -530,25 +529,25 @@ class KadeployServer
   end
 
   def workflows_clean()
+    clean_threshold = cfg().common.autoclean_threshold
     [:deploy,:reboot,:power].each do |kind|
       if @workflows_locks[kind] and @workflows_info[kind]
         to_clean = []
         @workflows_locks[kind].synchronize do
           @workflows_info[kind].each_pair do |wid,info|
             if info[:done] # Done workflow
-              if (Time.now - info[:start_time]) > AUTOCLEAN_THRESHOLD
+              if (Time.now - info[:start_time]) > clean_threshold
                 to_clean << wid
               end
             elsif !info[:thread].alive? # Dead workflow
               run_wmethod(kind,:kill,info)
               run_wmethod(kind,:free,info)
-              if (Time.now - info[:start_time]) > AUTOCLEAN_THRESHOLD
+              if (Time.now - info[:start_time]) > clean_threshold
                 to_clean << wid
               end
             end
           end
         end
-
         to_clean.each do |wid|
           run_wmethod(kind,:delete,nil,wid)
         end

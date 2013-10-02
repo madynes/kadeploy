@@ -90,6 +90,7 @@ pxe:
     profiles:
       directory: grub.cfg
       filename: ip
+autoclean_threshold: 360
 hooks:
   end_of_deployment: echo WORKFLOW_ID
 external:

@@ -534,6 +534,7 @@ pxe:
     profiles:
       directory: grub.cfg
       filename: ip
+autoclean_threshold: 360
 hooks:
   end_of_reboot: echo REBOOT_ID
   end_of_power: echo POWER_ID
@@ -743,6 +744,8 @@ The information used to generate this filenames are the one specified for each n
     \item \yfieldd{end\_of\_power}{String}{""} command to launch at the end of an asynchronous power operation. The POWER\_ID can be used in the command, it is replaced at the runtime.
     \item \yfieldd{end\_of\_deployment}{String}{""} command to launch at the end of an asynchronous deployment. The WORKFLOW\_ID can be used in the command, it is replaced at the runtime.
   \end{itemize}
+
+  \item \yfieldd{autoclean\_threshold}{Fixnum}{360} at the end of an operation (deploy/reboot/power) it's status kept until the user explicitly deletes them. This value fix the maximal time (in minutes) this information will be kept in memory by the server until the autoclean loop delete them.
 
   \item \ypath{/external/taktuk}
   \begin{itemize}
