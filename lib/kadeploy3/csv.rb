@@ -1,3 +1,5 @@
+require 'zlib'
+
 module Kadeploy
 
 class CompressedCSV
