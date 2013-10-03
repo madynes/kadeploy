@@ -1,24 +1,170 @@
 introduction do
   section "Request's parameters" do
+	  paragraph "There is several ways to specify parameters when using the network API. Parameters can be specified in the query's URI parameter but also in the query's body. Remark: it's only possible to use String and Array data structures when specifying parameters using the query's URI to specify more advanced parameters (Numbers, Hashs, ...) it's necessary to specify the parameters using a more advanced description language (JSON/YAML) in the query's body."
+    paragraph "The following examples are equivalent:"
+    paragraph $cgi.b{"Specifying parameters in the query's URI"}
+    str=<<-EOS
+      POST /deploy?user=frontent&nodes=node-1.testbed.lan&nodes=node-2.testbed.lan HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+
+    paragraph $cgi.b{"Specifying parameters in the query's body"}
+    paragraph "JSON body"
+    str=<<-EOS
+      POST /deploy HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 93
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ]
+      }
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+
+    paragraph "YAML body"
+    str=<<-EOS
+      POST /deploy HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/x-yaml
+      Content-Length: 70
+      ---
+      user: frontend
+      nodes:
+      - node-1.testbed.lan
+      - node-2.testbed.lan
+    EOS
+    paragraph "#{$cgi.pre{str}}"
   end
+
+  section "Output type and encoding" do
+    paragraph "The Kadeploy server can respond to a request in different formats: JSON and YAML, with or without compression (gzip only)."
+    paragraph "The response format depends on the value of the 'Accept' HTTP header of the request. By default (if it's set to */*) the response will be formated in JSON otherwise it will use the specified format."
+    paragraph "The response encoding (compression) depends on the value of the 'Accept-Encoding' HTTP header. By default (if it's not set or set to */*) the response will not be compressed, otherwise it will be compressed using the gzip algorithm."
+
+    paragraph "Here are some examples:"
+    paragraph "JSON response"
+    str=<<-EOS
+      GET /nodes HTTP/1.1
+      Accept: application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+    str=<<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 50
+      [
+        "node-1.testbed.lan",
+        "node-2.testbed.lan"
+      ]
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+
+    paragraph "YAML response"
+    str=<<-EOS
+      GET /nodes HTTP/1.1
+      Accept: application/x-yaml
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+    str=<<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/x-yaml
+      Content-Length: 47
+      ---
+      - node-1.testbed.lan
+      - node-2.testbed.lan
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+
+    paragraph "Compressed JSON response"
+    paragraph "YAML response"
+    str=<<-EOS
+      GET /nodes HTTP/1.1
+      Accept: application/x-yaml
+      Accept-Encoding: gzip
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+    str=<<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Encoding: gzip
+      Content-Length: 52
+      \u001F\x8B\b\u0000\x82\xFELR\u0000\u0003\x8B\xE6RPP\xCA\xCBOI\xD55\xD4+I-.IJM\xD1\xCBI\xCCSҁ\x8B\e\xA1\x88s\xC5\u0002\u0000\xBE\xFFȅ2\u0000\u0000\u0000
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+  end
+
+  section "Global parameters" do
+    paragraph "Some parameters are mendatory, they have to be precised in each request as parameter. Here is a list of them: #{['user'].collect{|v|$cgi.i{v}}.join(', ')}."
+  end
+
+  section "API path notation" do
+  end
+
   section 'Authentication' do
   end
+
   section 'Errors management' do
-    paragraph 'X-Application-Error-Code, ...'
-    paragraph 'Kadeploy Error numbers'
-  end
-  section "Output type and encoding" do
-    paragraph 'Accept: json/yaml and Accept-Encoding: gzip'
-  end
-  section "Global parameters" do
-    paragraph ':user -> mandatory'
+    paragraph "Two kind of errors will be returned by the service: classical HTTP errors (Unauthorized, Forbidden, Not Found, ...) and Kadeploy specific errors."
+
+    paragraph "Classical HTTP errors will be return fitting with the HTTP 1.1 standards, an error message will be add in the body of the response."
+
+    paragraph "Kadeploy errors will be returned using the HTTP return code 400 (Bad Request) plus some (non-standard) HTTP header: X-Application-Error-Code and X-Application-Error-Info. The header X-Application-Error-Code will contain a Kadeploy specific error code while the header X-Application-Error-Info contains a (Base64 encoded) error message. The Kadeploy specific error codes are described in the following."
+    paragraph "Here is an example of a Kadeploy specific error response:" 
+    #str=<<-EOS
+    #  POST /deploy HTTP/1.1
+    #  Content-Type: application/json
+    #  Content-Length: ...
+    #  ...
+    #EOS
+    #paragraph "#{$cgi.pre{str}}"
+    str=<<-EOS
+      HTTP/1.1 400 Bad Request
+      X-Application-Error-Code: 6
+      X-Application-Error-Info: WW91IGRvIG5vdCBoYXZlIHN1ZmZpY2llbnQgcmlnaHRzIHRvIHBlcmZvcm0gdGhlIG9wZXJhdGlvbiBvbiBhbGwgdGhlIG5vZGVz
+      Content-Type: text/plain
+      Content-Length: 75
+      You do not have sufficient rights to perform the operation on all the nodes
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+
+    paragraph $cgi.b{'Kadeploy error codes'}
+    list=[]
+    list << ["1", 'INVALID_WORKFLOW_ID', "Invalid workflow ID"]
+    list << ["2", 'INVALID_NODELIST', "Invalid node list"]
+    list << ["3", 'INVALID_CLIENT', "Invalid client's export"]
+    list << ["4", 'INVALID_OPTION', "Invalid option in the request"]
+    list << ["5", 'INVALID_FILE', "Invalid file"]
+    list << ["6", 'INVALID_RIGHTS', "You do not have sufficient rights to perform the operation on all the nodes"]
+    list << ["7", 'INVALID_ENVIRONMENT', "Invalid environment specification"]
+    list << ["8", 'INVALID_CUSTOMOP', "Invalid custom operations specification"]
+    list << ["9", 'INVALID_VLAN', "Invalid VLAN"]
+    list << ["10", 'EXISTING_ELEMENT', "Element already exists"]
+    list << ["11", 'CONFLICTING_ELEMENTS', "Some elements already exists and are conflicting"]
+    list << ["13", 'CONFLICTING_OPTIONS', "Some options are conflicting"]
+    list << ["12", 'MISSING_OPTION', "Some options are missing"]
+    list << ["14", 'NOTHING_MODIFIED', "No element has been modified"]
+    list << ["20", 'DATABASE_ERROR', "Database issue"]
+    list << ["21", 'CACHE_ERROR', "Something went wront with the cache system"]
+    list << ["22", 'CACHE_FULL', "The cache is full"]
+    list << ["30", 'DESTRUCTIVE_ENVIRONMENT', "Cannot reboot since the last deployed environment was destructive"]
+    list.collect!{|v|$cgi.tr{"#{$cgi.td{v[0]}}#{$cgi.td{v[1]}}#{$cgi.td{v[2]}}"}}
+    paragraph $cgi.table{$cgi.tr{"#{$cgi.th{'Error #'}}#{$cgi.th{'Name'}}#{$cgi.th{'Description'}}"}+list.join}
   end
   section 'Workflow based operations' do
     paragraph 'specific resources: /output, /debug (as timestamp|message), ...'
   end
   section 'Exporting files for the server','file_export' do
     paragraph 'local://, server://, http://'
-  end
-  section "API path notation" do
   end
 end
