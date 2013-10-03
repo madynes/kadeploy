@@ -24,7 +24,17 @@ operation 'Deployment' do
     end
   end
 
+  resource :GET, '/deploy' do
+  end
+
   resource :GET, '/deploy/:id' do
+    request do
+      parameter :nodes, :Boolean, ''
+      parameter :done, :Boolean, ''
+      parameter :error, :Boolean, ''
+      parameter :logs, :Boolean, ''
+      parameter :debugs, :Boolean, ''
+    end
   end
 
   resource :GET, '/deploy/:id/outputs' do
