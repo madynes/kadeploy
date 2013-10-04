@@ -112,6 +112,48 @@ introduction do
   end
 
   section 'Authentication' do
+    paragraph "To access API resources an authentication is needed. There is tree different methods to authenticate when accessing a ressource. Depending on the server's configuration it will be possible to use one of this methods."
+    paragraph $cgi.b{'Authentication using the IDENT protocol'}
+    paragraph "The first authentication method is based on the IDENT protocol. When a request will be received on the server, it will first check if the request is coming from a trusted machine then it will contact the IDENT server of this machine in order to be sure that the user specified in the 'user' request's parameter is actually corresponding to the user on the machine that initiated the request. In order to be authenticated with this method, no extra parameters have to be providen, an IDENT server just have to be set up on the machine that is used to initiate the request."
+    paragraph $cgi.b{'Authentication by password'}
+    paragraph "The second authentication method is the authentication by password (from trusted machines). In order to authenticate with such a method it's necessary to specify the password in the 'secret_key' request parameter. Here is some examples:"
+    str=<<-EOS
+      GET /nodes?user=frontend&secret_key=mypassword HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+    str=<<-EOS
+      GET /nodes?user=frontend HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 32
+      {
+        "secret_key": "mypassword"
+      }
+    EOS
+    paragraph "#{$cgi.pre{str}}"
+    paragraph $cgi.b{'Authentication by certificate'}
+    paragraph "To be able to authenticate using a (x509) certificate it's necessary to provide an x509 certificate that was signed with the server's private key in the field 'cert'. Here is an example:"
+    str=<<-EOS
+      GET /nodes?user=frontend HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/x-yaml
+      Content-Length: 1561
+      ---
+      cert: |-
+        -----BEGIN CERTIFICATE-----
+        MIIEIzCCAwugAwIBAgIBGTANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJVUzET
+        MBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlv
+        ...
+        zJEdOusjWv6lLZf3e7vWh0ZChetSPSayY6i0scqP9Mzis8hH4L+aWYP62phTKoL1
+        fGUuldkzXfXtZcwxN8VaBOhr4eeIA0p1npsoy0pAiGVDdd3LOiUjxZ5X+C7O0qmS
+        XnMuLyV1FQ==
+        -----END CERTIFICATE-----
+    EOS
+    paragraph "#{$cgi.pre{str}}"
   end
 
   section 'Errors management' do
@@ -121,13 +163,6 @@ introduction do
 
     paragraph "Kadeploy errors will be returned using the HTTP return code 400 (Bad Request) plus some (non-standard) HTTP header: X-Application-Error-Code and X-Application-Error-Info. The header X-Application-Error-Code will contain a Kadeploy specific error code while the header X-Application-Error-Info contains a (Base64 encoded) error message. The Kadeploy specific error codes are described in the following."
     paragraph "Here is an example of a Kadeploy specific error response:" 
-    #str=<<-EOS
-    #  POST /deploy HTTP/1.1
-    #  Content-Type: application/json
-    #  Content-Length: ...
-    #  ...
-    #EOS
-    #paragraph "#{$cgi.pre{str}}"
     str=<<-EOS
       HTTP/1.1 400 Bad Request
       X-Application-Error-Code: 6
@@ -159,7 +194,7 @@ introduction do
     list << ["22", 'CACHE_FULL', "The cache is full"]
     list << ["30", 'DESTRUCTIVE_ENVIRONMENT', "Cannot reboot since the last deployed environment was destructive"]
     list.collect!{|v|$cgi.tr{"#{$cgi.td{v[0]}}#{$cgi.td{v[1]}}#{$cgi.td{v[2]}}"}}
-    paragraph $cgi.table{$cgi.tr{"#{$cgi.th{'Error #'}}#{$cgi.th{'Name'}}#{$cgi.th{'Description'}}"}+list.join}
+    paragraph $cgi.table(:style => 'margin-left: 40px;'){$cgi.tr{"#{$cgi.th{'Error #'}}#{$cgi.th{'Name'}}#{$cgi.th{'Description'}}"}+list.join}
   end
   section 'Workflow based operations' do
     paragraph 'specific resources: /output, /debug (as timestamp|message), ...'
