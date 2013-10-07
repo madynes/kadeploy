@@ -27,7 +27,7 @@ DEB_REPOSITORY    = 'http://apt.grid5000.fr/kadeploy'
 GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPOSITORY = 'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
 DEPENDANCIES      = ['libmysql-ruby1.8','ruby1.8']
-BUILD_DEPENDANCIES = ['git','make','docbook2x','help2man']
+BUILD_DEPENDANCIES = ['git','make']
 
 if g5k?
   G5K_API         = 'https://api.grid5000.fr/2.0'
@@ -3345,10 +3345,16 @@ sshgw.ssh(servername,'root') do |session|
       apt_install(session,DEPENDANCIES,server)
 
       msg('Installing scm and build packages',MSG_INFO)
-      apt_install(session,BUILD_DEPENDANCIES,server)
+      build_extra = nil
+      if $version >= 8
+        build_extra = [ 'help2man' ]
+      else
+        build_extra = [ 'docbook2x' ]
+      end
+      apt_install(session,build_extra+BUILD_DEPENDANCIES,server)
 
       msg('Create a temporary directory',MSG_INFO)
-      tmpdir = sexec(session,'mktemp -d')
+      tmpdir = sexec(session,'mktemp -d')[0]
 
       env_vars = 'http_proxy=http://localhost:3128 https_proxy=$http_proxy GIT_SSL_NO_VERIFY=1'
       if options[:git]
@@ -3381,7 +3387,7 @@ sshgw.ssh(servername,'root') do |session|
       sexec(session, "useradd -U -m #{CFG_KADEPLOY_USER}; true")
 
       msg("Building Kadeploy packages",MSG_INFO)
-      sexec(session,"cd #{tmpdir} && PKG_DIR=#{File.join(tmpdir,'packages')} make deb")
+      sexec(session,"cd #{tmpdir} && PKG_DIR=#{File.join(tmpdir,'packages')} make deb 2>&1")
 
       msg('Installing Kadeploy server/client',MSG_INFO)
       if $version > 5
@@ -3393,8 +3399,8 @@ sshgw.ssh(servername,'root') do |session|
       msg('Remove the temporary directory',MSG_INFO)
       sexec(session,"rm -Rf #{tmpdir}")
 
-      #msg('Remove scm and build packages',MSG_INFO)
-      #apt_remove(session,BUILD_DEPENDANCIES)
+      msg('Remove scm and build packages',MSG_INFO)
+      apt_remove(session,build_extra)
     else
       msg('Installing Kadeploy server/client',MSG_INFO)
       apt_install(session,['kadeploy-server','kadeploy-client'],server)
