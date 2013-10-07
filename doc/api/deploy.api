@@ -22,6 +22,148 @@ operation 'Deployment' do
         field :error, :String, 'Error message'
       end
     end
+    example 'Deploy a recorded environment using the user specified key file',
+    <<-EOS ,
+      POST /rights HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 318
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "database",
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "ssh_authorized_keys": "/home/frontend/.ssh/authorized_keys",
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 843
+      {
+        "wid": "D-bf5608b0-9354-446b-a648-c3abaa3cab95",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs?user=frontend",
+          "logs": {
+            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error?user=frontend"
+        }
+      }
+    EOS
+    example 'Deploy an anonymous local environment',
+    <<-EOS ,
+      POST /rights HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 845
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "anonymous",
+          "name": "debian-base",
+          "version": 1,
+          "description": "My custom Debian 7",
+          "author": "frontend@testbed.lan",
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "/home/frontend/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "/home/frontend/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 83,
+          "multipart": false
+        },
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: ...
+      ...
+    EOS
+    example 'Deploy an anonymous HTTP environment',
+    <<-EOS ,
+      POST /rights HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 804
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "anonymous",
+          "name": "debian-base",
+          "version": 1,
+          "description": "My custom Debian 7",
+          "author": "frontend@testbed.lan",
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "http://testbed.lan/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 83,
+          "multipart": false
+        }
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: ...
+      ...
+    EOS
   end
 
   resource :GET, '/deploy' do
@@ -35,6 +177,41 @@ operation 'Deployment' do
       parameter :logs, :Boolean, ''
       parameter :debugs, :Boolean, ''
     end
+
+    example 'Gather a specific deployment status',
+    <<-EOS ,
+      GET /deployment/D-bed42b5d-f667-4701-adf3-2be22dfe7853?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 383
+      {
+        "id": "D-bed42b5d-f667-4701-adf3-2be22dfe7853",
+        "user": "frontend",
+        "done": false,
+        "error": false,
+        "environment": {
+          "id": 3,
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "logs": false,
+        "nodes": {
+          "ok": [
+          ],
+          "ko": [
+          ],
+          "processing": [
+            "node-1.testbed.lan",
+            "node-2.testbed.lan"
+          ]
+        },
+      }
+    EOS
   end
 
   resource :GET, '/deploy/:id/outputs' do

@@ -99,7 +99,7 @@ introduction do
       Content-Type: application/json
       Content-Encoding: gzip
       Content-Length: 52
-      \u001F\x8B\b\u0000\x82\xFELR\u0000\u0003\x8B\xE6RPP\xCA\xCBOI\xD55\xD4+I-.IJM\xD1\xCBI\xCCSҁ\x8B\e\xA1\x88s\xC5\u0002\u0000\xBE\xFFȅ2\u0000\u0000\u0000
+      ...BINARY_DATA...
     EOS
     paragraph "#{$cgi.pre{str}}"
   end
