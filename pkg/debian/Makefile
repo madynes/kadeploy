@@ -60,12 +60,7 @@ build-clean:
 	@rm -rf $(BUILD_DIR)
 
 install_log:
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/output.log
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/error.log
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/httpd.log
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/access.log
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/kadeploy.log
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 /dev/null $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)/kadeploy.debug
+	@install -d -o root -g $(DEPLOY_USER) -m 770 $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)
 install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/kadeploy3/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/
 	@sed "$(SED_CONFIGS)" -i $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/*.rb

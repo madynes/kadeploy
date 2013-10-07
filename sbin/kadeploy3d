@@ -60,7 +60,7 @@ Signal::trap("HUP") do
       io.reopen(filename,'a+')
     end
   end
-  file = File.open(File.join($kadeploy_logdir,LOGFILE_RELOAD),'w')
+  file = File.open(File.join($kadeploy_logdir,LOGFILE_RELOAD),'w+')
   begin
     STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
     $kadeploy.reload_config()
