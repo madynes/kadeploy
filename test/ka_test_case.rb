@@ -1,19 +1,21 @@
-KADEPLOY_LIBS=ENV['KADEPLOY_LIBS']||File.join(File.dirname(__FILE__), '..','src','lib')
+KADEPLOY_LIBS=ENV['KADEPLOY_LIBS']||File.join(File.dirname(__FILE__), '..','lib')
 $:.unshift KADEPLOY_LIBS
-require 'execute'
-require 'error'
+require 'kadeploy3/execute'
 require 'yaml'
+require 'test/unit'
+require 'rubygems'
+require 'net/ssh'
 
 module KaTestCase
   def errmsg(msg,exec,out,err)
-    "\n#{msg}\n"
-    "=== #{@binary}(cmd) ===\n#{exec.command.join(' ')}\n===\n"\
-    "=== #{@binary}(stdout) ===\n#{out}\n===\n"\
-    "=== #{@binary}(stderr) ===\n#{err}\n===\n"
+    "\t\n#{msg}\n"
+    "\t=== #{@binary}(cmd) ===\n\t#{exec.command.join(' ')}\n\t===\n"\
+    "\t=== #{@binary}(stdout) ===\n\t#{out.split("\n").join("\n\t")}\n\t===\n"\
+    "\t=== #{@binary}(stderr) ===\n\t#{err.split("\n").join("\n\t")}\n\t===\n"
   end
 
   def run_ka(binary,*options)
-    exec = Execute[binary,*options].run!
+    exec = Kadeploy::Execute[binary,*options].run!
     if block_given?
       yield(exec)
     else
@@ -41,17 +43,16 @@ module KaTestCase
     begin
       out = run_ka(@binary,*options)
 
-      assert(!(out =~ /^ERROR:.*$/),"#{@binary}: #{out}")
-      assert(!(out =~ /^.?druby:.*$/),"#{@binary}: #{out}")
+      assert(!(out =~ /Error/),"\t#{@binary}: #{out.split("\n").join("\n\t")}")
 
       if File.exists?(kofile)
         kos = File.read(kofile).split("\n")
-        assert(kos.empty?,"NODES_KO file not empty\n#{out}")
+        assert(kos.empty?,"NODES_KO file not empty\n\t#{out.split("\n").join("\n\t")}")
       end
 
-      assert(File.exists?(okfile),"NODES_OK file don't exists\n#{out}")
+      assert(File.exists?(okfile),"NODES_OK file don't exists\n\t#{out.split("\n").join("\n\t")}")
       oks = File.read(okfile).split("\n")
-      assert(oks.sort == @nodes.sort,"NODES_OK file does not include every nodes\n#{out}")
+      assert(oks.sort == @nodes.sort,"NODES_OK file does not include every nodes\n\t#{out.split("\n").join("\n\t")}")
     ensure
       `rm #{okfile}` if File.exists?(okfile)
       `rm #{kofile}` if File.exists?(kofile)
@@ -60,24 +61,8 @@ module KaTestCase
     out
   end
 
-  def run_ka_async(binary,*options)
-    out = run_ka(binary,'--async',*options)
-    out = YAML.load(out)
-
-    assert(out['nodes_ko'].empty?,"NODES_KO not empty\n#{out.inspect}") if out['nodes_ko']
-
-    assert_not_nil(out['nodes_ok'],"NODES_OK is empty\n#{out.inspect}")
-    assert(out['nodes_ok'].sort == @nodes.sort,"NODES_OK does not include every nodes\n#{out.inspect}")
-
-    out
-  end
-
   def run_ka_check(binary,*options)
-    if @async
-      run_ka_async(binary,*options)
-    else
-      run_ka_nodelist(binary,*options)
-    end
+    run_ka_nodelist(binary,*options)
   end
 
   def load_field(config,field_path,default=nil)
@@ -146,7 +131,6 @@ module KaTestCase
       :envname => '_TMP_KATESTSUITE',
       :localfile => File.join(Dir.pwd,'_TMP_KATESTSUITE'),
     }
-    @async = false
   end
 
   def connect_test(node)
@@ -158,16 +142,26 @@ module KaTestCase
     rescue Net::SSH::HostKeyMismatch => hkm
       hkm.remember_host!
       retry
-    rescue Net::SSH::AuthenticationFailed, SocketError,Errno::ECONNRESET
+    rescue Net::SSH::AuthenticationFailed,SocketError,Errno::ECONNRESET,Errno::EHOSTUNREACH
       assert(false,'Unable to contact nodes')
     end
     assert(hostname == node,'Hostname not set correctly')
   end
 
   def env_desc(env)
-    desc = run_ka(@binaries[:kaenv],'-p',env){}
-    desc = run_ka(@binaries[:kaenv],'-p',env,'-u',@deployuser){} unless desc =~ /^---.*$/
-    assert(desc =~ /^---.*$/,"Unable to gather description of '#{env}' environment")
+    begin
+      desc = run_ka(@binaries[:kaenv],'-p',env){}
+    rescue MiniTest::Assertion
+      begin
+        desc = run_ka(@binaries[:kaenv],'-p',env,'-u',@deployuser){}
+      rescue MiniTest::Assertion
+        begin
+          desc = run_ka(@binaries[:kaenv],'-p',env,'-u','root'){}
+        rescue MiniTest::Assertion
+          assert(false,"Unable to gather description of '#{env}' environment")
+        end
+      end
+    end
     YAML.load(desc)
   end
 end

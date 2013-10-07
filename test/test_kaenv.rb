@@ -1,10 +1,9 @@
+$:.unshift File.dirname(__FILE__)
 require 'ka_test_case'
 require 'test/unit'
 require 'tempfile'
 require 'tmpdir'
 require 'yaml'
-require 'rubygems'
-require 'net/ssh'
 
 class TestKadeploy < Test::Unit::TestCase
   include KaTestCase
@@ -26,9 +25,10 @@ class TestKadeploy < Test::Unit::TestCase
   def check_env(name)
     begin
       desc = YAML.load(run_kaenv('-p', name))
-      assert(desc['name'] == name,desc)
+      assert(desc['name'] == name,"Wrong description #{desc.inspect}")
       return desc
     rescue ArgumentError => ae
+      run_kaenv('-d', @tmp[:envname])
       assert(false,ae.message)
     end
     return nil
@@ -151,7 +151,7 @@ class TestKadeploy < Test::Unit::TestCase
     envfile.unlink
   end
 
-  def test_update_md5
+  def test_update_checksum
     envfile = Tempfile.new('env')
     desc = {
       'name' => @tmp[:envname],
@@ -194,9 +194,9 @@ class TestKadeploy < Test::Unit::TestCase
     `dd if=/dev/urandom of=#{file} bs=1M count=2 1>/dev/null 2>/dev/null`
     `tar czf #{@tgzfile} #{file} 1>/dev/null 2>/dev/null`
     `rm #{file}`
-    run_kaenv('--update-image-md5',@tmp[:envname])
-    run_kaenv('--update-preinstall-md5',@tmp[:envname])
-    run_kaenv('--update-postinstall-md5',@tmp[:envname])
+    run_kaenv('--update-image-checksum',@tmp[:envname])
+    run_kaenv('--update-preinstall-checksum',@tmp[:envname])
+    run_kaenv('--update-postinstall-checksum',@tmp[:envname])
     check_env(@tmp[:envname])
     run_kaenv('-d', @tmp[:envname])
     envfile.unlink
