@@ -76,7 +76,7 @@ install_conf_client:
 install_conf_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/server_conf.yml $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/clusters.yml $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
-	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster_conf*.yml $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
+	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cluster-*.yml $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(CONF)/cmd.yml $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 640 $(SCRIPTS)/bootloader/install_grub2 $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)

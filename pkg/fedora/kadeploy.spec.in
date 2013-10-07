@@ -78,7 +78,7 @@ rm -rf $RPM_BUILD_ROOT
 /var/log/kadeploy3/kadeploy.debug
 /etc/init.d/kadeploy3d
 %config(noreplace) /etc/kadeploy3/clusters.yml
-%config(noreplace) /etc/kadeploy3/cluster_conf-g5kdev-cluster.yml
+%config(noreplace) /etc/kadeploy3/cluster-sample.yml
 %config(noreplace) /etc/kadeploy3/cmd.yml
 %config(noreplace) /etc/kadeploy3/server_conf.yml
 %config(noreplace) /etc/kadeploy3/install_grub
