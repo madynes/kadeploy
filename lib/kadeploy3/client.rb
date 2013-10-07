@@ -589,7 +589,6 @@ class Client
       :get_user_info => false,
       :dry_run => false,
       :multi_server => false,
-      :servers => load_configfile(),
       :chosen_server => nil,
       :server_host => nil,
       :server_port => nil,
@@ -630,7 +629,7 @@ class Client
       add_opt(opt,"-S","--server STRING", "Specify the Kadeploy server to use") { |s|
         options[:chosen_server] = s
       }
-      add_opt(opt,"","--[no-]dry-run", "Perform a dry run") { |v|
+      add_opt(opt,"--[no-]dry-run", "Perform a dry run") { |v|
         options[:dry_run] = v
       }
       opt.separator ""
@@ -644,6 +643,7 @@ class Client
       return false
     end
 
+    options[:servers] = load_configfile()
     options[:chosen_server] = options[:servers]['default'] unless options[:chosen_server]
     error("The server '#{options[:chosen_server]}' does not exist") unless options[:servers][options[:chosen_server]]
     options[:server_host] = options[:servers][options[:chosen_server]][0]
