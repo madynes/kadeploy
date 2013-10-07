@@ -114,8 +114,8 @@ end
 def get_repo_commit(arg)
   if arg =~ /^((?:git)|(?:gerrit)):(.*)$/
     case Regexp.last_match(1).downcase
-    when 'git': [ GIT_REPO, Regexp.last_match(2), 'git' ]
-    when 'gerrit': [ GERRIT_REPO, Regexp.last_match(2), 'gerrit' ]
+    when 'git' [ GIT_REPO, Regexp.last_match(2), 'git' ]
+    when 'gerrit' [ GERRIT_REPO, Regexp.last_match(2), 'gerrit' ]
     end
   else
     [ GIT_REPO, arg, 'git' ]
