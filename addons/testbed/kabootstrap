@@ -3348,7 +3348,7 @@ sshgw.ssh(servername,'root') do |session|
       apt_install(session,BUILD_DEPENDANCIES,server)
 
       msg('Create a temporary directory',MSG_INFO)
-      tmpdir = sexec(session,'mktemp -d')
+      tmpdir = sexec(session,'mktemp -d')[0]
 
       env_vars = 'http_proxy=http://localhost:3128 https_proxy=$http_proxy GIT_SSL_NO_VERIFY=1'
       if options[:git]
@@ -3393,8 +3393,8 @@ sshgw.ssh(servername,'root') do |session|
       msg('Remove the temporary directory',MSG_INFO)
       sexec(session,"rm -Rf #{tmpdir}")
 
-      #msg('Remove scm and build packages',MSG_INFO)
-      #apt_remove(session,BUILD_DEPENDANCIES)
+      msg('Remove scm and build packages',MSG_INFO)
+      apt_remove(session,BUILD_DEPENDANCIES)
     else
       msg('Installing Kadeploy server/client',MSG_INFO)
       apt_install(session,['kadeploy-server','kadeploy-client'],server)
