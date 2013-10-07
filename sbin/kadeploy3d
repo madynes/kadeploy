@@ -1,15 +1,16 @@
 #!/usr/bin/ruby -w
 
-$kadeploy_logdir=ENV['KADEPLOY3_LOGDIR']||'/var/log/kadeploy3'
-$kadeploy_logfiles = {}
+$kadeploy_logdir=ENV['KADEPLOY3_LOG_DIR']||'/var/log/kadeploy3'
+$kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3'
+$kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 $kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/lib'
-$kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
+$kadeploy_logfiles = {}
 
-SSH_KEY=File.join($kadeploy_config_directory,'keys/id_deploy')
+SSH_KEY=File.join($kadeploy_confdir,'keys/id_deploy')
 
 LOGFILE_DEBUG='output.log'
 LOGFILE_ERROR='error.log'
-LOGFILE_RELOAD='reload.log'
+RUNFILE_RELOAD='reload'
 
 AUTOCLEAN_PITCH = 300
 
@@ -41,7 +42,7 @@ end
 
 # Reload the service & logfiles rotation (syslogd)
 Signal::trap("HUP") do
-  # The launcher will read the file LOGFILE_RELOAD to know if the reload operation was successful
+  # The launcher will read the file RUNFILE_RELOAD to know if the reload operation was successful
   # In this file, the first line is the return code (0 if successfull)
   # The following lines are representing the error message if there is an error
   stderr = $stderr
@@ -60,7 +61,7 @@ Signal::trap("HUP") do
       io.reopen(filename,'a+')
     end
   end
-  file = File.open(File.join($kadeploy_logdir,LOGFILE_RELOAD),'w+')
+  file = File.open(File.join($kadeploy_rundir,RUNFILE_RELOAD),'w+')
   begin
     STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
     $kadeploy.reload_config()

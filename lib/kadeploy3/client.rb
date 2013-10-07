@@ -1,4 +1,4 @@
-$kadeploy_config_directory=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
+$kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 
 $kadeploy_logdir = nil
 $files = []
@@ -93,7 +93,7 @@ class Client
   end
 
   def self.load_configfile()
-    configfile = File.join($kadeploy_config_directory,'client_conf.yml')
+    configfile = File.join($kadeploy_confdir,'client_conf.yml')
     begin
       begin
         config = YAML.load_file(configfile)

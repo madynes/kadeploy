@@ -23,7 +23,7 @@ pidfile=/var/run/kadeploy3d.pid
 args="--pidfile $pidfile"
 lockfile=/var/lock/subsys/kadeploy3d
 user=deploy
-logdir=/var/log/kadeploy3
+rundir=/var/run/kadeploy3
 RETVAL=0
 
 start() {
@@ -48,7 +48,7 @@ stop() {
 }
 
 reload() {
-        reloadfile=$logdir/reload.log
+        reloadfile=$rundir/reload
         rm -f $reloadfile
         killproc -p "$pidfile" "$kadeploy3d" -HUP
         while [ ! -s $reloadfile ]
