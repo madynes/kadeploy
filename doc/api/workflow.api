@@ -1,0 +1,658 @@
+operation 'Workflow-based operations' do
+  type :Workflow, :Hash, 'The information related to the workflow of an operation (deployment,reboot,power)' do
+    field :id, :String, 'The id# of the operation (prefixed by "D-" for deployment, "R-" for reboot and "P-" for power)'
+    field :user, :String, 'The user that initiated the operation'
+    field :done, :Boolean, 'Set to true if the operation is done. Once an operation is done it\'s information should be removed from the API using the DELETE method.'
+    field :error, :Boolean, 'Set to true if an error was encountered. The error message can be obtained by getting /%OPERATION/:id/error.'
+    field :logs, :Boolean, 'New logs available for polling (see /%OPERATION/:id/logs). Only available to the users that have the rights to consult the information about this operation.'
+    field :debugs, :Boolean, 'New debugs available for polling (see /%OPERATION/:id/debugs). Only available to the users that have the rights to consult the information about this operation.'
+    field :time, :Float, 'The time elapsed since the start of the operation. Only available to the users that have the rights to consult the information about this operation.'
+    field :environment, :Hash, 'The environment that is currently being deployed. Only displayed when the operation uses an environment. Only available to the users that have the rights to consult the information about this operation.' do
+      field :id, :String, 'The id# of the environment'
+      field :user, :String, 'The owner of the environment'
+      field :name, :String, 'The name of the environment'
+      field :version, :Integer, 'The version of the environment'
+    end
+    field :nodes, :'Hash/Array', 'If the user have the rights to consult the information, a list of nodes ordered by state will be returned otherwise an Array of the nodes involved in the operation will be returned' do
+      field :ok, :Array, 'The list of nodes that have finish the operation successfully'
+      field :ko, :Array, 'The list of nodes that have finish the operation with an error'
+      field :processing, :Array, 'The list of nodes that are still processing the operation'
+    end
+
+    sample \
+      <<-EOS
+        {
+          "id": "D-b9401264-4383-4401-a548-1f881ea14acb",
+          "user": "frontend",
+          "done": false,
+          "error": false,
+          "environment": {
+            "id": -1,
+            "user": "frontend",
+            "name": "debian-anon",
+            "version": 1
+          },
+          "logs": false,
+          "nodes": {
+            "ok": [
+            ],
+            "ko": [
+            ],
+            "processing": [
+              "node-2.testbed.lan"
+            ]
+          },
+          "time": 30.92
+        },
+      EOS
+    sample \
+      <<-EOS
+        {
+          "id": "D-75105d91-777a-4e3b-bf4e-2690a544031a",
+          "user": "root",
+          "done": false,
+          "error": false,
+          "nodes": [
+            "node-1.testbed.lan"
+          ]
+        }
+      EOS
+    sample \
+      <<-EOS
+        {
+          "id": "R-4d657bda-1cad-4739-ab3d-e58879a3d962",
+          "user": "frontend",
+          "done": false,
+          "error": false,
+          "nodes": [
+            "node-1.testbed.lan",
+            "node-2.testbed.lan"
+          ]
+        }
+      EOS
+    sample \
+      <<-EOS
+        {
+          "id": "P-bf447aae-1fd5-4062-b1ff-03e72d5de6ba",
+          "user": "frontend",
+          "done": false,
+          "error": false,
+          "logs": true,
+          "nodes": {
+            "ok": [
+            ],
+            "ko": [
+            ],
+            "processing": [
+              "node-1.testbed.lan",
+              "node-2.testbed.lan"
+            ]
+          },
+          "time": 1.01
+        }
+      EOS
+  end
+
+  resource :POST, '/%OPERATION', 'Launch an operation' do
+    request do
+      parameter :'', :'Deployment/Reboot/Power', 'The operation\'s parameters'
+    end
+    response do
+      field :wid, :String, 'The id# of the workflow that was initiated'
+      field :resources, :Hash, 'The resources associated with the workflow and their URL' do
+        field :output, :String, 'Concatenated outputs'
+        field :outputs, :Hash, 'Outputs by cluster' do
+          field 'clustername', :String, 'Output of cluster clustername'
+        end
+        field :debug, :String, 'Concatenated debugs'
+        field :debugs, :Hash, 'Debugs by node' do
+          field 'nodename', :String, 'Debug of node nodename'
+        end
+        field :state, :String, 'Deployment state of nodes'
+        field :status, :String, 'Status of operation\'s instances (one instance by cluster)'
+        field :error, :String, 'Error message'
+      end
+    end
+
+    example 'Deploy a recorded environment',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 318
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "database",
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "ssh_authorized_keys": "/home/frontend/.ssh/authorized_keys",
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 843
+      {
+        "wid": "D-bf5608b0-9354-446b-a648-c3abaa3cab95",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs?user=frontend",
+          "logs": {
+            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Perform a simple reboot',
+    <<-EOS ,
+      POST /reboot HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 132
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "kind": "simple",
+        "level": "soft"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 821
+      {
+        "wid": "R-6b7950ee-8889-4e0a-810e-9cb8db5286f7",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Perform a power-off',
+    <<-EOS ,
+      PUT /power HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 112
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "status": "off"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 815
+      {
+        "wid": "P-e69b39a2-8b5b-416e-b016-7139b5a7e255",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/error?user=frontend"
+        }
+      }
+    EOS
+  end
+
+  resource :GET, '/%OPERATION', 'Get the workflow information of every running operation of the kind OPERATION' do
+    request do
+    end
+    response do
+      field '#i', 'Workflow', 'The list of current operation\'s worklow information'
+    end
+    example 'Get the list of current deployments',
+    <<-EOS ,
+      GET /deployment?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 578
+      [
+        {
+          "id": "D-b9401264-4383-4401-a548-1f881ea14acb",
+          "user": "frontend",
+          "done": false,
+          "error": false,
+          "environment": {
+            "id": -1,
+            "user": "frontend",
+            "name": "debian-anon",
+            "version": 1
+          },
+          "logs": false,
+          "nodes": {
+            "ok": [
+            ],
+            "ko": [
+            ],
+            "processing": [
+              "node-2.testbed.lan"
+            ]
+          },
+          "time": 30.92
+        },
+        {
+          "id": "D-75105d91-777a-4e3b-bf4e-2690a544031a",
+          "user": "root",
+          "done": false,
+          "error": false,
+          "nodes": [
+            "node-1.testbed.lan"
+          ]
+        }
+      ]
+    EOS
+  end
+
+  resource :GET, '/%OPERATION/:id', 'Get the workflow information (polling) of an operation' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response do
+      field '', 'Workflow', 'The workflow information related to the operation #:id'
+    end
+
+    example 'Gather a specific deployment status',
+    <<-EOS ,
+      GET /deployment/D-bed42b5d-f667-4701-adf3-2be22dfe7853?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 383
+      {
+        "id": "D-bed42b5d-f667-4701-adf3-2be22dfe7853",
+        "user": "frontend",
+        "done": false,
+        "error": false,
+        "environment": {
+          "id": 3,
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "logs": false,
+        "nodes": {
+          "ok": [
+          ],
+          "ko": [
+          ],
+          "processing": [
+            "node-1.testbed.lan",
+            "node-2.testbed.lan"
+          ]
+        },
+      }
+    EOS
+  end
+
+  resource :GET, '/%OPERATION/:id/logs/:cluster?', 'Get logs of a running operation (the "logs" field was set to true on the workflow\'s info)' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+      parameter ':cluster', :String, 'The name of the specific cluster to get the logs for', false
+    end
+    response :String, 'text/plain' do
+      field '', :String, 'The logs of the current operation prefixed by the timestamp of each line plus \'|\' in order to be able to sort them'
+    end
+
+    example 'Gather a specific deployment logs',
+    <<-EOS ,
+      GET /deployment/D-f98782d7-f45b-4895-8bf5-80fd421e5d8d/logs?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/plain
+      Content-Length: 288
+      1381236580.19466|Launching a deployment on node-1.testbed.lan
+      1381236580.19626|Performing a Deploy[SetDeploymentEnvUntrusted] step
+      1381236580.19662|  switch_pxe
+      1381236580.70964|  reboot
+      1381236580.70982|   * Performing a soft reboot on node-1.testbed.lan
+      1381236590.22287|  wait_reboot
+    EOS
+
+    example 'Gather logs of a specific cluster',
+    <<-EOS ,
+      GET /deployment/D-f98782d7-f45b-4895-8bf5-80fd421e5d8d/logs/graphene-cluster?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/plain
+      Content-Length: 1054
+      1381236711.25015|  create_partition_table
+      1381236712.76318|  format_deploy_part
+      1381236716.77628|  mount_deploy_part
+      1381236717.28898|  format_swap_part
+      1381236717.78944|End of step Deploy[SetDeploymentEnvUntrusted] after 137s
+      1381236717.80271|Performing a Deploy[BroadcastEnvKastafior] step
+      1381236717.80311|  send_environment
+      1381236730.19086|   * Broadcast time: 13s
+      1381236730.31649|  manage_admin_post_install
+      1381236730.82923|  manage_user_post_install
+      1381236733.34273|  check_kernel_files
+      1381236733.85569|  install_bootloader
+      1381236757.87112|  sync
+      1381236758.37149|End of step Deploy[BroadcastEnvKastafior] after 41s
+      1381236758.38477|Performing a Deploy[BootNewEnvKexec] step
+      1381236758.38516|  switch_pxe
+      1381236758.89467|  umount_deploy_part
+      1381236759.90749|  mount_deploy_part
+      1381236760.42154|  kexec
+      1381236761.43468|  wait_reboot
+      1381236803.43984|End of step Deploy[BootNewEnvKexec] after 45s
+      1381236803.45057|End of deployment for node-1.testbed.lan after 223s
+      1381236803.89096|End of deployment on cluster griffon-cluster after 223s
+    EOS
+  end
+
+  resource :GET, '/%OPERATION/:id/debugs/:node?', 'Gather the command\'s debugs of some/every nodes (the "debugs" field was set to true on the workflow\'s info)' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+      parameter ':node', :String, 'The name of the specific node to get the debugs for', false
+    end
+    response :String, 'text/plain' do
+      field '', :String, 'The logs of the current operation prefixed by the timestamp of each line plus \'|\' in order to be able to sort them'
+    end
+
+    example 'Get debugs of every nodes',
+    <<-EOS ,
+      GET /deployment/D-1267f271-d078-491a-9e2e-f2bfed571c4d/debugs?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/plain
+      Content-Length: 5410
+      1381238174.79166|-------------------------
+      1381238174.79167|NODE: node-1.testbed.lan
+      1381238174.79168|-------------------------
+      1381238174.79169|COMMAND: taktuk --connector ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3 -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy -l root --dynamic 0 -o output="$type/$pid/$host/".length("$line").":$line"."\n" -o error="$type/$pid/$host/".length("$line").":$line"."\n" -o status="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o connector="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o state="$type/$pid/$host/".length("$command").":$command".length("$line").":$line".length("$peer").":$peer"."\n" -o info -o message -o taktuk -m 192.168.209.89 -m 192.168.209.90 broadcast exec [ tmp=`mktemp` && chmod 755 ${tmp} && cat - > $tmp && KADEPLOY_CLUSTER="griffon-cluster" KADEPLOY_DEPLOY_PART="/dev/sda3" KADEPLOY_BLOCK_DEVICE="/dev/sda" KADEPLOY_DEPLOY_PART_NUM="3" KADEPLOY_SWAP_PART_NUM="1" KADEPLOY_PROD_PART_NUM="2" KADEPLOY_TMP_PART_NUM="5" KADEPLOY_PREPOST_EXTRACTION_DIR="/rambin" KADEPLOY_TMP_DIR="/tmp" KADEPLOY_ENV="debian-base-http" KADEPLOY_ENV_KERNEL="/vmlinuz" KADEPLOY_ENV_INITRD="/initrd.img" KADEPLOY_ENV_KERNEL_PARAMS="console=tty0 console=ttyS0,19200n8" KADEPLOY_ENV_HYPERVISOR="" KADEPLOY_ENV_HYPERVISOR_PARAMS="" KADEPLOY_OS_KIND="linux" KADEPLOY_PART_TYPE="53" KADEPLOY_FS_TYPE="ext3" KADEPLOY_ENV_EXTRACTION_DIR="/mnt/dest"  ${tmp} ] ; broadcast input file [ /etc/kadeploy3/parted-sample ]
+      1381238174.79171|STATUS: 0
+      1381238180.50834|-------------------------
+      1381238180.50836|NODE: node-1.testbed.lan
+      1381238180.50838|-------------------------
+      1381238180.50840|COMMAND: taktuk --connector ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3 -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy -l root --dynamic 0 -o output="$type/$pid/$host/".length("$line").":$line"."\n" -o error="$type/$pid/$host/".length("$line").":$line"."\n" -o status="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o connector="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o state="$type/$pid/$host/".length("$command").":$command".length("$line").":$line".length("$peer").":$peer"."\n" -o info -o message -o taktuk -m 192.168.209.89 -m 192.168.209.90 broadcast exec [ mkdir -p /mnt/dest; umount /dev/sda3 2>/dev/null; mkfs -t ext3 -q -b 4096 -O sparse_super,filetype,resize_inode,dir_index /dev/sda3 ]
+      1381238180.50841|STATUS: 0
+      1381238174.79151|-------------------------
+      1381238174.79155|NODE: node-2.testbed.lan
+      1381238174.79157|-------------------------
+      1381238174.79161|COMMAND: taktuk --connector ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3 -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy -l root --dynamic 0 -o output="$type/$pid/$host/".length("$line").":$line"."\n" -o error="$type/$pid/$host/".length("$line").":$line"."\n" -o status="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o connector="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o state="$type/$pid/$host/".length("$command").":$command".length("$line").":$line".length("$peer").":$peer"."\n" -o info -o message -o taktuk -m 192.168.209.89 -m 192.168.209.90 broadcast exec [ tmp=`mktemp` && chmod 755 ${tmp} && cat - > $tmp && KADEPLOY_CLUSTER="griffon-cluster" KADEPLOY_DEPLOY_PART="/dev/sda3" KADEPLOY_BLOCK_DEVICE="/dev/sda" KADEPLOY_DEPLOY_PART_NUM="3" KADEPLOY_SWAP_PART_NUM="1" KADEPLOY_PROD_PART_NUM="2" KADEPLOY_TMP_PART_NUM="5" KADEPLOY_PREPOST_EXTRACTION_DIR="/rambin" KADEPLOY_TMP_DIR="/tmp" KADEPLOY_ENV="debian-base-http" KADEPLOY_ENV_KERNEL="/vmlinuz" KADEPLOY_ENV_INITRD="/initrd.img" KADEPLOY_ENV_KERNEL_PARAMS="console=tty0 console=ttyS0,19200n8" KADEPLOY_ENV_HYPERVISOR="" KADEPLOY_ENV_HYPERVISOR_PARAMS="" KADEPLOY_OS_KIND="linux" KADEPLOY_PART_TYPE="53" KADEPLOY_FS_TYPE="ext3" KADEPLOY_ENV_EXTRACTION_DIR="/mnt/dest"  ${tmp} ] ; broadcast input file [ /etc/kadeploy3/parted-sample ]
+      1381238174.79164|STATUS: 0
+      1381238180.50823|-------------------------
+      1381238180.50827|NODE: node-2.testbed.lan
+      1381238180.50829|-------------------------
+      1381238180.50830|COMMAND: taktuk --connector ssh -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3 -o BatchMode=yes -i /etc/kadeploy3/keys/id_deploy -l root --dynamic 0 -o output="$type/$pid/$host/".length("$line").":$line"."\n" -o error="$type/$pid/$host/".length("$line").":$line"."\n" -o status="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o connector="$type/$pid/$host/".length("$command").":$command".length("$line").":$line"."\n" -o state="$type/$pid/$host/".length("$command").":$command".length("$line").":$line".length("$peer").":$peer"."\n" -o info -o message -o taktuk -m 192.168.209.89 -m 192.168.209.90 broadcast exec [ mkdir -p /mnt/dest; umount /dev/sda3 2>/dev/null; mkfs -t ext3 -q -b 4096 -O sparse_super,filetype,resize_inode,dir_index /dev/sda3 ]
+      1381238180.50833|STATUS: 0
+    EOS
+
+    example 'Get debugs of a specific node',
+    <<-EOS ,
+      GET /deployment/D-1267f271-d078-491a-9e2e-f2bfed571c4d/debugs/node-1.testbed.lan?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/plain
+      Content-Length: 2244
+      1381237762.64731|-------------------------
+      1381237762.64738|NODE: node-1.testbed.lan
+      1381237762.64740|-------------------------
+      1381237762.64748|COMMAND: ["ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3 -i /var/lib/kadeploy/hostnames/.ssh_key lsarzyniec@kavlan-2.nancy.grid5000.fr \"kapower3 -m `cat /var/lib/kadeploy/hostnames/node-1.testbed.lan` --off\" && sleep 2 && ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o ConnectTimeout=12 -o ConnectionAttempts=3 -i /var/lib/kadeploy/hostnames/.ssh_key lsarzyniec@kavlan-2.nancy.grid5000.fr \"kapower3 -m `cat /var/lib/kadeploy/hostnames/node-1.testbed.lan` --on\""]
+      1381237762.64751|STDOUT: Power operation on the nodes griffon-89.nancy.grid5000.fr
+      1381237762.64754|STDOUT:   power
+      1381237762.64757|STDOUT:    * Performing a soft power_off on griffon-89.nancy.grid5000.fr
+      1381237762.64760|STDOUT:    * Performing a hard power_off on griffon-89.nancy.grid5000.fr
+      1381237762.64763|STDOUT: Done power operation on the nodes griffon-89.nancy.grid5000.fr
+      1381237762.64765|STDOUT: 
+      1381237762.64766|STDOUT: Operation correctly performed on cluster griffon
+      1381237762.64768|STDOUT: griffon-89.nancy.grid5000.fr
+      1381237762.64770|STDOUT: Power operation on the nodes griffon-89.nancy.grid5000.fr
+      1381237762.64772|STDOUT:   power
+      1381237762.64774|STDOUT:    * Performing a soft power_on on griffon-89.nancy.grid5000.fr
+      1381237762.64776|STDOUT:    *       /! No soft power_on command is defined for these nodes /! 
+      1381237762.64778|STDOUT:    * Performing a hard power_on on griffon-89.nancy.grid5000.fr
+      1381237762.64780|STDOUT: Done power operation on the nodes griffon-89.nancy.grid5000.fr
+      1381237762.64782|STDOUT: 
+      1381237762.64783|STDOUT: Operation correctly performed on cluster griffon
+      1381237762.64785|STDOUT: griffon-89.nancy.grid5000.fr
+      1381237762.64787|STDERR: Warning: Permanently added 'kavlan-2.nancy.grid5000.fr,172.16.79.121' (RSA) to the list of known hosts.
+      1381237762.64788|STDERR: Warning: Permanently added 'kavlan-2.nancy.grid5000.fr,172.16.79.121' (RSA) to the list of known hosts.
+      1381237762.64790|STATUS: 0
+    EOS
+  end
+
+  resource :GET, '/%OPERATION/:id/state', 'Get the state of every nodes in a specific operation' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response do
+      field 'nodename', :Hash, 'The state of the node nodename' do
+        field :macro, :String, 'The macro-step operation the node is performing'
+        field :micro, :String, 'The micro-step operation the node is performing'
+        field :state, :String, 'The state of the node'
+      end
+    end
+
+    example 'Get state of a specific deployment',
+    <<-EOS ,
+      GET /deployment/D-877303c3-e838-4cbf-b7e3-c9862baab93f/state?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 272
+      {
+        "node-1.testbed.lan": {
+          "macro": "SetDeploymentEnvUntrusted",
+          "micro": "wait_reboot",
+          "state": "reboot_in_progress"
+        },
+        "node-2.testbed.lan": {
+          "macro": "SetDeploymentEnvUntrusted",
+          "micro": "wait_reboot",
+          "state": "reboot_in_progress"
+        }
+      }
+    EOS
+
+    example 'Get state of a specific power operation',
+    <<-EOS ,
+      GET /power/P-d31fa2c1-d686-4b94-a639-21476a876d64/state?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 184
+      {
+        "node-1.testbed.lan": {
+          "macro": "Off",
+          "micro": "power",
+          "state": "ok"
+        },
+        "node-2.testbed.lan": {
+          "macro": "Off",
+          "micro": "power",
+          "state": "ok"
+        }
+      }
+    EOS
+  end
+
+  resource :GET, '/%OPERATION/:id/status', 'Get the global status of an operation (where are every nodes in the operation)' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response do
+      field 'clustername', :Hash, 'The status of the cluster clustername' do
+        field 'macrostepname', :Hash, 'The status of the macro-step macroname' do
+          field 'microstepname', :Hash, 'The status of the micro-step microname' do
+            field :nodes, :Hash, 'The status of the nodes (of clustername) in the step macroname-microname' do
+              field :OK, :Array, 'The nodes that have successfully done the step'
+              field :KO, :Array, 'The nodes that have failed the step'
+              field :'**', :Array, 'The nodes that are processing the step'
+            end
+          end
+        end
+      end
+    end
+
+    example 'Get the status of a specific deployment',
+    <<-EOS ,
+      GET /deployment/D-877303c3-e838-4cbf-b7e3-c9862baab93f/status?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 312
+      {
+        "griffon-cluster": {
+          "SetDeploymentEnvUntrusted": {
+            "wait_reboot": {
+              "nodes": {
+                "OK": [
+                ],
+                "KO": [
+                ],
+                "**": [
+                  "node-1.testbed.lan",
+                  "node-2.testbed.lan"
+                ]
+              },
+              "time": 63
+            }
+          }
+        }
+      }
+    EOS
+
+    example 'Get the status of a specific power operation',
+    <<-EOS ,
+      GET /power/P-d31fa2c1-d686-4b94-a639-21476a876d64/status?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 285
+      {
+        "graphene-cluster": {
+          "Off": {
+            "power": {
+              "nodes": {
+                "OK": [
+                ],
+                "KO": [
+                ],
+                "**": [
+                  "node-1.testbed.lan",
+                  "node-2.testbed.lan"
+                ]
+              },
+              "time": 14
+            }
+          }
+        }
+      }
+    EOS
+  end
+
+  resource :GET, '/%OPERATION/:id/error', 'Get the error of an operation (the "error" field was set to true on the workflow\'s info)' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response :String, 'text/plain' do
+      field '', :String, 'The error message'
+    end
+
+    example 'Gather information about a deployment error',
+    <<-EOS ,
+      GET /deployment/D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51/error?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 400 Bad Request
+      X-Application-Error-Code: 5
+      X-Application-Error-Info: SW52YWxpZCBmaWxlIC0tIFVuYWJsZSB0byBnZXQgdGhlIGNoZWNrc3VtIG9mIGh0dHA6Ly90ZXN0YmVkLmxhbi9kZWJpYW4tYmFzZS1ub25lLnRneiAoaHR0cCBlcnJvciAjNDA0KQ==
+      Content-Type: text/plain
+      Content-Length: 104
+      Invalid file -- Unable to get the checksum of http://testbed.lan/debian-base-none.tgz (http error #404)
+    EOS
+  end
+
+  resource :DELETE, '/%OPERATION/:id', 'Cancel a running operation or delete information about one that encountered an error' do
+    request do
+      parameter ':id', :String, 'The id# of the operatiooperationn'
+    end
+    response do
+      field :wid, :String, 'The id# of the operation that was deleted'
+    end
+
+    example 'Cancel a specific deployment',
+    <<-EOS ,
+      DELETE /deployment/D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 53
+      {
+        "wid": "D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51"
+      }
+    EOS
+  end
+end

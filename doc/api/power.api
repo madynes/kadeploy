@@ -1,5 +1,5 @@
 operation 'Power operations' do
-  resource :POST, '/power', 'Launch a power operation' do
+  resource :PUT, '/power', 'Launch a power operation' do
     request do
       parameter :'...', :String
     end
@@ -21,29 +21,5 @@ operation 'Power operations' do
       code 500, 'Internal Error'
       code 200, 'OK'
     end
-  end
-
-  resource :GET, '/power/:id' do
-  end
-
-  resource :GET, '/power/:id/outputs' do
-  end
-
-  resource :GET, '/power/:id/outputs/:cluster' do
-  end
-
-  resource :GET, '/power/:id/debugs' do
-  end
-
-  resource :GET, '/power/:id/debugs/:node' do
-  end
-
-  resource :GET, '/power/:id/state' do
-  end
-
-  resource :GET, '/power/:id/status' do
-  end
-
-  resource :GET, '/power/:id/error' do
   end
 end
