@@ -89,10 +89,8 @@ do_reload()
 {
   RELOADFILE=$LOGDIR/reload.log
   rm -f $RELOADFILE
-  touch $RELOADFILE
-  chown $DAEMON_USER $RELOADFILE
   killproc -p "$PIDFILE" "$DAEMON" -HUP
-  while [ ! -s $RELOADFILE ]
+  while [ ! -f $RELOADFILE ]
   do
     sleep 1
   done

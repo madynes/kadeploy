@@ -50,8 +50,6 @@ stop() {
 reload() {
         reloadfile=$logdir/reload.log
         rm -f $reloadfile
-        touch $reloadfile
-        chown $user $reloadfile
         killproc -p "$pidfile" "$kadeploy3d" -HUP
         while [ ! -s $reloadfile ]
         do

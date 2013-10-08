@@ -69,13 +69,8 @@ rm -rf $RPM_BUILD_ROOT
 
 %files server
 %dir /var/log/kadeploy3
+%attr(0770,root,deploy) /var/log/kadeploy3
 %defattr(-,deploy,deploy,-)
-/var/log/kadeploy3/output.log
-/var/log/kadeploy3/error.log
-/var/log/kadeploy3/httpd.log
-/var/log/kadeploy3/access.log
-/var/log/kadeploy3/kadeploy.log
-/var/log/kadeploy3/kadeploy.debug
 /etc/init.d/kadeploy3d
 %config(noreplace) /etc/kadeploy3/clusters.yml
 %config(noreplace) /etc/kadeploy3/cluster-sample.yml
