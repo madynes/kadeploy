@@ -292,7 +292,7 @@ module Kaworkflow
       begin
         info[:cached_files] = GrabFile.grab_user_files(context)
       rescue KadeployError => ke
-        info[:nodes].set_state('aborted',nil,cexec.database,cexec.user)
+        info[:nodes].set_state('aborted',nil,context[:database],context[:user])
         raise ke
       end
 
