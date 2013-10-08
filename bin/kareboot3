@@ -117,7 +117,6 @@ class KarebootClient < ClientWorkflow
     params[:vlan] = options[:vlan] if options[:vlan]
     params[:check_destructive] = options[:check_demolishing] if options[:check_demolishing]
 
-    localfiles = nil
     if options[:env_name]
       envname = options[:env_name]
       username = nil
@@ -141,32 +140,18 @@ class KarebootClient < ClientWorkflow
         :name => env['name'],
         :version => env['version'],
       }
-      localfiles = get_localfiles(env)
+      add_localfiles(env)
     end
 
     # Check if the environment contains local files
 
     if options[:key]
       params[:ssh_authorized_keys] = options[:key]
-      tmp = get_localfiles(params[:ssh_authorized_keys])
-      if localfiles
-        localfiles += tmp
-      else
-        localfiles = tmp
-      end
+      add_localfiles(params[:ssh_authorized_keys])
     end
 
     # Add the PXE files
-    unless options[:pxe_files].empty?
-      tmp = get_localfiles(options[:pxe_files])
-      if localfiles
-        localfiles += tmp
-      else
-        localfiles = tmp
-      end
-    end
-
-    params[:client] = http_export_files(localfiles,options[:secure]) if localfiles and !localfiles.empty?
+    add_localfiles(options[:pxe_files]) unless options[:pxe_files].empty?
 
     run_workflow(options,params)
   end
