@@ -22,29 +22,4 @@ operation 'Reboot operations' do
       code 200, 'OK'
     end
   end
-
-  resource :GET, '/reboot/:id' do
-  end
-
-  resource :GET, '/reboot/:id/outputs' do
-  end
-
-  resource :GET, '/reboot/:id/outputs/:cluster' do
-  end
-
-  resource :GET, '/reboot/:id/debugs' do
-  end
-
-  resource :GET, '/reboot/:id/debugs/:node' do
-  end
-
-  resource :GET, '/reboot/:id/state' do
-  end
-
-  resource :GET, '/reboot/:id/status' do
-  end
-
-  resource :GET, '/reboot/:id/error' do
-  end
 end
-

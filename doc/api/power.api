@@ -22,28 +22,4 @@ operation 'Power operations' do
       code 200, 'OK'
     end
   end
-
-  resource :GET, '/power/:id' do
-  end
-
-  resource :GET, '/power/:id/outputs' do
-  end
-
-  resource :GET, '/power/:id/outputs/:cluster' do
-  end
-
-  resource :GET, '/power/:id/debugs' do
-  end
-
-  resource :GET, '/power/:id/debugs/:node' do
-  end
-
-  resource :GET, '/power/:id/state' do
-  end
-
-  resource :GET, '/power/:id/status' do
-  end
-
-  resource :GET, '/power/:id/error' do
-  end
 end
