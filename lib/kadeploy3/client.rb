@@ -1134,12 +1134,18 @@ p @resources['resource']
       if res['nodes']['ok'] and !res['nodes']['ok'].empty?
         debug "The #{self.class.operation().downcase} is successful on nodes"
         debug res['nodes']['ok'].join("\n")
+        File.open(options[:nodes_ok_file],'w+') do |f|
+          f.puts res['nodes']['ok'].join("\n")
+        end if options[:nodes_ok_file]
       end
 
       # Fail
       if res['nodes']['ko'] and !res['nodes']['ko'].empty?
         debug "The #{self.class.operation().downcase} failed on nodes"
         debug res['nodes']['ko'].join("\n")
+        File.open(options[:nodes_ko_file],'w+') do |f|
+          f.puts res['nodes']['ko'].join("\n")
+        end if options[:nodes_ko_file]
       end
     end
   end
