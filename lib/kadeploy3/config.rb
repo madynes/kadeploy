@@ -47,7 +47,7 @@ module Configuration
   end
 
   class Config
-    VERSION_FILE = File.join($kadeploy_config_directory, "version")
+    VERSION_FILE = File.join($kadeploy_confdir, "version")
 
     attr_reader :common, :clusters, :caches, :static
 
@@ -115,7 +115,7 @@ module Configuration
     end
 
     def self.dir()
-      ENV['KADEPLOY_CONFIG_DIR']||'/etc/kadeploy3'
+      $kadeploy_confdir
     end
 
     private
@@ -163,7 +163,7 @@ module Configuration
     include ConfigFile
 
     def self.file()
-      File.join($kadeploy_config_directory, "server_conf.yml")
+      File.join($kadeploy_confdir, "server_conf.yml")
     end
 
     attr_reader :cache
@@ -643,7 +643,7 @@ module Configuration
     include ConfigFile
 
     def self.file()
-      File.join($kadeploy_config_directory, "clusters.yml")
+      File.join($kadeploy_confdir, "clusters.yml")
     end
 
     def load(commonconfig)
@@ -1249,7 +1249,7 @@ module Configuration
     include ConfigFile
 
     def self.file()
-      File.join($kadeploy_config_directory, "cmd.yml")
+      File.join($kadeploy_confdir, "cmd.yml")
     end
 
     def load(common)

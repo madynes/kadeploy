@@ -70,6 +70,8 @@ rm -rf $RPM_BUILD_ROOT
 %files server
 %dir /var/log/kadeploy3
 %attr(0770,root,deploy) /var/log/kadeploy3
+%dir /var/run/kadeploy3
+%attr(0740,deploy,deploy) /var/run/kadeploy3
 %defattr(-,deploy,deploy,-)
 /etc/init.d/kadeploy3d
 %config(noreplace) /etc/kadeploy3/clusters.yml

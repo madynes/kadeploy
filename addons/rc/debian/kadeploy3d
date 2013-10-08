@@ -24,7 +24,6 @@ PIDFILE=/var/run/$NAME.pid
 DAEMON_ARGS="--pidfile $PIDFILE --detach"
 SCRIPTNAME=/etc/init.d/$NAME
 DAEMON_USER=deploy
-LOGDIR=/var/log/kadeploy3
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
@@ -87,7 +86,7 @@ do_stop()
 
 do_reload()
 {
-  RELOADFILE=$LOGDIR/reload.log
+  RELOADFILE=/var/run/${NAME}/reload
   rm -f $RELOADFILE
   killproc -p "$PIDFILE" "$DAEMON" -HUP
   while [ ! -f $RELOADFILE ]

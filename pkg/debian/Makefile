@@ -33,10 +33,14 @@ DB=$(KADEPLOY_ROOT)/db
 TEST=$(KADEPLOY_ROOT)/test
 MAN=$(KADEPLOY_ROOT)/man
 SCRIPTS=$(KADEPLOY_ROOT)/scripts
-LIBS_PATH=\/usr\/local\/kadeploy3
-SED_LIBS=/KADEPLOY3_LIBS/ s/$(LIBS_PATH)/$(LIBS_PATH)$(SUFFIX)/g
 CONFIGS_PATH=\/etc\/kadeploy3
 SED_CONFIGS=/KADEPLOY3_CONFIG_DIR/ s/$(CONFIGS_PATH)/$(CONFIGS_PATH)$(SUFFIX)/g
+LOGS_PATH=\/var\/log\/kadeploy3
+SED_LOGS=/KADEPLOY3_LOG_DIR/ s/$(LOGS_PATH)/$(LOGS_PATH)$(SUFFIX)/g
+RUN_PATH=\/var\/run\/kadeploy3
+SED_RUN=/KADEPLOY3_RUN_DIR/ s/$(RUN_PATH)/$(RUN_PATH)$(SUFFIX)/g
+LIBS_PATH=\/usr\/local\/kadeploy3
+SED_LIBS=/KADEPLOY3_LIBS/ s/$(LIBS_PATH)/$(LIBS_PATH)$(SUFFIX)/g
 
 SUFFIX = ""
 ifdef DEV
@@ -61,9 +65,14 @@ build-clean:
 
 install_log:
 	@install -d -o root -g $(DEPLOY_USER) -m 770 $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)
+	@install -d -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 740 $(DEB_ROOT_SERVER)/var/run/kadeploy3$(SUFFIX)
+
 install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/kadeploy3/*.rb $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/
 	@sed "$(SED_CONFIGS)" -i $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/*.rb
+	@sed "$(SED_LOGS)" -i $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/*.rb
+	@sed "$(SED_RUN)" -i $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/*.rb
+	@sed "$(SED_LIBS)" -i $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/lib/kadeploy3/*.rb
 
 install_conf_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(CONF)/client_conf.yml $(DEB_ROOT_CLIENT)/etc/kadeploy3$(SUFFIX)/client_conf.yml
@@ -86,14 +95,23 @@ install_bin:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kapower3 $(DEB_ROOT_CLIENT)/usr/bin/kapower3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kareboot3 $(DEB_ROOT_CLIENT)/usr/bin/kareboot3$(SUFFIX)
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 755 $(BIN)/kastat3 $(DEB_ROOT_CLIENT)/usr/bin/kastat3$(SUFFIX)
+	@sed "$(SED_CONFIGS)" -i $(DEB_ROOT_CLIENT)/usr/bin/ka* -i
+	@sed "$(SED_LOGS)" -i $(DEB_ROOT_CLIENT)/usr/bin/ka* -i
+	@sed "$(SED_RUN)" -i $(DEB_ROOT_CLIENT)/usr/bin/ka* -i
 	@sed "$(SED_LIBS)" $(DEB_ROOT_CLIENT)/usr/bin/ka* -i
 
 install_sbin_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/kadeploy3d $(DEB_ROOT_SERVER)/usr/sbin/kadeploy3d$(SUFFIX)
+	@sed "$(SED_CONFIGS)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
+	@sed "$(SED_LOGS)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
+	@sed "$(SED_RUN)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
 	@sed "$(SED_LIBS)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
 
 install_sbin_client:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/karights3 $(DEB_ROOT_CLIENT)/usr/sbin/karights3$(SUFFIX)
+	@sed "$(SED_CONFIG)" $(DEB_ROOT_CLIENT)/usr/sbin/ka* -i
+	@sed "$(SED_LOGS)" $(DEB_ROOT_CLIENT)/usr/sbin/ka* -i
+	@sed "$(SED_RUN)" $(DEB_ROOT_CLIENT)/usr/sbin/ka* -i
 	@sed "$(SED_LIBS)" $(DEB_ROOT_CLIENT)/usr/sbin/ka* -i
 
 install_kastafior:
