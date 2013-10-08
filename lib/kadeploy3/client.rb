@@ -31,6 +31,7 @@ R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
 
 
 class Client
+  @@terminal_width = nil
   attr_reader :name, :nodes
 
   def initialize(name,server,port,secure=false,nodes=nil)
@@ -500,15 +501,20 @@ class Client
   end
 
   def self.term_size()
-    if ENV['COLUMNS']
-      ENV['COLUMNS'].to_i rescue 80
-    else
-      if !(size = `stty size`.strip).empty?
-        size.split(' ')[1].to_i
+    if !@@terminal_width
+      if ENV['COLUMNS']
+        @@terminal_width = ENV['COLUMNS'].to_i rescue 80
+      elsif !STDIN.tty? or STDIN.closed?
+        @@terminal_width = 80
       else
-        80
+        if !(size = `stty size`.strip).empty?
+          @@terminal_width = size.split(' ')[1].to_i
+        else
+          @@terminal_width = 80
+        end
       end
     end
+    @@terminal_width
   end
 
   def self.print_optdesc(str,indentsize)
