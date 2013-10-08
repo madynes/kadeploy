@@ -5,7 +5,7 @@ $:.unshift File.dirname(__FILE__)
 require 'common-g5k'
 
 def test_cmd(script)
-  "cd #{TEST_DIR} && ruby #{script} --verbose=verbose -- #{TEST_CONFIG} ~/NODEFILE"
+  "cd #{TEST_DIR} && ruby #{script} --verbose -- #{TEST_CONFIG} ~/NODEFILE"
 end
 
 def run_test(name,cmd)

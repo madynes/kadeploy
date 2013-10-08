@@ -1,3 +1,4 @@
+$:.unshift File.dirname(__FILE__)
 require 'ka_test_case'
 require 'test/unit'
 require 'tempfile'
@@ -9,8 +10,9 @@ class TestKareboot  < Test::Unit::TestCase
   def setup
     load_config()
     @binary = @binaries[:kareboot]
-    @kind = 'simple_reboot'
+    @kind = 'simple'
     @env = @envs[:base]
+    @part = '3'
   end
 
   def run_kareboot(*options)
@@ -36,11 +38,6 @@ class TestKareboot  < Test::Unit::TestCase
     rescue
       assert(false,'Node do not listen on SSH port')
     end
-  end
-
-  def test_async
-    @async = true
-    run_kareboot()
   end
 
   def test_set_pxe
@@ -97,9 +94,13 @@ class TestKareboot  < Test::Unit::TestCase
   end
 
   def test_env_recorded
+    @kind = 'recorded_env'
+    part = 3
+    run_ka(@binaries[:kadeploy],'-e',@env,'-f',@nodefile,'-p',@part,'-k'){}
+    run_kareboot('-e',@env,'-p',@part)
   end
 
-  def test_check_prod_env
+  def test_check_destructive
   end
 end
 

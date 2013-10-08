@@ -1,3 +1,4 @@
+$:.unshift File.dirname(__FILE__)
 require 'ka_test_case'
 require 'test/unit'
 require 'tempfile'
@@ -8,16 +9,16 @@ class TestKapower < Test::Unit::TestCase
   def setup
     load_config()
     @binary = @binaries[:kapower]
+    @nodefiles = true
   end
 
   def run_kapower(*options)
     options += ['-f',@nodefile]
-    run_ka_check(@binary,*options)
-  end
-
-  def test_async
-    @async = true
-    run_kapower('--off')
+    if @nodefiles
+      run_ka_check(@binary,*options)
+    else
+      run_ka(@binary,*options)
+    end
   end
 
   def test_on
@@ -33,6 +34,7 @@ class TestKapower < Test::Unit::TestCase
   end
 
   def test_no_wait
+    @nodefiles = false
     run_kapower('--off','--no-wait')
   end
 end

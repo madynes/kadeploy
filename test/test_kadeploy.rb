@@ -1,3 +1,4 @@
+$:.unshift File.dirname(__FILE__)
 require 'ka_test_case'
 require 'test/unit'
 require 'tempfile'
@@ -23,7 +24,7 @@ class TestKadeploy < Test::Unit::TestCase
     options += ['-u',@user] if @user
     options += ['-e',@env] if @env
     options << '-k' if @key
-    options << '--ignore-nodes-deploying'
+    options << '--force'
 
     run_ka_check(@binary,*options)
 
@@ -141,13 +142,6 @@ class TestKadeploy < Test::Unit::TestCase
     run_kadeploy()
   end
 
-  def test_async
-    @async = true
-    @key = false
-    @connect = false
-    run_kadeploy()
-  end
-
   def test_env_version
     desc = env_desc(@env)
     desc['name'] = @tmp[:envname]
@@ -170,7 +164,7 @@ class TestKadeploy < Test::Unit::TestCase
 
   def test_disable_bootloader
     @env = @envs[:grub]
-    run_kadeploy('--disable-bootloader')
+    run_kadeploy('--disable-bootloader-install')
   end
 
   def test_disable_disk_partitioning
@@ -323,7 +317,7 @@ class TestKadeploy < Test::Unit::TestCase
     opsfile.close
 
     begin
-      run_kadeploy('--set-custom-operations',opsfile.path)
+      run_kadeploy('--custom-steps',opsfile.path)
 
       pre = ''
       post = ''
