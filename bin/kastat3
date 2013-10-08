@@ -49,7 +49,7 @@ class KastatClient < Client
         options[:min_failure_rate] = r.to_f if r
       }
       parse_machinefile(opt,options)
-      add_opt(opt,"-F", "--fields FIELDS", Array, "Only print the selected fields (wid,user,hostname,step1,step2,step3,timeout_step1,timeout_step2,timeout_step3,retry_step1,retry_step2,retry_step3,start,step1_duration,step2_duration,step3_duration,env,md5,success,error)") { |f|
+      add_opt(opt,"-F", "--fields FIELDS", FIELDS, "Only print the selected fields (#{FIELDS.join(', ')})") { |f|
         options[:fields] = f
       }
       parse_machine(opt,options)
@@ -71,10 +71,10 @@ class KastatClient < Client
       add_opt(opt,"-y", "--date-max TIME", Time, "Get the stats to this date (yyyy-mm-dd hh:mm:ss)") { |d|
         options[:date_max] = d
       }
-      add_opt(opt,"", "--limit N", /^\d+$/, "Print a maximal number of N results") {|n|
+      add_opt(opt,"--limit N", /^\d+$/, "Print a maximal number of N results") {|n|
         options[:limit] = n
       }
-      add_opt(opt,"", "--sort VALS", Array, "Sort the result on some specific fields (default: start)") { |s|
+      add_opt(opt,"--sort VALS", Array, "Sort the result on some specific fields (default: start)") { |s|
         options[:sort] = s
       }
     end

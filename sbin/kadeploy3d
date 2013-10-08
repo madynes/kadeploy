@@ -152,7 +152,7 @@ OptionParser.new do |opts|
     $generate_dh_seeds = false
   end
 
-  opts.on("", "--ruby-debug", "Run with ruby interpreter's debug mode") do
+  opts.on("--ruby-debug", "Run with ruby interpreter's debug mode") do
     $DEBUG = true
   end
 end.parse!
