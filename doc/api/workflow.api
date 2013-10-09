@@ -137,6 +137,21 @@ operation 'Workflow-based operations' do
       end
     end
 
+    # Prototype, do not delete
+    # example 'Operation ...',
+    # <<-EOS ,
+    #   POST /deployment HTTP/1.1
+    #   Accept: text/plain, application/json
+    #   Host: kadeploy.testbed.lan:25300
+    #   Content-Type: application/json
+    #   Content-Length: ...
+    # EOS
+    # <<-EOS
+    #   HTTP/1.1 200 OK
+    #   Content-Type: application/json
+    #   Content-Length: ...
+    # EOS
+
     example 'Deploy a recorded environment',
     <<-EOS ,
       POST /deployment HTTP/1.1
@@ -246,6 +261,89 @@ operation 'Workflow-based operations' do
           "state": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/state?user=frontend",
           "status": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/status?user=frontend",
           "error": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Launch a deployment with some custom operations',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 1380
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "force": true,
+        "custom_operations": {
+          "SetDeploymentEnvUntrusted": {
+            "mount_deploy_part": {
+              "substitute": [
+                {
+                  "action": "exec",
+                  "name": "test-exec",
+                  "command": "mount ${KADEPLOY_DEPLOY_PART} ${KADEPLOY_ENV_EXTRACTION_DIR}; partprobe ${KADEPLOY_BLOCK_DEVICE}"
+                }
+              ],
+              "post-ops": [
+                {
+                  "action": "send",
+                  "name": "test-send",
+                  "file": "/home/frontend/test/_TMP_KATESTSUITE",
+                  "destination": "/mnt/dest",
+                  "scattering": "tree"
+                }
+              ]
+            }
+          },
+          "BroadcastEnvKastafior": {
+            "send_environment": {
+              "pre-ops": [
+                {
+                  "action": "exec",
+                  "name": "test-exec",
+                  "command": "echo OK > ${KADEPLOY_ENV_EXTRACTION_DIR}/TEST_EXEC"
+                }
+              ],
+              "post-ops": [
+                {
+                  "action": "run",
+                  "name": "test-run",
+                  "file": "/tmp/script20131009-30803-1cv2y8m"
+                }
+              ]
+            }
+          }
+        },
+        "environment": {
+          "kind": "database",
+          "user": "root",
+          "name": "debian-min",
+          "version": 1
+        },
+        "ssh_authorized_keys": "/home/frontend/.ssh/authorized_keys",
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 845
+      {
+        "wid": "D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/error?user=frontend"
         }
       }
     EOS
