@@ -591,7 +591,7 @@ module Configuration
           @end_of_power_hook = nil if @end_of_power_hook.empty?
         end
 
-        @autoclean_threshold = cp.value('autoclean_threshold',Fixnum,60*6).abs # 6h
+        @autoclean_threshold = cp.value('autoclean_threshold',Fixnum,60*6).abs * 60 # 6h by default
 
         cp.parse('external',true) do
           cp.parse('taktuk',true) do
