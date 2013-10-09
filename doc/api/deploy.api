@@ -1,5 +1,5 @@
 operation 'Deployment' do
-  resource :POST, '/deploy', 'Launch a deployment' do
+  resource :POST, '/deployment', 'Launch a deployment' do
     request do
       parameter :environment, :Hash, 'The environment that have to be deployed' do
         parameter :kind, :String, 'The kind of environment', false, :expected => [:anon,:database]
@@ -7,54 +7,173 @@ operation 'Deployment' do
       parameter :'...', :String
     end
     response do
-      field :wid, :String, 'The id# of the workflow that was initiated'
-      field :resources, :Hash, 'The resources associated with the workflow and their URL' do
-        field :output, :String, 'Concatenated outputs'
-        field :outputs, :Hash, 'Outputs by cluster' do
-          field 'clustername', :String, 'Output of cluster clustername'
-        end
-        field :debug, :String, 'Concatenated debugs'
-        field :debugs, :Hash, 'Debugs by node' do
-          field 'nodename', :String, 'Debug of node nodename'
-        end
-        field :state, :String, 'Deployment state of nodes'
-        field :status, :String, 'Status of deployment instances'
-        field :error, :String, 'Error message'
-      end
+      field '', 'Workflow', 'Information related to the workflow of the deployment'
     end
-  end
-
-  resource :GET, '/deploy' do
-  end
-
-  resource :GET, '/deploy/:id' do
-    request do
-      parameter :nodes, :Boolean, ''
-      parameter :done, :Boolean, ''
-      parameter :error, :Boolean, ''
-      parameter :logs, :Boolean, ''
-      parameter :debugs, :Boolean, ''
-    end
-  end
-
-  resource :GET, '/deploy/:id/outputs' do
-  end
-
-  resource :GET, '/deploy/:id/outputs/:cluster' do
-  end
-
-  resource :GET, '/deploy/:id/debugs' do
-  end
-
-  resource :GET, '/deploy/:id/debugs/:node' do
-  end
-
-  resource :GET, '/deploy/:id/state' do
-  end
-
-  resource :GET, '/deploy/:id/status' do
-  end
-
-  resource :GET, '/deploy/:id/error' do
+    example 'Deploy a recorded environment using the user specified key file',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 318
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "database",
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "ssh_authorized_keys": "/home/frontend/.ssh/authorized_keys",
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 843
+      {
+        "wid": "D-bf5608b0-9354-446b-a648-c3abaa3cab95",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs?user=frontend",
+          "logs": {
+            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error?user=frontend"
+        }
+      }
+    EOS
+    example 'Deploy an anonymous local environment',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 845
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "anonymous",
+          "name": "debian-anon",
+          "version": 1,
+          "description": "My custom Debian 7",
+          "author": "frontend@testbed.lan",
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "/home/frontend/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "/home/frontend/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 83,
+          "multipart": false
+        },
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 843
+      {
+        "wid": "D-abbaa88c-243e-42fb-8c5a-9332918a6ee1",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/logs?user=frontend",
+          "logs": {
+            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/logs/griffon-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/error?user=frontend"
+        }
+      }
+    EOS
+    example 'Deploy an anonymous HTTP environment',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 804
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "anonymous",
+          "name": "debian-anon",
+          "version": 1,
+          "description": "My custom Debian 7",
+          "author": "frontend@testbed.lan",
+          "visibility": "shared",
+          "destructive": false,
+          "os": "linux",
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "http://testbed.lan/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          "boot": {
+            "kernel": "/vmlinuz",
+            "initrd": "/initrd.img"
+          },
+          "filesystem": "ext3",
+          "partition_type": 83,
+          "multipart": false
+        }
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 843
+      {
+        "wid": "D-2669bedd-82f2-4be6-b090-a0837ad4e0a9",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/logs?user=frontend",
+          "logs": {
+            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/logs/griffon-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/error?user=frontend"
+        }
+      }
+    EOS
   end
 end

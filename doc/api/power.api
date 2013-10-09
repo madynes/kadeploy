@@ -1,49 +1,10 @@
 operation 'Power operations' do
-  resource :POST, '/power', 'Launch a power operation' do
+  resource :PUT, '/power', 'Launch a power operation' do
     request do
       parameter :'...', :String
     end
     response do
-      field :wid, :String, 'The id# of the workflow that was initiated'
-      field :resources, :Hash, 'The resources associated with the workflow and their URL' do
-        field :output, :String, 'Concatenated outputs'
-        field :outputs, :Hash, 'Outputs by cluster' do
-          field 'clustername', :String, 'Output of cluster clustername'
-        end
-        field :debug, :String, 'Concatenated debugs'
-        field :debugs, :Hash, 'Debugs by node' do
-          field 'nodename', :String, 'Debug of node nodename'
-        end
-        field :state, :String, 'Deployment state of nodes'
-        field :status, :String, 'Status of deployment instances'
-        field :error, :String, 'Error message'
-      end
-      code 500, 'Internal Error'
-      code 200, 'OK'
+      field '', 'Workflow', 'Information related to the workflow of the power operation'
     end
-  end
-
-  resource :GET, '/power/:id' do
-  end
-
-  resource :GET, '/power/:id/outputs' do
-  end
-
-  resource :GET, '/power/:id/outputs/:cluster' do
-  end
-
-  resource :GET, '/power/:id/debugs' do
-  end
-
-  resource :GET, '/power/:id/debugs/:node' do
-  end
-
-  resource :GET, '/power/:id/state' do
-  end
-
-  resource :GET, '/power/:id/status' do
-  end
-
-  resource :GET, '/power/:id/error' do
   end
 end

@@ -551,9 +551,9 @@ end
 def response(type=:Hash,content='application/json',&block)
   raise $current.class.name unless $current.is_a?(Resource)
   resp = $current.response(type,content)
-  resp.code 200,'Success, the request is successful'
+  resp.code 200,'OK, the request is successful'
   resp.code 500,'Internal Server Error, an uncatched exception was thrown on the server'
-  resp.code 400,'Kadeploy Error, please check the X-Application-Error-Code and X-Application-Error-Code headers'
+  resp.code 400,'Bad Request, Kadeploy Error: please check the X-Application-Error-Code and X-Application-Error-Code headers'
   resp.code 401,'Unauthorized, you need to be authenticated'
   resp.code 415,'Unsupported Media Type, check the Content-Type of your request\'s body'
   parse(resp,&block)
