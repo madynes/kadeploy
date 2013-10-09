@@ -135,7 +135,6 @@ class KarebootClient < ClientWorkflow
         env = envs.last
       end
       params[:environment] = {
-        :kind => :database,
         :user => env['user'],
         :name => env['name'],
         :version => env['version'],
