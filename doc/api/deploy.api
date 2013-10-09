@@ -1,10 +1,34 @@
 operation 'Deployment' do
   resource :POST, '/deployment', 'Launch a deployment' do
     request do
-      parameter :environment, :Hash, 'The environment that have to be deployed' do
-        parameter :kind, :String, 'The kind of environment', false, :expected => [:anon,:database]
+      parameter '_generic_parameter_', :'...', "Some workflow-based operation\'s generic parameter (see more #{$cgi.a(:href => '#workflow_operations'){'here'}})", false
+      parameter :nodes, :Array, 'The list of nodes the operation should be applied on'
+      parameter :client, :String, "The client used to export files to the server, useful for local:// files (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
+      parameter :ssh_authorized_keys, :String, "The path to a ssh authorized_keys file that have to be copied in the root directory of the deployed environment (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
+      parameter :vlan, :String, 'Specify the VLAN the nodes should be reboot in', false
+      parameter :pxe, :Hash, 'Specify some custom netboot parameters', false do
+        parameter :pxe, :String, 'A custom PXE profile, the string FILES_PREFIX-- will be replaced by the prefix to some exported files', false
+        parameter :files, :Array, "A list of path to files that have to be exported in the PXE repository\'s directory (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
+        parameter :singularities, :Hash, 'Specify a substitution pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)',false do
+            parameter 'nodename', :String, 'The substitution pattern for the node "nodename"', false
+        end
       end
-      parameter :'...', :String
+      parameter :block_device, :String, 'The block device the environment should be installed on', false
+      parameter :deploy_partition, :Integer, 'The partition the environment should be installed on', false
+      parameter :environment, :Hash, 'The environment that have to be deployed' do
+        parameter :kind, :String, 'The kind of environment, recorded or anonymous', false, :expected => [:anon,:database]
+        parameter :name, :String, 'The name of the environment'
+        parameter :version, :String, 'The version of the environment'
+        parameter :user, :String, 'The owner of the environment', false
+        parameter 'fields', 'Environment', 'Other fields that are used to describe an anonymous environment', false
+      end
+      parameter :timeout_reboot_classical, :Integer, 'Overwrite the default value for the reboot timeout', false
+      parameter :timeout_reboot_kexec, :Integer, 'Overwrite the default value for the kexec timeout', false
+      parameter :boot_partition, :Integer, 'The partition the node have to boot on (useful when deploying an image of the whole disk', false
+      parameter :disable_bootloader_install, :Set, 'Disable the install of a bootloader on the partition the image is installed on', false
+      parameter :disable_disk_partitioning, :Set, 'Disable the disk partitioning step', false
+      parameter :reformat_tmp_partition, :String, 'Reformat the partition that was defined as the tmp partition with the specified format', false
+      parameter :automata, :Hash, '...', false
     end
     response do
       field '', 'Workflow', 'Information related to the workflow of the deployment'

@@ -1,7 +1,19 @@
 operation 'Power operations' do
   resource :PUT, '/power', 'Launch a power operation' do
     request do
-      parameter :'...', :String
+      parameter '_generic_parameter_', :'...', "Some workflow-based operation\'s generic parameter (see more #{$cgi.a(:href => '#workflow_operations'){'here'}})", false
+      parameter :nodes, :Array, 'The list of nodes the operation should be applied on'
+      parameter :status, :String, 'The status to be applied', true, :expected => ['on','off']
+      parameter :level, :String, 'The level of the command that will be performed', false, :expected => ['soft','hard','very_hard'], :default => 'soft'
+    end
+    response do
+      field '', 'Workflow', 'Information related to the workflow of the power operation'
+    end
+  end
+
+  resource :GET, '/power', 'Get the power status of some nodes' do
+    request do
+      parameter :nodes, :Array, 'The list of nodes the power status should be returned'
     end
     response do
       field '', 'Workflow', 'Information related to the workflow of the power operation'
