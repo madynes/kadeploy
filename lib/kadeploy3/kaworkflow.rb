@@ -195,7 +195,7 @@ module Kaworkflow
             p.check(env['name'],String,:mandatory=>true)
 
             type = p.check(env['kind'],String,:values=>['anonymous','database'],
-              :mandatory=>true)
+              :default=>'database')
             if type == 'database'
               p.check(env['user'],String,:mandatory=>true,
                 :errno=>APIError::INVALID_ENVIRONMENT)
