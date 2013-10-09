@@ -31,7 +31,7 @@ class KarebootClient < ClientWorkflow
         :pxe_files => [],
         :pxe_profile_singularities => nil,
         :key => nil,
-        :level => :soft,
+        :level => nil,
         :reboot_classical_timeout => nil,
         :vlan => nil,
         :secure => false,
