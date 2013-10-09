@@ -5,8 +5,8 @@ require 'net/ssh'
 KADEPLOY_ENV_VARS=[
   'TESTSUITE_DIR',
   'KADEPLOY_BIN',
+  'KADEPLOY_ENV',
   'KABOOTSTRAP_BIN',
-  'ENVIRONMENT',
   'KABOOTSTRAP_KERNELS',
   'KABOOTSTRAP_ENVS',
   'KABOOTSTRAP_OPTS',
@@ -18,9 +18,9 @@ KADEPLOY_ENV_VARS=[
 ]
 TESTSUITE_DIR=ENV['TESTSUITE_DIR']||"#{ENV['HOME']}/katestsuite"
 KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
+ENVIRONMENT=ENV['KADEPLOY_ENV']||'wheezy-x64-base'
 KADEPLOY_RETRIES=3
 KABOOTSTRAP_BIN=ENV['KABOOTSTRAP_BIN']||File.join(TESTSUITE_DIR,'kabootstrap')
-ENVIRONMENT=ENV['KADEPLOY_ENV']||'squeeze-x64-base'
 KABOOTSTRAP_KERNELS=ENV['KABOOTSTRAP_KERNELS']||File.join(TESTSUITE_DIR,'kernels')
 KABOOTSTRAP_ENVS=ENV['KABOOTSTRAP_ENVS']||File.join(TESTSUITE_DIR,'envs')
 KABOOTSTRAP_OPTS=''
@@ -114,8 +114,10 @@ end
 def get_repo_commit(arg)
   if arg =~ /^((?:git)|(?:gerrit)):(.*)$/
     case Regexp.last_match(1).downcase
-    when 'git': [ GIT_REPO, Regexp.last_match(2), 'git' ]
-    when 'gerrit': [ GERRIT_REPO, Regexp.last_match(2), 'gerrit' ]
+    when 'git'
+      [ GIT_REPO, Regexp.last_match(2), 'git' ]
+    when 'gerrit'
+      [ GERRIT_REPO, Regexp.last_match(2), 'gerrit' ]
     end
   else
     [ GIT_REPO, arg, 'git' ]
