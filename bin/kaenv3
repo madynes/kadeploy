@@ -187,10 +187,10 @@ class KaenvsClient < Client
       else
         desc = get(path,params)[0]
       end
-      localfiles = get_localfiles(desc)
+      add_localfiles(desc)
 
       # Serve local files throught HTTP(s)
-      params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
+      params[:client] = http_export_files(options[:secure]) unless $files.empty?
     end
 
     method = nil

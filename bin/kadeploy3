@@ -37,7 +37,6 @@ class KadeployClient < ClientWorkflow
         :pxe_files => [],
         :steps => [],
         :force => false,
-        :custom_operations => nil,
         :disable_bootloader_install => nil,
         :disable_disk_partitioning => nil,
         :reboot_classical_timeout => nil,
@@ -169,19 +168,16 @@ class KadeployClient < ClientWorkflow
     end
 
     # Check if the environment contains local files
-    localfiles = get_localfiles(env)
+    add_localfiles(env)
 
     # Add the authorized_keys file
     if options[:key]
       params[:ssh_authorized_keys] = options[:key]
-      localfiles += get_localfiles(params[:ssh_authorized_keys])
+      add_localfiles(params[:ssh_authorized_keys])
     end
 
     # Add the PXE files
-    localfiles += get_localfiles(options[:pxe_files]) unless options[:pxe_files].empty?
-
-    # Serve local files throught HTTP(s)
-    params[:client] = http_export_files(localfiles,options[:secure]) unless localfiles.empty?
+    add_localfiles(options[:pxe_files]) unless options[:pxe_files].empty?
 
     # Launch the workflow
     run_workflow(options,params)

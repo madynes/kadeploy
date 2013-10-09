@@ -376,7 +376,7 @@ class Client
   end
 
   # Checks if the environment contains local files
-  def get_localfiles(env)
+  def add_localfiles(env)
     localfiles = []
     if env.is_a?(Array)
       env.each do |file|
@@ -394,7 +394,22 @@ class Client
       localfiles << localfile?(env)
     end
     localfiles.compact!
-    localfiles
+
+    unless localfiles.empty?
+      localfiles.each do |file|
+        error("Cannot read file '#{file}'") unless File.readable?(file)
+        if File.directory?(file)
+          Dir.foreach(file) do |fi|
+            $files << File.new(File.join(file,fi)) unless ['.','..'].include?(fi)
+          end
+        else
+          $files << File.new(file)
+        end
+      end
+      true
+    else
+      false
+    end
   end
 
   # returns absolute path if local, nil if not
@@ -406,10 +421,10 @@ class Client
   end
 
   # Serve files throught HTTP(s)
-  def http_export_files(files,secure=false)
-    return if !files or files.empty?
+  def http_export_files(secure=false)
+    return if !$files or $files.empty?
     self.class.httpd_init(secure)
-    self.class.httpd_bind_files(files)
+    self.class.httpd_bind_files()
     httpd = self.class.httpd_run()
     httpd.url()
   end
@@ -562,22 +577,9 @@ class Client
     $httpd = HTTPd::Server.new(nil,nil,secure)
   end
 
-  def self.httpd_bind_files(files)
-    bindfile = Proc.new do |f|
-      obj = File.new(f)
-      $files << obj
-      $httpd.bind([:HEAD,:GET],"/#{Base64.urlsafe_encode64(f)}",:file,obj)
-    end
-
-    files.each do |file|
-      error("Cannot read file '#{file}'") unless File.readable?(file)
-      if File.directory?(file)
-        Dir.foreach(file) do |fi|
-          bindfile.call(File.join(file,fi)) unless ['.','..'].include?(fi)
-        end
-      else
-        bindfile.call(file)
-      end
+  def self.httpd_bind_files()
+    $files.each do |file|
+      $httpd.bind([:HEAD,:GET],"/#{Base64.urlsafe_encode64(file.path)}",:file,file)
     end
   end
 
@@ -1064,6 +1066,22 @@ class ClientWorkflow < Client
   end
 
   def run_workflow(options,params,submit_method=:post)
+    if options[:custom_operations]
+      options[:custom_operations].each_pair do |macro,micros|
+        micros.each_pair do |micro,ops|
+          ops.each_pair do |op,acts|
+            acts.each do |act|
+              add_localfiles(act['file']) if act['file']
+            end
+          end
+        end
+      end
+    end
+
+    # Serve local files throught HTTP(s)
+    params[:client] = http_export_files(options[:secure]) unless $files.empty?
+
+    # Check if some files are local while the option no-wait is used
     if !options[:wait] and !$files.empty?
       error("Cannot use --no-wait since some files have to be exported to the server:\n  #{$files.collect{|f|f.path}.join("\n  ")}")
     end
