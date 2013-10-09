@@ -28,7 +28,7 @@ module Kadeploy
 
           unless context.environment.load_from_desc(
             env,
-            cexec.almighty_users,
+            context.almighty_users,
             context.user,
             context.client
           ) then
