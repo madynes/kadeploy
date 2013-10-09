@@ -166,8 +166,7 @@ class Operation
       cgi.div(:class => 'operation_index_frame') do
         cgi.h2(:class => 'operation_index_title'){'Resources'} +
         cgi.ul(:class => 'operation_index_list'){index(cgi)} +
-        cgi.h2(:class => 'operation_index_title'){'Return types'} +
-        @types.inject(''){ |out,t| out << t.to_html(cgi)}
+        (!@types.empty? ? cgi.h2(:class => 'operation_index_title'){'Return types'} + @types.inject(''){ |out,t| out << t.to_html(cgi)} : '')
       end +
       cgi.p(:class => 'operation_back_link') do
         cgi.a(:class => 'operation_back_link',
@@ -312,6 +311,7 @@ class Request
   end
 
   def to_html(cgi)
+    @parameters.sort_by!{|v| v.name(nil,false,(v.mandatory ? 'A' : 'Z'))}
     cgi.div(:class => 'request_frame') do
       cgi.h3(:class => 'request_title') do
         'Request ' +
@@ -357,6 +357,7 @@ class Response
   end
 
   def to_html(cgi)
+    @fields.sort_by!{|v| v.name}
     cgi.div(:class => 'response_frame') do
       cgi.h3(:class => 'response_title') do
         'Response ' +
@@ -396,7 +397,8 @@ class Element
     @parent = parent
   end
 
-  def name(cgi,last=false)
+  def name(cgi=nil,last=false,prefix='')
+    return (@parent ? "#{@parent.name}.":'') + prefix + @name.to_s unless cgi
     ret = nil
     parents = ''
 
@@ -426,6 +428,7 @@ class Element
 end
 
 class Parameter < Element
+  attr_reader :mandatory
   def initialize(name,type,desc,mandatory,values=nil,parent=nil)
     super(name,type,desc,values,parent)
     @mandatory = mandatory
