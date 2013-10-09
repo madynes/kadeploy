@@ -16,7 +16,7 @@ operation 'Deployment' do
       parameter :block_device, :String, 'The block device the environment should be installed on', false
       parameter :deploy_partition, :Integer, 'The partition the environment should be installed on', false
       parameter :environment, :Hash, 'The environment that have to be deployed' do
-        parameter :kind, :String, 'The kind of environment, recorded or anonymous', false, :expected => [:anon,:database]
+        parameter :kind, :String, 'The kind of environment, recorded or anonymous', true, :expected => [:anon,:database]
         parameter :name, :String, 'The name of the environment'
         parameter :version, :String, 'The version of the environment'
         parameter :user, :String, 'The owner of the environment', false
@@ -33,6 +33,7 @@ operation 'Deployment' do
     response do
       field '', 'Workflow', 'Information related to the workflow of the deployment'
     end
+
     example 'Deploy a recorded environment using the user specified key file',
     <<-EOS ,
       POST /deployment HTTP/1.1
@@ -74,6 +75,7 @@ operation 'Deployment' do
         }
       }
     EOS
+
     example 'Deploy an anonymous local environment',
     <<-EOS ,
       POST /deployment HTTP/1.1
@@ -137,6 +139,7 @@ operation 'Deployment' do
         }
       }
     EOS
+
     example 'Deploy an anonymous HTTP environment',
     <<-EOS ,
       POST /deployment HTTP/1.1
@@ -196,6 +199,122 @@ operation 'Deployment' do
           "state": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/state?user=frontend",
           "status": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/status?user=frontend",
           "error": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Deploy a recorded environment and reboot the nodes on a custom kernel with some nodes singularities',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 724
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "database",
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "pxe": {
+          "profile": "PROMPT 1\nSERIAL 0 19200\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n\tKERNEL FILES_PREFIX--myvmlinuz\n\tAPPEND initrd=FILES_PREFIX--myinitrd console=tty0 console=ttyS0,19200n8 ramdisk_size=290000 id=NODE_SINGULARITY rw noapic\n",
+          "singularities": {
+            "node-1.testbed.lan": "1",
+            "node-2.testbed.lan": "2"
+          },
+          "files": [
+            "/home/frontend/myvmlinuz",
+            "/home/frontend/myinitrd"
+          ]
+        },
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 845
+      {
+        "wid": "D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Deploy an environment and overwrite the automata\'s steps',
+    <<-EOS ,
+      POST /deployment HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 668
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "environment": {
+          "kind": "database",
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "automata": {
+          "SetDeploymentEnv": [
+            {
+              "name": "SetDeploymentEnvUntrusted",
+              "retries": 1,
+              "timeout": 800
+            }
+          ],
+          "BroadcastEnv": [
+            {
+              "name": "BroadcastEnvKastafior",
+              "retries": 1,
+              "timeout": 1200
+            }
+          ],
+          "BootNewEnv": [
+            {
+              "name": "BootNewEnvKexec",
+              "retries": 1,
+              "timeout": 400
+            }
+          ]
+        },
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 845
+      {
+        "wid": "D-facf0b49-20b0-4891-838e-06ee04c8045f",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/error?user=frontend"
         }
       }
     EOS
