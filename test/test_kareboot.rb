@@ -18,6 +18,7 @@ class TestKareboot  < Test::Unit::TestCase
   def run_kareboot(*options)
     options += ['-f',@nodefile]
     options += ['-r',@kind] if @kind
+    options << '--force'
 
     run_ka_nodelist(@binary,*options)
   end
