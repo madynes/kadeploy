@@ -416,7 +416,7 @@ operation 'Environments management' do
       parameter ':username', :String, 'The owner of the environment', false
       parameter ':name', :String, 'The name of the environment', false
       parameter ':version', :String, 'The version of the environment', false
-      parameter :all_versions, :Set, 'Show all the versions of environments (by default only the last version is returned)', false
+      parameter :last, :Set, 'Show the last version of environments (by default every versions are returned)', false
     end
     response :Array do
       field '#i', 'Environment', 'One of the environment that were matching the request\'s parameters'
@@ -657,7 +657,7 @@ operation 'Environments management' do
 
     example 'Get the description of every versions of a specific environment',
       <<-EOS ,
-        GET /environments/frontend/debian-custom?user=frontend&all_versions HTTP/1.1
+        GET /environments/frontend/debian-custom?user=frontend HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
       EOS
