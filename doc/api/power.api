@@ -1,6 +1,12 @@
 operation 'Power operations' do
   resource :PUT, '/power', 'Launch a power operation' do
     request do
+      parameter :nodes, :Array, 'The list of nodes the operation should be applied on'
+      parameter :breakpoint, :String, 'The name of a step to breakpoint on (can be MacrostepName or MacrostepName:MicrostepName)'
+      parameter :custom_operations, :Hash, '...'
+      parameter :force, :Set, 'Force the operation, even if the nodes seems to be already involved in another one'
+      parameter :verbose_level, :Integer, 'The verbose level of the logs'
+      parameter :debug, :Set, 'Enable the command\'s debugging'
       parameter :'...', :String
     end
     response do

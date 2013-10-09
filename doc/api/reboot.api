@@ -1,6 +1,30 @@
 operation 'Reboot operations' do
   resource :POST, '/reboot', 'Launch a reboot operation' do
     request do
+      parameter :nodes, :Array, 'The list of nodes the operation should be applied on'
+      parameter :breakpoint, :String, 'The name of a step to breakpoint on (can be MacrostepName or MacrostepName:MicrostepName)'
+      parameter :custom_operations, :Hash, '...'
+      parameter :force, :Set, 'Force the operation, even if the nodes seems to be already involved in another one'
+      parameter :verbose_level, :Integer, 'The verbose level of the logs'
+      parameter :debug, :Set, 'Enable the command\'s debugging'
+      parameter :client, :String, "The client used to export files to the server, useful for local:// files (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
+      parameter :ssh_authorized_keys, :String, 'The path to a ssh authorized_keys file that have to be copied in the root directory of the deployed environment'
+      parameter :vlan, :String, 'Specify the VLAN the nodes should be reboot in'
+      parameter :pxe, :Hash, 'Specify some custom netboot parameters' do
+        parameter :pxe, :String, 'A custom PXE profile, the string FILES_PREFIX-- will be replaced by the prefix to some exported files'
+        parameter :files, :Array, 'A list of path to files that have to be exported in the PXE repository\'s directory'
+        parameter :singularities, :String, '...'
+      end
+      parameter :block_device, :String, 'The block device the environment has been installed on'
+      parameter :deploy_partition, :Integer, 'The partition the environment has been installed on'
+      parameter :environment, :Hash, 'The environment that have to be deployed' do
+        parameter :kind, :String, 'The kind of environment, recorded or anonymous', false, :expected => [:anon,:database]
+        parameter :name, :String, 'The name of the environment'
+        parameter :version, :String, 'The version of the environment'
+        parameter :user, :String, 'The owner of the environment', false
+        parameter 'fields', 'Environment', 'Other fields that are used to describe an anonymous environment', false
+      end
+      parameter :'timeout_reboot_classical', :Integer, 'Overwrite the default value for the reboot timeout'
       parameter :'...', :String
     end
     response do
