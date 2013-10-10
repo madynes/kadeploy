@@ -10,7 +10,7 @@ introduction do
     EOS
 
     paragraph $cgi.b{"Specifying parameters in the query's body"}
-    paragraph $cgi.i{"JSON body"}
+    paragraph $cgi.tt{"JSON body"}
     paragraph html_code <<-EOS
       POST /deploy HTTP/1.1
       Accept: */*
@@ -26,7 +26,7 @@ introduction do
       }
     EOS
 
-    paragraph $cgi.i{"YAML body"}
+    paragraph $cgi.tt{"YAML body"}
     paragraph html_code <<-EOS
       POST /deploy HTTP/1.1
       Accept: */*
@@ -183,7 +183,16 @@ introduction do
     paragraph $cgi.table(:style => 'margin-left: 40px;'){$cgi.tr{"#{$cgi.th{'Error #'}}#{$cgi.th{'Name'}}#{$cgi.th{'Description'}}"}+list.join}
   end
   section 'Workflow based operations', 'workflow_operations' do
-    paragraph 'specific resources: /output, /debug (as timestamp|message), ...'
+    paragraph 'Since some operations take time to be executed and can\'t directly return a result, we implemented a common asynchronious workflow.'
+    paragraph 'The idea here will be to:'
+    paragraph $cgi.ul{
+      $cgi.li{"(1) Initialize the operation (see #{$cgi.a(:href=>'#POST/%OPERATION'){'POST /%OPERATION'}});"} +
+      $cgi.li{"(2) Do some polling to know if the operation is done (see #{$cgi.a(:href=>'#GET/%OPERATION/:id'){'GET /%OPERATION/:id'}});"} +
+      $cgi.li{"(3) Gather operation\'s logs when soma are marked as available (see #{$cgi.a(:href=>'#GET/%OPERATION/:id/logs/:cluster?'){'GET /%OPERATION/:id/logs/:cluster?'}});"} +
+      $cgi.li{"(4) When the operation is marked as done, delete workflow informations from the server (see #{$cgi.a(:href=>'#DELETE/%OPERATION/:id'){'DELETE /%OPERATION/:id'}});"} +
+      $cgi.li{"(!!) If the error state is set at true during the process, gather the error message and delete workflow information (see #{$cgi.a(:href=>'#GET/%OPERATION/:id/error'){'GET /%OPERATION/:id/error'}});"}
+    }
+    paragraph "#{$cgi.a(:href=>'#Deployment'){'Deployment'}}, #{$cgi.a(:href=>'#Reboot operations'){'Reboot'}} and #{$cgi.a(:href=>'#Power operations'){'Power'}} operations are workflow-based. For more information please take a look at the section #{$cgi.a(:href=>'#Workflow-based operations'){'Workflow-based operations'}}."
   end
   section 'Exporting files for the server','file_export' do
     paragraph 'local://, server://, http://'
