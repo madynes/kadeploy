@@ -306,7 +306,7 @@ class KadeployServer
   def config_httpd_bindings(httpd)
     # GET
     @httpd = httpd
-    @httpd.bind([:GET],'/version',:content,{:version => cfg.common.version.dup})
+    @httpd.bind([:GET],'/version',:content,cfg.common.version.dup)
     @httpd.bind([:GET],'/info',:method,:object=>self,:method=>:get_users_info)
     @httpd.bind([:GET],'/clusters',:method,:object=>self,:method=>:get_clusters)
     #@httpd.bind([:GET],'/nodes',:method,:object=>self,:method=>:get_nodes)

@@ -309,7 +309,7 @@ class Client
   def self.do_version(options)
     if options[:get_version]
       print = Proc.new do |res,prefix|
-        $stdout.puts "#{prefix if prefix}Kadeploy version: #{res['version']}"
+        $stdout.puts "#{prefix if prefix}Kadeploy version: #{res.strip}"
       end
       if options[:multi_server]
         options[:servers].each_pair do |server,inf|
