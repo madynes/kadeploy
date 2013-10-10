@@ -3,16 +3,15 @@ introduction do
 	  paragraph "There is several ways to specify parameters when using the network API. Parameters can be specified in the query's URI parameter but also in the query's body. Remark: it's only possible to use String and Array data structures when specifying parameters using the query's URI to specify more advanced parameters (Numbers, Hashs, ...) it's necessary to specify the parameters using a more advanced description language (JSON/YAML) in the query's body."
     paragraph "The following examples are equivalent:"
     paragraph $cgi.b{"Specifying parameters in the query's URI"}
-    str=<<-EOS
+    paragraph html_code <<-EOS
       POST /deploy?user=frontent&nodes=node-1.testbed.lan&nodes=node-2.testbed.lan HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
     EOS
-    paragraph "#{$cgi.pre{str}}"
 
     paragraph $cgi.b{"Specifying parameters in the query's body"}
-    paragraph "JSON body"
-    str=<<-EOS
+    paragraph $cgi.i{"JSON body"}
+    paragraph html_code <<-EOS
       POST /deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
@@ -26,10 +25,9 @@ introduction do
         ]
       }
     EOS
-    paragraph "#{$cgi.pre{str}}"
 
-    paragraph "YAML body"
-    str=<<-EOS
+    paragraph $cgi.i{"YAML body"}
+    paragraph html_code <<-EOS
       POST /deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
@@ -41,7 +39,6 @@ introduction do
       - node-1.testbed.lan
       - node-2.testbed.lan
     EOS
-    paragraph "#{$cgi.pre{str}}"
   end
 
   section "Output type and encoding" do
@@ -50,14 +47,13 @@ introduction do
     paragraph "The response encoding (compression) depends on the value of the 'Accept-Encoding' HTTP header. By default (if it's not set or set to */*) the response will not be compressed, otherwise it will be compressed using the gzip algorithm."
 
     paragraph "Here are some examples:"
-    paragraph "JSON response"
-    str=<<-EOS
+    paragraph $cgi.b{"JSON response"}
+    paragraph html_code <<-EOS
       GET /nodes HTTP/1.1
       Accept: application/json
       Host: kadeploy.testbed.lan:25300
     EOS
-    paragraph "#{$cgi.pre{str}}"
-    str=<<-EOS
+    paragraph html_code <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
       Content-Length: 50
@@ -66,16 +62,14 @@ introduction do
         "node-2.testbed.lan"
       ]
     EOS
-    paragraph "#{$cgi.pre{str}}"
 
-    paragraph "YAML response"
-    str=<<-EOS
+    paragraph $cgi.b{"YAML response"}
+    paragraph html_code <<-EOS
       GET /nodes HTTP/1.1
       Accept: application/x-yaml
       Host: kadeploy.testbed.lan:25300
     EOS
-    paragraph "#{$cgi.pre{str}}"
-    str=<<-EOS
+    paragraph html_code <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/x-yaml
       Content-Length: 47
@@ -83,25 +77,21 @@ introduction do
       - node-1.testbed.lan
       - node-2.testbed.lan
     EOS
-    paragraph "#{$cgi.pre{str}}"
 
-    paragraph "Compressed JSON response"
-    paragraph "YAML response"
-    str=<<-EOS
+    paragraph $cgi.b{"Compressed JSON response"}
+    paragraph html_code <<-EOS
       GET /nodes HTTP/1.1
       Accept: application/x-yaml
       Accept-Encoding: gzip
       Host: kadeploy.testbed.lan:25300
     EOS
-    paragraph "#{$cgi.pre{str}}"
-    str=<<-EOS
+    paragraph html_code <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
       Content-Encoding: gzip
       Content-Length: 52
       ...BINARY_DATA...
     EOS
-    paragraph "#{$cgi.pre{str}}"
   end
 
   section "Global parameters" do
@@ -117,13 +107,12 @@ introduction do
     paragraph "The first authentication method is based on the IDENT protocol. When a request will be received on the server, it will first check if the request is coming from a trusted machine then it will contact the IDENT server of this machine in order to be sure that the user specified in the 'user' request's parameter is actually corresponding to the user on the machine that initiated the request. In order to be authenticated with this method, no extra parameters have to be providen, an IDENT server just have to be set up on the machine that is used to initiate the request."
     paragraph $cgi.b{'Authentication by password'}
     paragraph "The second authentication method is the authentication by password (from trusted machines). In order to authenticate with such a method it's necessary to specify the password in the 'secret_key' request parameter. Here is some examples:"
-    str=<<-EOS
+    paragraph html_code <<-EOS
       GET /nodes?user=frontend&secret_key=mypassword HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
     EOS
-    paragraph "#{$cgi.pre{str}}"
-    str=<<-EOS
+    paragraph html_code <<-EOS
       GET /nodes?user=frontend HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
@@ -133,10 +122,9 @@ introduction do
         "secret_key": "mypassword"
       }
     EOS
-    paragraph "#{$cgi.pre{str}}"
     paragraph $cgi.b{'Authentication by certificate'}
     paragraph "To be able to authenticate using a (x509) certificate it's necessary to provide an x509 certificate that was signed with the server's private key in the field 'cert'. Here is an example:"
-    str=<<-EOS
+    paragraph html_code <<-EOS
       GET /nodes?user=frontend HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
@@ -153,7 +141,6 @@ introduction do
         XnMuLyV1FQ==
         -----END CERTIFICATE-----
     EOS
-    paragraph "#{$cgi.pre{str}}"
   end
 
   section 'Errors management' do
@@ -163,7 +150,7 @@ introduction do
 
     paragraph "Kadeploy errors will be returned using the HTTP return code 400 (Bad Request) plus some (non-standard) HTTP header: X-Application-Error-Code and X-Application-Error-Info. The header X-Application-Error-Code will contain a Kadeploy specific error code while the header X-Application-Error-Info contains a (Base64 encoded) error message. The Kadeploy specific error codes are described in the following."
     paragraph "Here is an example of a Kadeploy specific error response:" 
-    str=<<-EOS
+    paragraph html_code <<-EOS
       HTTP/1.1 400 Bad Request
       X-Application-Error-Code: 6
       X-Application-Error-Info: WW91IGRvIG5vdCBoYXZlIHN1ZmZpY2llbnQgcmlnaHRzIHRvIHBlcmZvcm0gdGhlIG9wZXJhdGlvbiBvbiBhbGwgdGhlIG5vZGVz
@@ -171,7 +158,6 @@ introduction do
       Content-Length: 75
       You do not have sufficient rights to perform the operation on all the nodes
     EOS
-    paragraph "#{$cgi.pre{str}}"
 
     paragraph $cgi.b{'Kadeploy error codes'}
     list=[]

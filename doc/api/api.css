@@ -1,5 +1,12 @@
 body {
   font-family: sans-serif;
+  background-color: #FFBB50;
+}
+div.apidoc_frame {
+  background-color: #FFBB50;
+}
+div {
+  background-color: white;
 }
 table {
   /* border: 1px solid black; */
@@ -30,20 +37,52 @@ td.parameter_mandat {
 td.parameter_type, td.field_type {
   color: #202020;
 }
-div.apidoc_index_frame {
-  margin-top: 20px;
-  margin-bottom: 50px;
+h1.apidoc_title{
+  text-align: center;
+  margin-bottom: 0px;
+  background-color: white;
+  border-radius: 8px;
+  border-style: solid;
+  border-width: 2px;
 }
-div.resource_frame, div.type_frame {
+h1.operation_title, h1.intro_title {
+  border: 1px black solid;
+  border-radius: 8px;
+  padding: 8px;
+  display: inline-block;
+  background-color: white;
+}
+div.apidoc_index_frame, div.intro_frame, div.operation_frame {
+  padding: 8px 8px;
+  margin-left: 8px;
+  margin-right: 8px;
+  margin-bottom: 16px;
+  background-color: #FFBB50;
+}
+div.apidoc_index_frame {
+  margin-top: 10px;
+  padding-top: 4px;
+}
+div.resource_frame, div.type_frame, div.section_frame {
   border-width: 1px;
+  border-radius: 8px;
   /*
   border-color: transparent;
   border-style: dashed;
   */
-  margin: 8px 8px;
-  padding: 4px 8px;
+  margin: 8px;
+  padding: 10px;
+}
+div.type_frame {
+  margin-top: 2px;
+  padding-top: 2px;
+}
+div.section_frame {
+  margin-left: 8px;
 }
 div.request_frame, div.response_frame, div.example_frame {
+  margin-bottom: 35px;
+  margin-left: 8px;
   /*
   border-width: 1px;
   border-color: transparent;
@@ -51,6 +90,9 @@ div.request_frame, div.response_frame, div.example_frame {
   margin: 8px 8px;
   padding: 4px 8px;
   */
+}
+div.example_frame {
+  margin-bottom: 0px;
 }
 /*
 div.resource_frame:hover, div.request_frame:hover, div.response_frame:hover, div.example_frame:hover {
@@ -58,8 +100,9 @@ div.resource_frame:hover, div.request_frame:hover, div.response_frame:hover, div
 }
 */
 div.operation_index_frame {
-  margin: 8px 16px;
-  padding: 4px 8px;
+  border-radius: 8px;
+  margin: 8px;
+  padding: 8px 8px;
 }
 div.request_subframe, div.response_subframe, div.example_subframe {
   margin-left: 16px;
@@ -68,13 +111,24 @@ a.apidoc_index_link, a.intro_index_link, a.operation_index_link {
   text-decoration: none;
   color: inherit;
   font-family: monospace;
+  border-radius: 8px;
+  padding: 4px 8px;
+  background-color: white;
+  border-style: solid;
+  border-width: 1px;
 }
 a.apidoc_index_link {
   margin-top: 32px;
   margin-bottom: 8px;
   font-size: 150%;
 }
+a.operation_index_link {
+  border-radius: 4px;
+  margin: 0px;
+}
 p.operation_back_link {
+  margin-top: 4px;
+  margin-bottom: 4px;
   text-align: right;
 }
 p.operation_back_link a {
@@ -85,6 +139,23 @@ p.section_paragraph {
   margin-left: 20px;
   margin-bottom: 10px;
   width: 800px;
+}
+p.resource_desc {
+  margin-top: 0px;
+  margin-left: 25px;
+  padding-left: 6px;
+  width: 600px;
+  border-left: 1px #888888 solid;
+  text-align: justify;
+}
+p.toggle_link {
+  margin-left: 8px;
+  margin-top: 0px;
+  margin-bottom: 0px;
+  color: #0000EE;
+}
+p.toggle_link:hover {
+  cursor: pointer;
 }
 h1 {
   margin-top: 0px;
@@ -100,13 +171,16 @@ h2 {
   margin-bottom: 8px;
   color: #282828;
 }
-h2.resource_title {
+h2.resource_title, h2.operation_index_title {
   font-family: monospace;
   display:inline-block;
-  padding: 6px 8px;
+  padding: 8px 32px;
   border-width: 1px;
   border-color: #282828;
+  border-radius: 4px;
+  background-color: #FFBB50;
   border-style: solid;
+  border-color: #888888;
 }
 h2.section_title {
   padding: 6px 8px;
@@ -116,7 +190,9 @@ h3 {
   margin-bottom: 2px;
   color: #303030;
 }
-
+h3.type_title {
+  margin-top: 2px;
+}
 h3.example_title span.example_desc {
   font-weight: normal;
   padding-left: 8px;
@@ -133,11 +209,16 @@ hr.apidoc_index_sep {
 }
 hr.operation_index_sep {
   width: 90%;
+  display: none;
 }
 hr.operation_sep {
   width: 100%;
 }
-pre.example_request, pre.example_response {
+hr.operation_inter_sep {
+  width: 60%;
+  display: none;
+}
+pre.code_sample {
   display:inline-block;
   font-family: monospace;
   margin: 0px;
@@ -145,6 +226,16 @@ pre.example_request, pre.example_response {
   padding: 8px;
   width: 95%;
   white-space: pre-wrap;
+  background-color: #F0F0F0;
+  border-radius: 8px;
+  display: inline-block;
+  border-width: 1px;
+  border-color: #888888;
+  border-style: solid;
+}
+
+div.toggle_frame, div.example_subframe {
+  cursor: pointer;
 }
 li {
   list-style-type: none;
@@ -154,12 +245,15 @@ ul.apidoc_index_list li {
 }
 ul.operation_index_list li {
   width: 40%;
-  margin: 0px 0px;
+  margin: 0px;
   margin-top: 4px;
-  padding: 4px 8px;
   border-width: 1px;
   border-color: #282828;
+/*
   border-style: solid;
+  background-color: white;
+  border-radius: 4px;
+*/
 }
 li a {
   margin: 0px;
@@ -167,7 +261,7 @@ li a {
   width: 100%;
   height: 100%;
 }
-li:hover {
+li a:hover {
   background-color: #f0f0f0;
 }
 span.request_title_desc, span.response_title_desc, span.type_title_desc {

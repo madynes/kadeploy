@@ -3,6 +3,7 @@
 $stdin = nil
 
 require 'cgi'
+$cgi = CGI.new('html4')
 
 class String
   def deindent
@@ -179,6 +180,7 @@ class Operation
           cgi.a(:class => 'operation_back_link',
             :href => "##{self.name}"){'Back to operation'}
         end
+        out << cgi.hr(:class => 'operation_inter_sep')
       end
     end
   end
@@ -232,7 +234,7 @@ class Type
       end +
       @examples.inject('') do |out,e|
         out << cgi.h3(:class => 'type_subtitle'){"Example ##{i}"}
-        out << cgi.pre(:class => 'type_example'){e}
+        out << html_toggle(cgi){html_code(e,cgi)}
         i += 1
         out
       end
@@ -496,11 +498,11 @@ class Example
   def to_html(cgi)
     cgi.div(:class => 'example_frame') do
       cgi.h3(:class => 'example_title'){"Example ##{@number}#{(@description? " #{cgi.span(:class => 'example_desc'){@description}}" : '')}"} +
-      cgi.div(:class => 'example_subframe') do
+      html_toggle(cgi,'example_subframe') do
         cgi.h4(:class => 'example_subtitle'){'Request'} +
-        cgi.pre(:class => 'example_request'){@request} +
+        html_code(@request,cgi) +
         cgi.h4(:class => 'example_subtitle'){'Response'} +
-        cgi.pre(:class => 'example_response'){@response}
+        html_code(@response,cgi)
       end
     end
   end
@@ -595,6 +597,24 @@ def code(number,desc='',&block)
   parse($current.code(number,desc),&block)
 end
 
+def html_code(content,cgi=$cgi)
+  cgi.pre(:class=>"code_sample"){content}
+end
+
+def html_toggle(cgi=$cgi,cssclass='toggle_frame')
+  cgi.div(
+    :onclick =>
+      "this.lastChild.style.display = "\
+        "(this.lastChild.style.display == 'none' ? 'block' : 'none');"\
+      "this.firstChild.style.display = "\
+        "(this.firstChild.style.display == 'none' ? 'block' : 'none');",
+    :class => cssclass
+  ) do
+    cgi.p(:class=>'toggle_link'){'show'} +
+    cgi.div(:class=>'toggle_content',:style=>'display: none;'){yield}
+  end
+end
+
 
 
 if ARGV.size < 3
@@ -604,7 +624,6 @@ end
 
 $current = APIDoc.new(ARGV[0])
 $parent = nil
-$cgi = CGI.new('html4')
 
 ARGV[2..-1].each do |file|
   unless File.readable?(file)
