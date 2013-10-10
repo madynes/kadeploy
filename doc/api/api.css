@@ -203,6 +203,7 @@ h4{
 h4.request_subtitle, h4.response_subtitle, h4.example_subtitle {
   font-size: 105%;
   margin: 0px 2px;
+  margin-top: 8px;
 }
 hr.apidoc_index_sep {
   width: 100%;
