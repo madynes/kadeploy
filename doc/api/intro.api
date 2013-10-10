@@ -195,6 +195,88 @@ introduction do
     paragraph "#{$cgi.a(:href=>'#Deployment'){'Deployment'}}, #{$cgi.a(:href=>'#Reboot operations'){'Reboot'}} and #{$cgi.a(:href=>'#Power operations'){'Power'}} operations are workflow-based. For more information please take a look at the section #{$cgi.a(:href=>'#Workflow-based operations'){'Workflow-based operations'}}."
   end
   section 'Exporting files for the server','file_export' do
-    paragraph 'local://, server://, http://'
+    paragraph 'Files can be specified to the server using different methods. To change the method, you have to use specific protocols in the URI of the file.'
+    paragraph 'Here are the supported protocols:'
+    paragraph $cgi.b{'http://'}
+    paragraph 'The file is hosted at the following HTTP url'
+    paragraph $cgi.b{'local://'}+' or '+$cgi.b{'nothing'}
+    paragraph "The file is hosted on a dynamic location, the parameter #{$cgi.tt{'client'}} will be used to specify where is the file hosted."
+    paragraph "The server will try to download the file at #{$cgi.tt{'[client]/Base64(filename)'}}."
+    paragraph "For sample, if the specified file is #{$cgi.tt{'file:///home/frontend/file'}} and #{$cgi.tt{'client'}} is set to #{$cgi.tt{'http://frontend.testbed.lan:12345'}}, the server will try to download the file #{$cgi.tt{'http://frontend.testbed.lan:12345/L2hvbWUvZnJvbnRlbmQvZmlsZQo='}}."
+    paragraph $cgi.b{'server://'}
+    paragraph 'The file is hosted on the Kadeploy server'
+    paragraph 'Samples:'
+    paragraph $cgi.tt{'http hosted file'}
+    paragraph html_code <<-EOS
+      POST /environments HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 321
+      {
+        "user": "frontend",
+        "environment": {
+          "name": "debian-base",
+          ...
+          "image": {
+            "file": "http://testbed.lan/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          ...
+        }
+      }
+    EOS
+    paragraph $cgi.tt{'localy hosted files'}
+    paragraph html_code <<-EOS
+      POST /environments HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 751
+      {
+        "user": "frontend",
+        "client": "http://frontend.testbed.lan:12345",
+        "environment": {
+          "name": "debian-base",
+          ...
+          "image": {
+            "file": "/home/frontend/debian-base.tgz",
+            "kind": "tar",
+            "compression": "gzip"
+          },
+          "postinstalls": [
+            {
+              "archive": "/home/frontend/debian-base-postinstall.tgz",
+              "compression": "gzip",
+              "script": "traitement.ash /rambin"
+            }
+          ],
+          ...
+        }
+      }
+    EOS
+
+    paragraph $cgi.tt{'server hosted files'}
+    paragraph html_code <<-EOS
+      POST /environments HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 677
+      {
+        "user": "frontend",
+        "environment": {
+          "name": "debian-base",
+          ...
+          "image": {
+            "file": "server:///tmp/debian-base.fsa",
+            "kind": "fsa",
+            "compression": 3
+          },
+          ...
+        }
+      }
+    EOS
   end
 end
