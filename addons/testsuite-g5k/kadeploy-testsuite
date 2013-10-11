@@ -71,6 +71,7 @@ puts ''
 
 success = true
 
+success = success & run_test('auth',TEST_AUTH)
 success = success & run_test('kadeploy',TEST_KADEPLOY)
 success = success & run_test('kareboot',TEST_KAREBOOT)
 success = success & run_test('kapower',TEST_KAPOWER)

@@ -34,6 +34,7 @@ SSH_KEY="#{ENV['HOME']}/.ssh/id_rsa"
 TMP_DIR='/tmp/testsuite'
 TEST_DIR=File.join(TMP_DIR,'test')
 TEST_CONFIG='test_config.yml'
+TEST_AUTH='test_auth.rb'
 TEST_KADEPLOY='test_kadeploy.rb'
 TEST_KAREBOOT='test_kareboot.rb'
 TEST_KAPOWER='test_kapower.rb'
