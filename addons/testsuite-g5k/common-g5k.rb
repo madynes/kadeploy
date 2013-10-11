@@ -38,6 +38,8 @@ TEST_KADEPLOY='test_kadeploy.rb'
 TEST_KAREBOOT='test_kareboot.rb'
 TEST_KAPOWER='test_kapower.rb'
 TEST_KAENV='test_kaenv.rb'
+TEST_KASTAT='test_kastat.rb'
+TEST_KANODES='test_kanodes.rb'
 DEBUG=false
 
 def cmd(cmd,checkstatus=true)

@@ -1,4 +1,5 @@
-KADEPLOY_LIBS=ENV['KADEPLOY_LIBS']||File.join(File.dirname(__FILE__), '..','lib')
+KADEPLOY_LIBS=ENV['KADEPLOY3_LIBS']||File.join(File.dirname(__FILE__), '..','lib')
+USER=ENV['USER']
 $:.unshift KADEPLOY_LIBS
 require 'kadeploy3/execute'
 require 'yaml'
@@ -59,10 +60,6 @@ module KaTestCase
     end
 
     out
-  end
-
-  def run_ka_check(binary,*options)
-    run_ka_nodelist(binary,*options)
   end
 
   def load_field(config,field_path,default=nil)
