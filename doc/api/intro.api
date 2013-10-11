@@ -1,5 +1,5 @@
 introduction do
-  section "Request's parameters" do
+  section "Request's parameters", 'request_parameters' do
 	  paragraph "There is several ways to specify parameters when using the network API. Parameters can be specified in the query's URI parameter but also in the query's body. Remark: it's only possible to use String and Array data structures when specifying parameters using the query's URI to specify more advanced parameters (Numbers, Hashs, ...) it's necessary to specify the parameters using a more advanced description language (JSON/YAML) in the query's body."
     paragraph "The following examples are equivalent:"
     paragraph $cgi.b{"Specifying parameters in the query's URI"}
@@ -41,7 +41,7 @@ introduction do
     EOS
   end
 
-  section "Output type and encoding" do
+  section "Output type and encoding", 'output_type' do
     paragraph "The Kadeploy server can respond to a request in different formats: JSON and YAML, with or without compression (gzip only)."
     paragraph "The response format depends on the value of the 'Accept' HTTP header of the request. By default (if it's set to */*) the response will be formated in JSON otherwise it will use the specified format."
     paragraph "The response encoding (compression) depends on the value of the 'Accept-Encoding' HTTP header. By default (if it's not set or set to */*) the response will not be compressed, otherwise it will be compressed using the gzip algorithm."
@@ -99,6 +99,132 @@ introduction do
   end
 
   section "API path notation" do
+    paragraph 'When using the Network API, the data structures used to describe resources can be complex (Array, Hash, nested structured, ...), that\'s why we decided to use a specific formalism to describe them.'
+
+    paragraph $cgi.b{'Body\'s type of the request/response'}
+    paragraph 'First of all, the type of the main structure is describe in the title, for sample:'
+    paragraph $cgi.h3(:class=>'request_title',:style=>'margin-left: 50px;'){"Request/Response/Type"+$cgi.span(:class=>'request_title_desc'){"("+$cgi.span(:class=>'request_type'){'Hash'}+")"}}
+    paragraph "Means that the request\'s body have to be a Hash, formated used one of the allowed Content-Type (see #{$cgi.a(:href=>'#request_parameters'){'Request\'s parameters'}} and #{$cgi.a(:href=>'#output_type'){'Output type and encoding'}})"
+
+    paragraph $cgi.b{'Hash'}
+    paragraph "Here is an example of the description of a simple Hash and some basic elements, the #{$cgi.tt{'{}'}} chars are used to specify that \"myhash\" has the type Hash."
+
+    t = Type.new(:Example,:Hash,'An example')
+    f = t.field(:myhash, :Hash, 'The sample Hash')
+    t.field(:user, :String, 'The username',nil,f)
+    t.field(:size, :Integer, 'The size',nil,f)
+    t.field(:option, :Boolean, 'Enable/Disable "option"',nil,f)
+    t.field(:setting, :Set, 'If this field is set, no mather it\'s value, the option "setting" is enabled',nil,f)
+    paragraph $cgi.div(:style=>'margin-left: 50px'){t.to_html($cgi)}
+    paragraph 'An HTTP request\'s sample:'
+    paragraph $cgi.div(:style=>'margin-left: 50px'){html_code <<-EOS
+      POST /sample HTTP/1.1
+      Accept: text/plain, application/json
+      Content-Type: application/json
+      Content-Length: 101
+      {
+        "myhash": {
+          "user": "frontend",
+          "size": 42,
+          "option": true,
+          "setting": null
+        }
+      }
+    EOS
+    }
+
+    paragraph $cgi.b{'Arrays'}
+    paragraph "Here is an example of the description of a simple Array, the #{$cgi.tt{'[]'}} chars are used to specify that \"myarray\" has the type Array, the char #{$cgi.tt{'#'}} specify that the element that is described is the result of an iteration on the Array."
+    t = Type.new(:Example,:Hash,'An example')
+    f = t.field(:myarray, :Array, 'The sample Array')
+    t.field('#i', :String, 'The element #i',nil,f)
+    paragraph $cgi.div(:style=>'margin-left: 50px'){t.to_html($cgi)}
+    paragraph 'An HTTP request\'s sample:'
+    paragraph $cgi.div(:style=>'margin-left: 50px'){html_code <<-EOS
+      POST /sample HTTP/1.1
+      Accept: text/plain, application/json
+      Content-Type: application/json
+      Content-Length: 54
+      {
+        "myarray": [
+          "abc",
+          "def",
+          "ghi"
+        ]
+      }
+    EOS
+    }
+
+    paragraph $cgi.b{'Dynamic Hash key names'}
+    paragraph "Hash table\'s keys do not always have a static name, in some cases, the key name can be dynamic. In this case, the key name will be #{$cgi.span(:class=>'element_dynamic'){'underlined'}}. Here is an example:"
+    t = Type.new(:Example,:Hash,'An example')
+    f = t.field(:myhash, :Hash, 'The sample Hash')
+    t.field('nodename', :Integer, 'Returns the uptime of the node "nodename"',nil,f)
+    paragraph $cgi.div(:style=>'margin-left: 50px'){t.to_html($cgi)}
+    paragraph 'An HTTP request\'s sample:'
+    paragraph $cgi.div(:style=>'margin-left: 50px'){html_code <<-EOS
+      POST /sample HTTP/1.1
+      Accept: text/plain, application/json
+      Content-Type: application/json
+      Content-Length: 83
+      {
+        "myhash": {
+          "node-1": 12345,
+          "node-2": 45678,
+          "node-3": 90123
+        }
+      }
+    EOS
+    }
+
+    paragraph $cgi.b{'Nested structured'}
+    paragraph 'Structures can then be nested in different ways:'
+    t = Type.new(:Example,:Hash,'An example')
+    f = t.field(:myhash, :Hash, 'The sample Hash')
+    f1 = t.field(:anotherhash, :Hash, 'The first hash',nil,f)
+    f2 = t.field('nodename', :Hash, 'Description of the node "nodename"',nil,f1)
+    t.field(:user, :String, 'The username',nil,f2)
+    t.field(:option, :Boolean, 'Enable/Disable "option"',nil,f2)
+    f3 = t.field(:myarray, :Array, 'The first array',nil,f)
+    f4 = t.field("#i", :Hash, 'The element #i',nil,f3)
+    t.field(:size, :Integer, 'The size',nil,f4)
+    t.field(:setting, :Set, 'If this field is set, no mather it\'s value, the option "setting" is enabled',nil,f4)
+    paragraph $cgi.div(:style=>'margin-left: 50px'){t.to_html($cgi)}
+    paragraph 'An HTTP request\'s sample:'
+    paragraph $cgi.div(:style=>'margin-left: 50px'){html_code <<-EOS
+      POST /sample HTTP/1.1
+      Accept: text/plain, application/json
+      Content-Type: application/json
+      Content-Length: 351
+      {
+        "myhash": {
+          "anotherhash": {
+            "node-1": {
+              "user": "user1",
+              "option": true
+            },
+            "node-2": {
+              "user": "user2",
+              "option": false
+            }
+          },
+          "myarray": [
+            {
+              "size": 4,
+              "setting": null
+            },
+            {
+              "size": 2
+            },
+            {
+              "size": 8
+            }
+          ]
+        }
+      }
+    EOS
+    }
+
   end
 
   section 'Authentication' do
@@ -206,7 +332,8 @@ introduction do
     paragraph $cgi.b{'server://'}
     paragraph 'The file is hosted on the Kadeploy server'
     paragraph 'Samples:'
-    paragraph $cgi.tt{'http hosted file'}
+
+    paragraph $cgi.b{'HTTP hosted file'}
     paragraph html_code <<-EOS
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
@@ -227,7 +354,7 @@ introduction do
         }
       }
     EOS
-    paragraph $cgi.tt{'localy hosted files'}
+    paragraph $cgi.b{'Localy hosted files'}
     paragraph html_code <<-EOS
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
@@ -257,7 +384,7 @@ introduction do
       }
     EOS
 
-    paragraph $cgi.tt{'server hosted files'}
+    paragraph $cgi.b{'Server hosted files'}
     paragraph html_code <<-EOS
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
