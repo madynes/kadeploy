@@ -5,10 +5,10 @@ require 'tempfile'
 require 'tmpdir'
 require 'yaml'
 require 'rubygems'
+require 'kadeploy3/http'
 
 class TestNodes < Test::Unit::TestCase
   include KaTestCase
-  R_WID = /^P-[a-z0-9-]+$/
 
   def setup
     load_config()
@@ -35,13 +35,17 @@ class TestNodes < Test::Unit::TestCase
   def test_status
     ret = run_ka(@binaries[:kapower],'--on','-m',@nodes[0],'--no-wait')
     wid = ret.split("\n").last.split(' ')[0]
-    assert(wid =~ R_WID,ret)
     ret = run_kanodes('-p')
     begin
       desc = YAML.load(ret)
-      assert(!desc.collect{|v| v[:id] == wid}.empty?,ret)
+      assert(!desc.select{|v| v[:id] == wid}.empty?,ret)
     rescue ArgumentError => ae
       assert(false,ae.message)
+    ensure
+      Kadeploy::HTTP::Client.request(
+        KADEPLOY_SERVER,KADEPLOY_PORT,KADEPLOY_SECURE,
+        Kadeploy::HTTP::Client.gen_request(:DELETE,"/power/#{wid}?user=#{USER}")
+      )
     end
   end
 end
