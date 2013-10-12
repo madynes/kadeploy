@@ -1,14 +1,14 @@
-## New in 3.1.8 ##
+## New in 3.2 ##
 == User interface ==
 * Environments files in old description format are no longer supported
   A migration script is available in addons/kaenv_migration
   (see doc sec/4.2.4, Environment description)
-* It's now possible to export files for the server a secured way
+* It's now possible to export files to the server a secured way
   (see doc sec/4.2.2)
 * Environment's demolishing tag related commands now refers to destructive tag
 
 == REST API ==
-* It's now possible to interact with the server using a REST API (see doc sec/5)
+* It's now possible to interact with the server using a REST API (see the Network API documentation)
 
 == Internals ==
 * Client/Server interactions are now performed using a REST API instead of DRb
