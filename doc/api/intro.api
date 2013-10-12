@@ -336,7 +336,7 @@ introduction do
     }
 
     paragraph $cgi.b{'Dynamic Hash key names'}
-    paragraph "Hash table\'s keys do not always have a static name, in some cases, the key name can be dynamic. In this case, the key name will be #{$cgi.span(:class=>'element_dynamic'){'underlined'}}. Here is an example:"
+    paragraph "Hash table\'s keys do not always have a static name, in some cases, the key name can be dynamic. In this case, the key name will be #{$cgi.span(:class=>'element_dynamic'){'underlined'}} this way. Here is an example:"
     t = Type.new(:Example,:Hash,'An example')
     f = t.field(:myhash, :Hash, 'The sample Hash')
     t.field('nodename', :Integer, 'Returns the uptime of the node "nodename"',nil,f)
@@ -357,10 +357,27 @@ introduction do
     EOS
     }
 
+    paragraph $cgi.b{'URI path parameters'}
+    paragraph "Some parameters can be specified in the URI, in the documentation, this parameters will be #{$cgi.span(:class=>'element_param'){'underlined'}}."
+    paragraph "In the URI, dynamic parameters will be prefixed with a #{$cgi.tt{':'}} such as #{$cgi.tt{':name'}}; if the parameter is suffixed with a #{$cgi.tt{'?'}}, this parameter is optional, for sample #{$cgi.tt{':version?'}}. Here is an example :"
+    paragraph $cgi.span(:class => 'resource_path'){''}
+    t = Type.new(:'GET /sample/:name/:version?',:'','An example')
+    t.field(:user, :String, 'The user')
+    t.field(':name', :String, 'The name')
+    t.field(':version', :String, 'The version')
+    paragraph $cgi.div(:style=>'margin-left: 50px'){t.to_html($cgi)}
+    paragraph 'An HTTP request\'s sample:'
+    paragraph $cgi.div(:style=>'margin-left: 50px'){html_code <<-EOS
+      GET /sample/thename/ HTTP/1.1
+      Accept: text/plain, application/json
+    EOS
+    }
+
     paragraph $cgi.b{'Nested structured'}
     paragraph 'Structures can then be nested in different ways:'
     t = Type.new(:Example,:Hash,'An example')
     f = t.field(:myhash, :Hash, 'The sample Hash')
+    t.field(':version', :String, 'The version')
     f1 = t.field(:anotherhash, :Hash, 'The first hash',nil,f)
     f2 = t.field('nodename', :Hash, 'Description of the node "nodename"',nil,f1)
     t.field(:user, :String, 'The username',nil,f2)
