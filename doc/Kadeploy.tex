@@ -2159,7 +2159,8 @@ Kadeploy has the same feature, so please refer to the use case about \textit{spe
 On an \emph{Other} environment, you eventually have to update your bootloader in order to boot on the new kernel.
 
 
-\section{Kadeploy3 Environment variables}\label{sec:env_vars}
+\section{Extra}
+\subsection{Kadeploy3 Environment variables}\label{sec:env_vars}
 When writing a script for an admin pre-install, an admin/user post-install or some custom operations, you can use the following environment variables :
 \begin{itemize}
 \item \texttt{KADEPLOY\_CLUSTER} : cluster on which the pre/post install is launched
@@ -2184,7 +2185,15 @@ When writing a script for an admin pre-install, an admin/user post-install or so
 \item \texttt{KADEPLOY\_FS\_TYPE\_TMP} : the filesystem format of the tmp partition (if the tmp partition is reformated with the option --reformat-tmp)
 \end{itemize}
 
-\section{Build a custom pre-install}\label{sec:custom-preinstall}
+\subsection{Specifying files to the server\label{sec:api_files_export}}
+Files can be specified to the server using three different URI-based notations:
+\begin{itemize}
+  \item \texttt{http://} The file is hosted on some HTTP server, sample: \texttt{http://testbed.lan/file.tgz};
+  \item \texttt{server://} The file locaclly hosted on the Kadeploy server, sample: \texttt{server:///tmp/file.tgz};
+  \item \texttt{local://} or \texttt{no URI prefix} The file is hosted on the client and will be exported to the server, sample: \texttt{local:///home/user/file.tgz}.
+\end{itemize}
+
+\subsection{Build a custom pre-install}\label{sec:custom-preinstall}
 The goal of the pre-install in the Kadeploy workflow is to prepare the disk of the nodes before the copy of the environment. It can include:
 \begin{itemize}
 \item setting disk parameters (with hdparm for instance) ;
@@ -2206,7 +2215,7 @@ You can do want you want in the pre-install but you must know that Kadeploy will
 If you choose to mount more than one partition in the pre-install, remember to umount all the partitions excepted the one mounted on \ypath{/environments/deployment/extraction\_dir} (\texttt{/mnt/dest} in principle) in the post-install step. Indeed, the common Kadeploy workflow will automatically umount the partition mounted on \ypath{/environments/deployment/extraction\_dir}. Thus, if other partitions are mounted, the umount will fail.
 
 
-\section{Do a custom partitioning}\label{sec:custom-partitioning}
+\subsection{Do a custom partitioning}\label{sec:custom-partitioning}
 To perform a custom partitioning, you can use a substitute custom operation.
 
 You can use the Kadeploy3 client's option \emph{-{}-set-custom-operations} (see \ref{sec:kadeploy_client}) to setup custom micro-step operations.
@@ -2248,7 +2257,7 @@ Here is a example of a the custom operations file:
 Note: It is also possible for administrators to add systematic custom operations in the deployment process in order to perform a custom partitioning: the setting to modify in the cluster-specific configuration file (see section \ref{sec:specific_config}) is \ypath{/automata/macrosteps/[SetDeploymentEnv]/[microsteps]/format\_deploy\_part/[substitute]}. The custom operations to add will look the same as the ones created in the \emph{custom\_ops.yml} script.
 
 
-\section{Fsarchiver environements}\label{sec:fsa}
+\subsection{Fsarchiver environements}\label{sec:fsa}
 Fsarchiver allow to save several partition in one single file. It supports a bunch of different filesystems, it's also possible to specify the compression algorithm used to compress the archive.
 
 A documentation about creating fsarchiver images is available on the project's website (\url{http://www.fsarchiver.org/}).
@@ -2297,96 +2306,5 @@ options:
 
 %\section{Boot non-supported systems}
 % Create a GRUB PXE disk, boot with custom PXE ...
-
-
-\chapter{Remote Network API}
-\section{Introduction}
-\subsection{REST}
-\subsection{Error management}
-\subsubsection{Specifications}
-X-Application-Error-Code, ...
-\subsubsection{Error numbers}
-\paragraph{File fetching errors}
-\begin{itemize}
-  \item \texttt{100}: No error
-  \item \texttt{101}: Invalid environment image archive
-  \item \texttt{102}: Invalid environment preinstall
-  \item \texttt{103}: Environment's preinstall archive is too big
-  \item \texttt{104}: Invalid environment postinstall
-  \item \texttt{105}: Environment's postinstall archive is too big
-  \item \texttt{106}: Invalid key file
-  \item \texttt{107}: Invalid custom file
-  \item \texttt{108}: Invalid PXE file
-  \item \texttt{109}: Tempfile creation failed
-  \item \texttt{110}: File cannot be moved in cache
-  \item \texttt{111}: Invalid checksum
-  \item \texttt{112}: Internal cache error
-  \item \texttt{113}: File too big for the cache
-  \item \texttt{114}: The cache is full
-  \item \texttt{115}: Unknown protocol
-\end{itemize}
-\paragraph{Kadeploy}
-\begin{itemize}
-  \item \texttt{200}: No error
-  \item \texttt{201}: All the nodes have been discarded
-  \item \texttt{202}: Invalid options or invalid rights on nodes
-  \item \texttt{203}: Unknown node in singularity file
-  \item \texttt{204}: At least one node in your node list does not exist
-  \item \texttt{205}: The VLAN management has been disabled on the site
-  \item \texttt{206}: The environment cannot be loaded from the specified file
-  \item \texttt{207}: The environment does not exist
-  \item \texttt{208}: You must choose an environment
-  \item \texttt{209}: Some options are conflicting
-  \item \texttt{210}: Database issue
-  \item \texttt{211}: The execution of a command failed
-\end{itemize}
-\paragraph{Kareboot}
-\begin{itemize}
-  \item \texttt{300}: No error
-  \item \texttt{301}: Reboot failed on some nodes
-  \item \texttt{302}: Cannot reboot since the nodes have been previously deployed with a destructive environment
-  \item \texttt{303}: Some PXE files cannot be fetched
-  \item \texttt{304}: You do not have the right to deploy on all the nodes
-  \item \texttt{305}: Unknown node in singularity file
-  \item \texttt{306}: At least one node in your node list does not exist
-  \item \texttt{307}: The VLAN management has been disabled on the site
-  \item \texttt{308}: The environment does not exist
-\end{itemize}
-\paragraph{Kapower}
-\begin{itemize}
-  \item \texttt{400}: No error
-\end{itemize}
-\subsection{Exporting files for the server\label{sec:api_files_export}}
-'client' field specification, ...
-\subsection{Request's parameters}
-Via query string or request's body, ...
-\subsection{On the server-side}
-
-\section{Specifications}
-\subsection{Authentication}
-admin/user: ident,secret\_key,ca\_cert, ...
-\subsection{Global}
-\begin{itemize}
-  \item GET /version
-  \item GET /info
-  \item GET /clusters
-  \item GET /nodes
-\end{itemize}
-\subsection{Deployments}
-\begin{itemize}
-  \item POST /deploy (wid/resources)
-  \item GET /deploy/\#dpl\#
-  \item GET /deploy/\#dpl\#/state
-  \item GET /deploy/\#dpl\#/outputs
-  \item GET /deploy/\#dpl\#/outputs/\#cluster\#
-  \item GET /deploy/\#dpl\#/debugs
-  \item GET /deploy/\#dpl\#/debugs/\#node\#
-\end{itemize}
-\subsection{Reboot operations}
-\subsection{Power operations}
-\subsection{Statistics}
-\subsection{Nodes status}
-
-
 
 \end{document}
