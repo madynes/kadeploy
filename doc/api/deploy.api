@@ -7,7 +7,7 @@ operation 'Deployment' do
       parameter :ssh_authorized_keys, :String, "The path to a ssh authorized_keys file that have to be copied in the root directory of the deployed environment (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
       parameter :vlan, :String, 'Specify the VLAN the nodes should be reboot in', false
       parameter :pxe, :Hash, 'Specify some custom netboot parameters', false do
-        parameter :pxe, :String, 'A custom PXE profile, the string FILES_PREFIX-- will be replaced by the prefix to some exported files', false
+        parameter :profile, :String, 'A custom PXE profile, the string FILES_PREFIX-- will be replaced by the prefix to some exported files', false
         parameter :files, :Array, "A list of path to files that have to be exported in the PXE repository\'s directory (see more #{$cgi.a(:href => '#file_export'){'here'}})", false
         parameter :singularities, :Hash, 'Specify a substitution pattern for each node in the PXE profile (the NODE_SINGULARITY pattern must be used in the PXE profile)',false do
             parameter 'nodename', :String, 'The substitution pattern for the node "nodename"', false
