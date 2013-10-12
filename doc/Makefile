@@ -14,7 +14,7 @@ JOBNAME := Kadeploy-$(MAJOR_VERSION).$(MINOR_VERSION)$(RELEASE_VERSION)
 TEXFILE := Kadeploy.tex
 PDFFILE := $(JOBNAME).pdf
 LATEX = pdflatex
-BASEDIR := ..
+BASEDIR := $(shell pwd)/..
 BINFILES := $(wildcard $(BASEDIR)/bin/*) $(wildcard $(BASEDIR)/sbin/*)
 HELPFILES := $(BINFILES:=.help)
 COMPLETETEXFILE := $(TEXFILE:=.complete)
@@ -30,7 +30,7 @@ $(PDFFILE): $(COMPLETETEXFILE) $(HELPFILES)
 dia: $(dia-files:%.dia=%.pdf)
 
 $(HELPFILES): $(COMPLETETEXFILE)
-	KADEPLOY3_LIBS=$(BASEDIR)/src/lib $(@:.help=) --help > $(notdir $@) || true
+	KADEPLOY3_LIBS=$(BASEDIR)/lib $(@:.help=) --help > $(notdir $@) || true
 	sed -i -e "/__HELP_$(notdir $(@:.help=))_HELP__/r $(notdir $@)" -e "//d" $(COMPLETETEXFILE)
 
 $(COMPLETETEXFILE):
