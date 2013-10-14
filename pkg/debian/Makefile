@@ -41,6 +41,9 @@ RUN_PATH=\/var\/run\/kadeploy3
 SED_RUN=/KADEPLOY3_RUN_DIR/ s/$(RUN_PATH)/$(RUN_PATH)$(SUFFIX)/g
 LIBS_PATH=\/usr\/local\/kadeploy3
 SED_LIBS=/KADEPLOY3_LIBS/ s/$(LIBS_PATH)/$(LIBS_PATH)$(SUFFIX)/g
+ifndef RUBY_VERSION
+RUBY_VERSION=1.9.1
+endif
 
 SUFFIX = ""
 ifdef DEV
@@ -102,6 +105,9 @@ install_bin:
 
 install_sbin_server:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 750 $(SBIN)/kadeploy3d $(DEB_ROOT_SERVER)/usr/sbin/kadeploy3d$(SUFFIX)
+ifdef DEV
+	@sed "1 s/#\!\/usr\/bin\/ruby/#\!\/usr\/bin\/ruby$(RUBY_VERSION)/" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
+endif
 	@sed "$(SED_CONFIGS)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
 	@sed "$(SED_LOGS)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
 	@sed "$(SED_RUN)" $(DEB_ROOT_SERVER)/usr/sbin/ka* -i
