@@ -71,10 +71,13 @@ puts ''
 
 success = true
 
+success = success & run_test('auth',TEST_AUTH)
 success = success & run_test('kadeploy',TEST_KADEPLOY)
 success = success & run_test('kareboot',TEST_KAREBOOT)
 success = success & run_test('kapower',TEST_KAPOWER)
 success = success & run_test('kaenv',TEST_KAENV)
+success = success & run_test('kastat',TEST_KASTAT)
+success = success & run_test('kanodes',TEST_KANODES)
 
 puts "\n\n"
 if success

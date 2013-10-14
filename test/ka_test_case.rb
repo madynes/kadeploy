@@ -1,4 +1,9 @@
-KADEPLOY_LIBS=ENV['KADEPLOY_LIBS']||File.join(File.dirname(__FILE__), '..','lib')
+KADEPLOY_LIBS=ENV['KADEPLOY3_LIBS']||File.join(File.dirname(__FILE__), '..','lib')
+KADEPLOY_SERVER=ENV['KADEPLOY3_SERVER']||'kadeploy.testbed.lan'
+KADEPLOY_PORT=(ENV['KADEPLOY3_PORT']||25300).to_i
+KADEPLOY_SECURE=ENV['KADEPLOY3_SECURE']||true
+USER=ENV['USER']
+
 $:.unshift KADEPLOY_LIBS
 require 'kadeploy3/execute'
 require 'yaml'
@@ -59,10 +64,6 @@ module KaTestCase
     end
 
     out
-  end
-
-  def run_ka_check(binary,*options)
-    run_ka_nodelist(binary,*options)
   end
 
   def load_field(config,field_path,default=nil)

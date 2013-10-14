@@ -49,7 +49,7 @@ class KastatClient < Client
         options[:min_failure_rate] = r.to_f if r
       }
       parse_machinefile(opt,options)
-      add_opt(opt,"-F", "--fields FIELDS", FIELDS, "Only print the selected fields (#{FIELDS.join(', ')})") { |f|
+      add_opt(opt,"-F", "--fields FIELDS", Array, "Only print the selected fields (#{FIELDS.join(', ')})") { |f|
         options[:fields] = f
       }
       parse_machine(opt,options)
@@ -81,6 +81,12 @@ class KastatClient < Client
   end
 
   def self.check_options(options)
+    if options[:fields]
+      unless (fields = (options[:fields] - (FIELDS & options[:fields]))).empty?
+        error("Invalid field(s) #{fields.join(', ')}")
+        return false
+      end
+    end
     true
   end
 
@@ -106,12 +112,12 @@ class KastatClient < Client
 
   def result(options,ret)
     case options[:kind]
-    when :all
-      debug ret unless ret.empty?
     when :failure_rates
       ret.each_pair do |host,rate|
         debug "#{host}: #{rate}"
       end
+    else
+      debug ret unless ret.empty?
     end
   end
 end

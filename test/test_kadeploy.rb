@@ -26,7 +26,7 @@ class TestKadeploy < Test::Unit::TestCase
     options << '-k' if @key
     options << '--force'
 
-    run_ka_check(@binary,*options)
+    run_ka_nodelist(@binary,*options)
 
     connect_test(@nodes.first) if @connect
   end

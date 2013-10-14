@@ -13,7 +13,7 @@ module Stats
     total = db.run_query(query,*args).to_array
 
     query = "SELECT hostname,COUNT(*) FROM log"
-    query << " WHERE success = true"
+    query << " WHERE success = 'true'"
     query << " AND #{where}" unless where.empty?
     query << " GROUP BY hostname"
     query << op unless op.empty?

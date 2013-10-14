@@ -5,6 +5,7 @@ require 'tempfile'
 
 class TestKapower < Test::Unit::TestCase
   include KaTestCase
+  R_WID = /^P-[a-z0-9-]+$/
 
   def setup
     load_config()
@@ -16,7 +17,7 @@ class TestKapower < Test::Unit::TestCase
     options += ['-f',@nodefile]
     options << '--force'
     if @nodefiles
-      run_ka_check(@binary,*options)
+      run_ka_nodelist(@binary,*options)
     else
       run_ka(@binary,*options)
     end
@@ -36,7 +37,8 @@ class TestKapower < Test::Unit::TestCase
 
   def test_no_wait
     @nodefiles = false
-    run_kapower('--off','--no-wait')
+    ret = run_kapower('--off','--no-wait')
+    assert(ret.split(' ')[0] =~ R_WID,ret)
   end
 end
 
