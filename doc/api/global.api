@@ -1,0 +1,176 @@
+operation 'Global information' do
+  resource :GET, '/clusters', 'Get the list of clusters' do
+    request do
+    end
+    response :Array do
+      field '#i', :String, 'The name of the cluster #i'
+    end
+
+    example 'Get the list of clusters',
+      <<-EOS ,
+        GET /clusters?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 45
+        [
+          "griffon-cluster",
+          "graphene-cluster"
+        ]
+      EOS
+  end
+
+  resource :GET, '/info', 'Get information about the configuration of the running service' do
+    request do
+    end
+    response :Hash do
+      field :pxe, :String, 'The netboot method configured on the server'
+      field :automata, :Hash, 'The configuration of the deployment automata' do
+        field 'clustername', :Hash, 'The configuration of the deployment automata for the cluster "clustername"' do
+          field 'macrostepkind', :Array, 'The configuration of the instances of the step "macrostepkind"' do
+            field '#i', :Hash, 'The configuration of the instances #i' do
+              field :name, :String, 'The name of the instance'
+              field :retries, :Integer, 'The number of retries for the instance'
+              field :timeout, :Integer, 'The timeout of the instance'
+            end
+          end
+        end
+      end
+      field :supported_fs, :Hash, 'The filesystem format supported by the deployment environment of the different clusters' do
+        field 'clustername', :Array, 'The filesystem format supported by the deployment environment of the cluster "clustername"' do
+          field '#format', :String, 'The filesystem format name'
+        end
+      end
+      field :vars, :Array, 'The environment variables exported by the deployment environment when running custom scripts' do
+        field '#name', :String, 'The variable name'
+      end
+    end
+
+    example 'Get information about the service\'s configuration',
+      <<-EOS ,
+        GET /info?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: application/json
+        Content-Length: 1851
+        {
+          "pxe": "PXElinux",
+          "automata": {
+            "griffon-cluster": {
+              "SetDeploymentEnv": [
+                {
+                  "name": "SetDeploymentEnvUntrusted",
+                  "retries": 1,
+                  "timeout": 200
+                }
+              ],
+              "BroadcastEnv": [
+                {
+                  "name": "BroadcastEnvKastafior",
+                  "retries": 1,
+                  "timeout": 200
+                }
+              ],
+              "BootNewEnv": [
+                {
+                  "name": "BootNewEnvKexec",
+                  "retries": 0,
+                  "timeout": 200
+                },
+                {
+                  "name": "BootNewEnvHardReboot",
+                  "retries": 1,
+                  "timeout": 200
+                }
+              ]
+            },
+            "graphene-cluster": {
+              "SetDeploymentEnv": [
+                {
+                  "name": "SetDeploymentEnvUntrusted",
+                  "retries": 1,
+                  "timeout": 200
+                }
+              ],
+              "BroadcastEnv": [
+                {
+                  "name": "BroadcastEnvKastafior",
+                  "retries": 1,
+                  "timeout": 200
+                }
+              ],
+              "BootNewEnv": [
+                {
+                  "name": "BootNewEnvKexec",
+                  "retries": 0,
+                  "timeout": 200
+                },
+                {
+                  "name": "BootNewEnvHardReboot",
+                  "retries": 1,
+                  "timeout": 200
+                }
+              ]
+            }
+          },
+          "supported_fs": {
+            "griffon-cluster": [
+              "ext2",
+              "ext3",
+              "fat"
+            ],
+            "graphene-cluster": [
+              "ext2",
+              "ext3",
+              "fat"
+            ]
+          },
+          "vars": [
+            "KADEPLOY_BLOCK_DEVICE",
+            "KADEPLOY_CLUSTER",
+            "KADEPLOY_DEPLOY_PART",
+            "KADEPLOY_DEPLOY_PART_NUM",
+            "KADEPLOY_ENV",
+            "KADEPLOY_ENV_HYPERVISOR",
+            "KADEPLOY_ENV_HYPERVISOR_PARAMS",
+            "KADEPLOY_ENV_INITRD",
+            "KADEPLOY_ENV_KERNEL",
+            "KADEPLOY_ENV_KERNEL_PARAMS",
+            "KADEPLOY_OS_KIND",
+            "KADEPLOY_PREPOST_EXTRACTION_DIR",
+            "KADEPLOY_PROD_PART_NUM",
+            "KADEPLOY_SWAP_PART_NUM",
+            "KADEPLOY_TMP_DIR",
+            "KADEPLOY_TMP_PART_NUM"
+          ]
+        }
+      EOS
+  end
+
+  resource :GET, '/version', 'Get the version of the server' do
+    request do
+    end
+    response :String, 'text/plain' do
+      field '', :String, 'The version of the server'
+    end
+
+    example 'Get the version of the server "kadeploy.testbed.lan"',
+      <<-EOS ,
+        GET /version?user=frontend HTTP/1.1
+        Accept: text/plain, application/json
+        Host: kadeploy.testbed.lan:25300
+      EOS
+      <<-EOS
+        HTTP/1.1 200 OK
+        Content-Type: text/plain
+        Content-Length: 5
+        3.2.0
+      EOS
+  end
+end
