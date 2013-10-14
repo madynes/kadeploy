@@ -234,7 +234,7 @@ class Type
       end +
       @examples.inject('') do |out,e|
         out << cgi.h3(:class => 'type_subtitle'){"Example ##{i}"}
-        out << html_toggle(cgi){html_code(e,cgi)}
+        out << html_code(e,cgi)
         i += 1
         out
       end

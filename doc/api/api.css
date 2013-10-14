@@ -122,7 +122,7 @@ a.apidoc_index_link {
   margin-bottom: 8px;
   font-size: 150%;
 }
-a.operation_index_link {
+a.intro_index_link, a.operation_index_link {
   border-radius: 4px;
   margin: 0px;
 }
@@ -243,10 +243,11 @@ li {
 ul.apidoc_index_list li {
   width:50%;
 }
-ul.operation_index_list li {
+ul.operation_index_list li, ul.intro_index_list li {
   width: 40%;
   margin: 0px;
-  margin-top: 4px;
+  margin-top: 6px;
+  margin-bottom: 10px;
   border-width: 1px;
   border-color: #282828;
 /*
@@ -255,7 +256,7 @@ ul.operation_index_list li {
   border-radius: 4px;
 */
 }
-li a {
+li a.apidoc_index_link {
   margin: 0px;
   display: block;
   width: 100%;
