@@ -28,5 +28,170 @@ operation 'Reboot operations' do
     response do
       field '', 'Workflow', 'Information related to the workflow of the reboot operation'
     end
+
+    example 'Perform a simple hard reboot on nodes (do not re-write the PXE profile)',
+    <<-EOS ,
+      POST /reboot HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 132
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "kind": "simple",
+        "level": "hard"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 821
+      {
+        "wid": "R-27714bc3-860d-40e7-8371-b7419f6c9021",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Reboot nodes on the deployment environment and send the user\'s SSH authorized_keys file',
+    <<-EOS ,
+      POST /reboot HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 249
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "kind": "deploy_env",
+        "level": "soft",
+        "ssh_authorized_keys": "/home/frontend/.ssh/authorized_keys",
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 821
+      {
+        "wid": "R-52269f0e-1a5b-4f23-8cbf-0f17b166c420",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Reboot nodes on a (previously installed) recorded environment and check if the partition table was destroyed',
+    <<-EOS ,
+      POST /reboot HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 331
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "kind": "recorded_env",
+        "level": "soft",
+        "deploy_partition": "3",
+        "check_destructive": true,
+        "environment": {
+          "user": "root",
+          "name": "debian-base",
+          "version": 1
+        },
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 821
+      {
+        "wid": "R-7b52716a-2b72-4c66-b725-dc9f1726d0a6",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/error?user=frontend"
+        }
+      }
+    EOS
+
+    example 'Reboot nodes on a specified kernel using a custom PXE profile with some nodes singularities',
+    <<-EOS ,
+      POST /reboot HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+      Content-Type: application/json
+      Content-Length: 633
+      {
+        "user": "frontend",
+        "nodes": [
+          "node-1.testbed.lan",
+          "node-2.testbed.lan"
+        ],
+        "kind": "set_pxe",
+        "pxe": {
+          "profile": "PROMPT 1\nSERIAL 0 19200\nDEFAULT bootlabel\nDISPLAY messages\nTIMEOUT 50\n\nlabel bootlabel\n\tKERNEL FILES_PREFIX--myvmlinuz\n\tAPPEND initrd=FILES_PREFIX--myinitrd console=tty0 console=ttyS0,19200n8 ramdisk_size=290000 id=NODE_SINGULARITY rw noapic\n",
+          "singularities": {
+            "node-1.testbed.lan": "1",
+            "node-2.testbed.lan": "2"
+          },
+          "files": [
+            "/home/frontend/myvmlinuz",
+            "/home/frontend/myinitrd"
+          ]
+        },
+        "client": "http://frontend.testbed.lan:12345"
+      }
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 821
+      {
+        "wid": "R-759f3f78-9742-47e6-b67e-c12b6750c2e4",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4?user=frontend",
+          "log": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/logs?user=frontend",
+          "logs": {
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/logs/graphene-cluster?user=frontend"
+          },
+          "state": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/state?user=frontend",
+          "status": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/status?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/error?user=frontend"
+        }
+      }
+    EOS
   end
 end
