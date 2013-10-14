@@ -95,7 +95,30 @@ operation 'Workflow-based operations' do
 
   resource :POST, '/%OPERATION', 'Launch an operation' do
     request do
-      parameter :'', :'Deployment/Reboot/Power', 'The operation\'s parameters'
+      parameter :'...', :'Deployment/Reboot/Power', 'The operation\'s parameters'
+      parameter :breakpoint, :String, 'The name of a step to breakpoint on (can be MacrostepName or MacrostepName:MicrostepName)', false
+      parameter :force, :Set, 'Force the operation, even if the nodes seems to be already involved in another one', false
+      parameter :verbose_level, :Integer, 'The verbose level of the logs', false, :expected => [1,2,3,4,5]
+      parameter :debug, :Set, 'Enable the command\'s debugging', false
+      parameter :custom_operations, :Hash, 'Add some custom steps to the operation\'s workflow', false do
+        parameter 'macrostepname', :Hash, 'The macro-step the custom-step has to be added to' do
+          parameter 'microstepname', :Hash, 'The micro-step the custom-step has to be added to' do
+            parameter 'overwrite', :Boolean, 'Overwrite the custom-steps that were add in the configuration by the administrators', false, :default => 'false'
+            parameter 'where', :Array, 'A list of actions to be substitued/pre/post to this step', false, :expected => ['substitute','pre-ops','post-ops'] do
+
+              parameter :name, :String, 'The name of the custom operation', false
+              parameter :action, :String, 'The action that have to be performed', false, :expected => ['run','send','exec']
+              parameter :file, :String, '(To be specified if the action is "send" or "run") The path to the file to be send/executed (if the action is "send" the file name will remains the same, if the action is "run" this file need to contain a script)', false
+              parameter :destination, :String, '(To be specified if the action is "send") The destination directory on the nodes (Kadeploy3 environment variables are substitued in the path)', false
+              parameter :params, :String, '(To be specified if the action is "run") The parameters of the script.', false, :default => ''
+              parameter :command, :String, '(To be specified if the action is "exec") The command to be executed. If you want to call a script, dont forget to add a "." (or use "source") before the script name to be able to use Kadeploy3 environment variables inside of it (example: "command: . /myscript.sh").', false
+              parameter :timeout, :Integer, 'The timeout (seconds) of this custom operation', false, :default => 0
+              parameter :retries, :Integer, 'The number of retries for this custom operation', false, :default => 0
+              parameter :scattering, :String, 'The scattering kind for this custom operation', false, :default => 'tree', :expected => ['tree','chain']
+            end
+          end
+        end
+      end
     end
     response do
       field :wid, :String, 'The id# of the workflow that was initiated'

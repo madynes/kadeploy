@@ -196,7 +196,7 @@ introduction do
     list.collect!{|v|$cgi.tr{"#{$cgi.td{v[0]}}#{$cgi.td{v[1]}}#{$cgi.td{v[2]}}"}}
     paragraph $cgi.table(:style => 'margin-left: 40px;'){$cgi.tr{"#{$cgi.th{'Error #'}}#{$cgi.th{'Name'}}#{$cgi.th{'Description'}}"}+list.join}
   end
-  section 'Workflow based operations' do
+  section 'Workflow based operations', 'workflow_operations' do
     paragraph 'specific resources: /output, /debug (as timestamp|message), ...'
   end
   section 'Exporting files for the server','file_export' do
