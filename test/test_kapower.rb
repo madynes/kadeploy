@@ -14,6 +14,7 @@ class TestKapower < Test::Unit::TestCase
 
   def run_kapower(*options)
     options += ['-f',@nodefile]
+    options << '--force'
     if @nodefiles
       run_ka_check(@binary,*options)
     else
