@@ -23,7 +23,7 @@ KADEPLOY_ENV_VARS.each do |var|
 end
 env = (vars.empty? ? '' : "export #{vars};")
 $commitfile = $commit.gsub('/','_').gsub(':','-')
-ret=cmd("oarsub -t deploy -n #{$commitfile} -l {\"type='kavlan-local'\"}/vlan=1+cluster=2/nodes=2,walltime=3 '#{env} #{File.join(TESTSUITE_DIR,'run-testsuite')} #{$commit} #{$version} #{$sources}'")
+ret=cmd("oarsub -t deploy -t destructive -n #{$commitfile} -l {\"type='kavlan-local'\"}/vlan=1+cluster=2/nodes=2,walltime=3 '#{env} #{File.join(TESTSUITE_DIR,'run-testsuite')} #{$commit} #{$version} #{$sources}'")
 
 $jobid=ret.split("\n").grep(/OAR_JOB_ID/)[0].split("=")[1]
 
