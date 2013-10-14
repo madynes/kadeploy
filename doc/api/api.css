@@ -238,8 +238,11 @@ pre.code_sample {
 div.toggle_frame, div.example_subframe {
   cursor: pointer;
 }
-li {
+ul {
   list-style-type: none;
+}
+li {
+  list-style-type: inherit;
 }
 ul.apidoc_index_list li {
   width:50%;
