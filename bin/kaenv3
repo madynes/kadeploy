@@ -171,7 +171,7 @@ class KaenvsClient < Client
     if ![:add, :list, :'move-files'].include?(options[:operation])
       path = File.join(path,options[:user]||USER)
       path = File.join(path,options[:env_name]) if options[:env_name]
-      path = File.join(path,options[:env_version]) if options[:env_version]
+      path = File.join(path,options[:env_version].to_s) if options[:env_version]
     elsif options[:operation] != :add
       path = File.join(path,options[:user]) if options[:user]
     end
