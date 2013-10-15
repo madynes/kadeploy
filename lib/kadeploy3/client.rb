@@ -191,7 +191,7 @@ class Client
   def self.load_machine(nodelist, hostname)
     hostname.strip!
     if R_HOSTNAME =~ hostname
-      nodelist.push(hostname) unless hostname.empty?
+      nodelist << hostname if !hostname.empty? and !nodelist.include?(hostname)
     else
       error("Invalid hostname: #{hostname}")
     end
