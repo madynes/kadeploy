@@ -1,9 +1,10 @@
 #!/usr/bin/ruby -w
-
-$kadeploy_logdir=ENV['KADEPLOY3_LOG_DIR']||'/var/log/kadeploy3'
-$kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3'
-$kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
-$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/lib'
+$binbase = 'kadeploy3d'
+$binsuffix = $0.slice(/#{$binbase}(.*)$/,1)
+$kadeploy_logdir=ENV['KADEPLOY3_LOG_DIR']||"/var/log/kadeploy3#{$binsuffix}"
+$kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||"/var/run/kadeploy3#{$binsuffix}"
+$kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||"/etc/kadeploy3#{$binsuffix}"
+$kadeploy_libs=ENV['KADEPLOY3_LIBS']||"/usr/local/kadeploy3#{$binsuffix}/lib"
 $kadeploy_logfiles = {}
 
 SSH_KEY=File.join($kadeploy_confdir,'keys/id_deploy')

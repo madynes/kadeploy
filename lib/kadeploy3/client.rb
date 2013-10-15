@@ -1,4 +1,4 @@
-$kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
+$kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||"/etc/kadeploy3#{$binsuffix}"
 
 $kadeploy_logdir = nil
 $files = []
