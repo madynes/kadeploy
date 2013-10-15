@@ -74,18 +74,20 @@ module Configuration
         # Commands
         res = res && CommandsConfig.new.load(@common)
 
-        # Caches
-        if caches
-          @caches = caches
+        if res
+          # Caches
+          if caches
+            @caches = caches
+          else
+            @caches = load_caches()
+          end
+
+          @static.freeze
+          @caches.freeze if @caches
         else
-          @caches = load_caches()
+          raise KadeployError.new(APIError::BAD_CONFIGURATION,nil,
+            "Problem in configuration")
         end
-
-        @static.freeze
-        @caches.freeze if @caches
-
-        raise KadeployError.new(APIError::BAD_CONFIGURATION,nil,
-          "Problem in configuration") if not res
       else
         @common = config.common.duplicate
         @clusters = config.clusters.duplicate
