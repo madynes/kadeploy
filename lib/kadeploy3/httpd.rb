@@ -624,7 +624,6 @@ module HTTPd
     # :object, args and method => :method_name or { :GET => :method1, :POST => :method2 }
     # :content :value => {},123,[],... or { :GET => 123, :POST => 'abc' }
     def bind(methods,path,kind=:proc,params={},&block)
-  puts "BIND #{kind} #{path}"
       methods = [methods] if methods.is_a?(Symbol)
       case kind
       when :method
