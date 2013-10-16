@@ -22,9 +22,11 @@ class TestKadeploy < Test::Unit::TestCase
     run_ka(@binary,*options)
   end
 
-  def check_env(name)
+  def check_env(name,version=nil)
     begin
-      desc = YAML.load(run_kaenv('-p', name))
+      opts = ['-p',name]
+      opts += ['--env-version',version.to_s] if version
+      desc = YAML.load(run_kaenv(*opts))
       assert(desc['name'] == name,"Wrong description #{desc.inspect}")
       return desc
     rescue ArgumentError => ae
@@ -83,7 +85,7 @@ class TestKadeploy < Test::Unit::TestCase
     envfile.write(desc.to_yaml)
     envfile.close
     run_kaenv('-a', envfile.path)
-    check_env(@tmp[:envname])
+    check_env(@tmp[:envname],2)
     run_kaenv('-d', @tmp[:envname])
     envfile.unlink
   end
