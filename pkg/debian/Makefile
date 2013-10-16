@@ -63,6 +63,13 @@ build:
 build-clean:
 	@rm -rf $(BUILD_DIR)
 
+man: man-clean
+	@$(MAKE) -C $(MAN)
+	@$(MAKE) -C $(MAN) build-clean
+
+man-clean:
+	@$(MAKE) -C $(MAN) clean
+
 install_log:
 	@install -d -o root -g $(DEPLOY_USER) -m 770 $(DEB_ROOT_SERVER)/var/log/kadeploy3$(SUFFIX)
 	@install -d -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 740 $(DEB_ROOT_SERVER)/var/run/kadeploy3$(SUFFIX)
@@ -138,9 +145,14 @@ install_version:
 	@echo $(VERSION) > $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)/version
 	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)/version
 
-install_man:
+install_man1: man
 ifndef DEV
-	@(cd $(MAN); sh generate.sh $(DEB_ROOT_COMMON)/usr/local/man)
+	@install -o root -g root -m 644 -t $(DEB_ROOT_CLIENT)/usr/local/man/man1 $(MAN)/*.1
+endif
+
+install_man8: man
+ifndef DEV
+	@install -o root -g root -m 644 -t $(DEB_ROOT_SERVER)/usr/local/man/man8 $(MAN)/*.8
 endif
 
 install_scripts:
@@ -152,11 +164,17 @@ install_scripts:
 tree_client:
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/bin
 	@mkdir -p $(DEB_ROOT_CLIENT)/usr/sbin
+ifndef DEV
+	@mkdir -p $(DEB_ROOT_CLIENT)/usr/local/man/man1
+endif
 	@mkdir -p $(DEB_ROOT_CLIENT)/etc/kadeploy3$(SUFFIX)
 
 tree_server:
 	@mkdir -p $(DEB_ROOT_SERVER)/usr/bin
 	@mkdir -p $(DEB_ROOT_SERVER)/usr/sbin
+ifndef DEV
+	@mkdir -p $(DEB_ROOT_SERVER)/usr/local/man/man8
+endif
 	@mkdir -p $(DEB_ROOT_SERVER)/etc/init.d
 	@mkdir -p $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)
 	@mkdir -p $(DEB_ROOT_SERVER)/etc/kadeploy3$(SUFFIX)/keys
@@ -173,11 +191,8 @@ tree_common:
 	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/test
 	#@mkdir -p $(DEB_ROOT_COMMON)/usr/local/kadeploy3$(SUFFIX)/src/contrib
 	@mkdir -p $(DEB_ROOT_COMMON)/etc/kadeploy3$(SUFFIX)
-ifndef DEV
-	@mkdir -p $(DEB_ROOT_COMMON)/usr/local/man
-endif
 
-package_client: build-clean build tree_client install_conf_client install_bin install_sbin_client
+package_client: build-clean build tree_client install_conf_client install_bin install_sbin_client install_man1
 	@mkdir -p $(DEB_ROOT_CLIENT)
 	@cp -r $(DEB_TEMPLATE_CLIENT)/* $(DEB_ROOT_CLIENT)
 ifdef DEV
@@ -187,9 +202,12 @@ ifdef DEV
 endif
 	@sh set_control.sh kadeploy-client-control.in kadeploy-client $(SUFFIX) > $(DEB_ROOT_CLIENT)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_CLIENT) $(PKG_DIR)/kadeploy-client$(SUFFIX)-$(VERSION).deb
+ifdef SUDO_USER
+	@chown $(SUDO_USER):$(SUDO_USER) $(PKG_DIR)/kadeploy-client$(SUFFIX)-$(VERSION).deb
+endif
 	@$(MAKE) build-clean
 
-package_server: build-clean build tree_server install_log install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version install_scripts
+package_server: build-clean build tree_server install_log install_conf_server install_rc_script install_ssh_key install_sbin_server install_kastafior install_version install_scripts install_man8
 	@mkdir -p $(DEB_ROOT_SERVER)
 	@cp -r $(DEB_TEMPLATE_SERVER)/* $(DEB_ROOT_SERVER)
 ifdef DEV
@@ -200,15 +218,20 @@ ifdef DEV
 endif
 	@sh set_control.sh kadeploy-server-control.in kadeploy-server $(SUFFIX) > $(DEB_ROOT_SERVER)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_SERVER) $(PKG_DIR)/kadeploy-server$(SUFFIX)-$(VERSION).deb
+ifdef SUDO_USER
+	@chown $(SUDO_USER):$(SUDO_USER) $(PKG_DIR)/kadeploy-server$(SUFFIX)-$(VERSION).deb
+endif
 	@$(MAKE) build-clean
 
-
-package_common: build-clean build tree_common install_src install_test install_db_script install_man
+package_common: build-clean build tree_common install_src install_test install_db_script
 	#@mkdir -p $(DEB_ROOT_COMMON)
 	#@cp -rf $(DEB_TEMPLATE_COMMON)/* $(DEB_ROOT_COMMON)
 	@mkdir -p $(DEB_ROOT_COMMON)/DEBIAN
 	@sh set_control.sh kadeploy-common-control.in kadeploy-common $(SUFFIX) > $(DEB_ROOT_COMMON)/DEBIAN/control
 	@dpkg-deb --build $(DEB_ROOT_COMMON) $(PKG_DIR)/kadeploy-common$(SUFFIX)-$(VERSION).deb
+ifdef SUDO_USER
+	@chown $(SUDO_USER):$(SUDO_USER) $(PKG_DIR)/kadeploy-common$(SUFFIX)-$(VERSION).deb
+endif
 	@$(MAKE) build-clean
 
 package_all: build-clean build package_client package_server package_common

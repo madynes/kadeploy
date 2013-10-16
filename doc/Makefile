@@ -19,6 +19,11 @@ BINFILES := $(wildcard $(BASEDIR)/bin/*) $(wildcard $(BASEDIR)/sbin/*)
 HELPFILES := $(BINFILES:=.help)
 COMPLETETEXFILE := $(TEXFILE:=.complete)
 
+KADEPLOY3_LIBS := $(BASEDIR)/lib/
+export KADEPLOY3_LIBS
+COLUMNS := 0
+export COLUMNS
+
 dia-files := $(wildcard fig/*.dia)
 tex-files := $(wildcard *.tex)
 
@@ -29,8 +34,8 @@ $(PDFFILE): $(COMPLETETEXFILE) $(HELPFILES)
 
 dia: $(dia-files:%.dia=%.pdf)
 
-$(HELPFILES): $(COMPLETETEXFILE)
-	KADEPLOY3_LIBS=$(BASEDIR)/lib $(@:.help=) --help > $(notdir $@) || true
+$(HELPFILES):
+	$(@:.help=) --help > $(notdir $@) || true
 	sed -i -e "/__HELP_$(notdir $(@:.help=))_HELP__/r $(notdir $@)" -e "//d" $(COMPLETETEXFILE)
 
 $(COMPLETETEXFILE):
@@ -41,6 +46,9 @@ $(COMPLETETEXFILE):
 
 %.pdf: %.eps
 	epstopdf "$<"
+
+build-clean:
+	-rm -f *.aux *.dvi *~ *.bbl *.blg *.log *.toc *.ps *.out *.help *.complete
 
 clean:
 	-rm -f *.aux *.dvi *~ *.bbl *.blg *.log *.toc *.ps *.pdf *.out *.help *.complete
