@@ -21,6 +21,8 @@ OUTFILE := $(OUTPREFIX)$(MAJOR_VERSION).$(MINOR_VERSION)$(RELEASE_VERSION).html
 api:
 	$(API_SCRIPT) 'Kadeploy $(MAJOR_VERSION).$(MINOR_VERSION) Network API specification' $(CSSFILE) $(DOCFILES) > $(OUTFILE)
 
+build-clean:
+
 clean:
 	-rm -f ./$(OUTPREFIX)*
 

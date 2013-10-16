@@ -10,6 +10,8 @@ ADDONS=$(KADEPLOY_ROOT)/addons
 TEST=$(KADEPLOY_ROOT)/test
 PKG=$(KADEPLOY_ROOT)/pkg
 MAN=$(KADEPLOY_ROOT)/man
+DOC=$(KADEPLOY_ROOT)/doc
+APIDOC=$(KADEPLOY_ROOT)/doc/api
 SCRIPTS=$(KADEPLOY_ROOT)/scripts
 MAJOR_VERSION:=$(shell cat major_version)
 MINOR_VERSION:=$(shell cat minor_version)
@@ -32,13 +34,9 @@ AR_DIR=$(CURRENT_DIR)/archives
 endif
 
 
-api: cleanapi
-	@echo "Generating API"
-	@rdoc --exclude src/contrib --exclude test --include src --all --diagram --line-numbers --inline-source -A cattr_accessor=object --op doc/api
-
-cleanapi:
-	@rm -rf doc/api
-
+tgz: ar dist
+	@tar czf $(AR_DIR)/$(DIST_TGZ_NAME) $(DIST_DIR_NAME)
+	@$(MAKE) dist-clean
 
 install_src:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SRC)/kadeploy3/*.rb $(DESTDIR)/usr/local/kadeploy3/lib
@@ -88,8 +86,11 @@ install_version:
 	@echo "$(MAJOR_VERSION).$(MINOR_VERSION)" > $(DESTDIR)/etc/kadeploy3/version
 	@chown $(DEPLOY_USER):$(DEPLOY_USER) $(DESTDIR)/etc/kadeploy3/version
 
-install_man:
-	@(cd $(MAN); sh generate.sh $(DESTDIR)/usr/local/man)
+install_man1: man
+	@install -o root -g root -m 644 -t $(DESTDIR)/usr/local/man/man1 $(MAN)/*.1
+
+install_man8: man
+	@install -o root -g root -m 644 -t $(DESTDIR)/usr/local/man/man8 $(MAN)/*.8
 
 install_scripts:
 	@install -o $(DEPLOY_USER) -g $(DEPLOY_USER) -m 644 $(SCRIPTS)/bootloader/install_grub $(DESTDIR)/usr/local/kadeploy3/scripts/bootloader
@@ -99,9 +100,11 @@ install_scripts:
 
 tree_client:
 	@mkdir -p $(DESTDIR)/usr/bin
+	@mkdir -p $(DESTDIR)/usr/local/man/man1
 	@mkdir -p $(DESTDIR)/
 tree_server:
 	@mkdir -p $(DESTDIR)/usr/sbin
+	@mkdir -p $(DESTDIR)/usr/local/man/man8
 	@mkdir -p $(DESTDIR)/etc/init.d
 	@mkdir -p $(DESTDIR)/etc/kadeploy3/keys
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/scripts
@@ -114,14 +117,13 @@ tree_common:
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/lib/kadeploy3
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/db
 	@mkdir -p $(DESTDIR)/usr/local/kadeploy3/test
-	@if [ -d $(DESTDIR)/etc/kadeploy3 ]; then  mv $(DESTDIR)/etc/kadeploy3 $(DESTDIR)/etc/kadeploy3-save-`date +"%s"`; fi
 	@mkdir -p $(DESTDIR)/etc/kadeploy3
 
-install_common: tree_common install_src install_test install_db install_man
+install_common: tree_common install_src install_test install_db
 
-install_client: tree_client install_conf_client install_bin
+install_client: tree_client install_conf_client install_bin install_man1
 
-install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version install_scripts
+install_server: tree_server install_conf_server install_rc_script install_ssh_key install_sbin install_kastafior install_version install_scripts install_man8
 
 install_all: install_common install_client install_server
 
@@ -170,11 +172,30 @@ rpm: build-clean build pkg dist
 deb: build-clean build pkg
 	@(cd $(PKG)/debian; PKG_DIR="$(PKG_DIR)" BUILD_DIR="$(BUILD_DIR)" make package_all; cd $(CURRENT_DIR))
 
-tgz: ar dist
-	@tar czf $(AR_DIR)/$(DIST_TGZ_NAME) $(DIST_DIR_NAME)
-	@$(MAKE) dist-clean
+man: man-clean
+	@$(MAKE) -C $(MAN)
+	@$(MAKE) -C $(MAN) build-clean
 
-mrproper: cleanapi dist-clean uninstall
-	@find . -name '*~' | xargs rm -f	
+man-clean:
+	@$(MAKE) -C $(MAN) clean
+
+doc: doc-clean
+	@$(MAKE) -C $(DOC)
+	@$(MAKE) -C $(DOC) build-clean
+
+doc-clean:
+	@$(MAKE) -C $(DOC) clean
+
+apidoc: apidoc-clean
+	@$(MAKE) -C $(APIDOC)
+	@$(MAKE) -C $(APIDOC) build-clean
+
+apidoc-clean:
+	@$(MAKE) -C $(APIDOC) clean
+
+clean: dist-clean build-clean pkg-clean ar-clean man-clean doc-clean apidoc-clean
+
+mrproper: dist-clean uninstall
+	@find . -name '*~' | xargs rm -f
 
 .PHONY : pkg ar build build-clean
