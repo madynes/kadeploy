@@ -133,13 +133,13 @@ uninstall:
 	@rm -f $(DESTDIR)/usr/sbin/kadeploy3d
 	@rm -f $(DESTDIR)/usr/bin/kaconsole3 $(DESTDIR)/usr/bin/kadeploy3 $(DESTDIR)/usr/bin/kaenv3 $(DESTDIR)/usr/bin/kanodes3 $(DESTDIR)/usr/bin/kareboot3 $(DESTDIR)/usr/bin/kastat3 $(DESTDIR)/usr/bin/kapower3 $(DESTDIR)/usr/sbin/karights3
 
-dist: dist-clean
-	@(PKG_DIR="$(PKG_DIR)" BUILD_DIR="$(BUILD_DIR)" AR_DIR="$(AR_DIR)" ./make_dist_dir.sh $(DIST_DIR))
+dist: dist-clean man doc apidoc
+	@(PKG_DIR="$(PKG_DIR)" BUILD_DIR="$(BUILD_DIR)" AR_DIR="$(AR_DIR)" ./make_dist_dir.sh $(DIST_DIR) man/*.1 man/*.8 doc/*.pdf doc/api/*.html)
 
 dist-tgz: dist
 	@tar czf $(DIST_TGZ) $(DIST_DIR_NAME)
 
-dist-clean:
+dist-clean: man-clean doc-clean apidoc-clean
 	@rm -rf $(DIST_DIR)
 	@rm -f $(DIST_TGZ)
 
