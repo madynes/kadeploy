@@ -1094,7 +1094,6 @@ class ClientWorkflow < Client
     @resources = ret['resources']
     @start_time = Time.now.to_i
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
-p @resources['resource']
 
     if options[:wait]
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
