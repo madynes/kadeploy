@@ -26,8 +26,8 @@ HTTP_PROXY_PORT   = 3128
 DEB_REPOSITORY    = 'http://apt.grid5000.fr/kadeploy'
 GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPOSITORY = 'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
-DEPENDANCIES      = ['libmysql-ruby1.8','ruby1.8']
-BUILD_DEPENDANCIES = ['git','make']
+DEPENDANCIES      = ['libmysql-ruby','ruby']
+BUILD_DEPENDANCIES = ['git','rake']
 
 if g5k?
   G5K_API         = 'https://api.grid5000.fr/2.0'
@@ -66,14 +66,16 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 # Update path for devel
 UPDATE_PATH_CHECK = {
   'common' => {
-    'lib' => 'environment.rb',
+    'lib' => 'common.rb',
   },
   'client' => {
     'bin' => '/usr/bin/kadeploy3',
+    'lib' => 'client.rb',
   },
   'server' => {
     'sbin' => '/usr/sbin/kadeploy3d',
     'init' => '/etc/init.d/kadeploy3d',
+    'lib' => 'automata.rb',
   }
 }
 UPDATE_FORWARD_PORT = 2222
@@ -1830,10 +1832,11 @@ def kadeploy_update(session,mountpath)
 
   $update_paths.each_pair do |pkg,keys|
     next if pkg == UPDATE_DIR_VAR
+    next unless keys
     keys.each do |key,localpath|
       rlocalpath = File.join(mountpath,localpath)
       msg("Updating '#{key}' files",MSG_INFO)
-      remotepaths = sexec(session,"dpkg -L kadeploy-#{pkg} | grep '#{UPDATE_PATH_CHECK[pkg][key]}$'")
+      remotepaths = sexec(session,"dpkg -L kadeploy-#{pkg} | grep '#{UPDATE_PATH_CHECK[pkg][key]}$' | tail -n 1")
       msg("file '#{UPDATE_PATH_CHECK[pkg][key]}' not found in kadeploy-#{pkg} package",MSG_ERROR,true) if !remotepaths or remotepaths.empty?
       remotepaths = [remotepaths] if remotepaths.is_a?(String)
       remotepaths.each do |remotepath|
@@ -2275,6 +2278,7 @@ if options[:update_file]
     updatepath = $update_paths[UPDATE_DIR_VAR]
     $update_paths.each do |pkg,keys|
       next if pkg == UPDATE_DIR_VAR
+      next unless keys
       msg("#{options[:update_file]}: invalid package '#{pkg}'",MSG_ERROR,true) unless UPDATE_PATH_CHECK[pkg]
       $update_paths[pkg] = {} unless $update_paths[pkg]
       keys.each do |key,path|
@@ -3381,18 +3385,26 @@ sshgw.ssh(servername,'root') do |session|
         )
       end
 
-      msg("Creating the #{CFG_KADEPLOY_USER} user",MSG_INFO)
-      #sexec(session, "userdel --force --remove #{CFG_KADEPLOY_USER}; true")
-      sexec(session, "useradd -U -m #{CFG_KADEPLOY_USER}; true")
+      if $version < 8
+        msg("Creating the #{CFG_KADEPLOY_USER} user",MSG_INFO)
+        #sexec(session, "userdel --force --remove #{CFG_KADEPLOY_USER}; true")
+        sexec(session, "useradd -U -m #{CFG_KADEPLOY_USER}; true")
 
-      msg("Building Kadeploy packages",MSG_INFO)
-      sexec(session,"cd #{tmpdir} && PKG_DIR=#{File.join(tmpdir,'packages')} make deb 2>&1")
+        msg("Building Kadeploy packages",MSG_INFO)
+        sexec(session,"cd #{tmpdir} && PKG_DIR=#{File.join(tmpdir,'packages')} make deb 2>&1")
 
-      msg('Installing Kadeploy server/client',MSG_INFO)
-      if $version > 5
-        sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'packages','*.deb')}")
+        msg('Installing Kadeploy server/client',MSG_INFO)
+        if $version > 5
+          sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'packages','*.deb')}")
+        else
+          sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'*.deb')}")
+        end
       else
-        sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'*.deb')}")
+        msg("Building Kadeploy packages",MSG_INFO)
+        sexec(session,"cd #{tmpdir} && rake deb 2>&1")
+
+        msg('Installing Kadeploy server/client',MSG_INFO)
+        sexec(session,"dpkg --force-all -i build/*.deb")
       end
 
       msg('Remove the temporary directory',MSG_INFO)
