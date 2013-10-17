@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+
+if ! getent passwd deploy >/dev/null 2>&1
+then
+        useradd --system --create-home --base-dir /var/lib deploy
+fi
+
+touch /var/log/kadeploy3/output.log
+touch /var/log/kadeploy3/error.log
+touch /var/log/kadeploy3/httpd.log
+touch /var/log/kadeploy3/access.log
+
+chown -R root:deploy /var/log/kadeploy3
+chmod -R 770 /var/log/kadeploy3
+
+exit 0

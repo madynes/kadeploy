@@ -1,9 +1,8 @@
 #!/usr/bin/ruby -w
-
+$:.unshift(ENV['KADEPLOY3_LIBS']) if ENV['KADEPLOY3_LIBS']
 $kadeploy_logdir=ENV['KADEPLOY3_LOG_DIR']||'/var/log/kadeploy3'
 $kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3'
 $kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
-$kadeploy_libs=ENV['KADEPLOY3_LIBS']||'/usr/local/kadeploy3/lib'
 $kadeploy_logfiles = {}
 
 SSH_KEY=File.join($kadeploy_confdir,'keys/id_deploy')
@@ -13,8 +12,6 @@ LOGFILE_ERROR='error.log'
 RUNFILE_RELOAD='reload'
 
 AUTOCLEAN_PITCH = 300
-
-$:.unshift($kadeploy_libs)
 
 $autoclean = nil
 $kadeploy = nil

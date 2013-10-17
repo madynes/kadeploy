@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+
+%:
+	dh $@ --buildsystem=ruby --with ruby
+
+# Do not work because of buggy dh_installexamples
+#override_dh_installdocs:
+#	dh_installdocs --link-doc=kadeploy -O--buildsystem=ruby

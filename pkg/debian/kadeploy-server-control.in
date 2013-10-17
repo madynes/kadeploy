@@ -1,8 +1,0 @@
-Package: kadeploy-server
-Version: MAJOR_VERSION.MINOR_VERSIONRELEASE_VERSION
-Section: base
-Priority: optional
-Architecture: all
-Depends: libmysql-ruby1.9.1,ruby1.9.1,kadeploy-commonSUFFIX (= MAJOR_VERSION.MINOR_VERSIONRELEASE_VERSION),taktuk (>= 3.6)
-Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
-Description: Kadeploy: the cluster deployment tool - server part
