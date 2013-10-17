@@ -10,8 +10,6 @@ $killing = false
 $debug_mode = nil
 $debug_http = nil
 
-require 'kadeploy3/common'
-
 require 'thread'
 require 'uri'
 require 'optparse'
