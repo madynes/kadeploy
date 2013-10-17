@@ -13,6 +13,8 @@ DEPLOY_USER='deploy'
 
 # Directories
 D = {
+  :base => File.dirname(__FILE__),
+  :build => File.join(File.dirname(__FILE__),'build'),
   :lib => File.join(File.dirname(__FILE__),'lib'),
   :man => File.join(File.dirname(__FILE__),'man'),
   :doc => File.join(File.dirname(__FILE__),'doc'),
@@ -21,6 +23,7 @@ D = {
   :sbin => File.join(File.dirname(__FILE__),'sbin'),
   :conf => File.join(File.dirname(__FILE__),'conf'),
   :scripts => File.join(File.dirname(__FILE__),'scripts'),
+  :pkg => File.join(File.dirname(__FILE__),'pkg'),
   :addons => File.join(File.dirname(__FILE__),'addons'),
 }
 
@@ -116,6 +119,7 @@ DESC = {
   :kastat3 => 'allows to get statistics on the deployments',
 }
 
+
 ENV['KADEPLOY3_LIBS'] = D[:lib]
 
 def self.sources()
@@ -189,30 +193,13 @@ end
 task :default => [:package]
 
 desc "Generate source tgz package"
-task :package => [:man, :doc, :apidoc]
+task :package => [:build_clean, :man, :doc, :apidoc]
 Rake::PackageTask::new("kadeploy3",VERSION) do |p|
   p.need_tar_gz = true
-  p.package_dir = 'archives'
+  p.package_dir = D[:build]
   src = sources()
   p.package_files.include(*src)
 end
-
-desc "Builds a Debian package"
-task :deb do
-  sh 'dpkg-buildpackage -us -uc'
-end
-
-#desc "Create the build directory"
-#task :build_prepare do
-#  D[:build] = Dir.mktmpdir('kadeploy_build-',File.dirname(__FILE__))
-#  puts "Created build directory #{File.basename(D[:build])}"
-#end
-#
-#desc "Delete the build directory"
-#task :build_clean do
-#  FileUtils.remove_entry(D[:build])
-#  puts "Deleted build directory #{File.basename(D[:build])}"
-#end
 
 desc "Generate manpages"
 task :man => [:man_clean, :man_client, :man_server]
@@ -462,7 +449,48 @@ task :install_kastafior do
   installf(:bin,File.join(D[:addons],'kastafior','kastafior'))
 end
 
-desc "Launch the test-suite"
-task :test do
-  raise 'Not implemented !'
+desc "Clean the build directory"
+task :build_clean do
+  sh "rm -Rf #{D[:build]}"
 end
+
+desc "Builds a Debian package"
+task :deb => [:build_clean, :package] do
+  tmp = File.join(D[:build],"kadeploy")
+  sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}-#{VERSION}.orig.tar.gz"
+  pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
+  sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
+  sh "cp -R #{File.join(D[:pkg],'debian')} #{pkgdir}"
+
+  # Changing directory
+  Dir.chdir(File.join(D[:build],"kadeploy-#{VERSION}"))
+
+  # Generating changelog file
+  news = File.read(File.join(D[:base],'NEWS'))
+  news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
+  news = news.grep(/^\s*\*/).collect{|v| v.gsub(/^\s*\*\s*/,'')}
+  sh "dch --create -v #{VERSION} --package kadeploy --empty"
+  news.each do |n|
+    sh "dch -a \"#{n}\""
+  end
+
+  # Prepare the source directory
+  sh 'mkdir -p kadeploy-common/lib/kadeploy3'
+  sh 'mv lib/kadeploy3/common* kadeploy-common/lib/kadeploy3'
+  sh 'mkdir -p kadeploy-client/lib/kadeploy3'
+  sh 'mv lib/kadeploy3/client* kadeploy-client/lib/kadeploy3'
+  sh 'mv bin kadeploy-client/'
+  sh 'mkdir -p kadeploy-server/lib/kadeploy3'
+  sh 'mv lib/kadeploy3/server* kadeploy-server/lib/kadeploy3'
+  sh 'mv sbin kadeploy-server/'
+  sh 'rm -R lib'
+
+  # Building the package
+  #ENV['DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR'] = '1'
+  sh 'dpkg-buildpackage -us -uc'
+end
+
+#desc "Launch the test-suite"
+#task :test do
+#  raise 'Not implemented !'
+#end
