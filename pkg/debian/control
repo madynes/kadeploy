@@ -1,0 +1,14 @@
+Source: kadeploy3
+Section: base
+Priority: optional
+Build-Depends: debhelper (>= 8)
+Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Standards-Version: 3.9.3
+
+Package: kadeploy3
+Section: base
+Priority: optional
+Architecture: all
+Depends: libmysql-ruby1.9.1,ruby1.9.1,libopenssl-ruby1.9.1
+XS-Ruby-Versions: ruby1.9.1
+Description: Kadeploy: the cluster deployment tool - common part
