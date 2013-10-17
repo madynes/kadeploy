@@ -13,6 +13,8 @@ DEPLOY_USER='deploy'
 
 # Directories
 D = {
+  :base => File.dirname(__FILE__),
+  :build => File.join(File.dirname(__FILE__),'build'),
   :lib => File.join(File.dirname(__FILE__),'lib'),
   :man => File.join(File.dirname(__FILE__),'man'),
   :doc => File.join(File.dirname(__FILE__),'doc'),
@@ -21,6 +23,7 @@ D = {
   :sbin => File.join(File.dirname(__FILE__),'sbin'),
   :conf => File.join(File.dirname(__FILE__),'conf'),
   :scripts => File.join(File.dirname(__FILE__),'scripts'),
+  :pkg => File.join(File.dirname(__FILE__),'pkg'),
   :addons => File.join(File.dirname(__FILE__),'addons'),
 }
 
@@ -31,37 +34,37 @@ FILES = {
 
 INSTALL = {
   :man1 => {
-    :dir => '/usr/local/man/man1',
+    :dir => '/usr/share/man/man1',
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :man8 => {
-    :dir => '/usr/local/man/man8',
+    :dir => '/usr/share/man/man8',
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib => {
-    :dir => '/usr/local/kadeploy3/lib/kadeploy3',
+    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_client => {
-    :dir => '/usr/local/kadeploy3/lib/kadeploy3/client',
+    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','client'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_server => {
-    :dir => '/usr/local/kadeploy3/lib/kadeploy3/server',
+    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','server'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_common => {
-    :dir => '/usr/local/kadeploy3/lib/kadeploy3/common',
+    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','common'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
@@ -79,9 +82,9 @@ INSTALL = {
     :mode => '644',
   },
   :script => {
-    :dir => '/usr/local/kadeploy3/scripts',
+    :dir => '/usr/share/doc/kadeploy3/scripts',
     :user => 'root',
-    :group => DEPLOY_USER,
+    :group => 'root',
     :mode => '640',
   },
   :bin => {
@@ -115,6 +118,7 @@ DESC = {
   :kareboot3 => 'allows to perform several reboot operations on the nodes involved in a deployment',
   :kastat3 => 'allows to get statistics on the deployments',
 }
+
 
 ENV['KADEPLOY3_LIBS'] = D[:lib]
 
@@ -189,37 +193,20 @@ end
 task :default => [:package]
 
 desc "Generate source tgz package"
-task :package => [:man, :doc, :apidoc]
+task :package => [:build_clean, :man, :doc, :apidoc]
 Rake::PackageTask::new("kadeploy3",VERSION) do |p|
   p.need_tar_gz = true
-  p.package_dir = 'archives'
+  p.package_dir = D[:build]
   src = sources()
   p.package_files.include(*src)
 end
-
-desc "Builds a Debian package"
-task :deb do
-  sh 'dpkg-buildpackage -us -uc'
-end
-
-#desc "Create the build directory"
-#task :build_prepare do
-#  D[:build] = Dir.mktmpdir('kadeploy_build-',File.dirname(__FILE__))
-#  puts "Created build directory #{File.basename(D[:build])}"
-#end
-#
-#desc "Delete the build directory"
-#task :build_clean do
-#  FileUtils.remove_entry(D[:build])
-#  puts "Deleted build directory #{File.basename(D[:build])}"
-#end
 
 desc "Generate manpages"
 task :man => [:man_clean, :man_client, :man_server]
 task :man_clean => [:man_client_clean, :man_server_clean ]
 
 desc "Generate client manpages"
-task :man_client, [:kind] => :man_client_clean do
+task :man_client => :man_client_clean do
   raise "help2man is missing !" unless system('which help2man')
 
   Dir[File.join(D[:bin],'/*')].each do |bin|
@@ -235,7 +222,7 @@ task :man_client_clean do
 end
 
 desc "Generate server manpages"
-task :man_server, [:kind] => :man_server_clean do
+task :man_server => :man_server_clean do
   raise "help2man is missing !" unless system('which help2man')
 
   Dir[File.join(D[:sbin],'*')].each do |bin|
@@ -285,7 +272,7 @@ end
 
 desc "Clean the REST API documentation files"
 task :apidoc_clean do
-  sh "rm -f #{File.join(D[:doc],'*.html')}"
+  sh "rm -f #{File.join(D[:apidoc],'*.html')}"
 end
 
 desc "Install the client and the server"
@@ -370,7 +357,7 @@ desc "Install the server"
 task :install_server, [:distrib] => [:man_server, :install_common] do |f,args|
   args.with_defaults(:distrib => 'debian')
   raise "unknown distrib '#{args.distrib}'" unless %w{debian fedora}.include?(args.distrib)
-  raise "user #{DEPLOY_USER} not found: useradd #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
+  raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
 
   create_dir(:man8)
   Dir[File.join(D[:man],'*.8')].each do |f|
@@ -462,7 +449,52 @@ task :install_kastafior do
   installf(:bin,File.join(D[:addons],'kastafior','kastafior'))
 end
 
-desc "Launch the test-suite"
-task :test do
-  raise 'Not implemented !'
+desc "Clean the build directory"
+task :build_clean do
+  sh "rm -Rf #{D[:build]}"
 end
+
+desc "Clean everything"
+task :clean => [:man_clean, :doc_clean, :apidoc_clean, :build_clean]
+
+desc "Builds a Debian package"
+task :deb => [:build_clean, :package] do
+  tmp = File.join(D[:build],"kadeploy")
+  sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}-#{VERSION}.orig.tar.gz"
+  pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
+  sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
+  sh "cp -R #{File.join(D[:pkg],'debian')} #{pkgdir}"
+
+  # Changing directory
+  Dir.chdir(File.join(D[:build],"kadeploy-#{VERSION}"))
+
+  # Generating changelog file
+  news = File.read(File.join(D[:base],'NEWS'))
+  news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
+  news = news.grep(/^\s*\*/).collect{|v| v.gsub(/^\s*\*\s*/,'')}
+  sh "dch --create -v #{VERSION} --package kadeploy --empty"
+  news.each do |n|
+    sh "dch -a \"#{n}\""
+  end
+
+  # Prepare the source directory
+  sh 'mkdir -p kadeploy-common/lib/kadeploy3'
+  sh 'cp -R lib/kadeploy3/common* kadeploy-common/lib/kadeploy3'
+  sh 'mkdir -p kadeploy-client/lib/kadeploy3'
+  sh 'cp -R lib/kadeploy3/client* kadeploy-client/lib/kadeploy3'
+  sh 'cp -R bin kadeploy-client/'
+  sh 'mkdir -p kadeploy-server/lib/kadeploy3'
+  sh 'cp -R lib/kadeploy3/server* kadeploy-server/lib/kadeploy3'
+  sh 'cp addons/rc/debian/kadeploy3d debian/kadeploy-server.init'
+  sh "echo '#{VERSION}' > conf/version"
+  sh 'cp License.txt debian/copyright'
+
+  # Building the package
+  #ENV['DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR'] = '1'
+  sh 'dpkg-buildpackage -us -uc'
+end
+
+#desc "Launch the test-suite"
+#task :test do
+#  raise 'Not implemented !'
+#end

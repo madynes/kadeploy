@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    purge)
+        rm -Rf /var/log/kadeploy3
+    ;;
+esac
+
+exit 0
