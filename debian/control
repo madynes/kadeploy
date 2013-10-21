@@ -1,34 +1,26 @@
 Source: kadeploy
-Section: base
-Priority: optional
-Build-Depends: debhelper (>= 8),rake,help2man
+Section: admin
+Priority: extra
+Build-Depends: debhelper (>= 8), rake, help2man
 Maintainer: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
 XS-Ruby-Versions: ruby1.9.1
 Standards-Version: 3.9.3
 
 Package: kadeploy-common
-Section: base
-Priority: optional
 Architecture: all
-Depends: ${shlibs:Depends},${misc:Depends},libmysql-ruby1.9.1,ruby1.9.1,libopenssl-ruby1.9.1
+Depends: ${shlibs:Depends}, ${misc:Depends}, ruby-mysql
 Description: Kadeploy: the cluster deployment tool - common part
 XB-Ruby-Versions: ruby1.9.1
-X-DhRuby-Root: kadeploy-common
 
 Package: kadeploy-client
-Section: base
-Priority: optional
 Architecture: all
-Depends: ${shlibs:Depends},${misc:Depends},libmysql-ruby1.9.1,ruby1.9.1,libopenssl-ruby1.9.1,kadeploy-common
+Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version})
 Description: Kadeploy: the cluster deployment tool - client part
 XB-Ruby-Versions: ruby1.9.1
-X-DhRuby-Root: kadeploy-client
 
-Package: kadeploy-server
-Section: base
-Priority: optional
+Package: kadeploy
 Architecture: all
-Depends: ${shlibs:Depends},${misc:Depends},libmysql-ruby1.9.1,ruby1.9.1,libopenssl-ruby1.9.1,kadeploy-common
+Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version})
+Recommends: kadeploy-client (= ${binary:Version})
 Description: Kadeploy: the cluster deployment tool - server part
 XB-Ruby-Versions: ruby1.9.1
-X-DhRuby-Root: kadeploy-server
