@@ -42,7 +42,6 @@ class KadeployServer
   attr_reader :dest_port
   @reboot_window = nil
   @nodes_check_window = nil
-  @syslog_lock = nil
   @workflow_info_hash = nil
   @workflow_info_hash_lock = nil
   @reboot_info_hash = nil
@@ -70,7 +69,6 @@ class KadeployServer
     @reboot_window = reboot_window
     @nodes_check_window = nodes_check_window
     @deployments_table_lock = Mutex.new
-    @syslog_lock = Mutex.new
     @workflow_info_hash = Hash.new
     @workflow_info_hash_lock = Mutex.new
     @reboot_info_hash = Hash.new
@@ -540,7 +538,6 @@ class KadeployServer
       :user => exec_specific.true_user,
       :database => db,
       :client => client,
-      :syslock => @syslog_lock,
       :dblock => @deployments_table_lock,
       :config => config,
       :common => config.common,
@@ -578,7 +575,6 @@ class KadeployServer
           context[:deploy_id],
           context[:common].dbg_to_syslog,
           context[:common].dbg_to_syslog_level,
-          context[:syslock],
           ''
         )
 
@@ -933,7 +929,6 @@ class KadeployServer
       :reboot_id => reboot_id,
       :database => db,
       :client => client,
-      :syslock => @syslog_lock,
       :dblock => @deployments_table_lock,
       :config => config,
       :common => config.common,
@@ -1156,8 +1151,7 @@ class KadeployServer
     end
     output = Debug::OutputControl.new(vl,
       exec_specific.debug, client, exec_specific.true_user, -1,
-      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level,
-      @syslog_lock
+      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level
     )
 
     begin
@@ -1296,7 +1290,7 @@ class KadeployServer
       exec_specific.debug, nil,
       exec_specific.true_user, -1,
       @config.common.dbg_to_syslog,
-      @config.common.dbg_to_syslog_level, @syslog_lock
+      @config.common.dbg_to_syslog_level
     )
     rid, microthreads = nil
     begin
@@ -2919,7 +2913,6 @@ class KadeployServer
       :power_id => power_id,
       :database => db,
       :client => client,
-      :syslock => @syslog_lock,
       :dblock => @deployments_table_lock,
       :config => config,
       :common => config.common,
@@ -3013,8 +3006,7 @@ class KadeployServer
     end
     output = Debug::OutputControl.new(vl,
       exec_specific.debug, client, exec_specific.true_user, -1,
-      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level,
-      @syslog_lock
+      @config.common.dbg_to_syslog, @config.common.dbg_to_syslog_level
     )
 
     begin
@@ -3115,7 +3107,7 @@ class KadeployServer
       exec_specific.debug, nil,
       exec_specific.true_user, -1,
       @config.common.dbg_to_syslog,
-      @config.common.dbg_to_syslog_level, @syslog_lock
+      @config.common.dbg_to_syslog_level
     )
     rid, microthreads = nil
     begin

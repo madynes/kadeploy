@@ -2041,7 +2041,6 @@ class CustomMicrostep < Microstep
       context[:deploy_id]||context[:reboot_id],
       context[:common].dbg_to_syslog,
       context[:common].dbg_to_syslog_level,
-      context[:syslock],
       context[:cluster].prefix
     )
     super('CUSTOM', 0, 0, nodes, 0, nil, output, context, [])

@@ -38,7 +38,6 @@ class Workflow < Automata::TaskManager
       context[:deploy_id],
       context[:common].dbg_to_syslog,
       context[:common].dbg_to_syslog_level,
-      context[:syslock],
       context[:cluster].prefix
     )
     super(nodeset,context)
@@ -54,8 +53,7 @@ class Workflow < Automata::TaskManager
       context[:deploy_id],
       Time.now,
       "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}",
-      context[:execution].load_env_kind == "file",
-      context[:syslock]
+      context[:execution].load_env_kind == "file"
     )
     @start_time = nil
   end

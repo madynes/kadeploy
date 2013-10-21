@@ -7,6 +7,13 @@
 require 'syslog'
 
 module Debug
+  @@syslog = Syslog.open("kadeploy3", Syslog::LOG_PID, Syslog::LOG_DAEMON | Syslog::LOG_LOCAL3)
+
+  def Debug::syslog(lvl,msg)
+    @@syslog.open("kadeploy3", Syslog::LOG_PID, Syslog::LOG_DAEMON | Syslog::LOG_LOCAL3) unless @@syslog.opened?
+    @@syslog.log(lvl,msg)
+  end
+
   # Print an error message on a local client
   #
   # Arguments
@@ -54,7 +61,6 @@ module Debug
     @deploy_id = nil
     @syslog = nil
     @syslog_dbg_level = nil
-    @syslog_lock = nil
     @client_output = nil
     @cluster_id = nil
 
@@ -68,10 +74,9 @@ module Debug
     # * deploy_id: id of the deployment
     # * syslog: boolean used to know if syslog must be used or not
     # * syslog_dbg_level: level of debug required in syslog
-    # * syslog_lock: mutex on Syslog
     # Output
     # * nothing
-    def initialize(verbose_level, debug, client, user, deploy_id, syslog, syslog_dbg_level, syslog_lock, cluster_id=nil)
+    def initialize(verbose_level, debug, client, user, deploy_id, syslog, syslog_dbg_level, cluster_id=nil)
       @verbose_level = verbose_level
       @debug = debug
       @client = client
@@ -79,7 +84,6 @@ module Debug
       @deploy_id = deploy_id
       @syslog = syslog
       @syslog_dbg_level = syslog_dbg_level
-      @syslog_lock = syslog_lock
       @client_output = (client != nil)
       @cluster_id = cluster_id
     end
@@ -92,7 +96,6 @@ module Debug
       @deploy_id = nil
       @syslog = nil
       @syslog_dbg_level = nil
-      @syslog_lock = nil
       @client_output = nil
       @cluster_id = nil
     end
@@ -138,16 +141,7 @@ module Debug
       end
       server_str = "#{@deploy_id}|#{@user} -> #{msg}"
       puts server_str
-      if (@syslog && (l <= @syslog_dbg_level)) then
-        @syslog_lock.synchronize do
-          while Syslog.opened?
-            sleep 0.2
-          end
-          sl = Syslog.open("Kadeploy-dbg")
-          sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-          sl.close
-        end
-      end
+      Debug::syslog(Syslog::LOG_INFO,server_str) if (@syslog && (l <= @syslog_dbg_level))
     end
 
     # Print the debug output of a command
@@ -192,16 +186,7 @@ module Debug
     def debug_server(msg)
       server_str = "#{@deploy_id}|#{@user} -> #{msg}"
       puts server_str
-      if @syslog then
-        @syslog_lock.synchronize do
-          while Syslog.opened?
-            sleep 0.2
-          end
-          sl = Syslog.open("Kadeploy-dbg")
-          sl.log(Syslog::LOG_NOTICE, "#{server_str}")
-          sl.close
-        end
-      end
+      Debug::syslog(Syslog::LOG_DEBUG,server_str)
     end
 
     # Print the debug output of a command
@@ -243,7 +228,6 @@ module Debug
     @nodes = nil
     @config = nil
     @db = nil
-    @syslog_lock = nil
 
     # Constructor of Logger
     #
@@ -256,24 +240,21 @@ module Debug
     # * start: start time
     # * env: environment name
     # * anonymous_env: anonymous environment or not
-    # * syslog_lock: mutex on Syslog
     # Output
     # * nothing
-    def initialize(node_set, config, db, user, deploy_id, start, env, anonymous_env, syslog_lock)
+    def initialize(node_set, config, db, user, deploy_id, start, env, anonymous_env)
       @nodes = Hash.new
       node_set.make_array_of_hostname.each { |n|
         @nodes[n] = create_node_infos(user, deploy_id, start, env, anonymous_env)
       }
       @config = config
       @db = db
-      @syslog_lock = syslog_lock
     end
 
     def free()
       @nodes = nil
       @config = nil
       @db = nil
-      @syslog_lock = nil
     end
 
     # Create an hashtable that contains all the information to log
@@ -368,7 +349,7 @@ module Debug
     # Arguments
     # * nothing
     # Output
-    # * nothing     
+    # * nothing
     def dump
       dump_to_file if (@config.common.log_to_file != "")
       dump_to_syslog if (@config.common.log_to_syslog)
@@ -382,24 +363,17 @@ module Debug
     # Output
     # * nothing
     def dump_to_syslog
-      @syslog_lock.synchronize do
-        while Syslog.opened?
-          sleep 0.2
-        end
-        sl = Syslog.open("Kadeploy-log")
-        @nodes.each_pair { |hostname, node_infos|
-          str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
-          str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
-          str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
-          str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
-          str += node_infos["start"].to_i.to_s + ","
-          str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
-          str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"]
-          str += node_infos["success"].to_s + "," + node_infos["error"].to_s
-          sl.log(Syslog::LOG_NOTICE, "#{str}")
-        }
-        sl.close
-      end # synchronize
+      @nodes.each_pair { |hostname, node_infos|
+        str = node_infos["deploy_id"].to_s + "," + hostname + "," + node_infos["user"] + ","
+        str += node_infos["step1"] + "," + node_infos["step2"] + "," + node_infos["step3"]  + ","
+        str += node_infos["timeout_step1"].to_s + "," + node_infos["timeout_step2"].to_s + "," + node_infos["timeout_step3"].to_s + ","
+        str += node_infos["retry_step1"].to_s + "," + node_infos["retry_step2"].to_s + "," +  node_infos["retry_step3"].to_s + ","
+        str += node_infos["start"].to_i.to_s + ","
+        str += node_infos["step1_duration"].to_s + "," + node_infos["step2_duration"].to_s + "," + node_infos["step3_duration"].to_s + ","
+        str += node_infos["env"] + "," + node_infos["anonymous_env"].to_s + "," + node_infos["md5"]
+        str += node_infos["success"].to_s + "," + node_infos["error"].to_s
+        Debug::syslog(Syslog::LOG_NOTICE,str)
+      }
     end
 
     # Dump the logged information to the database
