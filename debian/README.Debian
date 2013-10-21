@@ -1,0 +1,10 @@
+Kadeploy for Debian
+===================
+
+Installation & Configuration
+----------------------------
+After installing the kadeploy debian packages,  you need to follow the instructions in the subsection Installation of the Kadeploy-VERSION.pdf file.
+
+To get more information about the configuration of the server and the client, please refer to the subsections "Server side configuration" and "Client side configuration" of the Kadeploy-VERSION.pdf file.
+
+You'll find the Kadeploy-VERSION.pdf file in /usr/share/doc/kadeploy-common/Kadeploy-VERSION.pdf.
