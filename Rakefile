@@ -465,7 +465,7 @@ task :build => [:build_clean, :man, :doc, :apidoc] do
   Rake::Task[:clean].invoke
   puts
   puts "Tarball created in build/."
-  puts "You probably want to: git tag #{VERSION}"
+  puts "You probably want to: git tag v#{VERSION}"
 end
 
 desc "Generate debian changelog file"
