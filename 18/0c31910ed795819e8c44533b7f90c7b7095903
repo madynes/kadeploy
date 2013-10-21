@@ -1,0 +1,8 @@
+Change-Id: I180c31910ed795819e8c44533b7f90c7b7095903
+Code-Review+2: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Verified+1: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-by: Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Submitted-at: Mon, 21 Oct 2013 10:40:47 +0200
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1369
+Project: kadeploy3
+Branch: refs/heads/debian-stable
