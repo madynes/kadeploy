@@ -447,15 +447,19 @@ end
 desc "Clean everything"
 task :clean => [:man_clean, :doc_clean, :apidoc_clean]
 
-desc "Generate source dir and a tgz package"
-task :build => [:build_clean, :man, :doc, :apidoc] do
+desc "Generate source dir and a tgz package, can be of kind classical or deb, usage: 'rake build[deb]', default: classical"
+task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
+  args.with_defaults(:kind => 'classical')
+  sh "echo '#{VERSION}' > #{File.join(D[:conf],'version')}"
   Rake::PackageTask::new("kadeploy3",VERSION) do |p|
     p.need_tar_gz = true
     p.package_dir = D[:build]
     src = sources()
     p.package_files.include(*src)
+    p.package_files.include('conf/version')
   end
   Rake::Task[:package].invoke
+  sh "rm #{File.join(D[:conf],'version')}"
   Rake::Task[:clean].reenable
   Rake::Task[:doc_clean].reenable
   Rake::Task[:apidoc_clean].reenable
@@ -463,14 +467,22 @@ task :build => [:build_clean, :man, :doc, :apidoc] do
   Rake::Task[:man_client_clean].reenable
   Rake::Task[:man_server_clean].reenable
   Rake::Task[:clean].invoke
-  puts "\nTarball created in #{D[:build]}"
-  puts "You probably want to:"
-  puts "  git tag v#{VERSION}"
-  puts "  git push origin HEAD:refs/tags/v#{VERSION}"
+
+  if args.kind == 'deb'
+    tmp = File.join(D[:build],"kadeploy")
+    sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
+    pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
+    sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
+
+    puts "\nTarball created in #{D[:build]}"
+    puts "You probably want to:"
+    puts "  git tag v#{VERSION}"
+    puts "  git push origin HEAD:refs/tags/v#{VERSION}"
+  end
 end
 
 desc "Generate debian changelog file"
-task :deb_init_changelog, [:dir] do |f,args|
+task :deb_changelog, [:dir] do |f,args|
   args.with_defaults(:dir => D[:pkg])
   news = File.read(File.join(D[:base],'NEWS'))
   news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
@@ -479,35 +491,6 @@ task :deb_init_changelog, [:dir] do |f,args|
   news.each do |n|
     sh "dch -a \"#{n}\" --changelog #{File.join(args.dir,'changelog')}"
   end
-end
-
-desc "Builds archives for the Debian package"
-task :build_deb => [:clean, :build_clean, :build] do
-  tmp = File.join(D[:build],"kadeploy")
-  sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
-  pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
-  sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
-
-  Rake::Task[:clean].reenable
-  Rake::Task[:doc_clean].reenable
-  Rake::Task[:apidoc_clean].reenable
-  Rake::Task[:man_clean].reenable
-  Rake::Task[:man_client_clean].reenable
-  Rake::Task[:man_server_clean].reenable
-  Rake::Task[:clean].invoke
-end
-
-
-desc "Builds a Debian package"
-task :deb => [:build_deb] do
-  sh "cp -R #{File.join(D[:pkg],'debian')} #{pkgdir}"
-
-  # Changing directory
-  Dir.chdir(File.join(D[:build],"kadeploy-#{VERSION}"))
-
-  # Building the package
-  #ENV['DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR'] = '1'
-  sh 'dpkg-buildpackage -us -uc'
 end
 
 #desc "Launch the test-suite"
