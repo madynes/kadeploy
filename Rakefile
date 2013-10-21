@@ -463,6 +463,10 @@ task :build => [:build_clean, :man, :doc, :apidoc] do
   Rake::Task[:man_client_clean].reenable
   Rake::Task[:man_server_clean].reenable
   Rake::Task[:clean].invoke
+  puts "\nTarball created in #{D[:build]}"
+  puts "You probably want to:"
+  puts "  git tag v#{VERSION}"
+  puts "  git push origin HEAD:refs/tags/v#{VERSION}"
 end
 
 desc "Generate debian changelog file"
