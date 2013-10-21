@@ -1,6 +1,0 @@
-sbin/* /usr/sbin
-conf/server_conf.yml /etc/kadeploy3
-conf/clusters.yml /etc/kadeploy3
-conf/cmd.yml /etc/kadeploy3
-conf/cluster-*.yml /etc/kadeploy3
-conf/version /etc/kadeploy3
