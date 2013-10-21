@@ -1,0 +1,5 @@
+kadeploy (3.2.0~alpha1) unstable; urgency=low
+
+  * Initial release. (Closes: #XXXXXX)
+
+ -- Lucas Nussbaum <lucas@debian.org>  Mon, 21 Oct 2013 13:24:17 +0200
