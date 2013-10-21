@@ -1,0 +1,96 @@
+#!/usr/bin/ruby -w
+require 'fileutils'
+
+stage = ARGV[0]
+suffix = ENV['KADEPLOY_DEVEL_PKG']
+pkgs = ['kadeploy-common', 'kadeploy', 'kadeploy-client']
+
+if stage == "clean"
+  if File::exists?('debian/control.devpkg')
+    FileUtils::mv('debian/control.devpkg', 'debian/control')
+  end
+  exit(0)
+end
+
+if stage != 'build'
+  puts "Invalid stage."
+  exit(1)
+end
+
+# update debian/control
+FileUtils::cp('debian/control', 'debian/control.devpkg')
+s = IO::read('debian/control').gsub(/^Package: (.*)$/, "Package: \\1-#{suffix}")
+File::open('debian/control', 'w') { |fd| fd.puts s }
+
+# update debian/files
+s = IO::read('debian/files')
+pkgs.each do |pkg|
+  s.gsub!(/^#{pkg}_/, "#{pkg}-#{suffix}_")
+end
+File::open('debian/files', 'w') { |fd| fd.puts s }
+
+# mv pkg dirs
+pkgs.each do |pkg|
+  FileUtils::mv("debian/#{pkg}", "debian/#{pkg}-#{suffix}")
+end
+
+# fix DEBIAN/control
+pkgs.each do |pkg|
+  pkgsuffix = "#{pkg}-#{suffix}"
+  s = IO::read("debian/#{pkgsuffix}/DEBIAN/control")
+  s.gsub!(/^(Package: .*)$/, "\\1-#{suffix}")
+  pkgs.each do |pkg2|
+    s.gsub!(/^(Depends: .* )#{pkg2} /, "\\1 #{pkg2}-#{suffix} ")
+    s.gsub!(/^(Recommends: .* )#{pkg2} /, "\\1 #{pkg2}-#{suffix} ")
+  end
+  File::open("debian/#{pkgsuffix}/DEBIAN/control", 'w') { |fd| fd.puts s }
+end
+
+# modify other meta data files
+PATTERNS = {
+  "/etc/kadeploy3/" => "/etc/kadeploy3-#{suffix}/",
+  "/etc/init.d/kadeploy" => "/etc/init.d/kadeploy-#{suffix}",
+  "/var/log/kadeploy3" => "/var/log/kadeploy3-#{suffix}",
+  "update-rc.d kadeploy defaults" => "update-rc.d kadeploy-#{suffix} defaults",
+  "invoke-rc.d kadeploy start" => "invoke-rc.d kadeploy-#{suffix} start"
+}
+
+p Dir::glob("debian/{#{pkgs.map { |pkg| "#{pkg}-#{suffix}"}.join(',')}}/DEBIAN/{conffiles,postinst,postrm,prerm}")
+Dir::glob("debian/{#{pkgs.map { |pkg| "#{pkg}-#{suffix}"}.join(',')}}/DEBIAN/{conffiles,postinst,postrm,prerm}").each do |f|
+  s = IO::read(f)
+  PATTERNS.each_pair do |k, v|
+    s.gsub!(k, v)
+  end
+  File::open(f, 'w') { |fd| fd.puts s }
+end
+
+# Move stuff around
+PATTERNS = {
+  "/etc/kadeploy3" => "/etc/kadeploy3-#{suffix}",
+  "/etc/init.d/kadeploy" => "/etc/init.d/kadeploy-#{suffix}",
+  "/var/log/kadeploy3" => "/var/log/kadeploy3-#{suffix}",
+  "/usr/share/doc/kadeploy-client" => "/usr/share/doc/kadeploy-client-#{suffix}",
+  "/usr/share/doc/kadeploy" => "/usr/share/doc/kadeploy-#{suffix}",
+  "/usr/share/doc/kadeploy-common" => "/usr/share/doc/kadeploy-common-#{suffix}",
+  "/usr/lib/ruby/vendor_ruby/kadeploy3" => "/usr/lib/ruby/vendor_ruby/kadeploy3-#{suffix}"
+}
+
+BINARIES = ['kastat3', 'kapower3', 'kaenv3', 'kaconsole3', 'kareboot3', 'kanodes3', 'kadeploy3', 'kadeploy3d', 'karights3']
+BINARIES.each do |b|
+  PATTERNS["/usr/share/man/man1/#{b}.1.gz"] = "/usr/share/man/man1/#{b}-#{suffix}.1.gz"
+  PATTERNS["/usr/share/man/man8/#{b}.8.gz"] = "/usr/share/man/man8/#{b}-#{suffix}.8.gz"
+  PATTERNS["/usr/bin/#{b}"] = "/usr/bin/#{b}-#{suffix}"
+  PATTERNS["/usr/sbin/#{b}"] = "/usr/sbin/#{b}-#{suffix}"
+end
+pkgs.map { |pkg| "#{pkg}-#{suffix}"}.each do |pkg|
+  PATTERNS.each_pair do |k, v|
+    if File::exists?("debian/#{pkg}/#{k}")
+      FileUtils::mv("debian/#{pkg}/#{k}", "debian/#{pkg}/#{v}")
+    end
+  end
+end
+
+# FIXME update require paths.
+
+system("dh_md5sums") or raise
+system("dh_builddeb") or raise
