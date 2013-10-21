@@ -14,8 +14,16 @@ override_dh_auto_install:
 	# gem2deb install binaries to debian/kadeploy-common. we move them manually
 	# to the correct binary package
 	mv debian/kadeploy-common/usr/bin/* debian/kadeploy-client/usr/bin/
-	
 
-# Do not work because of buggy dh_installexamples
-#override_dh_installdocs:
-#	dh_installdocs --link-doc=kadeploy -O--buildsystem=ruby
+# generation of custom packages with a suffix
+ifdef KADEPLOY_DEVEL_PKG
+override_dh_md5sums:
+	debian/generate-devel-package build
+
+override_dh_builddeb:
+	# will be done by generate-devel-package. yes, eeeek!
+
+override_dh_clean:
+	dh_clean
+	debian/generate-devel-package clean
+endif
