@@ -1,6 +1,23 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 
+clean:
+	mkdir -p kadeploy-common/lib/kadeploy3
+	mkdir -p kadeploy-client/lib/kadeploy3
+	mkdir -p kadeploy-server/lib/kadeploy3
+	dh clean --buildsystem=ruby --with ruby
+build:
+	mkdir -p kadeploy-common/lib/kadeploy3
+	cp -R lib/kadeploy3/common* kadeploy-common/lib/kadeploy3
+	mkdir -p kadeploy-client/lib/kadeploy3
+	cp -R lib/kadeploy3/client* kadeploy-client/lib/kadeploy3
+	cp -R bin kadeploy-client
+	mkdir -p kadeploy-server/lib/kadeploy3
+	cp -R lib/kadeploy3/server* kadeploy-server/lib/kadeploy3
+	cp addons/rc/debian/kadeploy3d debian/kadeploy-server.init
+	cp License.txt debian/copyright
+	echo $(shell cat major_version).$(shell cat minor_version).$(shell cat release_version) > conf/version
+	dh build --buildsystem=ruby --with ruby
 %:
 	dh $@ --buildsystem=ruby --with ruby
 

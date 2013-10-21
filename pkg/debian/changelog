@@ -1,0 +1,20 @@
+kadeploy (3.2.0.alpha1) UNRELEASED; urgency=low
+
+  * Environments files in old description format are no longer supported
+  * It's now possible to export files to the server a secured way
+  * Environment's demolishing tag related commands now refers to
+    destructive tag
+  * It's now possible to interact with the server using a REST API (see
+    the Network API documentation)
+  * Client/Server interactions are now performed using a REST API
+    instead of DRb
+  * The kadeploy service now run an HTTP server: ruby/Webrick (see doc
+    sec/5.1.4)
+  * kadeploy3d launcher has be rewritten in ruby, new options available
+  * Clients has been rewritten in single-file ruby scripts
+  * General configuration (doc sec/2.1)
+  * Client configuration file (doc sec/3)
+  * The Kadeploy3 database have to be updated with the script db/update-
+    3.2.sql
+
+ -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Mon, 21 Oct 2013 12:32:33 +0200

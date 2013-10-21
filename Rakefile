@@ -465,42 +465,25 @@ task :build => [:build_clean, :man, :doc, :apidoc] do
   Rake::Task[:clean].invoke
 end
 
+desc "Generate debian changelog file"
+task :deb_init_changelog, [:dir] do |f,args|
+  args.with_defaults(:dir => D[:pkg])
+  news = File.read(File.join(D[:base],'NEWS'))
+  news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
+  news = news.grep(/^\s*\*/).collect{|v| v.gsub(/^\s*\*\s*/,'')}
+  sh "dch --create -v #{VERSION} --package kadeploy --empty --changelog #{File.join(args.dir,'changelog')}"
+  news.each do |n|
+    sh "dch -a \"#{n}\" --changelog #{File.join(args.dir,'changelog')}"
+  end
+end
 
-desc "Builds a Debian package"
-task :deb => [:clean, :build_clean, :build] do
+desc "Builds archives for the Debian package"
+task :build_deb => [:clean, :build_clean, :build] do
   tmp = File.join(D[:build],"kadeploy")
   sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
   pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
   sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
   sh "cp -R #{File.join(D[:pkg],'debian')} #{pkgdir}"
-
-  # Changing directory
-  Dir.chdir(File.join(D[:build],"kadeploy-#{VERSION}"))
-
-  # Generating changelog file
-  news = File.read(File.join(D[:base],'NEWS'))
-  news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
-  news = news.grep(/^\s*\*/).collect{|v| v.gsub(/^\s*\*\s*/,'')}
-  sh "dch --create -v #{VERSION} --package kadeploy --empty"
-  news.each do |n|
-    sh "dch -a \"#{n}\""
-  end
-
-  # Prepare the source directory
-  sh 'mkdir -p kadeploy-common/lib/kadeploy3'
-  sh 'cp -R lib/kadeploy3/common* kadeploy-common/lib/kadeploy3'
-  sh 'mkdir -p kadeploy-client/lib/kadeploy3'
-  sh 'cp -R lib/kadeploy3/client* kadeploy-client/lib/kadeploy3'
-  sh 'cp -R bin kadeploy-client/'
-  sh 'mkdir -p kadeploy-server/lib/kadeploy3'
-  sh 'cp -R lib/kadeploy3/server* kadeploy-server/lib/kadeploy3'
-  sh 'cp addons/rc/debian/kadeploy3d debian/kadeploy-server.init'
-  sh "echo '#{VERSION}' > conf/version"
-  sh 'cp License.txt debian/copyright'
-
-  # Building the package
-  #ENV['DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR'] = '1'
-  sh 'dpkg-buildpackage -us -uc'
 
   Rake::Task[:clean].reenable
   Rake::Task[:doc_clean].reenable
@@ -509,6 +492,17 @@ task :deb => [:clean, :build_clean, :build] do
   Rake::Task[:man_client_clean].reenable
   Rake::Task[:man_server_clean].reenable
   Rake::Task[:clean].invoke
+end
+
+
+desc "Builds a Debian package"
+task :deb => [:build_deb] do
+  # Changing directory
+  Dir.chdir(File.join(D[:build],"kadeploy-#{VERSION}"))
+
+  # Building the package
+  #ENV['DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR'] = '1'
+  sh 'dpkg-buildpackage -us -uc'
 end
 
 #desc "Launch the test-suite"
