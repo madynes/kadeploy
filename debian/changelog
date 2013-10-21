@@ -1,5 +1,11 @@
 kadeploy (3.2.0~alpha1) unstable; urgency=low
 
   * Initial release. (Closes: #XXXXXX)
+  * TODO:
+    - do we really want to drop ruby1.8 support in 3.2?
+    - add README.Debian that describes post-install setup
+    - test ; additional dependencies?
+    - lintian warnings and errors
+    - generation of -dev packages
 
  -- Lucas Nussbaum <lucas@debian.org>  Mon, 21 Oct 2013 13:24:17 +0200
