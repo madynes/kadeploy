@@ -231,8 +231,8 @@ desc "Generate the documentation"
 task :doc => :doc_clean do
   raise "help2man is missing !" unless system('which help2man')
 
-  Dir.mktmpdir('kadeploy_build-',File.dirname(__FILE__)) do |dir|
-    Tempfile.open('Kadeploy.tex.complete',File.dirname(__FILE__)) do |f|
+  Dir.mktmpdir('kadeploy_build-') do |dir|
+    Tempfile.open('Kadeploy.tex.complete') do |f|
       # Replace the __HELP_..._HELP__ pattern by the --help of the binaries
       content = File.read("#{D[:doc]}/Kadeploy.tex")
       Dir[File.join(D[:bin],'*'),File.join(D[:sbin],'*')].each do |bin|
@@ -448,8 +448,9 @@ desc "Clean everything"
 task :clean => [:man_clean, :doc_clean, :apidoc_clean]
 
 desc "Generate source dir and a tgz package, can be of kind classical or deb, usage: 'rake build[deb]', default: classical"
-task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
+task :build, [:kind,:dir] => [:build_clean, :man, :doc, :apidoc] do |f,args|
   args.with_defaults(:kind => 'classical')
+  D[:build] = File.expand_path(args.dir) if args.dir
   sh "echo '#{VERSION}' > #{File.join(D[:conf],'version')}"
   Rake::PackageTask::new("kadeploy3",VERSION) do |p|
     p.need_tar_gz = true
