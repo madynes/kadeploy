@@ -27,7 +27,7 @@ DEB_REPOSITORY    = 'http://apt.grid5000.fr/kadeploy'
 GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPOSITORY = 'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
 DEPENDANCIES      = ['libmysql-ruby','ruby']
-BUILD_DEPENDANCIES = ['git','rake']
+BUILD_DEPENDANCIES = ['git']
 
 if g5k?
   G5K_API         = 'https://api.grid5000.fr/2.0'
@@ -66,7 +66,12 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 # Update path for devel
 UPDATE_PATH_CHECK = {
   'common' => {
-    'lib' => 'common.rb',
+    'src' => 'kadeploy_server.rb',
+    'lib' => 'environment.rb',
+    'libs' => 'common.rb',
+    'common_lib' => 'environment.rb',
+    'client_lib' => 'client.rb',
+    'server_lib' => 'automata.rb',
   },
   'client' => {
     'bin' => '/usr/bin/kadeploy3',
@@ -74,7 +79,7 @@ UPDATE_PATH_CHECK = {
   },
   'server' => {
     'sbin' => '/usr/sbin/kadeploy3d',
-    'init' => '/etc/init.d/kadeploy3d',
+    'init' => '/etc/init.d/kadeploy.*',
     'lib' => 'automata.rb',
   }
 }
@@ -1298,6 +1303,12 @@ CFG_SQL_PASS_ROOT = 'kadeploy'
 CFG_SQL_PASS_USER = "#{CFG_KADEPLOY_USER}-pass"
 
 def cfg_sql()
+  wid_field = nil
+  if $version >= 8
+    wid_field = 'wid'
+  else
+    wid_field = 'deploy_id'
+  end
   # Cleaning up
   "DROP DATABASE IF EXISTS #{CFG_SQL_DB};\n"\
   + # Kadeploy database
@@ -1332,7 +1343,7 @@ def cfg_sql()
   ") ENGINE=MyISAM  DEFAULT CHARSET=utf8;\n"\
   + # table log
   "CREATE TABLE IF NOT EXISTS #{CFG_SQL_DB}.`log` (\n"\
-  "  `wid` varchar(41) NOT NULL,\n"\
+  "  `#{wid_field}` varchar(41) NOT NULL,\n"\
   "  `hostname` varchar(256) NOT NULL,\n"\
   "  `step1` varchar(45) NOT NULL,\n"\
   "  `step2` varchar(45) NOT NULL,\n"\
@@ -1767,6 +1778,25 @@ def apt_remove(session,packages,server=nil)
   apt_cmd(session,'apt-get','remove',['q','y','force-yes','purge'],server,packages)
 end
 
+def kapkg(kind)
+  case kind
+  when 'common'
+    'kadeploy-common'
+  when 'client'
+    'kadeploy-client'
+  when 'server'
+    if $version >= 8
+      'kadeploy'
+    else
+      'kadeploy-server'
+    end
+  else
+    msg("invalid kind #{kind}",MSG_ERROR,true)
+  end
+end
+
+
+
 def get_open_port()
   tmp=`netstat -l -n`
   usedports=[]
@@ -1818,13 +1848,13 @@ end
 
 def kadeploy_update(session,mountpath)
   # Check if debian package is installed
-  ['common','server','client'].each do |pkg|
-    tmp = sexec(session,"dpkg -s kadeploy-#{pkg}")
+  [kapkg('common'),kapkg('client'),kapkg('server')].each do |pkg|
+    tmp = sexec(session,"dpkg -s #{pkg}")
     msg('dpkg error',MSG_ERROR,true) if !tmp or tmp.empty?
     tmp.each do |line|
       if line =~ /^Status: .* ([^ ]+)$/
         unless Regexp.last_match(1) == 'installed'
-          msg("debian package 'kadeploy-#{pkg}' is not installed",MSG_ERROR,true)
+          msg("debian package '#{pkg}' is not installed",MSG_ERROR,true)
         end
       end
     end
@@ -1836,8 +1866,8 @@ def kadeploy_update(session,mountpath)
     keys.each do |key,localpath|
       rlocalpath = File.join(mountpath,localpath)
       msg("Updating '#{key}' files",MSG_INFO)
-      remotepaths = sexec(session,"dpkg -L kadeploy-#{pkg} | grep '#{UPDATE_PATH_CHECK[pkg][key]}$' | tail -n 1")
-      msg("file '#{UPDATE_PATH_CHECK[pkg][key]}' not found in kadeploy-#{pkg} package",MSG_ERROR,true) if !remotepaths or remotepaths.empty?
+      remotepaths = sexec(session,"dpkg -L #{kapkg(pkg)} | grep '#{UPDATE_PATH_CHECK[pkg][key]}$' | tail -n 1")
+      msg("file '#{UPDATE_PATH_CHECK[pkg][key]}' not found in #{kapkg(pkg)} package",MSG_ERROR,true) if !remotepaths or remotepaths.empty?
       remotepaths = [remotepaths] if remotepaths.is_a?(String)
       remotepaths.each do |remotepath|
         remotepath=File.dirname(remotepath)
@@ -3341,16 +3371,16 @@ sshgw.ssh(servername,'root') do |session|
 
     if options[:git] or options[:gerrit]
       msg('Cleaning previous Kadeploy install',MSG_INFO)
-      sexec(session,"dpkg --force-all -r kadeploy-common kadeploy-server kadeploy-client")
+      sexec(session,"dpkg --force-all -r #{kapkg('common')} #{kapkg('client')} #{kapkg('server')}")
 
       msg('Installing Kadeploy dependancies',MSG_INFO)
-      #apt_build_dep(session,['kadeploy-server','kadeploy-client'],server)
+      #apt_build_dep(session,[kapkg('server'),kapkg('client')],server)
       apt_install(session,DEPENDANCIES,server)
 
       msg('Installing scm and build packages',MSG_INFO)
       build_extra = nil
       if $version >= 8
-        build_extra = [ 'help2man' ]
+        build_extra = [ 'debhelper','gem2deb','help2man','rake','texlive-latex-base','texlive-latex-recommended','texlive-latex-extra','git-buildpackage' ]
       else
         build_extra = [ 'docbook2x' ]
       end
@@ -3401,10 +3431,22 @@ sshgw.ssh(servername,'root') do |session|
         end
       else
         msg("Building Kadeploy packages",MSG_INFO)
-        sexec(session,"cd #{tmpdir} && rake deb 2>&1")
+        sexec(session,"cd #{tmpdir} && #{env_vars} rake deb 2>&1")
 
         msg('Installing Kadeploy server/client',MSG_INFO)
-        sexec(session,"dpkg --force-all -i build/*.deb")
+        sexec(session,"cd #{tmpdir} && dpkg --force-all -i ../*.deb")
+
+        msg("Copying the deploy ssh key pair",MSG_INFO)
+        sexec(session,"mkdir -p #{CFG_KADEPLOY_SSHKEY_PATH}")
+        sexec(session,"cp -f #{File.join(tmpdir,'addons','ssh','id_deploy*')} #{CFG_KADEPLOY_SSHKEY_PATH}")
+        sexec(session,"chmod 600 #{File.join(CFG_KADEPLOY_SSHKEY_PATH,'id_deploy')}")
+
+        msg("Copying admin scripts",MSG_INFO)
+        sexec(session,"cp -f #{File.join(tmpdir,'scripts','**','*')} #{CFG_KADEPLOY_CONF_PATH}")
+
+        msg("Copying kastafior",MSG_INFO)
+        sexec(session,"cp -f #{File.join(tmpdir,'addons','kastafior','kastafior')} /usr/bin")
+        sexec(session,"chmod +x /usr/bin/kastafior")
       end
 
       msg('Remove the temporary directory',MSG_INFO)
@@ -3414,7 +3456,7 @@ sshgw.ssh(servername,'root') do |session|
       apt_remove(session,build_extra)
     else
       msg('Installing Kadeploy server/client',MSG_INFO)
-      apt_install(session,['kadeploy-server','kadeploy-client'],server)
+      apt_install(session,[kapkg('server'),kapkg('client')],server)
     end
 
     msg('Creating Kadeploy directories',MSG_INFO)
@@ -3447,6 +3489,7 @@ sshgw.ssh(servername,'root') do |session|
         sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_HOSTS_PATH}")
       end
     end
+
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_SSHKEY_PATH}")
 
     msg('Set the shell for the deploy user',MSG_INFO)
@@ -3625,7 +3668,11 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_CONF_PATH}")
 
 
-    sexec(session,'service kadeploy3d restart')
+    if $version >= 8
+      sexec(session,'service kadeploy restart')
+    else
+      sexec(session,'service kadeploy3d restart')
+    end
 
     sleep 6
 
@@ -3651,7 +3698,7 @@ sshgw.ssh(servername,'root') do |session|
     end
 
     msg('Removing configuration related packages',MSG_INFO)
-    #apt_remove(session,'kadeploy-client')
+    #apt_remove(session,kapkg('client'))
   end
 end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
@@ -3785,7 +3832,7 @@ sshgw.ssh(servername,'root') do |session|
     apt_update(session,server)
 
     msg('Installing Kadeploy client',MSG_INFO)
-    apt_install(session,'kadeploy-client',server)
+    apt_install(session,kapkg('client'),server)
 
     msg('Configuring Kadeploy client',MSG_INFO)
     tempfile(cfg_kadeploy_client()) do |path|
