@@ -5,6 +5,7 @@
 
 #Ruby libs
 require 'mysql'
+require 'timeout'
 
 module Database
   class DbFactory
@@ -136,8 +137,13 @@ module Database
     def connect(host, user, passwd, base)
       ret = true
       begin
-        @dbh = Mysql.real_connect(host, user, passwd, base)
-        @dbh.reconnect = true
+        Timeout.timeout(60) do
+          @dbh = Mysql.real_connect(host, user, passwd, base)
+          @dbh.reconnect = true
+        end
+      rescue Timeout::Error
+        $stderr.puts "MySQL error: Timeout when connecting to DB (#{user}@#{host}/#{base})"
+        ret = false
       rescue Mysql::Error => e
         $stderr.puts "MySQL error (code): #{e.errno}"
         $stderr.puts "MySQL error (message): #{e.error}"
