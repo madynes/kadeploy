@@ -4,17 +4,22 @@ require 'rake/packagetask'
 require 'fileutils'
 require 'tmpdir'
 require 'tempfile'
+require 'date'
 
-VERSION= "#{File.read('major_version').strip}."\
-  "#{File.read('minor_version').strip}."\
-  "#{File.read('release_version').strip}"
+MAJOR_VERSION=File.read('major_version').strip
+MINOR_VERSION=File.read('minor_version').strip
+RELEASE_VERSION=File.read('release_version').strip
+
+RELEASE_VERSION="git#{Time.now.strftime('%Y%m%d%H%M%S')}" if RELEASE_VERSION == 'git'
+
+VERSION="#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
 
 DEPLOY_USER='deploy'
 
 # Directories
 D = {
   :base => File.dirname(__FILE__),
-  :build => File.join(File.dirname(__FILE__),'build'),
+  :build => '/tmp/kabuild',
   :lib => File.join(File.dirname(__FILE__),'lib'),
   :man => File.join(File.dirname(__FILE__),'man'),
   :doc => File.join(File.dirname(__FILE__),'doc'),
@@ -467,18 +472,37 @@ task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
   Rake::Task[:man_client_clean].reenable
   Rake::Task[:man_server_clean].reenable
   Rake::Task[:clean].invoke
+  Rake::Task[:build_deb].invoke if args.kind == 'deb'
+end
 
-  if args.kind == 'deb'
-    tmp = File.join(D[:build],"kadeploy")
-    sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
-    pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
-    sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
+desc "Build an origin archive for debian packaging"
+task :build_deb => :build do
+  tmp = File.join(D[:build],"kadeploy")
+  sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
+  pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
+  sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
 
-    puts "\nTarball created in #{D[:build]}"
-    puts "You probably want to:"
-    puts "  git tag v#{VERSION}"
-    puts "  git push origin HEAD:refs/tags/v#{VERSION}"
+  puts "\nTarball created in #{D[:build]}"
+  puts "You probably want to:"
+  puts "  git tag v#{VERSION}"
+  puts "  git push origin HEAD:refs/tags/v#{VERSION}"
+end
+
+desc "Generate debian package (Be careful it will break your Git repository !)"
+task :deb => :build_deb do
+  deb_version = nil
+  if RELEASE_VERSION =~ /git|alpha|rc/
+    deb_version = "#{MAJOR_VERSION}.#{MINOR_VERSION}~#{RELEASE_VERSION}"
+  else
+    deb_version = "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
   end
+  sh "git tag -d 'debian/v#{VERSION}'; git tag 'debian/v#{VERSION}'"
+  sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
+  sh 'git branch -D debian; git checkout -b debian origin/debian'
+  sh 'git checkout master'
+  sh "git-import-orig --upstream-branch=upstream --debian-branch=debian --upstream-version=#{deb_version} --upstream-vcs-tag='debian/v#{VERSION}' #{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
+  sh 'git checkout debian'
+  sh 'git-buildpackage -uc -us'
 end
 
 desc "Generate debian changelog file"
