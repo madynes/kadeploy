@@ -66,7 +66,7 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 # Update path for devel
 UPDATE_PATH_CHECK = {
   'common' => {
-    'lib' => 'common.rb',
+    'lib' => 'environment.rb',
   },
   'client' => {
     'bin' => '/usr/bin/kadeploy3',
@@ -1298,6 +1298,12 @@ CFG_SQL_PASS_ROOT = 'kadeploy'
 CFG_SQL_PASS_USER = "#{CFG_KADEPLOY_USER}-pass"
 
 def cfg_sql()
+  wid_field = nil
+  if $version >= 8
+    wid_field = 'wid'
+  else
+    wid_field = 'deploy_id'
+  end
   # Cleaning up
   "DROP DATABASE IF EXISTS #{CFG_SQL_DB};\n"\
   + # Kadeploy database
@@ -1332,7 +1338,7 @@ def cfg_sql()
   ") ENGINE=MyISAM  DEFAULT CHARSET=utf8;\n"\
   + # table log
   "CREATE TABLE IF NOT EXISTS #{CFG_SQL_DB}.`log` (\n"\
-  "  `wid` varchar(41) NOT NULL,\n"\
+  "  `#{wid_field}` varchar(41) NOT NULL,\n"\
   "  `hostname` varchar(256) NOT NULL,\n"\
   "  `step1` varchar(45) NOT NULL,\n"\
   "  `step2` varchar(45) NOT NULL,\n"\
@@ -3401,10 +3407,10 @@ sshgw.ssh(servername,'root') do |session|
         end
       else
         msg("Building Kadeploy packages",MSG_INFO)
-        sexec(session,"cd #{tmpdir} && rake deb 2>&1")
+        sexec(session,"cd #{tmpdir} && #{env_vars} rake deb 2>&1")
 
         msg('Installing Kadeploy server/client',MSG_INFO)
-        sexec(session,"dpkg --force-all -i build/*.deb")
+        sexec(session,"cd #{tmpdir} && dpkg --force-all -i ../*.deb")
       end
 
       msg('Remove the temporary directory',MSG_INFO)
