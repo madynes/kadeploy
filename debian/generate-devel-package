@@ -2,7 +2,9 @@
 require 'fileutils'
 
 stage = ARGV[0]
-suffix = ENV['KADEPLOY_DEVEL_PKG']
+# extract suffix from DEB_BUILD_OPTIONS
+suffix = ENV['DEB_BUILD_OPTIONS'].split(/ /).select { |e| e =~ /^devpkg=/ }.first.split(/=/)[1]
+
 pkgs = ['kadeploy-common', 'kadeploy', 'kadeploy-client']
 
 if stage == "clean"
@@ -29,7 +31,7 @@ pkgs.each do |pkg|
 end
 File::open('debian/files', 'w') { |fd| fd.puts s }
 
-# mv pkg dirs
+# mv pkg dirs
 pkgs.each do |pkg|
   FileUtils::mv("debian/#{pkg}", "debian/#{pkg}-#{suffix}")
 end
@@ -66,7 +68,7 @@ Dir::glob("debian/{#{pkgs.map { |pkg| "#{pkg}-#{suffix}"}.join(',')}}/DEBIAN/{co
   File::open(f, 'w') { |fd| fd.puts s }
 end
 
-# Move stuff around
+# Move stuff around
 PATTERNS = {
   "/etc/kadeploy3" => "/etc/kadeploy3-#{suffix}",
   "/etc/init.d/kadeploy" => "/etc/init.d/kadeploy-#{suffix}",
@@ -92,7 +94,7 @@ pkgs.map { |pkg| "#{pkg}-#{suffix}"}.each do |pkg|
   end
 end
 
-# FIXME update require paths.
+# FIXME update require paths.
 
 system("dh_md5sums") or raise
 system("dh_builddeb") or raise

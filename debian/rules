@@ -16,7 +16,8 @@ override_dh_auto_install:
 	mv debian/kadeploy-common/usr/bin/* debian/kadeploy-client/usr/bin/
 
 # generation of custom packages with a suffix
-ifdef KADEPLOY_DEVEL_PKG
+# use with DEB_BUILD_OPTIONS=devpkg=dev
+ifneq (,$(filter devpkg=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
 override_dh_md5sums:
 	debian/generate-devel-package build
 
