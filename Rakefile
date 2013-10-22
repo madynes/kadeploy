@@ -254,8 +254,8 @@ desc "Generate the documentation"
 task :doc => :doc_clean do
   raise "help2man is missing !" unless system('which help2man')
 
-  Dir.mktmpdir('kadeploy_build-',File.dirname(__FILE__)) do |dir|
-    Tempfile.open('Kadeploy.tex.complete',File.dirname(__FILE__)) do |f|
+  Dir.mktmpdir('kadeploy_build-') do |dir|
+    Tempfile.open('Kadeploy.tex.complete') do |f|
       # Replace the __HELP_..._HELP__ pattern by the --help of the binaries
       content = File.read("#{D[:doc]}/Kadeploy.tex")
       Dir[File.join(D[:bin],'*'),File.join(D[:sbin],'*')].each do |bin|
