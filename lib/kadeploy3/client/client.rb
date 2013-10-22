@@ -309,14 +309,18 @@ class Client
       print = Proc.new do |res,prefix|
         $stdout.puts "#{prefix if prefix}Kadeploy version: #{res.strip}"
       end
-      if options[:multi_server]
-        options[:servers].each_pair do |server,inf|
-          next if server.downcase == "default"
-          print.call(get(inf[0],inf[1],'/version',inf[2]),"(#{inf[0]}) ")
-        end
+      if ENV['KADEPLOY3_VERSION']
+        $stdout.puts ENV['KADEPLOY3_VERSION']
       else
-        info = options[:servers][options[:chosen_server]]
-        print.call(get(info[0],info[1],'/version',info[2]))
+        if options[:multi_server]
+          options[:servers].each_pair do |server,inf|
+            next if server.downcase == "default"
+            print.call(get(inf[0],inf[1],'/version',inf[2]),"(#{inf[0]}) ")
+          end
+        else
+          info = options[:servers][options[:chosen_server]]
+          print.call(get(info[0],info[1],'/version',info[2]))
+        end
       end
       exit 0
     end
@@ -604,7 +608,7 @@ class Client
   def self.add_opt(opt,*args,&block)
     desc = args.last
     tmp = print_optdesc(desc,opt.summary_width+opt.summary_indent.size+1)
-    desc.clear
+    desc.clear rescue desc.gsub!(/.*/,'')
     desc << tmp
     opt.on(*args,&block)
   end
@@ -1092,7 +1096,6 @@ class ClientWorkflow < Client
     @resources = ret['resources']
     @start_time = Time.now.to_i
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
-p @resources['resource']
 
     if options[:wait]
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
@@ -1123,14 +1126,14 @@ p @resources['resource']
           else
             out += dbg
           end
-          dbg.clear
+          dbg.clear rescue dbg.gsub!(/.*/,'')
         end
 
         unless out.empty?
           out.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
           out.collect!{|line| line.split("|")[1] rescue line }
           debug out.join("\n")
-          out.clear
+          out.clear rescue out.gsub!(/.*/,'')
         end
 
         sleep SLEEP_PITCH
