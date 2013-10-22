@@ -40,8 +40,8 @@ pkgs.each do |pkg|
   s = IO::read("debian/#{pkgsuffix}/DEBIAN/control")
   s.gsub!(/^(Package: .*)$/, "\\1-#{suffix}")
   pkgs.each do |pkg2|
-    s.gsub!(/^(Depends: .* )#{pkg2} /, "\\1 #{pkg2}-#{suffix} ")
-    s.gsub!(/^(Recommends: .* )#{pkg2} /, "\\1 #{pkg2}-#{suffix} ")
+    s.gsub!(/^(Depends: .*)#{pkg2} /, "\\1 #{pkg2}-#{suffix} ")
+    s.gsub!(/^(Recommends: .*)#{pkg2} /, "\\1 #{pkg2}-#{suffix} ")
   end
   File::open("debian/#{pkgsuffix}/DEBIAN/control", 'w') { |fd| fd.puts s }
 end
