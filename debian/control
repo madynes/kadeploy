@@ -19,6 +19,7 @@ XB-Ruby-Versions: ruby1.9.1
 Package: kadeploy-client
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby1.9.1
+Recommends: oidentd | pidentd | ident2 | nullidentd
 Description: Kadeploy: the cluster deployment tool - client part
 XB-Ruby-Versions: ruby1.9.1
 
