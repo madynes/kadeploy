@@ -27,7 +27,7 @@ DEB_REPOSITORY    = 'http://apt.grid5000.fr/kadeploy'
 GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPOSITORY = 'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
 DEPENDANCIES      = ['libmysql-ruby','ruby']
-BUILD_DEPENDANCIES = ['git','rake']
+BUILD_DEPENDANCIES = ['git']
 
 if g5k?
   G5K_API         = 'https://api.grid5000.fr/2.0'
@@ -66,7 +66,7 @@ DEFAULT_DISK_DRIVER = 'scsi_mod'
 # Update path for devel
 UPDATE_PATH_CHECK = {
   'common' => {
-    'lib' => 'common.rb',
+    'lib' => 'environment.rb',
   },
   'client' => {
     'bin' => '/usr/bin/kadeploy3',
@@ -74,7 +74,7 @@ UPDATE_PATH_CHECK = {
   },
   'server' => {
     'sbin' => '/usr/sbin/kadeploy3d',
-    'init' => '/etc/init.d/kadeploy3d',
+    'init' => '/etc/init.d/kadeploy.*',
     'lib' => 'automata.rb',
   }
 }
@@ -1298,6 +1298,12 @@ CFG_SQL_PASS_ROOT = 'kadeploy'
 CFG_SQL_PASS_USER = "#{CFG_KADEPLOY_USER}-pass"
 
 def cfg_sql()
+  wid_field = nil
+  if $version >= 8
+    wid_field = 'wid'
+  else
+    wid_field = 'deploy_id'
+  end
   # Cleaning up
   "DROP DATABASE IF EXISTS #{CFG_SQL_DB};\n"\
   + # Kadeploy database
@@ -1332,7 +1338,7 @@ def cfg_sql()
   ") ENGINE=MyISAM  DEFAULT CHARSET=utf8;\n"\
   + # table log
   "CREATE TABLE IF NOT EXISTS #{CFG_SQL_DB}.`log` (\n"\
-  "  `wid` varchar(41) NOT NULL,\n"\
+  "  `#{wid_field}` varchar(41) NOT NULL,\n"\
   "  `hostname` varchar(256) NOT NULL,\n"\
   "  `step1` varchar(45) NOT NULL,\n"\
   "  `step2` varchar(45) NOT NULL,\n"\
@@ -3350,7 +3356,7 @@ sshgw.ssh(servername,'root') do |session|
       msg('Installing scm and build packages',MSG_INFO)
       build_extra = nil
       if $version >= 8
-        build_extra = [ 'help2man' ]
+        build_extra = [ 'debhelper','gem2deb','help2man','rake','texlive-latex-base','texlive-latex-recommended','texlive-latex-extra','git-buildpackage' ]
       else
         build_extra = [ 'docbook2x' ]
       end
@@ -3401,10 +3407,21 @@ sshgw.ssh(servername,'root') do |session|
         end
       else
         msg("Building Kadeploy packages",MSG_INFO)
-        sexec(session,"cd #{tmpdir} && rake deb 2>&1")
+        sexec(session,"cd #{tmpdir} && #{env_vars} rake deb 2>&1")
 
         msg('Installing Kadeploy server/client',MSG_INFO)
-        sexec(session,"dpkg --force-all -i build/*.deb")
+        sexec(session,"cd #{tmpdir} && dpkg --force-all -i ../*.deb")
+
+        msg("Copying the deploy ssh key pair",MSG_INFO)
+        sexec(session,"mkdir -p #{CFG_KADEPLOY_SSHKEY_PATH}")
+        sexec(session,"cp -f #{File.join(tmpdir,'addons','ssh','id_deploy*')} #{CFG_KADEPLOY_SSHKEY_PATH}")
+
+        msg("Copying admin scripts",MSG_INFO)
+        sexec(session,"cp -f #{File.join(tmpdir,'scripts','**','*')} #{CFG_KADEPLOY_CONF_PATH}")
+
+        msg("Copying kastafior",MSG_INFO)
+        sexec(session,"cp -f #{File.join(tmpdir,'addons','kastafior','kastafior')} /usr/bin")
+        sexec(session,"chmod +x /usr/bin/kastafior")
       end
 
       msg('Remove the temporary directory',MSG_INFO)
@@ -3447,6 +3464,7 @@ sshgw.ssh(servername,'root') do |session|
         sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_KVM_HOSTS_PATH}")
       end
     end
+
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_SSHKEY_PATH}")
 
     msg('Set the shell for the deploy user',MSG_INFO)
@@ -3625,7 +3643,11 @@ sshgw.ssh(servername,'root') do |session|
     sexec(session,"chown -R #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_CONF_PATH}")
 
 
-    sexec(session,'service kadeploy3d restart')
+    if $version >= 8
+      sexec(session,'service kadeploy restart')
+    else
+      sexec(session,'service kadeploy3d restart')
+    end
 
     sleep 6
 
