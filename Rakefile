@@ -494,6 +494,11 @@ task :deb_changelog, [:dir] do |f,args|
   end
 end
 
+desc "Generate rpm package"
+task :rpm do
+  # ...
+end
+
 #desc "Launch the test-suite"
 #task :test do
 #  raise 'Not implemented !'
