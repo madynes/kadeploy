@@ -604,7 +604,7 @@ class Client
   def self.add_opt(opt,*args,&block)
     desc = args.last
     tmp = print_optdesc(desc,opt.summary_width+opt.summary_indent.size+1)
-    desc.clear
+    desc.clear rescue desc.gsub!(/.*/,'')
     desc << tmp
     opt.on(*args,&block)
   end
@@ -649,13 +649,19 @@ class Client
       return false
     end
 
+    return options
+  end
+
+  def self.parse_config(options)
     options[:servers] = load_configfile()
     options[:chosen_server] = options[:servers]['default'] unless options[:chosen_server]
-    error("The server '#{options[:chosen_server]}' does not exist") unless options[:servers][options[:chosen_server]]
+    unless options[:servers][options[:chosen_server]]
+      error("The server '#{options[:chosen_server]}' does not exist")
+      return false
+    end
     options[:server_host] = options[:servers][options[:chosen_server]][0]
     options[:server_port] = options[:servers][options[:chosen_server]][1]
-
-    return options
+    true
   end
 
   def init_params(options)
@@ -667,6 +673,12 @@ class Client
   def self.launch()
     options = nil
     error() unless options = parse_options()
+    # Hack to make the --version work even if the client is not installed
+    if options[:get_version] and ENV['KADEPLOY3_VERSION']
+      $stdout.puts ENV['KADEPLOY3_VERSION']
+      exit 0
+    end
+    error() unless parse_config(options)
     error() unless check_servers(options)
     do_version(options) if options[:get_version]
     do_info(options) if options[:get_users_info]
@@ -1092,7 +1104,6 @@ class ClientWorkflow < Client
     @resources = ret['resources']
     @start_time = Time.now.to_i
     File.open(options[:wid_file],'w'){|f| f.write @wid} if options[:wid_file]
-p @resources['resource']
 
     if options[:wait]
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} started\n"
@@ -1123,14 +1134,14 @@ p @resources['resource']
           else
             out += dbg
           end
-          dbg.clear
+          dbg.clear rescue dbg.gsub!(/.*/,'')
         end
 
         unless out.empty?
           out.sort_by!{|line| (line.split("|")[0] rescue '0').to_f}
           out.collect!{|line| line.split("|")[1] rescue line }
           debug out.join("\n")
-          out.clear
+          out.clear rescue out.gsub!(/.*/,'')
         end
 
         sleep SLEEP_PITCH
