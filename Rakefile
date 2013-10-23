@@ -126,6 +126,7 @@ DESC = {
 
 
 ENV['KADEPLOY3_LIBS'] = D[:lib]
+ENV['KADEPLOY3_VERSION'] = VERSION
 
 def self.sources()
   if system('git status > /dev/null')
@@ -207,7 +208,7 @@ task :man_client => :man_client_clean do
   Dir[File.join(D[:bin],'/*')].each do |bin|
     filename = File.basename(bin)
 	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man --version-string=#{VERSION} -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 1 -o #{D[:man]}/#{filename}.1 #{bin}"
+	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 1 -o #{D[:man]}/#{filename}.1 #{bin}"
   end
 end
 
@@ -223,7 +224,7 @@ task :man_server => :man_server_clean do
   Dir[File.join(D[:sbin],'*')].each do |bin|
     filename = File.basename(bin)
 	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man --version-string=#{VERSION} -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 8 -o #{D[:man]}/#{filename}.8 #{bin}"
+	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 8 -o #{D[:man]}/#{filename}.8 #{bin}"
   end
 end
 
