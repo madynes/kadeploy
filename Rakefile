@@ -1,6 +1,6 @@
 require 'rake'
-require 'rdoc/task'
 require 'rake/packagetask'
+require 'rbconfig'
 require 'fileutils'
 require 'tmpdir'
 require 'tempfile'
@@ -159,6 +159,7 @@ def create_dir(dir,opts={})
     opts = {:user=>'root',:group=>'root',:mode=>'640'}.merge(opts)
   end
 
+  dir = File.join(@root_dir,dir) if @root_dir
   unless File.exists?(dir)
     sh "mkdir -p #{dir}"
     sh "chown #{opts[:user]}:#{opts[:group]} #{dir}"
@@ -169,6 +170,7 @@ end
 
 def delete_dir(dir)
   dir = INSTALL[dir][:dir] if dir.is_a?(Symbol)
+  dir = File.join(@root_dir,dir) if @root_dir
   system("rmdir #{dir.to_s}")
 end
 
@@ -178,7 +180,7 @@ def installf(kind,file,filename=nil)
   raise file if !inst or !File.exist?(file)
   dest = inst[:dir]
   dest = File.join(dest,filename) if filename
-
+  dest = File.join(@root_dir,dest) if @root_dir
   sh "install -o #{inst[:user]} -g #{inst[:group]} -m #{inst[:mode]} #{file} #{dest}"
 end
 
@@ -186,6 +188,7 @@ def uninstallf(kind,file,filename=nil)
   file = File.basename(file) unless file.is_a?(Symbol)
   dest = INSTALL[kind][:dir]
   dest = File.join(dest,filename) if filename
+  dest = File.join(@root_dir,dest) if @root_dir
   sh "rm -f #{File.join(dest,file.to_s)}"
 end
 
@@ -266,8 +269,12 @@ task :apidoc_clean do
   sh "rm -f #{File.join(D[:apidoc],'*.html')}"
 end
 
+task :preinstall, [:root_dir] do |f,args|
+  @root_dir = args.root_dir
+end
+
 desc "Install the client and the server"
-task :install => [:install_client,:install_server]
+task :install, [:root_dir,:distrib] => [:preinstall,:install_client,:install_server]
 
 desc "Uninstall the client and the server"
 task :uninstall => [:uninstall_client,:uninstall_server] do
@@ -275,7 +282,7 @@ task :uninstall => [:uninstall_client,:uninstall_server] do
 end
 
 desc "Install common files"
-task :install_common do
+task :install_common, [:root_dir,:distrib] => :preinstall do
   create_dir(:lib)
   installf(:lib,:'kadeploy3/common.rb')
 
@@ -297,7 +304,7 @@ task :uninstall_common do
 end
 
 desc "Install the client"
-task :install_client => [:man_client, :install_common] do
+task :install_client, [:root_dir,:distrib] => [:preinstall, :man_client, :install_common] do
   create_dir(:man1)
   Dir[File.join(D[:man],'*.1')].each do |f|
     installf(:man1,f)
@@ -343,9 +350,8 @@ task :uninstall_client => :uninstall_common do
   delete_dir(:lib)
 end
 
-
 desc "Install the server"
-task :install_server, [:distrib] => [:man_server, :install_common] do |f,args|
+task :install_server, [:root_dir,:distrib] => [:preinstall,:man_server, :install_common] do |f,args|
   args.with_defaults(:distrib => 'debian')
   raise "unknown distrib '#{args.distrib}'" unless %w{debian fedora}.include?(args.distrib)
   raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
@@ -452,7 +458,7 @@ desc "Generate source dir and a tgz package, can be of kind classical or deb, us
 task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
   args.with_defaults(:kind => 'classical')
   sh "echo '#{VERSION}' > #{File.join(D[:conf],'version')}"
-  Rake::PackageTask::new("kadeploy3",VERSION) do |p|
+  Rake::PackageTask::new("kadeploy",VERSION) do |p|
     p.need_tar_gz = true
     p.package_dir = D[:build]
     src = sources()
@@ -471,9 +477,7 @@ task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
 
   if args.kind == 'deb'
     tmp = File.join(D[:build],"kadeploy")
-    sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
-    pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
-    sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
+    sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
 
     puts "\nTarball created in #{D[:build]}"
     puts "You probably want to:"
@@ -492,6 +496,19 @@ task :deb_changelog, [:dir] do |f,args|
   news.each do |n|
     sh "dch -a \"#{n}\" --changelog #{File.join(args.dir,'changelog')}"
   end
+end
+
+desc "Generate rpm package"
+task :rpm => :build do
+  sh "mkdir -p #{File.join(D[:build],'SOURCES')}"
+  sh "mv #{File.join(D[:build],'*')} #{File.join(D[:build],'SOURCES')} || true"
+  specs = File.read(File.join(D[:pkg],'fedora','kadeploy.spec.in'))
+  specs.gsub!(/KADEPLOY3_LIBS/,INSTALL[:lib][:dir])
+  specs.gsub!(/MAJOR_VERSION/,MAJOR_VERSION)
+  specs.gsub!(/MINOR_VERSION/,MINOR_VERSION)
+  specs.gsub!(/RELEASE_VERSION/,RELEASE_VERSION)
+  File.open(File.join(D[:build],'kadeploy.spec'),'w'){|f| f.write specs}
+  sh "rpmbuild --define '_topdir #{D[:build]}' -ba #{File.join(D[:build],'kadeploy.spec')}"
 end
 
 #desc "Launch the test-suite"
