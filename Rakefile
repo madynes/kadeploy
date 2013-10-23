@@ -514,31 +514,29 @@ end
 desc "Generate debian package (Be careful it will break your Git repository !)"
 task :deb => :build_deb do
   deb_version, tag_version = deb_versions()
-  cur_branch = %x{git rev-parse --abbrev-ref HEAD}
-  sh "git tag -d 'debian/#{tag_version}'; git tag -am '#{tag_version}' 'debian/#{tag_version}'"
+  sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
   sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
   sh 'git branch -D debian; git checkout -b debian origin/debian'
   sh 'git checkout master'
   sh "git-import-orig --upstream-branch=upstream --debian-branch=debian "\
     "--upstream-version=#{deb_version} "\
     "--upstream-tag='upstream/v%(version)s' "\
-    "--upstream-vcs-tag='debian/#{tag_version}' "\
+    "--upstream-vcs-tag='#{tag_version}' "\
     "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
   sh 'git checkout debian'
-  sh 'git-buildpackage -uc -us'
-  sh "git checkout #{cur_branch}"
-end
-
-desc "Push packaging modifications in the git repository (gerrit)"
-task :deb_push do
-  deb_version, tag_version = deb_versions()
-  cur_branch = %x{git rev-parse --abbrev-ref HEAD}
-  sh "git checkout master"
-  sh "git push origin debian/#{tag_version} :refs/heads/master"
-  sh "git push origin upstream/#{tag_version} :refs/heads/master"
-  sh "git checkout debian; git push origin HEAD:refs/for/debian"
-  sh "git checkout upstream; git push origin HEAD:refs/for/upstream"
-  sh "git checkout #{cur_branch}"
+  sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
+  sh 'git-buildpackage --git-ignore-new -uc -us'
+  puts <<-EOF
+## When you package is ready, you will need to:
+### Push upstream and merge modifications and tags
+  git push origin upstream:refs/for/upstream
+  git push origin debian:refs/for/debian
+  git push origin #{tag_version}:refs/tags/#{tag_version}
+  git push origin upstream/#{tag_version}:refs/tags/#{tag_version}
+### Tag the final Debian package, push the tag:
+  git tag debian/#{deb_version}-1
+  git push origin debian/#{deb_version}-1:refs/tags/debian/#{deb_version}-1
+EOF
 end
 
 desc "Generate debian changelog file"
