@@ -197,6 +197,20 @@ def uninstallf(kind,file,filename=nil)
   sh "rm -f #{File.join(dest,file.to_s)}"
 end
 
+def deb_versions()
+  if RELEASE_VERSION =~ /git|alpha|rc/
+    [
+      "#{MAJOR_VERSION}.#{MINOR_VERSION}~#{RELEASE_VERSION}",
+      "v#{MAJOR_VERSION}.#{MINOR_VERSION}_#{RELEASE_VERSION}",
+    ]
+  else
+    [
+      "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
+      "v#{deb_version}",
+    ]
+  end
+end
+
 
 task :default => [:build]
 
@@ -495,19 +509,32 @@ end
 
 desc "Generate debian package (Be careful it will break your Git repository !)"
 task :deb => :build_deb do
-  deb_version = nil
-  if RELEASE_VERSION =~ /git|alpha|rc/
-    deb_version = "#{MAJOR_VERSION}.#{MINOR_VERSION}~#{RELEASE_VERSION}"
-  else
-    deb_version = "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
-  end
-  sh "git tag -d 'debian/v#{VERSION}'; git tag 'debian/v#{VERSION}'"
+  deb_version, tag_version = deb_versions()
+  cur_branch = %x{git rev-parse --abbrev-ref HEAD}
+  sh "git tag -d 'debian/#{tag_version}'; git tag -am '#{tag_version}' 'debian/#{tag_version}'"
   sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
   sh 'git branch -D debian; git checkout -b debian origin/debian'
   sh 'git checkout master'
-  sh "git-import-orig --upstream-branch=upstream --debian-branch=debian --upstream-version=#{deb_version} --upstream-vcs-tag='debian/v#{VERSION}' #{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
+  sh "git-import-orig --upstream-branch=upstream --debian-branch=debian "\
+    "--upstream-version=#{deb_version} "\
+    "--upstream-tag='upstream/v%(version)s' "\
+    "--upstream-vcs-tag='debian/#{tag_version}' "\
+    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
   sh 'git checkout debian'
   sh 'git-buildpackage -uc -us'
+  sh "git checkout #{cur_branch}"
+end
+
+desc "Push packaging modifications in the git repository (gerrit)"
+task :deb_push do
+  deb_version, tag_version = deb_versions()
+  cur_branch = %x{git rev-parse --abbrev-ref HEAD}
+  sh "git checkout master"
+  sh "git push origin debian/#{tag_version} :refs/heads/master"
+  sh "git push origin upstream/#{tag_version} :refs/heads/master"
+  sh "git checkout debian; git push origin HEAD:refs/for/debian"
+  sh "git checkout upstream; git push origin HEAD:refs/for/upstream"
+  sh "git checkout #{cur_branch}"
 end
 
 desc "Generate debian changelog file"
