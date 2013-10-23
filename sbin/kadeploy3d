@@ -152,7 +152,27 @@ OptionParser.new do |opts|
   opts.on("--ruby-debug", "Run with ruby interpreter's debug mode") do
     $DEBUG = true
   end
+
+  opts.on("-v", "--version", "Display the version of the service") do
+    $version = true
+  end
 end.parse!
+
+if $version
+  if ENV['KADEPLOY3_VERSION']
+    $stdout.puts ENV['KADEPLOY3_VERSION']
+    exit 0
+  else
+    version_file = File.join($kadeploy_confdir,'version')
+    if File.readable?(version_file)
+      $stdout.puts File.read(version_file).strip
+      exit 0
+    else
+      $stderr.puts "cannot read the file '#{version_file}'"
+      exit 1
+    end
+  end
+end
 
 
 # Check logs directory

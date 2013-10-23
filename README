@@ -87,3 +87,16 @@ Recommanded services:
 - sql
 - dns
 - http
+
+
+License & copyright
+-------------------
+Copyright 2008-2013 INRIA, Kadeploy Developers <kadeploy-devel@lists.gforge.inria.fr>
+
+Kadeploy3 is developed at INRIA Nancy - Grand Est. Its development is currently
+supported by the ADT Kadeploy project (2011-2013), which is led by the
+AlGorille team at LORIA.
+
+Current developers are Luc Sarzyniec (Inria, main developer since 2011),
+Emmanuel Jeanvoine (Inria, design & main developer from 2008 to 2011) and
+Lucas Nussbaum (Univ. de Lorraine, design since 2011).

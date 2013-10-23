@@ -361,7 +361,7 @@ introduction do
     paragraph "Some parameters can be specified in the URI, in the documentation, this parameters will be #{$cgi.span(:class=>'element_param'){'underlined'}}."
     paragraph "In the URI, dynamic parameters will be prefixed with a #{$cgi.tt{':'}} such as #{$cgi.tt{':name'}}; if the parameter is suffixed with a #{$cgi.tt{'?'}}, this parameter is optional, for sample #{$cgi.tt{':version?'}}. Here is an example :"
     paragraph $cgi.span(:class => 'resource_path'){''}
-    t = Type.new(:'GET /sample/:name/:version?',:'','An example')
+    t = Type.new(:'GET /sample/:name/:version?',:' ','An example')
     t.field(:user, :String, 'The user')
     t.field(':name', :String, 'The name')
     t.field(':version', :String, 'The version')
