@@ -9,8 +9,12 @@ require 'date'
 MAJOR_VERSION=File.read('major_version').strip
 MINOR_VERSION=File.read('minor_version').strip
 RELEASE_VERSION=File.read('release_version').strip
-
-RELEASE_VERSION="git#{Time.now.strftime('%Y%m%d%H%M%S')}" if RELEASE_VERSION == 'git'
+if RELEASE_VERSION == 'git'
+  RELEASE_VERSION="git+#{Time.now.strftime('%Y%m%d%H%M%S')}"
+  if system('git status > /dev/null')
+    RELEASE_VERSION="#{RELEASE_VERSION}+#{%x{git log --pretty=format:'%h' -n 1}}"
+  end
+end
 
 VERSION="#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
 
