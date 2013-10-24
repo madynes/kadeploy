@@ -3,6 +3,17 @@
 $stdin = nil
 
 require 'cgi'
+# Ugly hack for ruby 1.8
+if RUBY_VERSION < '1.9'
+  class CGI
+    class << self
+      alias_method :__escapeHTML__, :escapeHTML
+      def escapeHTML(str)
+        __escapeHTML__(str.to_s)
+      end
+    end
+  end
+end
 $cgi = CGI.new('html4')
 
 class String
@@ -313,7 +324,7 @@ class Request
   end
 
   def to_html(cgi)
-    @parameters.sort_by!{|v| v.name(nil,false,(v.mandatory ? 'A' : 'Z'))}
+    @parameters = @parameters.sort_by{|v| v.name(nil,false,(v.mandatory ? 'A' : 'Z'))}
     cgi.div(:class => 'request_frame') do
       cgi.h3(:class => 'request_title') do
         'Request ' +
@@ -359,7 +370,7 @@ class Response
   end
 
   def to_html(cgi)
-    @fields.sort_by!{|v| v.name}
+    @fields = @fields.sort_by{|v| v.name}
     cgi.div(:class => 'response_frame') do
       cgi.h3(:class => 'response_title') do
         'Response ' +
@@ -460,8 +471,8 @@ class Field < Element
         (@type.is_a?(String) ? cgi.a(:href => "#type_#{Type.id(@type)}"){@type} : @type)
       end +
       cgi.td(:class => 'field_desc') do
-        @description + (@values ?
-          cgi.br + "Possible values: #{@values.join(', ')}"
+        @description + (@values ? \
+          cgi.br + "Possible values: #{@values.join(', ')}" \
           : ''
         )
         #) + (@type.is_a?(String) ?
@@ -535,7 +546,7 @@ def operation(name,&block)
   parse($current.operation(name),&block)
 end
 
-def type(name,basetype=:Hash,desc,&block)
+def type(name,basetype,desc,&block)
   raise $current.class.name unless $current.is_a?(Operation)
   req = $current.type(name,basetype,desc)
   parse(req,&block)

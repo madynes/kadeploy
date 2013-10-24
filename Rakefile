@@ -1,20 +1,29 @@
 require 'rake'
-require 'rdoc/task'
 require 'rake/packagetask'
+require 'rbconfig'
 require 'fileutils'
 require 'tmpdir'
 require 'tempfile'
+require 'date'
 
-VERSION= "#{File.read('major_version').strip}."\
-  "#{File.read('minor_version').strip}."\
-  "#{File.read('release_version').strip}"
+MAJOR_VERSION=File.read('major_version').strip
+MINOR_VERSION=File.read('minor_version').strip
+RELEASE_VERSION=File.read('release_version').strip
+if RELEASE_VERSION == 'git'
+  RELEASE_VERSION="git+#{Time.now.strftime('%Y%m%d%H%M%S')}"
+  if system('git status > /dev/null')
+    RELEASE_VERSION="#{RELEASE_VERSION}+#{%x{git log --pretty=format:'%h' -n 1}}"
+  end
+end
+
+VERSION="#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
 
 DEPLOY_USER='deploy'
 
 # Directories
 D = {
   :base => File.dirname(__FILE__),
-  :build => File.join(File.dirname(__FILE__),'build'),
+  :build => '/tmp/kabuild',
   :lib => File.join(File.dirname(__FILE__),'lib'),
   :man => File.join(File.dirname(__FILE__),'man'),
   :doc => File.join(File.dirname(__FILE__),'doc'),
@@ -121,6 +130,7 @@ DESC = {
 
 
 ENV['KADEPLOY3_LIBS'] = D[:lib]
+ENV['KADEPLOY3_VERSION'] = VERSION
 
 def self.sources()
   if system('git status > /dev/null')
@@ -142,7 +152,7 @@ def self.sources()
     files << 'doc/**/*'
     files << 'addons/**/*'
     files << 'test/*'
-    files += ['Rakefile','License.txt','README','AUTHORS','NEWS']
+    files += ['Rakefile','License.txt','README','AUTHORS','NEWS','major_version','minor_version','release_version']
     files
   end
 end
@@ -158,6 +168,7 @@ def create_dir(dir,opts={})
     opts = {:user=>'root',:group=>'root',:mode=>'640'}.merge(opts)
   end
 
+  dir = File.join(@root_dir,dir) if @root_dir
   unless File.exists?(dir)
     sh "mkdir -p #{dir}"
     sh "chown #{opts[:user]}:#{opts[:group]} #{dir}"
@@ -168,6 +179,7 @@ end
 
 def delete_dir(dir)
   dir = INSTALL[dir][:dir] if dir.is_a?(Symbol)
+  dir = File.join(@root_dir,dir) if @root_dir
   system("rmdir #{dir.to_s}")
 end
 
@@ -177,7 +189,7 @@ def installf(kind,file,filename=nil)
   raise file if !inst or !File.exist?(file)
   dest = inst[:dir]
   dest = File.join(dest,filename) if filename
-
+  dest = File.join(@root_dir,dest) if @root_dir
   sh "install -o #{inst[:user]} -g #{inst[:group]} -m #{inst[:mode]} #{file} #{dest}"
 end
 
@@ -185,7 +197,22 @@ def uninstallf(kind,file,filename=nil)
   file = File.basename(file) unless file.is_a?(Symbol)
   dest = INSTALL[kind][:dir]
   dest = File.join(dest,filename) if filename
+  dest = File.join(@root_dir,dest) if @root_dir
   sh "rm -f #{File.join(dest,file.to_s)}"
+end
+
+def deb_versions()
+  if RELEASE_VERSION =~ /git|alpha|rc/
+    [
+      "#{MAJOR_VERSION}.#{MINOR_VERSION}~#{RELEASE_VERSION}",
+      "v#{MAJOR_VERSION}.#{MINOR_VERSION}_#{RELEASE_VERSION}",
+    ]
+  else
+    [
+      "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
+      "v#{deb_version}",
+    ]
+  end
 end
 
 
@@ -202,7 +229,7 @@ task :man_client => :man_client_clean do
   Dir[File.join(D[:bin],'/*')].each do |bin|
     filename = File.basename(bin)
 	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man --version-string=#{VERSION} -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 1 -o #{D[:man]}/#{filename}.1 #{bin}"
+	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 1 -o #{D[:man]}/#{filename}.1 #{bin}"
   end
 end
 
@@ -218,7 +245,7 @@ task :man_server => :man_server_clean do
   Dir[File.join(D[:sbin],'*')].each do |bin|
     filename = File.basename(bin)
 	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man --version-string=#{VERSION} -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 8 -o #{D[:man]}/#{filename}.8 #{bin}"
+	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 8 -o #{D[:man]}/#{filename}.8 #{bin}"
   end
 end
 
@@ -265,8 +292,12 @@ task :apidoc_clean do
   sh "rm -f #{File.join(D[:apidoc],'*.html')}"
 end
 
+task :preinstall, [:root_dir] do |f,args|
+  @root_dir = args.root_dir
+end
+
 desc "Install the client and the server"
-task :install => [:install_client,:install_server]
+task :install, [:root_dir,:distrib] => [:preinstall,:install_client,:install_server]
 
 desc "Uninstall the client and the server"
 task :uninstall => [:uninstall_client,:uninstall_server] do
@@ -274,7 +305,7 @@ task :uninstall => [:uninstall_client,:uninstall_server] do
 end
 
 desc "Install common files"
-task :install_common do
+task :install_common, [:root_dir,:distrib] => :preinstall do
   create_dir(:lib)
   installf(:lib,:'kadeploy3/common.rb')
 
@@ -296,7 +327,7 @@ task :uninstall_common do
 end
 
 desc "Install the client"
-task :install_client => [:man_client, :install_common] do
+task :install_client, [:root_dir,:distrib] => [:preinstall, :man_client, :install_common] do
   create_dir(:man1)
   Dir[File.join(D[:man],'*.1')].each do |f|
     installf(:man1,f)
@@ -342,9 +373,8 @@ task :uninstall_client => :uninstall_common do
   delete_dir(:lib)
 end
 
-
 desc "Install the server"
-task :install_server, [:distrib] => [:man_server, :install_common] do |f,args|
+task :install_server, [:root_dir,:distrib] => [:preinstall,:man_server, :install_common] do |f,args|
   args.with_defaults(:distrib => 'debian')
   raise "unknown distrib '#{args.distrib}'" unless %w{debian fedora}.include?(args.distrib)
   raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
@@ -434,7 +464,7 @@ task :uninstall_server => :uninstall_common do
 end
 
 desc "Install kastafior"
-task :install_kastafior do
+task :install_kastafior, [:root_dir,:distrib] => [:preinstall] do
   create_dir(:bin)
   installf(:bin,File.join(D[:addons],'kastafior','kastafior'))
 end
@@ -447,15 +477,19 @@ end
 desc "Clean everything"
 task :clean => [:man_clean, :doc_clean, :apidoc_clean]
 
-desc "Generate source dir and a tgz package"
-task :build => [:build_clean, :man, :doc, :apidoc] do
-  Rake::PackageTask::new("kadeploy3",VERSION) do |p|
+desc "Generate source dir and a tgz package, can be of kind classical or deb, usage: 'rake build[deb]', default: classical"
+task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
+  args.with_defaults(:kind => 'classical')
+  sh "echo '#{VERSION}' > #{File.join(D[:conf],'version')}"
+  Rake::PackageTask::new("kadeploy",VERSION) do |p|
     p.need_tar_gz = true
     p.package_dir = D[:build]
     src = sources()
     p.package_files.include(*src)
+    p.package_files.include('conf/version')
   end
   Rake::Task[:package].invoke
+  sh "rm #{File.join(D[:conf],'version')}"
   Rake::Task[:clean].reenable
   Rake::Task[:doc_clean].reenable
   Rake::Task[:apidoc_clean].reenable
@@ -463,13 +497,52 @@ task :build => [:build_clean, :man, :doc, :apidoc] do
   Rake::Task[:man_client_clean].reenable
   Rake::Task[:man_server_clean].reenable
   Rake::Task[:clean].invoke
-  puts
-  puts "Tarball created in build/."
-  puts "You probably want to: git tag #{VERSION}"
+  Rake::Task[:build_deb].invoke if args.kind == 'deb'
+end
+
+desc "Build an origin archive for debian packaging"
+task :build_deb => :build do
+  tmp = File.join(D[:build],"kadeploy")
+  sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
+
+  puts "\nTarball created in #{D[:build]}"
+  puts "You probably want to:"
+  puts "  git tag v#{VERSION}"
+  puts "  git push origin HEAD:refs/tags/v#{VERSION}"
+end
+
+desc "Generate debian package (Be careful it will break your Git repository !)"
+task :deb => :build_deb do
+  deb_version, tag_version = deb_versions()
+  cur_branch = %x{git rev-parse --abbrev-ref HEAD}
+  sh "git tag -d 'debian/#{tag_version}'; git tag -am '#{tag_version}' 'debian/#{tag_version}'"
+  sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
+  sh 'git branch -D debian; git checkout -b debian origin/debian'
+  sh 'git checkout master'
+  sh "git-import-orig --upstream-branch=upstream --debian-branch=debian "\
+    "--upstream-version=#{deb_version} "\
+    "--upstream-tag='upstream/v%(version)s' "\
+    "--upstream-vcs-tag='debian/#{tag_version}' "\
+    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
+  sh 'git checkout debian'
+  sh 'git-buildpackage -uc -us'
+  sh "git checkout #{cur_branch}"
+end
+
+desc "Push packaging modifications in the git repository (gerrit)"
+task :deb_push do
+  deb_version, tag_version = deb_versions()
+  cur_branch = %x{git rev-parse --abbrev-ref HEAD}
+  sh "git checkout master"
+  sh "git push origin debian/#{tag_version} :refs/heads/master"
+  sh "git push origin upstream/#{tag_version} :refs/heads/master"
+  sh "git checkout debian; git push origin HEAD:refs/for/debian"
+  sh "git checkout upstream; git push origin HEAD:refs/for/upstream"
+  sh "git checkout #{cur_branch}"
 end
 
 desc "Generate debian changelog file"
-task :deb_init_changelog, [:dir] do |f,args|
+task :deb_changelog, [:dir] do |f,args|
   args.with_defaults(:dir => D[:pkg])
   news = File.read(File.join(D[:base],'NEWS'))
   news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
@@ -480,33 +553,17 @@ task :deb_init_changelog, [:dir] do |f,args|
   end
 end
 
-desc "Builds archives for the Debian package"
-task :build_deb => [:clean, :build_clean, :build] do
-  tmp = File.join(D[:build],"kadeploy")
-  sh "mv #{tmp}3-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
-  pkgdir = File.join(D[:build],"kadeploy-#{VERSION}")
-  sh "mv #{tmp}3-#{VERSION} #{tmp}-#{VERSION}"
-
-  Rake::Task[:clean].reenable
-  Rake::Task[:doc_clean].reenable
-  Rake::Task[:apidoc_clean].reenable
-  Rake::Task[:man_clean].reenable
-  Rake::Task[:man_client_clean].reenable
-  Rake::Task[:man_server_clean].reenable
-  Rake::Task[:clean].invoke
-end
-
-
-desc "Builds a Debian package"
-task :deb => [:build_deb] do
-  sh "cp -R #{File.join(D[:pkg],'debian')} #{pkgdir}"
-
-  # Changing directory
-  Dir.chdir(File.join(D[:build],"kadeploy-#{VERSION}"))
-
-  # Building the package
-  #ENV['DH_RUBY_USE_DH_AUTO_INSTALL_DESTDIR'] = '1'
-  sh 'dpkg-buildpackage -us -uc'
+desc "Generate rpm package"
+task :rpm => :build do
+  sh "mkdir -p #{File.join(D[:build],'SOURCES')}"
+  sh "mv #{File.join(D[:build],'*')} #{File.join(D[:build],'SOURCES')} || true"
+  specs = File.read(File.join(D[:pkg],'fedora','kadeploy.spec.in'))
+  specs.gsub!(/KADEPLOY3_LIBS/,INSTALL[:lib][:dir])
+  specs.gsub!(/MAJOR_VERSION/,MAJOR_VERSION)
+  specs.gsub!(/MINOR_VERSION/,MINOR_VERSION)
+  specs.gsub!(/RELEASE_VERSION/,RELEASE_VERSION)
+  File.open(File.join(D[:build],'kadeploy.spec'),'w'){|f| f.write specs}
+  sh "rpmbuild --define '_topdir #{D[:build]}' -ba #{File.join(D[:build],'kadeploy.spec')}"
 end
 
 #desc "Launch the test-suite"
