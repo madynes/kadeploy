@@ -1,0 +1,8 @@
+Change-Id: Iad506cfebfe6c65507284a4d14c893bf46a5e845
+Code-Review+2: Lucas Nussbaum <lucas.nussbaum@loria.fr>
+Verified+1: Lucas Nussbaum <lucas.nussbaum@loria.fr>
+Submitted-by: Lucas Nussbaum <lucas.nussbaum@loria.fr>
+Submitted-at: Thu, 24 Oct 2013 10:34:34 +0200
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1410
+Project: kadeploy3
+Branch: refs/heads/upstream
