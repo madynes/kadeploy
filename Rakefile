@@ -296,20 +296,20 @@ task :apidoc_clean do
   sh "rm -f #{File.join(D[:apidoc],'*.html')}"
 end
 
-task :preinstall, [:root_dir] do |f,args|
+task :prepare, [:root_dir] do |f,args|
   @root_dir = args.root_dir
 end
 
 desc "Install the client and the server"
-task :install, [:root_dir,:distrib] => [:preinstall,:install_client,:install_server]
+task :install, [:root_dir,:distrib] => [:prepare,:install_client,:install_server]
 
 desc "Uninstall the client and the server"
-task :uninstall => [:uninstall_client,:uninstall_server] do
+task :uninstall, [:root_dir] => [:uninstall_client,:uninstall_server] do
   delete_dir(:lib)
 end
 
 desc "Install common files"
-task :install_common, [:root_dir,:distrib] => :preinstall do
+task :install_common, [:root_dir,:distrib] => :prepare do
   create_dir(:lib)
   installf(:lib,:'kadeploy3/common.rb')
 
@@ -320,7 +320,7 @@ task :install_common, [:root_dir,:distrib] => :preinstall do
 end
 
 desc "Uninstall common files"
-task :uninstall_common do
+task :uninstall_common, [:root_dir] => :prepare do
   Dir[File.join(D[:lib],'kadeploy3','common','*.rb')].each do |f|
     uninstallf(:lib_common,f)
   end
@@ -331,7 +331,7 @@ task :uninstall_common do
 end
 
 desc "Install the client"
-task :install_client, [:root_dir,:distrib] => [:preinstall, :man_client, :install_common] do
+task :install_client, [:root_dir,:distrib] => [:prepare, :man_client, :install_common] do
   create_dir(:man1)
   Dir[File.join(D[:man],'*.1')].each do |f|
     installf(:man1,f)
@@ -355,13 +355,13 @@ task :install_client, [:root_dir,:distrib] => [:preinstall, :man_client, :instal
 end
 
 desc "Uninstall the client"
-task :uninstall_client => :uninstall_common do
+task :uninstall_client, [:root_dir] => [:prepare, :uninstall_common] do
   Dir[File.join(D[:man],'*.1')].each do |f|
     uninstallf(:man1,f)
   end
 
   Dir[File.join(D[:bin],'*')].each do |f|
-    uninstallf(:bin,f.to_sym)
+    uninstallf(:bin,File.basename(f).to_sym)
   end
   delete_dir(:bin)
 
@@ -378,7 +378,7 @@ task :uninstall_client => :uninstall_common do
 end
 
 desc "Install the server"
-task :install_server, [:root_dir,:distrib] => [:preinstall,:man_server, :install_common] do |f,args|
+task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_common] do |f,args|
   args.with_defaults(:distrib => 'debian')
   raise "unknown distrib '#{args.distrib}'" unless %w{debian fedora}.include?(args.distrib)
   raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
@@ -427,13 +427,13 @@ task :install_server, [:root_dir,:distrib] => [:preinstall,:man_server, :install
 end
 
 desc "Uninstall the server"
-task :uninstall_server => :uninstall_common do
+task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   Dir[File.join(D[:man],'*.8')].each do |f|
     uninstallf(:man8,f)
   end
 
   Dir[File.join(D[:sbin],'*')].each do |f|
-    uninstallf(:sbin,f.to_sym)
+    uninstallf(:sbin,File.basename(f).to_sym)
   end
   delete_dir(:sbin)
 
@@ -463,12 +463,14 @@ task :uninstall_server => :uninstall_common do
   uninstallf(:rc,'kadeploy3d')
   delete_dir(:rc)
 
-  sh "rm -f #{File.join(INSTALL[:log][:dir],'*')}"
+  logs = File.join(INSTALL[:log][:dir],'*')
+  logs = File.join(@root_dir,logs) if @root_dir
+  sh "rm -f #{logs}"
   delete_dir(:log)
 end
 
 desc "Install kastafior"
-task :install_kastafior, [:root_dir,:distrib] => [:preinstall] do
+task :install_kastafior, [:root_dir,:distrib] => [:prepare] do
   create_dir(:bin)
   installf(:bin,File.join(D[:addons],'kastafior','kastafior'))
 end
