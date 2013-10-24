@@ -530,9 +530,10 @@ task :deb => :build_deb do
   git push origin upstream:refs/for/upstream
   git push origin debian:refs/for/debian
   git push origin #{tag_version}:refs/tags/#{tag_version}
-  git push origin upstream/#{tag_version}:refs/tags/#{tag_version}
-### Tag the final Debian package, push the tag:
-  git tag debian/#{deb_version}-1
+  git push origin upstream/#{tag_version}:refs/tags/upstream/#{tag_version}
+### After the packaging work, tag the final Debian package, push the tag:
+  git commit -m "Update Debian changelog." debian/changelog
+  git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
   git push origin debian/#{deb_version}-1:refs/tags/debian/#{deb_version}-1
 EOF
 end
