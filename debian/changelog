@@ -1,3 +1,9 @@
+kadeploy (3.2.0~git+20131024113232+da1b28b-1) UNRELEASED; urgency=low
+
+  * New Git snapshot based on v3.2.0_git+20131024113232+da1b28b.
+
+ -- Lucas Nussbaum <lucas@debian.org>  Thu, 24 Oct 2013 11:32:40 +0200
+
 kadeploy (3.2.0~alpha1) unstable; urgency=low
 
   * Initial release. (Closes: #XXXXXX)
