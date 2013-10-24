@@ -517,13 +517,11 @@ task :deb => :build_deb do
   sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
   sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
   sh 'git branch -D debian; git checkout -b debian origin/debian'
-  sh 'git checkout master'
-  sh "git-import-orig --upstream-branch=upstream --debian-branch=debian "\
+  sh 'git checkout debian'
+  sh "git-import-orig "\
     "--upstream-version=#{deb_version} "\
-    "--upstream-tag='upstream/v%(version)s' "\
     "--upstream-vcs-tag='#{tag_version}' "\
     "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
-  sh 'git checkout debian'
   sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
   sh 'git-buildpackage --git-ignore-new -uc -us'
   puts <<-EOF
