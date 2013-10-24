@@ -336,6 +336,8 @@ task :install_client, [:root_dir,:distrib] => [:prepare, :man_client, :install_c
   Dir[File.join(D[:man],'*.1')].each do |f|
     installf(:man1,f)
   end
+  create_dir(:man8)
+  installf(:man8,File.join(D[:man],'karights3.8'))
 
   create_dir(:conf)
   installf(:conf,:'client_conf.yml')
@@ -344,6 +346,9 @@ task :install_client, [:root_dir,:distrib] => [:prepare, :man_client, :install_c
   Dir[File.join(D[:bin],'*')].each do |f|
     installf(:bin,File.basename(f).to_sym)
   end
+
+  create_dir(:sbin)
+  installf(:sbin,:karights3)
 
   create_dir(:lib)
   installf(:lib,:'kadeploy3/client.rb')
@@ -359,11 +364,15 @@ task :uninstall_client, [:root_dir] => [:prepare, :uninstall_common] do
   Dir[File.join(D[:man],'*.1')].each do |f|
     uninstallf(:man1,f)
   end
+  uninstallf(:man8,File.join(D[:man],'karights3.8'))
 
   Dir[File.join(D[:bin],'*')].each do |f|
     uninstallf(:bin,File.basename(f).to_sym)
   end
   delete_dir(:bin)
+
+  uninstallf(:sbin,:'karights3')
+  delete_dir(:sbin)
 
   uninstallf(:conf,:'client_conf.yml')
   delete_dir(:conf)
@@ -384,9 +393,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
 
   create_dir(:man8)
-  Dir[File.join(D[:man],'*.8')].each do |f|
-    installf(:man8,f)
-  end
+  installf(:man8,File.join(D[:man],'kadeploy3d.8'))
 
   create_dir(:conf)
   installf(:conf,:'server_conf.yml')
@@ -408,9 +415,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:script,File.join(D[:scripts],'partitioning','fdisk-sample'))
 
   create_dir(:sbin)
-  Dir[File.join(D[:sbin],'*')].each do |f|
-    installf(:sbin,File.basename(f).to_sym)
-  end
+  installf(:sbin,:kadeploy3d)
 
   create_dir(:rc)
   installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy3d'))
@@ -428,13 +433,9 @@ end
 
 desc "Uninstall the server"
 task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
-  Dir[File.join(D[:man],'*.8')].each do |f|
-    uninstallf(:man8,f)
-  end
+  uninstallf(:man8,File.join(D[:man],'kadeploy3d.8'))
 
-  Dir[File.join(D[:sbin],'*')].each do |f|
-    uninstallf(:sbin,File.basename(f).to_sym)
-  end
+  uninstallf(:sbin,:'kadeploy3d')
   delete_dir(:sbin)
 
   Dir[File.join(D[:lib],'kadeploy3','server','*.rb')].each do |f|
@@ -449,7 +450,7 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:conf,:'clusters.yml')
   uninstallf(:conf,:'cmd.yml')
   Dir[File.join(D[:conf],'cluster-*.yml')].each do |f|
-    uninstallf(:conf,f.to_sym)
+    uninstallf(:conf,File.basename(f).to_sym)
   end
   uninstallf(:conf,:version)
   delete_dir(:conf)
