@@ -477,8 +477,12 @@ end
 desc "Clean everything"
 task :clean => [:man_clean, :doc_clean, :apidoc_clean]
 
+task :build_prepare, [:dir] do |f,args|
+  D[:build] = File.expand_path(args.dir) if args.dir
+end
+
 desc "Generate source dir and a tgz package, can be of kind classical or deb, usage: 'rake build[deb]', default: classical"
-task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
+task :build, [:dir,:kind] => [:build_prepare, :build_clean, :man, :doc, :apidoc] do |f,args|
   args.with_defaults(:kind => 'classical')
   sh "echo '#{VERSION}' > #{File.join(D[:conf],'version')}"
   Rake::PackageTask::new("kadeploy",VERSION) do |p|
@@ -501,7 +505,7 @@ task :build, [:kind] => [:build_clean, :man, :doc, :apidoc] do |f,args|
 end
 
 desc "Build an origin archive for debian packaging"
-task :build_deb => :build do
+task :build_deb, [:dir] => :build do
   tmp = File.join(D[:build],"kadeploy")
   sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
 
@@ -512,7 +516,7 @@ task :build_deb => :build do
 end
 
 desc "Generate debian package (Be careful it will break your Git repository !)"
-task :deb => :build_deb do
+task :deb, [:dir] => :build_deb do
   deb_version, tag_version = deb_versions()
   sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
   sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
@@ -551,7 +555,7 @@ task :deb_changelog, [:dir] do |f,args|
 end
 
 desc "Generate rpm package"
-task :rpm => :build do
+task :rpm, [:dir] => :build do
   sh "mkdir -p #{File.join(D[:build],'SOURCES')}"
   sh "mv #{File.join(D[:build],'*')} #{File.join(D[:build],'SOURCES')} || true"
   specs = File.read(File.join(D[:pkg],'fedora','kadeploy.spec.in'))
