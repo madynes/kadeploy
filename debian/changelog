@@ -1,3 +1,9 @@
+kadeploy (3.2.0~alpha4-1) UNRELEASED; urgency=low
+
+  * Move karights3 binaries in the client package
+
+ -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Fri, 25 Oct 2013 11:11:55 +0200
+
 kadeploy (3.2.0~alpha1) unstable; urgency=low
 
   * Initial release. (Closes: #XXXXXX)
