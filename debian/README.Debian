@@ -8,3 +8,5 @@ After installing the kadeploy debian packages,  you need to follow the instructi
 To get more information about the configuration of the server and the client, please refer to the subsections "Server side configuration" and "Client side configuration" of the Kadeploy-VERSION.pdf file.
 
 You'll find the Kadeploy-VERSION.pdf file in /usr/share/doc/kadeploy-common/Kadeploy-VERSION.pdf.
+
+Note: if you want to use Kastafior to broadcast the environment files, you should decompress the /usr/share/doc/kadeploy/kastafior.gz binary in the /usr/bin directory and make the file executable.
