@@ -485,7 +485,7 @@ desc "Clean everything"
 task :clean => [:man_clean, :doc_clean, :apidoc_clean]
 
 task :build_prepare, [:dir] do |f,args|
-  D[:build] = File.expand_path(args.dir) if args.dir
+  D[:build] = File.expand_path(args.dir) if args.dir and !args.dir.empty?
 end
 
 desc "Generate source dir and a tgz package, can be of kind classical or deb, usage: 'rake build[deb]', default: classical"
@@ -515,20 +515,16 @@ desc "Build an origin archive for debian packaging"
 task :build_deb, [:dir] => :build do
   tmp = File.join(D[:build],"kadeploy")
   sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
-
-  puts "\nTarball created in #{D[:build]}"
-  puts "You probably want to:"
-  puts "  git tag v#{VERSION}"
-  puts "  git push origin HEAD:refs/tags/v#{VERSION}"
 end
 
 desc "Generate debian package (Be careful it will break your Git repository !)"
-task :deb, [:dir] => :build_deb do
+task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
+  suff = args.branch_suffix || ''
   deb_version, tag_version = deb_versions()
   sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
-  sh 'git branch -D upstream; git checkout -b upstream origin/upstream'
-  sh 'git branch -D debian; git checkout -b debian origin/debian'
-  sh 'git checkout debian'
+  sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
+  sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
+  sh "git checkout debian#{suff}"
   sh "git-import-orig "\
     "--upstream-version=#{deb_version} "\
     "--upstream-vcs-tag='#{tag_version}' "\
@@ -540,14 +536,14 @@ task :deb, [:dir] => :build_deb do
   puts <<-EOF
 ## When you package is ready, you will need to:
 ### Push upstream and merge modifications and tags
-  git push origin upstream:refs/for/upstream
-  git push origin debian:refs/for/debian
+  git push origin upstream#{suff}:refs/for/upstream#{suff}
+  git push origin debian#{suff}:refs/for/debian#{suff}
   git push origin #{tag_version}:refs/tags/#{tag_version}
-  git push origin upstream/#{tag_version}:refs/tags/upstream/#{tag_version}
+  git push origin upstream#{suff}/#{tag_version}:refs/tags/upstream#{suff}/#{tag_version}
 ### After the packaging work, tag the final Debian package, push the tag:
-  git commit -m "Update Debian changelog." debian/changelog
+  git commit -m "Update Debian changelog for #{deb_version}" debian#{suff}/changelog
   git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
-  git push origin debian/#{deb_version}-1:refs/tags/debian/#{deb_version}-1
+  git push origin debian#{suff}/#{deb_version}-1:refs/tags/debian#{suff}/#{deb_version}-1
 EOF
 end
 
