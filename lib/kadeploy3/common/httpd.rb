@@ -648,7 +648,6 @@ module HTTPd
     end
 
     def unbind(path)
-  puts "UNBIND #{path}"
       @server.umount(path)
     end
   end
