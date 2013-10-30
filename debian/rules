@@ -16,6 +16,10 @@ override_dh_auto_install:
 	mv debian/kadeploy-common/usr/bin/* debian/kadeploy-client/usr/bin/
 	rmdir debian/kadeploy-common/usr/bin
 
+override_dh_fixperms:
+	dh_fixperms
+	chmod 600 debian/kadeploy/etc/kadeploy3/server_conf.yml
+
 # generation of custom packages with a suffix
 # use with DEB_BUILD_OPTIONS=devpkg=dev
 ifneq (,$(filter devpkg=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
