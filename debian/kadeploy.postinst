@@ -6,6 +6,8 @@ then
         useradd --system --create-home --base-dir /var/lib deploy
 fi
 
+chown -R root:deploy /etc/kadeploy3/*.yml
+
 touch /var/log/kadeploy3/output.log
 touch /var/log/kadeploy3/error.log
 touch /var/log/kadeploy3/httpd.log
