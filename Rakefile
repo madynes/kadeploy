@@ -6,20 +6,25 @@ require 'tmpdir'
 require 'tempfile'
 require 'date'
 
-MAJOR_VERSION=File.read('major_version').strip
-MINOR_VERSION=File.read('minor_version').strip
-RELEASE_VERSION=File.read('release_version').strip
-if RELEASE_VERSION == 'git'
-  Object.instance_eval{remove_const(:RELEASE_VERSION)}
-  RELEASE_VERSION="git+#{Time.now.strftime('%Y%m%d%H%M%S')}"
-  if system('git status > /dev/null')
-    tmp = RELEASE_VERSION
-    Object.instance_eval{remove_const(:RELEASE_VERSION)}
-    RELEASE_VERSION="#{tmp}+#{%x{git log --pretty=format:'%h' -n 1}}"
+def self.set_version()
+  Object.instance_eval{const_set(:MAJOR_VERSION,File.read('major_version').strip)}
+  Object.instance_eval{const_set(:MINOR_VERSION,File.read('minor_version').strip)}
+  if ((rel=File.read('release_version').strip) == 'git')
+    tmp = "git+#{Time.now.strftime('%Y%m%d%H%M%S')}"
+    if system('git status > /dev/null')
+      Object.instance_eval{const_set(:RELEASE_VERSION,
+        "#{tmp}+#{%x{git log --pretty=format:'%h' -n 1}}")}
+    else
+      Object.instance_eval{const_set(:RELEASE_VERSION,tmp)}
+    end
+  else
+    Object.instance_eval{const_set(:RELEASE_VERSION,rel)}
   end
+  Object.instance_eval{const_set(:VERSION,
+    "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}")}
 end
 
-VERSION="#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
+set_version()
 
 DEPLOY_USER='deploy'
 
@@ -202,6 +207,21 @@ def uninstallf(kind,file,filename=nil)
   dest = File.join(dest,filename) if filename
   dest = File.join(@root_dir,dest) if @root_dir
   sh "rm -f #{File.join(dest,file.to_s)}"
+end
+
+def deb_generate(suff)
+  deb_version, tag_version = deb_versions()
+  sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
+  sh "git tag -d 'upstream#{suff}/#{tag_version}'; true"
+  sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
+  sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
+  sh "git checkout debian#{suff}"
+  sh "git-import-orig "\
+    "--upstream-version=#{deb_version} "\
+    "--upstream-vcs-tag='#{tag_version}' "\
+    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
+  sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
+  sh 'git-buildpackage --git-ignore-new -uc -us'
 end
 
 def deb_versions()
@@ -523,19 +543,12 @@ end
 desc "Generate debian package (Be careful it will break your Git repository !)"
 task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   suff = args.branch_suffix || ''
-  deb_version, tag_version = deb_versions()
-  sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
-  sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
-  sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
-  sh "git checkout debian#{suff}"
-  sh "git-import-orig "\
-    "--upstream-version=#{deb_version} "\
-    "--upstream-vcs-tag='#{tag_version}' "\
-    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
-  sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
-  sh 'git-buildpackage --git-ignore-new -uc -us'
+
+  deb_generate(suff)
+
   Rake::Task[:build_clean].reenable
   Rake::Task[:build_clean].invoke
+
   puts <<-EOF
 ## When you package is ready, you will need to:
 ### Push upstream and merge modifications and tags
@@ -548,6 +561,27 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
   git push origin debian#{suff}/#{deb_version}-1:refs/tags/debian#{suff}/#{deb_version}-1
 EOF
+end
+
+desc "Generate a debian snapshot"
+task :deb_snapshot, [:dir,:branch_suffix] => :build_deb do |f,args|
+  suff = args.branch_suffix || ''
+
+  # Set the version to the git one
+  old_version = VERSION
+  sh "echo 'git' > release_version"
+  sh "git commit -m 'git' release_version"
+  set_version()
+
+  tmp = File.join(D[:build],"kadeploy")
+  sh "mv #{tmp}_#{old_version}.orig.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
+
+  deb_version, tag_version = deb_versions()
+
+  deb_generate(suff)
+
+  Rake::Task[:build_clean].reenable
+  Rake::Task[:build_clean].invoke
 end
 
 desc "Generate debian changelog file"
