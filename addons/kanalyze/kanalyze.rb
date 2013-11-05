@@ -27,35 +27,11 @@ require 'shellwords'
 # Config
 SSH_KEY='~/.ssh/id_rsa.pub'
 KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
-KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
-KADEPLOY_RETRIES=3
-KABOOTSTRAP_RETRIES=3
-KABOOTSTRAP_BIN=ENV['KABOOTSTRAP_BIN']||'../kabootstrap'
-KABOOTSTRAP_KERNELS=ENV['KABOOTSTRAP_KERNELS']||'/home/lsarzyniec/kernels'
-KABOOTSTRAP_ENVS=ENV['KABOOTSTRAP_ENVS']||'/home/lsarzyniec/envs-tmp'
-ENVIRONMENT=ENV['KADEPLOY_ENV']||'wheezy-x64-base'
-KASTAT_BIN='kastat3'
 REMOTE=false
 CONSOLE_BIN="/usr/local/conman/bin/conman"
 CONSOLE_CMD="#{CONSOLE_BIN} -f -d conman"
 SCRIPT_BIN="/usr/bin/script"
-OARTAG="kanalyze"
-GIT_REPO=ENV['GIT_REPO']||'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
-GERRIT_REPO=ENV['GERRIT_REPO']||'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
-# Kadeploy environment variables
-KADEPLOY_ENV_VARS=[
-  'KADEPLOY_BIN',
-  'KABOOTSTRAP_BIN',
-  'ENVIRONMENT',
-  'KABOOTSTRAP_KERNELS',
-  'KABOOTSTRAP_ENVS',
-  'KABOOTSTRAP_OPTS',
-  'GIT_REPO',
-  'GERRIT_REPO',
-  'HTTP_PROXY',
-  'SSH_OPTIONS',
-  'DEBUG',
-]
+
 # Allowed values
 MACROSTEPS = {
   :SetDeploymentEnv => {
@@ -97,75 +73,14 @@ end
 
 
 #Contains useful functions to work with g5k tools
-module CommonG5K
-
-  def cmd(cmd,checkstatus=true)
-    puts "=== COMMAND: #{cmd} ===" if $verbose
-    ret=`#{cmd}`
-    if checkstatus and !$?.success?
-      $stderr.puts("Unable to perform the command: #{cmd}\n=== Error ===\n#{ret}")
-    end
-    puts "=== STDOUT ===\n#{ret}" if ret and !ret.empty? and $verbose
-    ret.strip
+def cmd(cmd,checkstatus=true)
+  puts "=== COMMAND: #{cmd} ===" if $verbose
+  ret=`#{cmd}`
+  if checkstatus and !$?.success?
+    $stderr.puts("Unable to perform the command: #{cmd}\n=== Error ===\n#{ret}")
   end
-
-  def reserve_nodes(cluster,nodes,walltime)
-    puts "Make the reservation" if $verbose
-    vars = ''
-    KADEPLOY_ENV_VARS.each do |var|
-      vars << " #{var}=\"#{ENV[var]}\"" if ENV[var]
-    end
-    env = (vars.empty? ? '' : "export #{vars};")
-    command="oarsub -t deploy -n #{OARTAG}"
-    command+=" -l {\"type='kavlan-local'\"}/vlan=1+"
-    command+="{'cluster=\"#{cluster}\"'}" if cluster!=""
-    command+="/nodes=#{$best ? "BEST" : nodes},walltime=#{walltime} 'ruby kanalyze.rb --installmode -y #{$expfile}"
-    command+=" --kastat" if $kastat
-    command+=" -v'"
-    
-    ret=cmd(command)
-    $jobid=ret.split("\n").grep(/OAR_JOB_ID/).to_s.split("=")[1]
-  end
-
-  def prepare_env
-    puts 'Enable VLAN DHCP' if $verbose
-    cmd('kavlan -e')
-    vlan=`kavlan -V`.chomp
-    puts 'Running Kadeploy...' if $verbose
-    kadeploy($nodes,ENVIRONMENT,vlan)
-    puts 'done' if $verbose
-  end
-
-def kadeploy(nodes,env,vlan)
-  bin=KADEPLOY_BIN
-  begin
-    tmpfile=cmd('mktemp')
-    tmpkofile=cmd('mktemp')
-    i=0
-    node_list = String.new
-    nodes.each { |node|
-      node_list += " -m #{node}"
-    }
-    begin
-      command="#{bin} #{node_list} -e #{env} -k -o #{tmpfile} -n #{tmpkofile}"
-      command+=" --vlan #{vlan}" if vlan
-      command+=" --ignore-nodes-deploying "
-      cmd(command)
-      deployed_nodes=File.read(tmpfile).split("\n").uniq
-      i+=1
-      puts deployed_nodes.sort
-      puts $nodes.sort
-      if File.exist?(tmpkofile)
-        nodes=IO.read(tmpkofile).split("\n").uniq
-        nodes.each { |node|
-          node_list += " -m #{node}"
-        }
-      end
-    end while nodes.size>0 and i<KADEPLOY_RETRIES
-  ensure
-    cmd("rm -f #{tmpfile}") if tmpfile
-    cmd("rm -f #{tmpkofile}") if tmpkofile
-  end
+  puts "=== STDOUT ===\n#{ret}" if ret and !ret.empty? and $verbose
+  ret.strip
 end
 
 def kareboot_prod(nodes)
@@ -176,25 +91,6 @@ def kareboot_prod(nodes)
   cmd("kareboot3 #{node_list} -r env_recorded --env-name squeeze-x64-prod -p 2")
 end
 
-def kabootstrap(nodefile,repo_kind,commit,version)
-    frontend=nil
-    ret=nil
-    i = 0
-    begin
-      ret=cmd("#{KABOOTSTRAP_BIN} #{KABOOTSTRAP_KERNELS} #{KABOOTSTRAP_ENVS} -f #{nodefile} --#{repo_kind} #{commit} -v #{version}" ,false)
-      if ret.split("\n")[-1] =~ /^Frontend:\s*([\w\-_\.]+@[\w\-_\.]+)\s*$/
-        frontend=Regexp.last_match(1)
-      end
-      i+=1
-    end while frontend.nil? and i<KABOOTSTRAP_RETRIES
-    
-    if frontend.nil?
-      exit_error("Unable to perform kabootstrap\n=== Error ===\n#{ret}")
-    end
-  frontend
-  end
-
-end
 def kill_recursive(pid)
   begin
     # SIGSTOPs the process to avoid it creating new children
@@ -241,15 +137,6 @@ def conlogger_stop(envcondir,nodes)
     end
   end
   puts "      Stop monitoring" if $verbose
-end
-
-def exit_error(errmsg)
-  $stderr.puts errmsg
-  exit 1
-end
-
-def yaml_error(msg)
-  exit_error("Error in YAML file: #{msg}")
 end
 
 def check_field(name,val,type=nil)
@@ -795,16 +682,16 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   if $mode != Kanalyzemode::RESCUE_STATS
 #checks the yaml file
     if yaml_file.empty? 
-      exit_error "You have to specify a YAML test file"
+      error "You have to specify a YAML test file"
     end
     if !File.exist?(yaml_file)
-      exit_error "The file #{yaml_file} does not exist"
+      error "The file #{yaml_file} does not exist"
     end
     yaml_file = File.expand_path(yaml_file)
     begin
       $exps = YAML.load_file(yaml_file)
     rescue
-      exit_error("file '#{yaml_file}' should use YAML format")
+      error("file '#{yaml_file}' should use YAML format")
     end
     check_exp($exps)
  end 
@@ -814,13 +701,13 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
     if  $exps[exp.to_i]
       $exp_rank=exp.to_i
     else
-      exit_error("The experiment #{exp} is not in the YAML file")
+      error("The experiment #{exp} is not in the YAML file")
     end
   end
 
 #ckecks the time
   if ($walltime<0)
-    exit_error "Reservation duration must be a positive integer"
+    error "Reservation duration must be a positive integer"
   end
 
 #checks the nodes file
@@ -831,9 +718,9 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
     end
     if !File.exists?($filenode)
       if $filenode==`echo $OAR_FILE_NODES`.chomp 
-        exit_error "You have to reserve some nodes to run "+$scriptname
+        error "You have to reserve some nodes to run "+$scriptname
       else
-        exit_error "The file #{$filenode} does not exist"
+        error "The file #{$filenode} does not exist"
       end
     else
       File.read($filenode).split("\n").uniq.each { |node| nodes.push(node) }
@@ -859,7 +746,7 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   if $mode==Kanalyzemode::RESERVE
 #checks nodes count
     if (!$best && nodescount<2) 
-      exit_error "You have to test with at least 2 nodes"
+      error "You have to test with at least 2 nodes"
     end
     $nodescount=nodescount
   end
@@ -971,412 +858,10 @@ def run_test(exp)
   $stats={}
 end
 
-include CommonG5K
 
 $scriptname=File.basename($0,File.extname($0))
 load_cmdline_options
 $savedir = File.join($dir,$scriptname+"-"+$name)
-
-CommonG5K.reserve_nodes($cluster,$nodescount,$walltime) if $mode==Kanalyzemode::RESERVE
-
-if $mode==Kanalyzemode::INSTALL
-  CommonG5K.prepare_env()
-  puts "Creating directory '#{$savedir}'" if $verbose
-  FileUtils.mkdir_p($savedir)
-
-  $statsdir=File.join($savedir,"stats")
-  puts "Creating stats directory '#{$statsdir}'" if $verbose
-  FileUtils.mkdir_p($statsdir)
-
-  git=""
-  version=""
-  $exps.each do |exp|
-    if ( exp['git']!=git || exp['version']!=version )
-      puts "New Kadeploy version to use: performing Kabootstrap" if $verbose
-      if $exps.index(exp)>0
-        CommonG5K.cmd("kavlan -e")
-        kadeploy($nodes,ENVIRONMENT,`kavlan -V`.chomp)#Redeploys nodes before Kabootstrap if it's not the first experience
-      end
-      frontend=CommonG5K.kabootstrap("$OAR_FILE_NODES","git",exp['git'],exp['version'])
-    end
-    git=exp['git']
-    version=exp['version']
-    command="scp #{$0} #{$expfile} #{frontend}:."
-    CommonG5K.cmd(command)
-    command="ssh #{frontend} ruby #{$0} --testmode -y #{$expfile.split('/').last} -f NODEFILE -e #{$exps.index(exp)} -v"
-    command+=" --kastat" if $kastat
-    ret=CommonG5K.cmd(command)
-    remote_savedir=/Done, statistics are available in '(.+)'/.match(ret.split("\n").last)[1]
-    remote_statsdir=File.join(remote_savedir,"stats")
-    remote_expdir=File.join(remote_savedir,exp['name'])
-    command="scp -r #{frontend}:#{remote_statsdir} #{frontend}:#{remote_expdir} #{$savedir}"
-    CommonG5K.cmd(command)
-  end
-  generate_stats
-end
-
-
-def generate_stats
-  rscript= <<RSCRIPT
-library(ggplot2)
-
-args=commandArgs(TRUE)
-
-if (length(args)==0) files=c("#{$csvfiles.join("\",\"")}") else files=args
-
-data=data.frame()
-
-for (file in files)
-{  
-  if(length(data)==0)
-  {
-    data<-read.csv(file,head=TRUE,sep=",")
-  }
-  else
-  {
-    data<-rbind(data,read.csv(file,head=TRUE,sep=","))
-  }
-}
-
-numl=length(data[,1])
-numc=length(data[1,])
-
-zeros=rep(0,numl)
-times_df=cbind(zeros,data$time1,data$time2,data$time3)
-cumtimes_tmp=apply(times_df,1,cumsum)
-cumtimes=as.vector(cumtimes_tmp)
-
-maxis=apply(cumtimes_tmp,1,max)
-minis=apply(cumtimes_tmp,1,min)
-means=apply(cumtimes_tmp,1,mean)
-cumtimes_stats=as.vector(cbind(maxis,minis,means))
-
-run_ids=as.vector(apply(data["id"],1,function(x) rep(x,4)))
-run_ids_stats=as.vector(sapply(c("Maximum","Minimum","Mean"),function(x) rep(x,4)))
-
-times=as.vector(t(cbind(data["time1"],data["time2"],data["time3"])))
-times1=as.vector(t(data["time1"]))
-times2=as.vector(t(data["time2"]))
-times3=as.vector(t(data["time3"]))
-
-kadeploy_version=as.vector(t(data["kadeploy"]))
-names1=as.vector(t(data["step1"]))
-names2=as.vector(t(data["step2"]))
-names3=as.vector(t(data["step3"]))
-
-experiments=as.vector(t(data["expname"]))
-success=as.vector(t(data["success"]))
-grep=as.vector(t(data["grep"]))
-run_ids_success=as.vector(t(data["id"]))
-iters=as.vector(t(data["iter"]))
-
-output=c()
-
-success_mean=mean(success)
-time1_mean=mean(times1)
-time2_mean=mean(times2)
-time3_mean=mean(times3)
-
-output=c(output,paste("Success Rate \\\\dotfill",round(success_mean,2),"\\\\% \\\\\\\\"))
-output=c(output,paste("Step1 duration mean \\\\dotfill",round(time1_mean,2),"s \\\\\\\\"))
-output=c(output,paste("Step2 duration mean \\\\dotfill",round(time2_mean,2),"s \\\\\\\\"))
-output=c(output,paste("Step3 duration mean \\\\dotfill",round(time3_mean,2),"s \\\\\\\\"))
-
-for(level in levels(data$kadeploy))
-{
-  dataset=subset(data,kadeploy==level)
-  output=c(output,paste("Step1 duration mean for Kadeploy",level,"\\\\dotfill",round(mean(as.vector(t(dataset["time1"]))),2),"s \\\\\\\\"))
-  output=c(output,paste("Step2 duration mean for Kadeploy",level,"\\\\dotfill",round(mean(as.vector(t(dataset["time2"]))),2),"s \\\\\\\\"))
-  output=c(output,paste("Step3 duration mean for Kadeploy",level,"\\\\dotfill",round(mean(as.vector(t(dataset["time3"]))),2),"s \\\\\\\\"))
-}
-
-times1_by_macro=subset(data,select=c("step1","time1"))
-times2_by_macro=subset(data,select=c("step2","time2"))
-times3_by_macro=subset(data,select=c("step3","time3"))
-for(level in levels(data$step1))
-{
-  time1_by_macro_mean=mean(t(subset(times1_by_macro,step1==level)["time1"]))
-  output=c(output,paste(level,"duration mean \\\\dotfill",round(time1_by_macro_mean,2),"s \\\\\\\\"))
-}
-for(level in levels(data$step2))
-{
-  time2_by_macro_mean=mean(t(subset(times2_by_macro,step2==level)["time2"]))
-  output=c(output,paste(level,"duration mean \\\\dotfill",round(time2_by_macro_mean,2),"s \\\\\\\\"))
-}
-for(level in levels(data$step3))
-{
-  time3_by_macro_mean=mean(t(subset(times3_by_macro,step3==level)["time3"]))
-  output=c(output,paste(level,"duration mean \\\\dotfill",round(time3_by_macro_mean,2),"s \\\\\\\\"))
-}
-
-dir.create("pictures")
-
-steps=c("0","step1","step2","step3")
-fr=data.frame(cumtimes_stats,steps,run_ids_stats)
-
-graph<-ggplot(fr,aes(x=steps,y=cumtimes_stats,color=run_ids_stats,group=run_ids_stats))+geom_point()+geom_line()#+theme(legend.position="bottom") 
-graph<-graph+ylab("Time (s)")+xlab("Steps")+ggtitle("Evolution of steps on the time")+scale_fill_discrete(name="Runs")
-ggsave(file=paste("pictures/steps-line.jpeg",sep=""),dpi=300)
-
-steps=c("step1","step2","step3")
-fr=data.frame(times,steps)
-
-graph<-ggplot(fr,aes(x=steps,y=times,fill=steps,group=steps))+geom_boxplot(alpha=.5)+geom_line()+theme(legend.position="bottom")
-graph<-graph+ylab("Time (s)")+xlab("Steps")+ggtitle("Times of steps")+scale_fill_discrete(name="Steps")
-ggsave(file=paste("pictures/steps-boxplot.jpeg",sep=""),dpi=300)
-
-groups=paste(kadeploy_version,names1)
-fr=data.frame(times1,groups,kadeploy_version)
-
-graph<-ggplot(fr,aes(x=groups,y=times1,fill=kadeploy_version,group=groups))+geom_boxplot(alpha=.5)+geom_line()
-graph=graph+scale_fill_discrete(name="Kadeploy Versions")
-graph<-graph+ylab("Time (s)")+xlab("Versions")+ggtitle(paste("Times of step 1 for different versions of Kadeploy"))
-graph<-graph+theme(axis.text.x = element_text(angle = 90))
-ggsave(file=paste("pictures/boxplot1-per-kadeploy.jpeg",sep=""),dpi=300)
-
-groups=paste(kadeploy_version,names2)
-fr=data.frame(times2,groups,kadeploy_version)
-
-graph<-ggplot(fr,aes(x=groups,y=times2,fill=kadeploy_version,group=groups))+geom_boxplot(alpha=.5)+geom_line()
-graph=graph+scale_fill_discrete(name="Kadeploy Versions")
-graph<-graph+ylab("Time (s)")+xlab("Versions")+ggtitle(paste("Times of step 2 for different versions of Kadeploy"))
-graph<-graph+theme(axis.text.x = element_text(angle = 90))
-ggsave(file=paste("pictures/boxplot2-per-kadeploy.jpeg",sep=""),dpi=300)
-
-groups=paste(kadeploy_version,names3)
-fr=data.frame(times3,groups,kadeploy_version)
-
-graph<-ggplot(fr,aes(x=groups,y=times3,fill=kadeploy_version,group=groups))+geom_boxplot(alpha=.5)+geom_line()
-graph=graph+scale_fill_discrete(name="Kadeploy Versions")
-graph<-graph+ylab("Time (s)")+xlab("Versions")+ggtitle(paste("Times of step 3 for different versions of Kadeploy"))
-graph<-graph+theme(axis.text.x = element_text(angle = 90))
-ggsave(file=paste("pictures/boxplot3-per-kadeploy.jpeg",sep=""),dpi=300)
-RSCRIPT
-
-  if $grep != ""
-    rscript=rscript+ <<RSCRIPT
-groups=paste(experiments,iters)
-fra=data.frame(groups,success,experiments)
-colnames(fra) <- c("groups", "nb", "experiments")
-fra$type<-'success'
-frb=data.frame(groups,grep,experiments)
-colnames(frb) <- c("groups", "nb", "experiments")
-frb$type<-'grep #{$grep}'
-fr <- rbind(fra,frb)
-graph<-ggplot(fr,aes(x=groups,y=nb,fill=type))+geom_bar(data=subset(fr,type=='success'),stat="identity",alpha=.5)+geom_bar(data=subset(fr,type=='grep #{$grep}'),stat="identity",alpha=.5)
-graph=graph+scale_fill_discrete(name="Experiments")
-graph<-graph+ylab("Success Rate (%)")+xlab("Runs")+ggtitle(paste("Success rate of different test runs"))
-graph<-graph+theme(axis.text.x = element_text(angle = 90))
-ggsave(file=paste("pictures/success.jpeg",sep=""),dpi=300)
-RSCRIPT
-  else
-    rscript=rscript+ <<RSCRIPT
-
-groups=paste(experiments,iters)
-fr=data.frame(groups,success,experiments)
-
-graph<-ggplot(fr,aes(x=groups,y=success,fill=experiments))+geom_bar(stat="identity",alpha=.5)
-graph=graph+scale_fill_discrete(name="Experiments")
-graph<-graph+ylab("Success Rate (%)")+xlab("Runs")+ggtitle(paste("Success rate of different test runs"))
-graph<-graph+theme(axis.text.x = element_text(angle = 90))
-ggsave(file=paste("pictures/success.jpeg",sep=""),dpi=300)
-RSCRIPT
-  end
-
-rscript_micro= <<RSCRIPT_M
-#MICROSTEPS
-
-microtimes1_cols=c()
-microtimes2_cols=c()
-microtimes3_cols=c()
-microids1=c()
-microids2=c()
-microids3=c()
-
-for(col in colnames(data))
-{
-  if(substr(col,1,6)=="time1_")
-  {
-    microtimes1_cols<-c(microtimes1_cols,col)
-  }
-  if(substr(col,1,6)=="time2_")
-  {
-    microtimes2_cols<-c(microtimes2_cols,col)
-  }
-  if(substr(col,1,6)=="time3_")
-  {
-    microtimes3_cols<-c(microtimes3_cols,col)
-  }
-  if(substr(col,1,6)=="step1_")
-  {
-    microids1<-c(microids1,col)
-  }
-  if(substr(col,1,6)=="step2_")
-  {
-    microids2<-c(microids2,col)
-  }
-  if(substr(col,1,6)=="step3_")
-  {
-    microids3<-c(microids3,col)
-  }
-
-}
-microtimes1_df<-subset(data,select=microtimes1_cols)
-microtimes2_df<-subset(data,select=microtimes2_cols)
-microtimes3_df<-subset(data,select=microtimes3_cols)
-
-
-microtimes_df=cbind(microtimes1_df,microtimes2_df,microtimes3_df)
-microids=c(microids1,microids2,microids3)
-cumicrotimes=as.vector(apply(microtimes_df,1,cumsum))
-microrun_ids=as.vector(apply(data["id"],1,function(x) rep(x,length(microtimes_df))))
-
-microtimes1=as.vector(t(microtimes1_df))
-microtimes2=as.vector(t(microtimes2_df))
-microtimes3=as.vector(t(microtimes3_df))
-
-micronames_out=c()
-
-micronames=unique(subset(data,select=microids))
-
-for(i in 1:length(micronames))
-{
-    micronames_out=c(micronames_out,paste(colnames(micronames)[i],"\\\\dotfill",micronames[,i],"\\\\\\\\"))
-}
-
-con <- file("micronames.txt", open = "w")
-writeLines(micronames_out, con = con)
-close(con)
-
-
-
-fr=data.frame(cumicrotimes,microids,microrun_ids)
-
-graph<-ggplot(fr,aes(x=microids,y=cumicrotimes,color=microrun_ids,group=microrun_ids))+geom_point()+geom_line() 
-graph<-graph+xlab("Microsteps")+ylab("Time (s)")+ggtitle("Evolution of microsteps on the time")+scale_fill_discrete(name="Runs")
-graph<-graph+theme(axis.text.x = element_text(angle = 90))
-ggsave(file=paste("pictures/microsteps-line.jpeg",sep=""),dpi=300)
-
-fr=data.frame(microtimes1,microids1)
-
-graph<-ggplot(fr,aes(x=microids1,y=microtimes1,fill=microids1,group=microids1))+geom_boxplot(alpha=.5)+geom_line()
-graph<-graph+ylab("Time (s)")+xlab("Microsteps")+ggtitle(paste("Times of microsteps of ",levels(data$step1)))
-graph<-graph+scale_fill_discrete(name="Microsteps")
-ggsave(file=paste("pictures/microsteps1-boxplot.jpeg",sep=""),dpi=300)
-
-fr=data.frame(microtimes2,microids2)
-
-graph<-ggplot(fr,aes(x=microids2,y=microtimes2,fill=microids2,group=microids2))+geom_boxplot(alpha=.5)+geom_line()
-graph<-graph+ylab("Time (s)")+xlab("Microsteps")+ggtitle(paste("Times of microsteps of ",levels(data$step2)))
-graph<-graph+scale_fill_discrete(name="Microsteps")
-ggsave(file=paste("pictures/microsteps2-boxplot.jpeg",sep=""),dpi=300)
-
-fr=data.frame(microtimes3,microids3)
-
-graph<-ggplot(fr,aes(x=microids3,y=microtimes3,fill=microids3,group=microids3))+geom_boxplot(alpha=.5)+geom_line()
-graph<-graph+ylab("Time (s)")+xlab("Microsteps")+ggtitle(paste("Times of microsteps of ",levels(data$step3)))
-graph<-graph+scale_fill_discrete(name="Microsteps")
-ggsave(file=paste("pictures/microsteps3-boxplot.jpeg",sep=""),dpi=300)
-
-RSCRIPT_M
-
-rscript_write= <<RSCRIPT_WRITE
-con <- file("data.tex", open = "w")
-writeLines(output, con = con)
-close(con)
-RSCRIPT_WRITE
-
-
-filescript=File.join($statsdir,"kanalyze.r")
-
-puts "Generating R script: '#{filescript}'" if $verbose
-
-File::open(filescript,"w") do |f|
-  f << rscript
-  f << rscript_micro if $microsteps
-  f << rscript_write
-  end
-
-latex=<<LATEX_SCRIPT
-
-\\documentclass[12pt]{article}
-
-\\usepackage[utf8]{inputenc}
-\\usepackage[english]{babel}
-\\usepackage[T1]{fontenc}
-\\usepackage{graphicx}
-\\usepackage[top=2cm, bottom=2cm, left=2cm, right=2cm]{geometry}
-\\title{Kanalyze Report}
-\\date{ #{Time.now.year}-#{Time.now.mon}-#{Time.now.day}-#{Time.now.hour}:#{Time.now.min}:#{Time.now.sec} }
-\\begin{document}
-\\maketitle
-{\\LARGE General statistics}
-\\newline
-\\input{"data.tex"}
-\\newline
-{\\LARGE Deployment with macrosteps}\\\\
-\\includegraphics[width=9cm]{pictures/steps-line}
-\\includegraphics[width=9cm]{pictures/success}
-\\includegraphics[width=9cm]{pictures/steps-boxplot}
-\\includegraphics[width=9cm]{pictures/boxplot1-per-kadeploy}
-\\includegraphics[width=9cm]{pictures/boxplot2-per-kadeploy}
-\\includegraphics[width=9cm]{pictures/boxplot3-per-kadeploy}
-LATEX_SCRIPT
-
-micro_latex=<<MICRO_LATEX_SCRIPT
-\\newpage
-{\\LARGE Deployment with microsteps}\\\\
-\\includegraphics[width=9cm]{pictures/microsteps-line}
-\\includegraphics[width=9cm]{pictures/microsteps1-boxplot}
-\\includegraphics[width=9cm]{pictures/microsteps2-boxplot}
-\\includegraphics[width=9cm]{pictures/microsteps3-boxplot}
-
-
-MICRO_LATEX_SCRIPT
-
-filescript=File.join($statsdir,"kanalyze.tex")
-
-puts "Generating LaTeX script: '#{filescript}"
-
-File::open(filescript,"w") do |f|
-  f << latex
-  f << micro_latex if $microsteps
-  f << "\\end{document}"
-  end
-
-make=<<MAKE
-  echo 'Executing R script'
-  Rscript kanalyze.r *.csv
-  echo 'Compiling LaTeX report'
-  pdflatex kanalyze.tex
-MAKE
-
-makefile=File.join($statsdir,"make.sh")
-
-File::open(makefile,"w") do |f|
-  f << make
-  end
-
-puts "Done, statistics are available in '#{$savedir}'"
-
-end
-
-if $mode==Kanalyzemode::TEST
-  puts "Creating directory '#{$savedir}'" if $verbose
-  FileUtils.mkdir_p($savedir)
-
-  $statsdir=File.join($savedir,"stats")
-  puts "Creating stats directory '#{$statsdir}'" if $verbose
-  FileUtils.mkdir_p($statsdir)
-  if $exp_rank.nil?
-    $exps.each do |exp|
-      run_test(exp)
-    end
-  else
-    run_test($exps[$exp_rank]) 
-  end
-  generate_stats
-end
 
 if $mode==Kanalyzemode::RESCUE_STATS
   $statsdir=File.join($dir,"stats")
@@ -1400,7 +885,30 @@ if $mode==Kanalyzemode::RESCUE_STATS
       end
       store_stats(exp['name'],$dir, exp['iter'])
     }
-  end 
-  generate_stats
+  end
+else
+  puts "Creating directory '#{$savedir}'" if $verbose
+  FileUtils.mkdir_p($savedir)
+
+  $statsdir=File.join($savedir,"stats")
+  puts "Creating stats directory '#{$statsdir}'" if $verbose
+  FileUtils.mkdir_p($statsdir)
+  if $exp_rank.nil?
+    $exps.each do |exp|
+      run_test(exp)
+    end
+  else
+    run_test($exps[$exp_rank])
+  end
+
+  remote_savedir=/Done, statistics are available in '(.+)'/.match(ret.split("\n").last)[1]
+  remote_statsdir=File.join(remote_savedir,"stats")
+  remote_expdir=File.join(remote_savedir,exp['name'])
+  cmd("scp -r #{frontend}:#{remote_statsdir} #{frontend}:#{remote_expdir} #{$savedir}")
 end
+
+generate_stats
+
+
+
 

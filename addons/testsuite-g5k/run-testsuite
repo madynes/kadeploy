@@ -1,6 +1,18 @@
 #!/bin/bash -e
 
+if [ -z "$TESTSUITE_DIR" ]
+then
+  TESTSUITE_DIR=$(pwd)
+fi
+
 frontend=`mktemp`
-${HOME}/katestsuite/kabootstrap-setup $1 $2 $frontend $3
-${HOME}/katestsuite/kadeploy-testsuite $1 $(cat $frontend) $3
+${TESTSUITE_DIR}/kabootstrap-setup $2 $3 $frontend $4
+
+if [ "$1" -eq "test" ]
+then
+  ${TESTSUITE_DIR}/kadeploy-testsuite $2 $(cat $frontend) $4
+else
+  ${TESTSUITE_DIR}/kanalyse-testsuite $2 $(cat $frontend)
+fi
+
 rm -f $frontend
