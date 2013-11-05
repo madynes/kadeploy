@@ -14,11 +14,12 @@ KADEPLOY_ENV_VARS=[
   'GERRIT_REPO',
   'HTTP_PROXY',
   'SSH_OPTIONS',
+  'KANALYZE_RESULTS_DIR',
   'DEBUG',
 ]
-TESTSUITE_DIR=ENV['TESTSUITE_DIR']||"#{ENV['HOME']}/katestsuite"
+TESTSUITE_DIR=ENV['TESTSUITE_DIR']||Dir.pwd
 KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
-ENVIRONMENT=ENV['KADEPLOY_ENV']||'wheezy-x64-base'
+KADEPLOY_ENV=ENV['KADEPLOY_ENV']||'wheezy-x64-base'
 KADEPLOY_RETRIES=3
 KABOOTSTRAP_BIN=ENV['KABOOTSTRAP_BIN']||File.join(TESTSUITE_DIR,'kabootstrap')
 KABOOTSTRAP_KERNELS=ENV['KABOOTSTRAP_KERNELS']||File.join(TESTSUITE_DIR,'kernels')
@@ -41,6 +42,7 @@ TEST_KAPOWER='test_kapower.rb'
 TEST_KAENV='test_kaenv.rb'
 TEST_KASTAT='test_kastat.rb'
 TEST_KANODES='test_kanodes.rb'
+KANALYZE_RESULTS_DIR='kanalyze-results'
 DEBUG=false
 
 def cmd(cmd,checkstatus=true)
@@ -53,8 +55,12 @@ def cmd(cmd,checkstatus=true)
   ret.strip
 end
 
-def scp(user,host,source,dest)
-  cmd("scp -q #{SSH_OPTIONS} -r #{source} #{user}@#{host}:#{dest}")
+def scp(user,host,source,dest,reverse=false)
+  if reverse
+    cmd("scp -q #{SSH_OPTIONS} -r #{user}@#{host}:#{source} #{dest}")
+  else
+    cmd("scp -q #{SSH_OPTIONS} -r #{source} #{user}@#{host}:#{dest}")
+  end
 end
 
 def ssh(user,host,cmd,checkstatus=true,password='grid5000')
@@ -65,7 +71,7 @@ def ssh(user,host,cmd,checkstatus=true,password='grid5000')
   puts "=== SSH (#{host}): #{cmd} ===" if ENV['DEBUG']
   Net::SSH.start(host,user,:keys => SSH_KEY, :password=>password) do |ssh|
     ssh.open_channel do |channel|
-      channel.exec(cmd) do |ch, success|
+      channel.exec(cmd) do |chan, success|
         channel.on_data do |ch, data|
           stdout += data
         end
