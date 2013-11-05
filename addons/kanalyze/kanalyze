@@ -1,0 +1,824 @@
+#!/usr/bin/ruby
+
+$cur_run = {}
+$results = Array.new
+$stats = Hash.new
+$pids=[]
+$csvfiles = Array.new
+$microsteps=true
+
+Signal.trap("INT") do
+  puts "\nSIGINT, killing #{$0}"
+  system(
+    "#{CONLOG_SCRIPT} stop #{$cur_run[:run_id]} #{$cur_run[:nodefile]} #{$cur_run[:envcondir]}"
+  ) if $cur_run and !$cur_run.empty?
+  exit!(1)
+end
+
+require 'yaml'
+require 'tempfile'
+require 'fileutils'
+require 'optparse'
+require 'csv'
+require 'shellwords'
+
+# Config
+SSH_KEY='~/.ssh/id_rsa.pub'
+KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
+REMOTE=false
+CONSOLE_BIN="/usr/local/conman/bin/conman"
+CONSOLE_CMD="#{CONSOLE_BIN} -f -d conman"
+SCRIPT_BIN="/usr/bin/script"
+KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
+KASTAT_BIN=ENV['KASTAT_BIN']||'kastat3'
+
+# Allowed values
+MACROSTEPS = {
+  :SetDeploymentEnv => {
+    :types => [
+      'Untrusted',
+      'Kexec',
+      'UntrustedCustomPreInstall',
+      'Prod',
+      'Nfsroot',
+      'Dummy',
+    ],
+  },
+  :BroadcastEnv => {
+    :types => [
+      'Chain',
+      'Kastafior',
+      'Tree',
+      'Bittorrent',
+      'Dummy',
+    ],
+  },
+  :BootNewEnv => {
+    :types => [
+      'Kexec',
+      'PivotRoot',
+      'Classical',
+      'HardReboot',
+      'Dummy',
+    ],
+  },
+}
+
+module Kanalyzemode
+  TEST=1
+  STATS=2
+end
+
+def info(msg)
+  puts msg if msg and !msg.empty?
+end
+
+def debug(msg)
+  msg.each{|l| puts "[D] #{l}"} if msg and !msg.empty? and $verbose
+end
+
+def error(msg)
+  $stderr.puts msg
+  exit 1
+end
+
+def yaml_error(msg)
+  error("Error in YAML file: #{msg}")
+end
+
+
+#Contains useful functions to work with g5k tools
+def cmd(cmd,checkstatus=true)
+  debug("=== COMMAND: #{cmd} ===")
+  ret=`#{cmd}`
+  if checkstatus and !$?.success?
+    $stderr.puts("Unable to perform the command: #{cmd}\n=== Error ===\n#{ret}")
+  end
+  debug("=== STDOUT ===\n#{ret}") if ret and !ret.empty?
+  ret.strip
+end
+
+def kareboot_prod(nodes)
+  node_list = String.new
+  nodes.each { |node|
+    node_list += " -m #{node.chomp}"
+  }
+  cmd("kareboot3 #{node_list} -r env_recorded --env-name squeeze-x64-prod -p 2")
+end
+
+def kill_recursive(pid)
+  begin
+    # SIGSTOPs the process to avoid it creating new children
+    Process.kill('STOP',pid)
+    # Gather the list of children before killing the parent in order to
+    # be able to kill children that will be re-attached to init
+    children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
+    # Directly kill the process not to generate <defunct> children
+    Process.kill('KILL',pid)
+    children.each do |cpid|
+      kill_recursive(cpid)
+    end
+  rescue Errno::ESRCH
+  end
+end
+
+def conlogger_start(envcondir,nodes)
+  pids=[]
+  info("      Initialize monitors")
+  nodes.each do |node|
+    info("        init #{node}")
+    cmd="#{SCRIPT_BIN} -f -c '#{CONSOLE_CMD} #{node.split(".")[0]}' "
+    cmd+="-t 2>#{File.join(envcondir,node+".timing")} "
+    cmd+="-a #{File.join(envcondir,node+".typescript")} "
+    cmd+="1>/dev/null"
+    cmd+="&"
+    system(cmd)
+  end
+  info("      Start monitoring")
+end
+
+def conlogger_stop(envcondir,nodes)
+  info("      Kill monitors")
+  nodes.each do |node|
+    # Get the list of processus for the current user
+    psresult=`ps -u $(id -nu) -o pid= -o command=`.split("\n")
+    # Only select the monitoring processus on the selected node
+    commands=psresult.select { |line| (line =~ /#{SCRIPT_BIN}/ && line=~/#{CONSOLE_BIN}/ && line =~/#{node}\ /) }
+    if(!commands.empty?)
+     # Get the pid of the command
+      pid=commands[0].split(" ")[0]
+      info("        killing #{node} monitoring")
+      kill_recursive(pid.to_i)
+    end
+  end
+  info("      Stop monitoring")
+end
+
+def check_field(name,val,type=nil)
+  yaml_error("experiment should have a field '#{name}'") if val.nil? or (type.nil? and val.empty?)
+  yaml_error("the field '#{name}' should have the type #{type.name}") if type and !val.is_a?(type)
+end
+
+
+def check_macro(type,macro)
+  if macro.is_a?(Array)
+    macro.each do |m|
+      check_macro(type,m)
+    end
+  else
+    unless macro.empty?
+      if macro['type'].nil?
+        yaml_error("macrostep #{type.to_s}/type is empty")
+      else
+        check_field('type',macro['type'])
+        yaml_error("macrostep #{type.to_s} should be #{MACROSTEPS[type][:types].join(' or ')}") unless MACROSTEPS[type][:types].include?(macro['type'])
+      end
+
+      if macro['timeout'].nil?
+        yaml_error("macrostep #{type.to_s}/timeout is empty")
+      else
+        if macro['timeout'] <= 0
+          yaml_error("'macrosteps/timeout' field should be > 0")
+        end
+      end
+
+      if macro['retries'].nil?
+        yaml_error("macrostep #{type.to_s}/retries is empty")
+      else
+        if macro['retries'] < 0
+          yaml_error("'macrosteps/retries' field should be >= 0")
+        end
+      end
+    end
+  end
+end
+
+def check_env(env)
+  unless REMOTE
+    $kaenvs = `kaenv3 -l | grep -v '^Name' | grep -v '^####' | cut -d ' ' -f 1`.split("\n") unless $kaenvs
+    yaml_error("env '#{env}' does not exists") unless $kaenvs.include?(env)
+  end
+end
+
+def check_exp(exps)
+  yaml_error("root should be a YAML Array") unless exps.is_a?(Array)
+  custom=Array.new
+  deployments=0
+  exps.each do |exp|
+    check_field('name',exp['name'])
+    check_field('times',exp['times'],Fixnum)
+    if exp['simult']
+      check_field('simult',exp['simult'],Array)
+      exp['simult'].each_index do |i|
+        check_field("simult/#{i}",exp['simult'][i],Fixnum)
+      end
+      exp.delete('simult') if exp['simult'].empty?
+    end
+    if exp['times'] <= 0
+      yaml_error("'times' field should be > 0")
+    end
+    deployments+=exp['times']
+    if exp['custom']
+      custom.push(exp['custom'])
+    end
+    check_field('environments',exp['environments'])
+    exp['environments'].each do |env|
+      check_env(env)
+    end
+    exp['macrosteps'] = {} if exp['macrosteps'].nil?
+
+    exp['macrosteps']['SetDeploymentEnv'] = {} if exp['macrosteps']['SetDeploymentEnv'].nil?
+    check_macro(:SetDeploymentEnv,exp['macrosteps']['SetDeploymentEnv'])
+
+    exp['macrosteps']['BroadcastEnv'] = {} if exp['macrosteps']['BroadcastEnv'].nil?
+    check_macro(:BroadcastEnv,exp['macrosteps']['BroadcastEnv'])
+
+    exp['macrosteps']['BootNewEnv'] = {} if exp['macrosteps']['BootNewEnv'].nil?
+    check_macro(:BootNewEnv,exp['macrosteps']['BootNewEnv'])
+  end
+end
+
+def gen_macro(type,macro)
+  if macro.is_a?(Array)
+    macro.collect{ |m| gen_macro(type,m) }.join(',')
+  elsif macro.empty?
+    ''
+  else
+    "#{type.to_s}#{macro['type']}:#{macro['retries']}:#{macro['timeout']}"
+  end
+end
+
+def add_result(kind, env , result, time, ok, ko, name, iter)
+  h = Hash.new
+  h["kadeploy_version"] = $version
+  h["kind"] = kind
+  h["env"] = env
+  h["testname"] = $name
+  h["time"] = time
+  h["status"] = result
+  h["name"] = name
+  h["iter"] = iter
+  h["nodes"] = {}
+  h["nodes"]["list"] = $nodes.clone
+  h["nodes"]["ok"] = ok.to_i
+  h["nodes"]["ko"] = ko.to_i
+  $results.push(h)
+end
+
+def store_results(resfile)
+  outFile = File.new(resfile, "w+")
+  outFile.puts($results.to_yaml)
+  outFile.close
+end
+
+def store_stats(expname,expdir, iterCount)
+  statfile=File.new(File.join($statsdir,expname+".yml"),"w")
+  statfile.write($stats.to_yaml)
+  statfile.close
+  if($stats.size>0)
+    csvfile=CSV.open(File.join($statsdir,expname+".csv"),"w") do |csv|
+      csv<<$stats.first[1].keys.sort
+      $stats.each do |key,stat|
+        keytab=stat.keys.sort
+        stattab=[]
+        keytab.each do |k|
+          stattab.push(stat[k])
+        end
+        csv<<stattab
+      end
+    end
+    $csvfiles.push(File.join(expname+".csv"))
+  end
+end
+
+def gen_logs_dir(workdir,env,simult)
+  if simult
+    workdir = File.join(workdir,"simult-#{simult}")#workdir is a folder like simult-n/simult-n:i with i<n
+  end
+
+  envlogdir = File.join(workdir,"logs")
+  debug("      Creating logs dir '#{envlogdir}'")
+  FileUtils.mkdir_p(envlogdir)
+
+  if simult
+    envresultfile=File.join(workdir,'..','..','..','results')
+  else
+    envresultfile = File.join(workdir,'..','..','results')
+  end
+
+  envdebugfile = File.join(envlogdir,'debug')
+  envwidfile = File.join(envlogdir,'wid')
+  envdatefile = File.join(envlogdir,'time')
+
+  envcondir = File.join(workdir,"consoles")
+  debug("      Creating consoles dir '#{envcondir}'")
+  FileUtils.mkdir_p(envcondir)
+  envconbugdir = File.join(envcondir,'bugs')
+  debug("      Creating consoles bugs dir '#{envconbugdir}'")
+  FileUtils.mkdir_p(envconbugdir)
+
+  sleep 1
+
+  system("date > #{envdatefile}")
+
+  return envcondir,envresultfile,envdebugfile,envconbugdir,envwidfile
+end
+
+def link_bugs(envcondir,envresultfile, envdebugfile,envconbugdir)
+  info('      Linking bugs')
+  File.open(envdebugfile) do |file|
+    dirls = nil
+    file.each_line do |line|
+      if line =~ /^\s*### KO\[(\S+)\]\s*$/ \
+      or line =~ /^\s*### CantConnect\[(\S+)\]\s*$/
+        nodename = Regexp.last_match(1).split('.')[0].strip
+        dirls = Dir.entries(envcondir) unless dirls
+        dirls.each do |filename|
+          if filename =~ /^#{nodename}\..*\.gz$/
+            FileUtils.ln_sf(
+              File.expand_path(File.join(envcondir,filename)),
+              envconbugdir
+            )
+          end
+        end
+      end
+    end
+  end
+end
+
+def kastat_method(expname,env,iter,nok,nko,wid)
+  $microsteps=false
+  h={}
+  h["expname"]=expname
+  h["env"]=env
+  h["kadeploy"]=$version
+  h["iter"]=iter
+  h["id"]=expname+"-"+iter.to_s+"-"+env
+
+  if nok+nko == 0
+  	h["success"]=0
+  else
+  	h["success"]=nok*100/(nok+nko)
+  end
+
+  if $version >= "3.2"
+    str=`#{KASTAT_BIN} -a -m #{$nodes[0]} -F step1 -F step2 -F step3 -F step1_duration -F step2_duration -F step3_duration -w #{wid}`
+  else
+    str=`#{KASTAT_BIN} -d -m #{$nodes[0]} -f step1 -f step2 -f step3 -f step1_duration -f step2_duration -f step3_duration -w #{wid}`
+  end
+
+  str=str.split("\n").last
+
+  res_tab=str.split(",")
+
+  h["step1"]=res_tab[0]
+  h["step2"]=res_tab[1]
+  h["step3"]=res_tab[2]
+  h["time1"]=res_tab[3]
+  h["time2"]=res_tab[4]
+  h["time3"]=res_tab[5]
+  return h
+end
+
+def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,envcondir,nodes,wid)
+  hashes={}
+  branch="0"#branch (nodeset) of the current line
+
+# Uses the Kastat method: works on versions of Kadeploy lower than 3.1.6 but doesn't support microsteps and nodeset splits
+
+  if $kastat
+    hashes["0"]={}
+    hashes["0"].update(kastat_method(expname,env,iter,nok,nko,wid))
+  else
+    trunk="0"#origin of a nodeset split
+    microstep_order={}
+    step_order={}
+
+    #  Opens the debug file and parses it
+    if $version>="3.1.6"
+      File.open(envdebugfile) do |file|
+        file.each_line do |line|
+          if line =~ /\A\[([\w|:|.]+)\]/ || line =~ /\A\(([\w|:]+)\)/
+            branch=Regexp.last_match(1)
+          end
+
+          if hashes[branch].nil?
+            hashes[branch]={}
+            microstep_order[branch]=0
+            step_order[branch]=0
+          end
+
+          hashes[branch]["expname"]=expname
+          hashes[branch]["env"]=env
+          hashes[branch]["kadeploy"]=$version
+          hashes[branch]["iter"]=iter
+          hashes[branch]["id"]=expname+"-"+iter.to_s+"-"+env+"-"+branch
+          hashes[branch]["success"]=nok*100/(nok+nko)
+
+          if line =~ /Nodeset \[([\w|:]+)\] split into :/
+            trunk=Regexp.last_match(1)
+            while !((line=file.gets) =~ /---/)
+              if line=~ /\A\[([\w|:]+)\]   \[([\w|:]+)\]/ || line=~ /\A  \[([\w|:]+)\]/
+                hashes[Regexp.last_match(1)]={}
+                hashes[Regexp.last_match(1)].update(hashes[trunk])
+                microstep_order[Regexp.last_match(1)]=microstep_order[trunk]
+                step_order[Regexp.last_match(1)]=step_order[trunk]
+              end
+            end
+            hashes.delete(trunk) {puts "Error: #{trunk} key not found in stats hashes"}
+          end
+
+          if line =~ /End of step ([\[\]\w]+) after (\d+)s/
+            microstep_order[branch]=0
+            step=Regexp.last_match(1)
+            time=Regexp.last_match(2)
+            if step =~ /SetDeploymentEnv/
+              hashes[branch]["step1"]=step
+              hashes[branch]["time1"]=time
+              step_order[branch]=1
+            end
+            if step =~ /BroadcastEnv/
+              hashes[branch]["step2"]=step
+              hashes[branch]["time2"]=time
+              step_order[branch]=2
+            end
+            if step =~ /BootNewEnv/
+              hashes[branch]["step3"]=step
+              hashes[branch]["time3"]=time
+              step_order[branch]=3
+            end
+          end
+
+          if line =~ /~\s+Time in ([\[\]\w]+)\s*:\s+(\d+)s/
+            current_step=(step_order[branch].to_i+1).to_s
+            microstep=Regexp.last_match(1)
+            time=Regexp.last_match(2)
+            if(hashes[branch].has_value?("step"+current_step+":"+microstep))
+              microstep_order[branch]=hashes[branch].key("step"+current_step+":"+microstep).split("_").to_i
+            else
+              microstep_order[branch]=microstep_order[branch].to_i+1
+            end
+            hashes[branch]["time"+current_step+"_"+microstep_order[branch].to_s]=time
+            hashes[branch]["step"+current_step+"_"+microstep_order[branch].to_s]="step"+current_step+":"+microstep
+          end
+
+        end#end each line
+        file.close
+      end#end file.open
+    else#old/unknown version case => uses kastat method
+      info("Unknown or old version of Kadeploy (<=3.1.5): using Kastat method (no microsteps)")
+      hashes["0"]={}
+      hashes["0"].update(kastat_method(expname,env,iter,nok,nko,wid))
+    end #end case
+  end#end if $kastat
+  hashes.each do |key,h|
+    if(h["step1"] && h["step2"] && h["step3"])
+      h["branch"]=key
+      $stats.store(run_id+"-"+expname+"-"+key,h)
+    end
+  end
+end
+
+def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter, exp)
+  info("    Launch[#{$name}/#{env}#{(simultid ? "(#{simultid})" : '')}]")
+  ok_file = Tempfile.new("kanalyze-ok")
+  ok = ok_file.path
+  ko_file = Tempfile.new("kanalyze-ko")
+  ko = ko_file.path
+
+  node_list = String.new
+  nodes.each { |node|
+    node_list += " -m #{node}"
+  }
+  automata_opt=''
+  if macrosteps[0] and macrosteps[1] and macrosteps[2]
+    automata_opt = "--force-steps \""\
+      "SetDeploymentEnv|#{macrosteps[0]}&"\
+      "BroadcastEnv|#{macrosteps[1]}&"\
+      "BootNewEnv|#{macrosteps[2]}"\
+    "\""
+  end
+
+  envcondir, envresultfile, envdebugfile, envconbugdir, envwidfile = gen_logs_dir(workdir, env, simultid)
+
+  cmd = "#{$kadeploy} #{node_list} -e \"#{env}\" -o #{ok} -n #{ko}"
+  cmd += " --set-custom-operations #{exp['custom']} " if exp['custom']
+  if $version >= '3.2'
+    cmd += " --force "
+  else
+    cmd += " --ignore-nodes-deploying "
+  end
+  cmd += " #{automata_opt}" if automata_opt and !automata_opt.empty?
+  cmd += " -k"
+  cmd+=" #{$key}" if $key!=""
+  cmd += " --write-workflow-id #{envwidfile}"
+
+  cmd += " | sed 's/.*/(#{simultid}) &/'" if simultid
+  cmd += " 1> #{envdebugfile} 2> #{envdebugfile}"
+
+  nodefile=Tempfile.new('nodefile')
+  nodes.each{ |node| nodefile.write(node+'\n') }
+
+  $cur_run[:run_id] = run_id
+  $cur_run[:envcondir] = envcondir
+
+  info("      Init conman monitoring #{(simultid ? simultid : '')}")
+  pids=[]
+  conlogger_start(envcondir,nodes)
+  info("        Running Kadeploy")
+  debug(cmd)
+  res=system(cmd)
+  #res=system("touch "+envdebugfile) #useful to test without really deploying...
+  #res=system("cp ~/debug #{envdebugfile}")
+
+  info("      Stop conman monitoring #{(simultid ? simultid : '')}")
+  conlogger_stop(envcondir,nodes)
+
+  nodefile.unlink
+
+  Dir[File.join(envcondir,'*.timing'),File.join(envcondir,'*.typescript')].each{ |f| `gzip -f #{f}` }
+
+  link_bugs(envcondir,envresultfile,envdebugfile,envconbugdir)
+
+  unless res
+    $stderr.puts 'Kadeploy command failed, exiting'
+    $stderr.puts cmd
+    exit!(1)
+  end
+
+  nbok = File.exists?(ok) ? IO.readlines(ok).size : 0
+  nbko = File.exists?(ko) ? IO.readlines(ko).size : 0
+
+  add_stats(expname,envdebugfile,env,run_id,iter,nbok,nbko,envcondir,nodes,File.read(envwidfile).strip)
+
+  return (nbko == 0), nbok, nbko, envresultfile unless $check
+
+  if (nbok > 0 && nbko == 0) then
+    deployed_nodes = Array.new
+    IO.readlines(ok).each { |node|
+      deployed_nodes.push(node.chomp)
+    }
+    results = Hash.new
+    deployed_nodes.each { |node|
+      cmd = "ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 root@#{node} \"true\" 1>&2"
+      res = system(cmd)
+      results[node] = res
+    }
+    no_errors = true
+    results.each_pair { |node,res|
+      if not res then
+        $stderr.puts "### CantConnect[#{node}]"
+        no_errors = false
+      end
+    }
+    return no_errors, nbok, nbko, envresultfile
+  else
+    return false, nbok, nbko, envresultfile
+  end
+end
+
+def test_dummy(expname,macrosteps,env,workdir,run_id,iter,exp)
+  start = Time.now.to_i
+  res, nok, nko, envresultfile = test_deploy(
+    expname, $nodes, macrosteps, env, nil, workdir, run_id, iter, exp)
+  time = Time.now.to_i - start
+  if res then
+    add_result("seq", env , "ok", time, nok, nko, expname, iter)
+  else
+    add_result("seq", env , "ko", time, nok, nko, expname, iter)
+  end
+  store_results(envresultfile)
+end
+
+def test_simultaneous_deployments(expname ,macrosteps, env, simult, workdir, run_id, iter, exp)
+  start = Time.now.to_i
+  nodes_hash = Hash.new
+  (0...simult).to_a.each { |n|
+    nodes_hash[n] = Array.new
+  }
+  $nodes.each_index { |i|
+    nodes_hash[i.modulo(simult)].push($nodes[i])
+  }
+  tid_array = Array.new
+  tid_hash_result = Hash.new
+  envresultfile=String.new
+  (0...simult).to_a.each { |n|
+    tid = Thread.new {
+      r, o, k ,envresultfile = test_deploy(
+        expname, nodes_hash[n], macrosteps, env, "#{simult}:#{n}", workdir,
+        run_id, iter, exp
+      )
+      tid_hash_result[tid] = [r, o, k]
+    }
+    tid_array << tid
+  }
+  result = true
+  nodes_ok = 0
+  nodes_ko = 0
+  tid_array.each { |tid|
+    tid.join
+    nodes_ok += tid_hash_result[tid][1].to_i
+    nodes_ko += tid_hash_result[tid][2].to_i
+    if not tid_hash_result[tid][0] then
+      result = false
+    end
+  }
+  time = Time.now.to_i - start
+  if result then
+    add_result("simult-#{simult}", env, "ok", time, nodes_ok, nodes_ko, expname, iter)
+  else
+    add_result("simult-#{simult}", env, "ko", time, nodes_ok, nodes_ko, expname, iter)
+    outFile.puts($results.to_yaml)
+  end
+  store_results(envresultfile)
+end
+
+def test_env(workdir,expname,run_id,macrosteps,env,iter,exp,simult=nil)
+  info("    Testing environment '#{env}'#{(simult ? " simult \##{simult}" : '')}")
+  if(!simult)
+    test_dummy(expname,macrosteps,env,workdir,run_id,iter,exp)
+  else
+    test_simultaneous_deployments(expname,macrosteps,env,simult,workdir,run_id,iter,exp)
+  end
+end
+
+def check_args(name,yaml_file,nodes,keyfile,exp)
+  $exps=Array.new
+  $nodes=Array.new
+  $key=String.new
+  $name=String.new
+
+#checks the name
+  $name = (name.empty? ? '' : "#{name}-") + Time.now.strftime("%Y-%m-%d-%H-%M-%S")
+
+#checks the yaml file
+  if yaml_file.empty?
+    error "You have to specify a exp description file"
+  end
+  if !File.exist?(yaml_file)
+    error "The file #{yaml_file} does not exist"
+  end
+  yaml_file = File.expand_path(yaml_file)
+  begin
+    $exps = YAML.load_file(yaml_file)
+  rescue
+    error("file '#{yaml_file}' should use the YAML format")
+  end
+  check_exp($exps)
+
+#checks the exp name
+  if exp
+    if  $exps[exp.to_i]
+      $exp_rank=exp.to_i
+    else
+      error("The experiment #{exp} is not in the YAML file")
+    end
+  end
+
+#checks the nodes file
+  if !$filenode && nodes.empty?
+    $stderr.puts "No nodes specified, try to use $OAR_NODE_FILE"
+    $filenode=ENV['OAR_NODE_FILE']
+  end
+  error("No nodes were specified") if !$filenode
+  if !File.exists?($filenode)
+    error("The file #{$filenode} does not exist")
+  else
+    File.read($filenode).split("\n").uniq.each { |node| nodes.push(node) }
+  end
+  $nodes=(nodes.uniq)
+#checks the key file
+  if !File.exist?(File.expand_path(keyfile))
+    $stderr.puts "The file #{keyfile} does not exist. Using "+SSH_KEY
+    keyfile=SSH_KEY
+  end
+  $key = File.expand_path(keyfile)
+
+#checks kadeploy command
+  $version=`#{KADEPLOY_BIN} -v`.split(" ").last
+  case
+  when $version=="3.1.5"
+    kadeploy_options='-V 4 -d'
+  when $version >= "3.1.6"
+    kadeploy_options='-V 5 -d'
+  end
+  $kadeploy="#{KADEPLOY_BIN} #{kadeploy_options}"
+end
+
+def load_cmdline_options
+  nodes = Array.new
+  keyfile = SSH_KEY
+  name= String.new
+  exps = Array.new
+  exp=nil
+  $best=false
+  $filenode =nil
+  $expfile=""
+  $check=false
+  $verbose=false
+  $kastat=false
+  $cluster=""
+
+  opts = OptionParser::new do |opts|
+    opts.summary_indent = "  "
+    opts.summary_width = 28
+    opts.program_name = $0
+    opts.banner = "Usage: #{$0} [options] <exp_file>"
+    opts.separator ""
+    opts.separator "General options:"
+    opts.on("-K", "--kastat","Forces the usage of kastat for (doesn't handle nodeset splits nor microsteps)") { |k| $kastat=k}
+    opts.on("-k", "--key FILE", "Public key to copy in the root's authorized_keys") { |f| keyfile=f }
+    opts.on("-d", "--directory DIR", "Directory to save results"){ |d| $savedir=d }
+    opts.on("-v", "--verbose","Verbose mode") { |v| $verbose=v }
+    opts.on("-c", "--check", "Try to contact the nodes (SSH) after deployments") { |c| $check=c }
+    opts.on("-n", "--name NAME", "Name of the test run") { |n| name=n }
+    opts.on("-f", "--file MACHINELIST", "Files containing list of nodes")  { |f| $filenode=f }
+    opts.on("-e", "--experiment EXP","Only run the experiment #EXP") {|e| exp=e}
+  end
+
+  opts.parse!(ARGV)
+  if ARGV.size < 1
+    $stderr.puts "Usage: #{$0} [options] <exp_file>"
+    exit 1
+  end
+
+  check_args(name,ARGV.first,nodes,keyfile,exp)
+end
+
+def run_test(exp)
+  $results=Array.new
+  info("Running experiment '#{exp['name']}'")
+  expdir = exp['name']
+  debug("  Creating experiments directory '#{expdir}'")
+  FileUtils.mkdir_p(expdir)
+  info("  Start to iterate")
+
+  exp['times'].times do |i|
+    info("\n  Iteration ##{i}")
+    testname = "test-#{i}"
+    testdir = File.join(expdir,testname)
+    debug("    Creating #{testname} dir '#{testdir}'")
+    FileUtils.mkdir_p(testdir)
+
+    macrosteps=Array.new(3)
+    macrosteps[0]=gen_macro('SetDeploymentEnv',exp['macrosteps']['SetDeploymentEnv'])
+    macrosteps[1]=gen_macro('BroadcastEnv',exp['macrosteps']['BroadcastEnv'])
+    macrosteps[2]=gen_macro('BootNewEnv',exp['macrosteps']['BootNewEnv'])
+
+    exp['environments'].each do |env|
+      run_id="#{$name}-#{i}-#{env}"
+      envdir = File.join(testdir,env)
+      debug("    Creating environment dir '#{envdir}'")
+      FileUtils.mkdir_p(envdir)
+
+      if exp['simult']
+        exp['simult'].each do |simult|
+          if simult > $nodes.size
+            puts "    !!! Not enough nodes for simult #{simult}, ignoring"
+            next
+          end
+          run_id += "-simult-#{simult}"
+          simuldir = File.join(envdir,"simult-#{simult}")
+          debug("    Creating simult-#{simult} dir '#{simuldir}'")
+          FileUtils.mkdir_p(testdir)
+          test_env(simuldir,exp['name'],run_id,macrosteps,env,i,exp,simult)
+        end
+      else
+        test_env(envdir,exp['name'],run_id,macrosteps,env,i,exp)
+      end
+    end
+  end
+  store_stats(exp['name'],expdir,exp['times'])
+  $stats={}
+end
+
+
+$scriptname=File.basename($0,File.extname($0))
+load_cmdline_options
+if !$savedir or $savedir.empty?
+  $savedir = File.join(Dir.pwd,$scriptname+"-"+$name)
+end
+
+unless File.exist?($savedir)
+  debug("Creating directory '#{$savedir}'")
+  FileUtils.mkdir_p($savedir)
+end
+info("Working directory: #{$savedir}")
+info("Copying experiment description file #{File.basename(ARGV.first)}")
+FileUtils.cp(ARGV.first,$savedir)
+Dir.chdir($savedir)
+
+$statsdir=File.join('stats')
+debug("Creating stats directory '#{$statsdir}'")
+FileUtils.mkdir_p($statsdir)
+File.open(File.join($statsdir,'microsteps'),'w+'){|f|f.puts '1'} if $microsteps
+
+if $exp_rank.nil?
+  $exps.each do |exp|
+    run_test(exp)
+  end
+else
+  run_test($exps[$exp_rank])
+end
+
+info("Done experiment\n")

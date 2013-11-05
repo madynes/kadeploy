@@ -1,0 +1,206 @@
+require 'rake'
+
+KANALYSE='./kanalyze'
+RSCRIPT='Rscript'
+PDFLATEX='pdflatex'
+
+OUTFILE='results'
+R_TEMPLATE='template.r'
+LATEX_TEMPLATE='template.tex'
+
+def error(msg)
+  $stderr.puts msg
+  exit 1
+end
+
+def expdir(val=nil)
+  dir = @directory || ENV['DIRECTORY'] || val
+  error('DIRECTORY not specified') if !dir or dir.empty?
+  dir = File.expand_path(dir)
+  if File.readable?(dir)
+    error("'#{dir}' is not a directory") unless File.directory?(dir)
+  else
+    error("cannot read directory '#{dir}'")
+  end
+  @directory = dir.dup
+end
+
+def microsteps()
+  if @microsteps.nil?
+    @microsteps = File.exists?(File.join(@directory,'stats','microsteps'))
+  end
+end
+
+desc "Run experimentations and generate statistics (EXPFILE,DIRECTORY)"
+task :launch, [:expfile] => [:run, :stats] do |t,args|
+  puts "Experimentations done, statistics available in #{@directory}"
+end
+
+desc "Run experimentations (EXPFILE,DIRECTORY)"
+task :run, [:expfile] do |t,args|
+  puts "Run experimentations"
+  file=nil
+  if !args[:expfile]
+    if !ENV['EXPFILE'] or ENV['EXPFILE'].empty?
+      file = File.join(Dir.pwd,'experiences','dummy_exp.yml')
+    else
+      file = ENV['EXPFILE']
+    end
+  else
+    file = args[:expfile]
+  end
+  file = File.expand_path(file) if file
+  error("cannot read file '#{file}'") unless File.readable?(file)
+
+  if !ENV['DIRECTORY'] or ENV['DIRECTORY'].empty?
+    dir = File.join(
+      Dir.pwd,
+      "#{ENV['EXPNAME']||'kanalyze'}-#{Time.now.strftime("%Y-%m-%d-%H-%M-%S")}"
+    )
+    sh "mkdir -p #{dir}"
+    expdir(dir)
+  else
+    expdir()
+  end
+
+  opts = "-d #{@directory} "
+  opts << "-f #{ENV['NODEFILE']} " if ENV['NODEFILE']
+  opts << "-k #{ENV['KEYFILE']} " if ENV['KEYFILE']
+  opts << "-c " if ENV['CHECKNODES']
+  opts << "-e #{ENV['EXPNUM']}" if ENV['EXPNUM']
+  opts << "-K" if ENV['KASTAT']
+  opts << "-v" if ENV['VERBOSE']
+
+  puts "Run kanalyze"
+  sh "#{KANALYSE} #{file} #{opts}"
+  puts "Done kanalyze"
+end
+
+task :stats_setup do
+  @files = nil
+  if @directory
+    microsteps()
+    @directory = File.join(@directory,'stats')
+    @files = Dir[File.join(@directory,'*.csv')]
+    error("no CSV file found in '#{@directory}'") if @files.empty?
+  else
+    expdir()
+    files=nil
+    if !ENV['FILES'] or ENV['FILES'].empty?
+      microsteps()
+      @directory = File.join(@directory,'stats')
+      files = File.join(@directory,'*.csv')
+    else
+      files = ENV['FILES']
+      @microsteps = ENV['MICROSTEPS']
+    end
+    @files = Dir[files]
+    error("no files not found '#{files}'") if @files.empty?
+    sh "mkdir -p #{@directory}"
+  end
+  @files.collect!{|f| File.expand_path(f) }
+end
+
+desc "Install packages that are needed to generate statistics (debian)"
+task :stats_install_deps do
+  ENV['http_proxy'] = 'http://proxy:3128/'
+  ENV['https_proxy'] = 'http://proxy:3128/'
+
+  sh "grep r-project /etc/apt/sources.list || echo 'deb http://cran.r-project.org/bin/linux/debian wheezy-cran3/' >> /etc/apt/sources.list"
+  sh "apt-get -y update"
+  sh "apt-get -y --force-yes install texlive-base texlive-latex-extra r-base r-base-dev r-cran-ggplot2"
+  sh "R <<< 'options(repos=structure(c(CRAN=\"http://cran.rstudio.com/\"))); update.packages(checkBuilt = TRUE, ask = FALSE)' --save"
+end
+
+desc "Generate statistics (DIRECTORY,FILES,MICROSTEPS)"
+task :stats => [:stats_setup,:generate_r,:generate_latex] do
+  puts "Generate statistics"
+
+  # Change the directory to DIRECTORY/stats
+  Dir.chdir(@directory)
+
+  sh "#{RSCRIPT} #{OUTFILE}.r #{@files.join(' ')}"
+  sh "mkdir -p build"
+  sh "#{PDFLATEX} -jobname #{OUTFILE} --output-directory=build #{OUTFILE}.tex"
+  sh "mv build/*.pdf ."
+  sh "rm -rf build/"
+
+  puts "generated #{OUTFILE}.pdf"
+end
+
+desc "Build R statistics script"
+task :generate_r do
+  puts "Build R statistics script"
+  expdir()
+  microsteps()
+
+  file = ENV['R_TEMPLATE']||R_TEMPLATE
+  error('R_TEMPLATE not specified') if !file or file.empty?
+  file = File.expand_path(file)
+  error("cannot read file '#{file}'") unless File.readable?(file)
+
+  # Do not write lines between "# MICROSTEPS" if microsteps are disabled
+  begin
+    fin = File.open(file,'r')
+    fout = File.open(File.join(@directory,"#{OUTFILE}.r"),"w")
+    micro = false
+    fin.each do |lin|
+      if @microsteps
+        fout.puts lin
+      else
+        micro = !micro if lin =~ /^#.*MICROSTEPS/
+        fout.puts lin if !micro
+      end
+    end
+  ensure
+    fin.close if fin
+    fout.close if fout
+  end
+
+  puts "generated #{OUTFILE}.r"
+end
+
+desc "Build LaTeX statistics script"
+task :generate_latex => [:generate_r] do
+  puts "Build LaTeX statistics script"
+  expdir()
+  microsteps()
+
+  file = ENV['LATEX_TEMPLATE']||LATEX_TEMPLATE
+  error('LATEX_TEMPLATE not specified') if !file or file.empty?
+  file = File.expand_path(file)
+  error("cannot read file '#{file}'") unless File.readable?(file)
+
+  # Do not write lines between "% MICROSTEPS" if microsteps are disabled
+  begin
+    fin = File.open(file,'r')
+    fout = File.open(File.join(@directory,"#{OUTFILE}.tex"),"w")
+    micro = false
+    fin.each do |lin|
+      if @microsteps
+        fout.puts lin
+      else
+        micro = !micro if lin =~ /^%.*MICROSTEPS/
+        fout.puts lin if !micro
+      end
+    end
+  ensure
+    fin.close if fin
+    fout.close if fout
+  end
+
+  puts "generated #{OUTFILE}.tex"
+end
+
+desc "Look for a pattern (grep regexp) in the console log files"
+task :search, :pattern do |t,args|
+  puts "Search for a pattern in the console log files"
+  dir = @directory || ENV['DIRECTORY']
+  error('DIRECTORY not specified') if !dir or dir.empty?
+
+  if !args[:pattern] or args[:pattern].empty?
+    error("search pattern missing")
+  else
+    sh "zgrep '#{args[:pattern]}' #{File.join(dir,'**','test-*','*','consoles','*.typescript.gz')} || true"
+  end
+end

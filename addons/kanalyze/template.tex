@@ -1,0 +1,42 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{datetime}
+\usepackage[top=2cm, bottom=2cm, left=2cm, right=2cm]{geometry}
+\title{Kanalyze Report}
+\date{\currenttime}
+\begin{document}
+\maketitle
+\LARGE General statistics
+\newline
+\input{"data.tex"}
+\newline
+{\LARGE Deployment with macrosteps}\\
+\includegraphics[width=9cm]{pictures/steps-line}
+\includegraphics[width=9cm]{pictures/success}
+\includegraphics[width=9cm]{pictures/steps-boxplot}
+\includegraphics[width=9cm]{pictures/boxplot1-per-kadeploy}
+\includegraphics[width=9cm]{pictures/boxplot2-per-kadeploy}
+\includegraphics[width=9cm]{pictures/boxplot3-per-kadeploy}
+\newpage
+%---MICROSTEPS---
+{\LARGE Deployment with microsteps}\\
+\includegraphics[width=9cm]{pictures/microsteps-line}
+\includegraphics[width=9cm]{pictures/microsteps1-boxplot}
+\includegraphics[width=9cm]{pictures/microsteps2-boxplot}
+\includegraphics[width=9cm]{pictures/microsteps3-boxplot}
+\newline
+\begin{table}
+\small
+\begin{tabular}{|l|l|}
+\hline
+ID & Name \\
+\hline
+\input{"micronames.tex"}
+\hline
+\end{tabular}
+\end{table}
+%---MICROSTEPS---
+\end{document}
