@@ -664,8 +664,11 @@ def _test_deploy(expname,nodes, macrosteps , env , widf , simultid , workdir , r
 
   nodefile.unlink
 
-  link_bugs(envcondir,envresultfile,envdebugfile,envconbugdir);
-    unless res
+  Dir[File.join(envcondir,'*.timing'),File.join(envcondir,'*.typescript')].each{ |f| `gzip #{f}` }
+
+  link_bugs(envcondir,envresultfile,envdebugfile,envconbugdir)
+
+  unless res
     $stderr.puts 'Kadeploy command failed, exiting'
     $stderr.puts cmd
     exit!(1)
@@ -770,7 +773,6 @@ def test_simultaneous_deployments(expname,macrosteps, env , simult , widf , work
 end
 
 def test_env(workdir,expname,run_id,macrosteps,env,iter,exp,simult=nil)
-
     puts "    Testing environment '#{env}'#{(simult ? " simult \##{simult}" : '')}" if $verbose
     if(!simult)
       test_dummy(expname,macrosteps,env,nil,workdir,run_id,iter, exp)
@@ -788,8 +790,7 @@ def check_args(name,yaml_file,nodes,keyfile,kadeploy,nodescount,exp)
   $name=String.new
 
 #checks the name
-  date=(Time.now.year.to_s+"-"+Time.now.mon.to_s+"-"+Time.now.day.to_s)+"-"
-  $name=(name!="" ? name+"-" : "")+date+Time.now.to_s.split(" ")[3].split(":").join("-")
+  $name = (name.empty? ? '' : "#{name}-") + Time.now.strftime("%Y-%m-%d-%H-%M-%S")
 
   if $mode != Kanalyzemode::RESCUE_STATS
 #checks the yaml file
