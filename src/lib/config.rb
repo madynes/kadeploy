@@ -784,6 +784,8 @@ module ConfigInformation
                 cp.value('args',String)
             end
           end
+
+          conf.tar_options = cp.value('tar',String,'--warning=no-timestamp')
         end
 
       rescue ArgumentError => ae
@@ -3255,6 +3257,7 @@ module ConfigInformation
     attr_accessor :purge_deployment_timer
     attr_accessor :rambin_path
     attr_accessor :mkfs_options
+    attr_accessor :tar_options
     attr_accessor :bt_tracker_ip
     attr_accessor :bt_download_timeout
     attr_accessor :almighty_env_users
