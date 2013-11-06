@@ -195,6 +195,7 @@ module Configuration
     attr_reader :purge_deployment_timer
     attr_reader :rambin_path
     attr_reader :mkfs_options
+    attr_reader :tar_options
     attr_reader :bt_tracker_ip
     attr_reader :bt_download_timeout
     attr_reader :almighty_env_users
@@ -625,6 +626,8 @@ module Configuration
                 cp.value('args',String)
             end
           end
+
+          @tar_options = cp.value('tar',String,'--warning=no-timestamp')
         end
 
       rescue ArgumentError => ae

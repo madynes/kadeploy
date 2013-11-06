@@ -665,17 +665,18 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the file are extracted correctly, false otherwise
   def extract_files_from_archive(archive, archive_kind, file_array, dest_dir)
+    opts = context[:common].tar_options
     file_array.each { |file|
       all_links_followed = false
       initial_file = file
-      while (not all_links_followed) 
+      while (not all_links_followed)
         case archive_kind
         when "tgz"
-          cmd = "tar -C #{dest_dir} -xzf #{archive} #{file}"          
+          cmd = "tar #{opts} -C #{dest_dir} -xzf #{archive} #{file}"
         when "tbz2"
-          cmd = "tar -C #{dest_dir} -xjf #{archive} #{file}"
+          cmd = "tar #{opts} -C #{dest_dir} -xjf #{archive} #{file}"
         when "txz"
-          cmd = "tar -C #{dest_dir} -xJf #{archive} #{file}"          
+          cmd = "tar #{opts} -C #{dest_dir} -xJf #{archive} #{file}"
         else
           raise "The kind #{archive_kind} of archive is not supported"
         end
@@ -844,13 +845,14 @@ class Microstep < Automata::QueueTask
     if output_file
       "cat #{(input_file ? input_file : '-')} > #{output_file}"
     else
+      opts = context[:common].tar_options
       case kind
       when "tgz"
-        "tar xz#{"f #{input_file}" if input_file} -C #{directory}"
+        "tar #{opts} xz#{"f #{input_file}" if input_file} -C #{directory}"
       when "tbz2"
-        "tar xj#{"f #{input_file}" if input_file} -C #{directory}"
+        "tar #{opts} xj#{"f #{input_file}" if input_file} -C #{directory}"
       when "txz"
-        "tar xJ#{"f #{input_file}" if input_file} -C #{directory}"
+        "tar #{opts} xJ#{"f #{input_file}" if input_file} -C #{directory}"
       when "ddgz"
         if partition
           "gzip -cd #{input_file if input_file} > #{partition}"

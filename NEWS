@@ -24,6 +24,7 @@
   - The server can be launched in secure mode using a custom certificate/key
   - Clients can be forced to export files in secure mode
   - You can now specify a log file and a debug file, no more syslog
+  - It's now possible to specify options for tarballs manipulations
   - End of deployment/reboot/power hooks are now specified in the field 'hooks'
   - It's now possible to specify a threshold for the autoclean loop
 * Client configuration file (doc sec/3)
