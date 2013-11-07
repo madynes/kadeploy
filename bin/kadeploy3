@@ -143,18 +143,18 @@ class KadeployClient < ClientWorkflow
       username = nil
       username = options[:user] if options[:user]
 
-      envs = get(api_path(username,:envs),{:user=>USER})
+      tmp = {:user=>USER}
+      tmp[:last] = true unless options[:env_version]
+      envs = get(api_path(username,:envs),tmp)
       envs.select!{|en| en['name'] == envname}
       error("The environment '#{envname}' does not exist") if envs.size <= 0
-      envs.sort_by!{|en| en['version']}
 
       if options[:env_version]
         envs.select!{|en| en['version'] == options[:env_version]}
         error("The environment '#{envname}' does not exist in version #{options[:env_version]}") if envs.size <= 0
-        env = envs.first
-      else
-        env = envs.last
       end
+      env = envs.first
+
       params[:environment][:user] = env['user']
       params[:environment][:name] = env['name']
       params[:environment][:version] = env['version']
