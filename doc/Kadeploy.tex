@@ -556,6 +556,7 @@ external:
     args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
   - fstype: ext3
     args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index
+  tar: --warning=timestamp
   kastafior:
     binary: /usr/bin/kastafior
 \end{verbatim}
@@ -766,6 +767,8 @@ The information used to generate this filenames are the one specified for each n
     \item \yfieldd{fstype}{String}{nil} the filesystem type
     \item \yfieldd{args}{String}{nil} the specific options for this filesystem type
   \end{itemize}
+
+  \item \yfieldd{tar}{String}{'--warning=no-timestamp'} Options for tar (used in the deployment environment)
 
   \item \ypath{/external/kastafior}
   \begin{itemize}
