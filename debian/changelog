@@ -1,9 +1,10 @@
-kadeploy (3.2.0~alpha4-1) UNRELEASED; urgency=low
+kadeploy (3.2.0~rc2-1) UNRELEASED; urgency=low
 
   * Move karights3 binaries in the client package
   * Add the Kastafior binary in the server package
+  * New Git snapshot based on v3.2.0_rc2.
 
- -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Fri, 25 Oct 2013 11:11:55 +0200
+ -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Tue, 19 Nov 2013 15:49:53 +0100
 
 kadeploy (3.2.0~alpha1) unstable; urgency=low
 
