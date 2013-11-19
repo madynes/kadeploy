@@ -13,6 +13,7 @@ RUNFILE_RELOAD='reload'
 
 AUTOCLEAN_PITCH = 300
 
+$version = nil
 $autoclean = nil
 $kadeploy = nil
 $httpd = nil

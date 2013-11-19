@@ -525,6 +525,7 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   suff = args.branch_suffix || ''
   deb_version, tag_version = deb_versions()
   sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
+  sh "git tag -d 'upstream#{suff}/#{tag_version}'; true"
   sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
   sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
   sh "git checkout debian#{suff}"

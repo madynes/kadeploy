@@ -1,4 +1,5 @@
 require 'kadeploy3/common/api'
+require 'kadeploy3/common/compat'
 require 'kadeploy3/common/configparser'
 require 'kadeploy3/common/environment'
 require 'kadeploy3/common/error'

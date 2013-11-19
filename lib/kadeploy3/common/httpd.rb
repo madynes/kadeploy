@@ -101,7 +101,7 @@ module HTTPd
 
     def self.parse_header_list(val)
       if val and !val.strip.empty?
-        ret = val.split(',').collect{|v| v.split(';')[0].strip.downcase}
+        ret = val.split(',').collect{|v| v.split(';').first.strip.downcase}
         if (ret & ['*','*/*']).empty?
           ret
         else
@@ -136,7 +136,7 @@ module HTTPd
               "The Content-Length HTTP header has to be sed")
           end
 
-          case @request['Content-Type'].downcase
+          case @request['Content-Type'].split(';').first.downcase
           when TYPES[:json]
             begin
               res = JSON::load(@body)
@@ -205,6 +205,11 @@ module HTTPd
       else
         type,content = [ TYPES[:json], JSON.pretty_generate(obj) ]
       end
+
+      # Force encoding to UTF-8
+      content.encode!('UTF-8', {:invalid => :replace, :undef => :replace})
+      type = type.dup
+      type << '; charset=utf-8'
 
       if @encoding and @encoding.include?('gzip')
         sio = StringIO.new('w')
@@ -349,6 +354,11 @@ module HTTPd
         response['Allow'] = (@allowed + [:HEAD]).collect{|m|m.to_s}.join(',')
       end
       res << "\n" if response['Content-Type'] == 'text/plain'
+      # Force encoding to UTF-8
+      if response['Content-Type'] == 'text/plain'
+        response['Content-Type'] << '; charset=utf-8'
+        res.encode!('UTF-8', {:invalid => :replace, :undef => :replace})
+      end
       response['Content-Length'] = res.size
       response.body = res unless get_method(request) == :HEAD
       res = nil
@@ -648,7 +658,6 @@ module HTTPd
     end
 
     def unbind(path)
-  puts "UNBIND #{path}"
       @server.umount(path)
     end
   end

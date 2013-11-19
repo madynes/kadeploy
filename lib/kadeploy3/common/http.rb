@@ -138,13 +138,14 @@ module HTTP
         if response.is_a?(Net::HTTPOK)
 
           if parse
-            if response['Content-Type'] == 'application/json'
+            case response['Content-Type'].split(';').first.downcase
+            when 'application/json'
               res = JSON::load(body)
-            elsif response['Content-Type'] == 'application/x-yaml'
+            when 'application/x-yaml'
               res = YAML::load(body)
-            elsif response['Content-Type'] == 'text/csv'
+            when 'text/csv'
               res = body
-            elsif response['Content-Type'] == 'text/plain'
+            when 'text/plain'
               res = body
             else
               error("Invalid server response (Content-Type: '#{response['Content-Type']}')")

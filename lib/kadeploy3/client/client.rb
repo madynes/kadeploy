@@ -686,8 +686,13 @@ class Client
 
 
     # Treatment of -m/--machine and -f/--file options
-
-    options[:nodes] = nil if options[:nodes] and options[:nodes].empty?
+    if options[:nodes]
+      if options[:nodes].empty?
+        options[:nodes] = nil
+      else
+        options[:nodes].uniq!
+      end
+    end
     treated = []
     # Sort nodes from the list by server (if multiserver option is specified)
     nodes = nil
