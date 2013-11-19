@@ -1,0 +1,8 @@
+Change-Id: Ie6cfb178c00c06fdd2afffdaeb98be0bdf1322d5
+Code-Review+2: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Verified+1: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-by: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-at: Tue, 19 Nov 2013 14:21:26 +0100
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1463
+Project: kadeploy3
+Branch: refs/heads/debian
