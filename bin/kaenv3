@@ -183,7 +183,9 @@ class KaenvsClient < Client
       when :'move-files'
         desc = options[:files_to_move].values
       else
-        desc = get(path,params)[0]
+        tmp = params.dup
+        tmp[:last] = true unless options[:env_version]
+        desc = get(path,tmp)[0]
       end
       add_localfiles(desc)
 
