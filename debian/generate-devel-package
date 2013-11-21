@@ -53,6 +53,7 @@ PATTERNS = {
   "/etc/kadeploy3/" => "/etc/kadeploy3-#{suffix}/",
   "/etc/init.d/kadeploy" => "/etc/init.d/kadeploy-#{suffix}",
   "/var/log/kadeploy3" => "/var/log/kadeploy3-#{suffix}",
+  "/var/run/kadeploy3d" => "/var/run/kadeploy3d-#{suffix}",
   "update-rc.d kadeploy defaults" => "update-rc.d kadeploy-#{suffix} defaults",
   "invoke-rc.d kadeploy start" => "invoke-rc.d kadeploy-#{suffix} start",
   "update-rc.d kadeploy remove" => "update-rc.d kadeploy-#{suffix} remove",
@@ -95,7 +96,9 @@ end
 
 f = File.join('debian',"kadeploy-#{suffix}","/etc/init.d/kadeploy-#{suffix}")
 s = File.read(f)
-s.gsub!(/^\s*NAME=kadeploy3d/,"NAME=kadeploy3d-#{suffix}")
+s.gsub!(/(^\s*NAME=\S+)/,"\\1-#{suffix}")
+s.gsub!(/(^\s*DAEMON_NAME=\S+)/,"\\1-#{suffix}")
+s.gsub!(/(^\s*#\s*Provides:\s*kadeploy)/,"\\1-#{suffix}")
 File::open(f, 'w') { |fd| fd.puts s }
 
 files = [
