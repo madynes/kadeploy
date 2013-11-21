@@ -12,7 +12,7 @@ Vcs-Browser: https://gforge.inria.fr/scm/browser.php?group_id=2026
 
 Package: kadeploy-common
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, ruby-mysql, ruby1.9.1
+Depends: ${shlibs:Depends}, ${misc:Depends}, ruby1.9.1
 Description: Kadeploy: the cluster deployment tool - common part
 XB-Ruby-Versions: ruby1.9.1
 
@@ -25,7 +25,7 @@ XB-Ruby-Versions: ruby1.9.1
 
 Package: kadeploy
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby1.9.1, openssh-client | ssh, taktuk
+Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby1.9.1, ruby-mysql | libmysql-ruby, openssh-client | ssh, taktuk
 Recommends: kadeploy-client (= ${binary:Version}), tftpd-hpa | atftpd | tftpd, syslinux-common
 Description: Kadeploy: the cluster deployment tool - server part
 XB-Ruby-Versions: ruby1.9.1
