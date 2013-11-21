@@ -1,7 +1,7 @@
 #!/usr/bin/ruby -w
 $:.unshift(ENV['KADEPLOY3_LIBS']) if ENV['KADEPLOY3_LIBS']
 $kadeploy_logdir=ENV['KADEPLOY3_LOG_DIR']||'/var/log/kadeploy3'
-$kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3'
+$kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3d'
 $kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 $kadeploy_logfiles = {}
 
