@@ -95,7 +95,8 @@ end
 
 f = File.join('debian',"kadeploy-#{suffix}","/etc/init.d/kadeploy-#{suffix}")
 s = File.read(f)
-s.gsub!(/^\s*NAME=kadeploy3d/,"NAME=kadeploy3d-#{suffix}")
+s.gsub!(/(^\s*NAME=kadeploy)/,"\1-#{suffix}")
+s.gsub!(/(\s*#^\s*Provides:\s*kadeploy)/,"\1-#{suffix}")
 File::open(f, 'w') { |fd| fd.puts s }
 
 files = [
