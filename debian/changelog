@@ -6,6 +6,8 @@ kadeploy (3.2.0~rc3-1) UNRELEASED; urgency=low
   * Move ruby-mysql dependency from common to server package
   * Modify ruby-mysql dependency to be compatible with squeeze
   * New Git snapshot based on v3.2.0_rc3.
+  * Create the /var/run/kadeploy3 directory in the server package
+  * Modify the devel-package generator to work with the new init script
 
  -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Mon, 25 Nov 2013 15:44:26 +0100
 
