@@ -2,6 +2,8 @@ kadeploy (3.2.0~alpha4-1) UNRELEASED; urgency=low
 
   * Move karights3 binaries in the client package
   * Add the Kastafior binary in the server package
+  * Move ruby-mysql dependency from common to server package
+  * Modify ruby-mysql dependency to be compatible with squeeze
 
  -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Fri, 25 Oct 2013 11:11:55 +0200
 
