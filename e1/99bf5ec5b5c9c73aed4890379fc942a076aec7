@@ -1,0 +1,8 @@
+Change-Id: Ie199bf5ec5b5c9c73aed4890379fc942a076aec7
+Code-Review+2: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Verified+1: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-by: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+Submitted-at: Tue, 19 Nov 2013 14:20:48 +0100
+Reviewed-on: https://helpdesk.grid5000.fr/gerrit/1462
+Project: kadeploy3
+Branch: refs/heads/upstream
