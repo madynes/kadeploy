@@ -1,29 +1,32 @@
 #! /bin/sh
 ### BEGIN INIT INFO
-# Provides:          skeleton
-# Required-Start:    $local_fs $remote_fs
-# Required-Stop:     $local_fs $remote_fs
+# Provides:          kadeploy
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: Example initscript
-# Description:       This file should be used to construct scripts to be
-#                    placed in /etc/init.d.
+# Short-Description: Kadeploy server initscript
+# Description:       Kadeploy: the cluster deployment tool - server part
 ### END INIT INFO
 
-# Author: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
-
+# Author: Kadeploy developers <kadeploy3-devel@lists.gforge.inria.fr>
+#
+# Please remove the "Author" lines above and replace them
+# with your own name if you copy and modify this script.
 
 # Do NOT "set -e"
 
 # PATH should only include /usr/* if it runs after the mountnfs.sh script
-PATH=/usr/sbin:/usr/bin:/sbin:/bin
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
 DESC="Kadeploy Server"
-NAME=kadeploy3d
-DAEMON=/usr/sbin/$NAME
-PIDFILE=/var/run/$NAME.pid
+NAME=kadeploy
+DAEMON_NAME=kadeploy3d
+DAEMON=/usr/sbin/${DAEMON_NAME}
+RUNDIR=/var/run/${DAEMON_NAME}
+PIDFILE=$RUNDIR/${DAEMON_NAME}.pid
 DAEMON_ARGS="--pidfile $PIDFILE --detach"
-SCRIPTNAME=/etc/init.d/$NAME
 DAEMON_USER=deploy
+SCRIPTNAME=/etc/init.d/$NAME
 
 # Exit if the package is not installed
 [ -x "$DAEMON" ] || exit 0
@@ -32,12 +35,12 @@ DAEMON_USER=deploy
 [ -r /etc/default/$NAME ] && . /etc/default/$NAME
 
 # Load the VERBOSE setting and other rcS variables
-[ -f /etc/default/rcS ] && . /etc/default/rcS
+. /lib/init/vars.sh
 
 # Define LSB log_* functions.
-# Depend on lsb-base (>= 3.0-6) to ensure that this file is present.
+# Depend on lsb-base (>= 3.2-14) to ensure that this file is present
+# and status_of_proc is working.
 . /lib/lsb/init-functions
-
 
 #
 # Function that starts the daemon/service
@@ -48,14 +51,10 @@ do_start()
 	#   0 if daemon has been started
 	#   1 if daemon was already running
 	#   2 if daemon could not be started
-        [ -e $PIDFILE ] && [ -e /proc/`cat $PIDFILE` ] && return 1
-        [ -e $PIDFILE ] || ( touch $PIDFILE && chown $DAEMON_USER:$DAEMON_USER $PIDFILE )
-        start-stop-daemon --start --quiet --exec $DAEMON --test -- $DAEMON_ARGS > /dev/null || return 1
-        start-stop-daemon --start --quiet --exec $DAEMON --chuid $DAEMON_USER -- $DAEMON_ARGS > /dev/null || return 2
-	# Add code here, if necessary, that waits for the process to be ready
-	# to handle requests from services started subsequently which depend
-	# on this one.  As a last resort, sleep for some time.
-	sleep 1 && [ -e /proc/`cat $PIDFILE` ] || (rm $PIDFILE ;return 2)
+	[ -e $PIDFILE ] && [ -e /proc/`cat $PIDFILE` ] && return 1
+	start-stop-daemon --start --quiet --chuid $DAEMON_USER --exec $DAEMON -- $DAEMON_ARGS \
+		|| return 2
+	return 0
 }
 
 #
@@ -68,7 +67,7 @@ do_stop()
 	#   1 if daemon was already stopped
 	#   2 if daemon could not be stopped
 	#   other if a failure occurred
-	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $NAME
+	start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile $PIDFILE --name $DAEMON_NAME
 	RETVAL="$?"
 	[ "$RETVAL" = 2 ] && return 2
 	# Wait for children to finish too if this is a daemon that forks
@@ -84,87 +83,71 @@ do_stop()
 	return "$RETVAL"
 }
 
-do_reload()
-{
-  RELOADFILE=/var/run/${NAME}/reload
-  rm -f $RELOADFILE
-  killproc -p "$PIDFILE" "$DAEMON" -HUP
-  while [ ! -f $RELOADFILE ]
-  do
-    sleep 1
-  done
-  # The first line of the file is the return code of the reload command
-  # (0 if successful), the following ones are representing the error message
-  sed '1d' $RELOADFILE >&2
-  [ "$(sed '1q' $RELOADFILE)" = "0" ]
+#
+# Function that sends a SIGHUP to the daemon/service
+#
+do_reload() {
+	#
+	# If the daemon can reload its configuration without
+	# restarting (for example, when it is sent a SIGHUP),
+	# then implement that here.
+	#
+	rm -f $RUNDIR/reload
+	start-stop-daemon --stop --signal 1 --quiet --pidfile $PIDFILE --name $DAEMON_NAME
+	# Wait for the reload operation to finish
+	while [ ! -f $RUNDIR/reload ]; do sleep 1; done
+	# Display reload messages/errors
+	sed '1d' $RUNDIR/reload >&2
+	return 0
 }
 
 case "$1" in
   start)
-	log_action_begin_msg "Starting $DESC"
+	[ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
 	do_start
 	case "$?" in
-		0) log_action_end_msg 0 ;;
-		1) log_action_end_msg 1 ; echo "Daemon already running" 1>&2;;
-		2) log_action_end_msg 1;; #log_daemon_msg "An error occured, probably a configuration issue, please check your syslog file." ;;
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
 	esac
 	;;
   stop)
-	log_action_begin_msg "Stopping $DESC"
+	[ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
 	do_stop
 	case "$?" in
-		0|1) log_action_end_msg 0 ;;
-		2) log_action_end_msg 1 ;;
+		0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+		2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
 	esac
 	;;
+  status)
+	status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
+	;;
+  reload|force-reload)
+	log_daemon_msg "Reloading $DESC" "$NAME"
+	do_reload
+	log_end_msg $?
+	;;
   restart)
-	log_action_begin_msg "Restarting $DESC"
+	log_daemon_msg "Restarting $DESC" "$NAME"
 	do_stop
 	case "$?" in
 	  0|1)
 		do_start
 		case "$?" in
-			0) log_action_end_msg 0 ;;
-			1) log_action_end_msg 1 ;; # Old process is still running
-			*) log_action_end_msg 1 ;; # log_daemon_msg "An error occured, probably a configuration issue, please check your syslog file." ;; # Failed to start
+			0) log_end_msg 0 ;;
+			1) log_end_msg 1 ;; # Old process is still running
+			*) log_end_msg 1 ;; # Failed to start
 		esac
 		;;
 	  *)
-	  	# Failed to stop
+		# Failed to stop
 		log_end_msg 1
 		;;
 	esac
 	;;
-  reload|force-reload)
-	log_action_begin_msg "Reloading $DESC"
-  do_reload
-	case "$?" in
-		0) log_action_end_msg 0 ;;
-		*)
-      case "$1" in
-      reload) log_action_end_msg 1 ;;
-      force-reload)
-	      log_action_begin_msg "Restarting $DESC"
-	      do_stop
-	      case "$?" in
-	        0|1)
-	      	  do_start
-	      	  case "$?" in
-	      	  	0) log_action_end_msg 0 ;;
-	      	  	*) log_action_end_msg 1 ;;
-	      	  esac
-	      	;;
-	        *) log_end_msg 1 ;; # Failed to stop
-	      esac
-      ;;
-	    esac
-  esac
-  ;;
-  status)
-        status_of_proc "$DAEMON" "$NAME" && exit 0 || exit $?
-        ;;
   *)
-	echo "Usage: $SCRIPTNAME {start|stop|restart|reload|force-reload|status}" >&2
+	echo "Usage: $SCRIPTNAME {start|stop|status|restart|reload|force-reload}" >&2
 	exit 3
 	;;
 esac
+
+:
