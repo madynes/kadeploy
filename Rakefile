@@ -547,7 +547,7 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
 ### After the packaging work, tag the final Debian package, push the tag:
   git commit -m "Update Debian changelog for #{deb_version}" debian#{suff}/changelog
   git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
-  git push origin debian#{suff}/#{tag_version}-1:refs/tags/debian#{suff}/#{tag_version}-1
+  git push origin debian#{suff}/#{deb_version}-1:refs/tags/debian#{suff}/#{deb_version}-1
 EOF
 end
 
