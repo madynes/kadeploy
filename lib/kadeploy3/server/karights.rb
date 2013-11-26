@@ -47,7 +47,6 @@ module Karights
   end
 
   def rights_create(cexec)
-    cexec.rights.delete(cexec.username,cexec.nodes) if cexec.overwrite
     existing = cexec.rights.get(cexec.username,cexec.nodes)
     existing = existing[cexec.username] if existing
     if existing.is_a?(Hash)
@@ -69,10 +68,14 @@ module Karights
       if existing and (existing.keys.size > 1 or existing.keys[0] != cexec.username)
         existing.keys.each do |usr|
           unless cexec.almighty_users.include?(usr)
-            kaerror(APIError::CONFLICTING_ELEMENTS,
-              "Some rights are already set for user #{usr}"\
-              " on nodes #{cexec.nodes.join(',')}"
-            )
+            if cexec.overwrite
+              cexec.rights.delete(usr,cexec.nodes)
+            else
+              kaerror(APIError::CONFLICTING_ELEMENTS,
+                "Some rights are already set for user #{usr}"\
+                " on nodes #{cexec.nodes.join(',')}"
+              )
+            end
           end
         end
       end
