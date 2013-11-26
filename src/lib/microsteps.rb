@@ -863,11 +863,11 @@ class Microstep < Automata::QueueTask
     opts = context[:common].tar_options
     case tarball_kind
     when "tgz"
-      cmd = "tar #{opts} xz -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xz -C #{deploy_mount_point}"
     when "tbz2"
-      cmd = "tar #{opts} xj -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xj -C #{deploy_mount_point}"
     when "txz"
-      cmd = "tar #{opts} xJ -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xJ -C #{deploy_mount_point}"
     when "ddgz"
       cmd = "gzip -cd > #{deploy_part}"
     when "ddbz2"
@@ -943,11 +943,11 @@ class Microstep < Automata::QueueTask
     opts = context[:common].tar_options
     case tarball_kind
     when "tgz"
-      cmd = "tar #{opts} xz -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xz -C #{deploy_mount_point}"
     when "tbz2"
-      cmd = "tar #{opts} xj -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xj -C #{deploy_mount_point}"
     when "txz"
-      cmd = "tar #{opts} xJ -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xJ -C #{deploy_mount_point}"
     when "ddgz"
       cmd = "gzip -cd > #{deploy_part}"
     when "ddbz2"
@@ -1040,11 +1040,11 @@ class Microstep < Automata::QueueTask
     opts = context[:common].tar_options
     case tarball_kind
     when "tgz"
-      cmd = "tar #{opts} xzf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xzf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
     when "tbz2"
-      cmd = "tar #{opts} xjf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xjf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
     when "txz"
-      cmd = "tar #{opts} xJf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
+      cmd = "tar #{opts} -xJf /tmp/#{File.basename(tarball_file)} -C #{deploy_mount_point}"
     when "ddgz"
       cmd = "gzip -cd /tmp/#{File.basename(tarball_file)} > #{deploy_part}"
     when "ddbz2"
