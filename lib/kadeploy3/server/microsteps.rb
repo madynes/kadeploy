@@ -848,11 +848,11 @@ class Microstep < Automata::QueueTask
       opts = context[:common].tar_options
       case kind
       when "tgz"
-        "tar #{opts} xz#{"f #{input_file}" if input_file} -C #{directory}"
+        "tar #{opts} -C #{directory} -xz#{"f #{input_file}" if input_file}"
       when "tbz2"
-        "tar #{opts} xj#{"f #{input_file}" if input_file} -C #{directory}"
+        "tar #{opts} -C #{directory} -xj#{"f #{input_file}" if input_file}"
       when "txz"
-        "tar #{opts} xJ#{"f #{input_file}" if input_file} -C #{directory}"
+        "tar #{opts} -C #{directory} -xJ#{"f #{input_file}" if input_file}"
       when "ddgz"
         if partition
           "gzip -cd #{input_file if input_file} > #{partition}"
