@@ -412,6 +412,7 @@ module ConfigInformation
       exec_specific.multi_server = false
       exec_specific.kadeploy_server = String.new
       exec_specific.kadeploy_server_port = String.new
+      exec_specific.kexec = true
       exec_specific.reboot_classical_timeout = nil
       exec_specific.reboot_kexec_timeout = nil
       exec_specific.vlan = nil
@@ -1958,6 +1959,9 @@ module ConfigInformation
         }
         opt.on("--set-custom-operations FILE", "Add some custom operations defined in a file") { |file|
           return false unless Config.load_custom_ops_file(exec_specific,file)
+        }
+        opt.on("--no-kexec", "Disable kexec reboots during the deployment process") {
+          exec_specific.kexec = false
         }
         opt.on("--reboot-classical-timeout V", "Overload the default timeout for classical reboots") { |t|
           if (t =~ /\A\d+\Z/) then

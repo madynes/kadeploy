@@ -118,6 +118,13 @@ class Workflow < Automata::TaskManager
 
     # SetDeploymentEnv step
     macrosteps[0].get_instances.each do |instance|
+      if !context[:execution].kexec and instance[0] == 'SetDeploymentEnvKexec'
+        instance[0] = 'SetDeploymentEnvUntrusted'
+        # Should not be hardcoded
+        instance[1] = 0
+        instance[2] = eval("(#{context[:cluster].timeout_reboot_classical})+200").to_i
+        debug(0,"Using classical reboot instead of kexec (#{macrosteps[0].name})")
+      end
       @tasks[0] << [ instance[0].to_sym ]
     end
 
@@ -143,13 +150,18 @@ class Workflow < Automata::TaskManager
         setclassical.call(
           instance,
           "Using classical reboot instead of kexec one with this "\
-          "non-linux environment"
+          "non-linux environment (#{macrosteps[2].name})"
         )
       # The filesystem is not supported by the deployment kernel
       elsif !context[:cluster].deploy_supported_fs.include?(context[:execution].environment.filesystem)
         setclassical.call(
           instance,
-          "Using classical reboot instead of kexec since the filesystem of the boot partition is not supported"
+          "Using classical reboot instead of kexec since the filesystem of the boot partition is not supported (#{macrosteps[2].name})"
+        )
+      elsif !context[:execution].kexec
+        setclassical.call(
+          instance,
+          "Using classical reboot instead of kexec (#{macrosteps[2].name})"
         )
       end
 
