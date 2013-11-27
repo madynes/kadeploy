@@ -6,6 +6,7 @@ module Kadeploy
   def deploy_init_exec_context()
     ret = work_init_exec_context(:deploy)
     ret.reformat_tmp = nil
+    ret.disable_kexec = false
     ret.disable_bootloader_install = false
     ret.disable_disk_partitioning = false
     ret.timeout_reboot_kexec = nil
@@ -63,6 +64,7 @@ module Kadeploy
         # Check disable options
         context.disable_bootloader_install = p.parse('disable_bootloader_install',nil,:toggle=>true)
         context.disable_disk_partitioning = p.parse('disable_disk_partitioning',nil,:toggle=>true)
+        context.disable_kexec = p.parse('disable_kexec',nil,:toggle=>true)
 
         # Check rights on multipart environement
         if context.environment.multipart
