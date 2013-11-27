@@ -627,7 +627,7 @@ module Configuration
             end
           end
 
-          @tar_options = cp.value('tar',String,'--warning=no-timestamp')
+          @tar_options = cp.value('tar',String,'')
         end
 
       rescue ArgumentError => ae

@@ -35,6 +35,7 @@ class KadeployClient < ClientWorkflow
         :pxe_files => [],
         :steps => [],
         :force => false,
+        :disable_kexec => nil,
         :disable_bootloader_install => nil,
         :disable_disk_partitioning => nil,
         :reboot_classical_timeout => nil,
@@ -70,6 +71,9 @@ class KadeployClient < ClientWorkflow
       parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
+      add_opt(opt,"--no-kexec", "Disable kexec reboots during the deployment process") {
+        options[:disable_kexec] = true
+      }
       add_opt(opt,"--disable-bootloader-install", "Disable the automatic installation of a bootloader for a Linux based environnment") {
         options[:disable_bootloader_install] = true
       }
@@ -124,6 +128,7 @@ class KadeployClient < ClientWorkflow
     params[:reformat_tmp_partition] = options[:reformat_tmp] if options[:reformat_tmp]
     params[:timeout_reboot_classical] = options[:reboot_classical_timeout] if options[:reboot_classical_timeout]
     params[:timeout_reboot_kexec] = options[:reboot_kexec_timeout] if options[:reboot_kexec_timeout]
+    params[:disable_kexec] = options[:disable_kexec] if options[:disable_kexec]
     params[:disable_bootloader_install] = options[:disable_bootloader_install] if options[:disable_bootloader_install]
     params[:disable_disk_partitioning] = options[:disable_disk_partitioning] if options[:disable_disk_partitioning]
     if options[:pxe_profile]

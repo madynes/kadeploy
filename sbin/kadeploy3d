@@ -10,6 +10,7 @@ SSH_KEY=File.join($kadeploy_confdir,'keys/id_deploy')
 LOGFILE_DEBUG='output.log'
 LOGFILE_ERROR='error.log'
 RUNFILE_RELOAD='reload'
+RUNFILE_DUMP='dump'
 
 AUTOCLEAN_PITCH = 300
 
@@ -82,6 +83,23 @@ Signal::trap("HUP") do
   end
 end
 
+
+# Print a dump of the running service data structures
+Signal::trap("USR1") do
+  require 'kadeploy3/server/dump'
+
+  file = File.open(File.join($kadeploy_rundir,RUNFILE_DUMP),'w+')
+  begin
+    STDOUT.puts "[#{Time.now.to_s}] Dump internal structures"
+    Kadeploy.dump(file)
+  rescue Exception => e
+    STDOUT.puts e.class.name
+    STDOUT.puts e.message
+    STDOUT.puts e.backtrace
+  ensure
+    file.close unless file.closed?
+  end
+end
 
 require 'kadeploy3/server'
 
