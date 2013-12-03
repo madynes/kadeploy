@@ -19,7 +19,7 @@ class KarebootClient < ClientWorkflow
   def self.load_options()
     global_load_options().merge(
       {
-        :operation => nil,
+        :operation => :simple,
         :env_name => nil,
         :env_version => nil, #By default we load the latest version
         :check_demolishing => false,
