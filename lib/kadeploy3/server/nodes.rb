@@ -7,6 +7,10 @@ module Nodes
   REGEXP_NODELIST = /\A([A-Za-z0-9\.\-]+\[#{REGEXP_LIST.source}\][A-Za-z0-9\.\-]*)\Z/
   REGEXP_IPLIST = /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[#{REGEXP_LIST.source}\])\Z/
 
+  def self.sort_list(nodes)
+    nodes.sort_by!{|v| v.to_s.scan(/\w+/).first.hash + v.to_s.scan(/\d+/).first.to_i}
+  end
+
   def self.get_states(db,nodes)
     where = nil
     args = nil

@@ -149,6 +149,7 @@ class ParamsParser
           error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
         end
       end
+      Nodes::sort_list(param.set)
     when :vlan
       if @vlan_hostname_suffix.empty? or @set_vlan_cmd.empty?
         error(APIError::INVALID_VLAN, "The VLAN management is disabled")
