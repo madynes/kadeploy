@@ -864,6 +864,24 @@ module Nodes
       return group_by_cluster.length
     end
 
+    def get_node(hostname)
+      res = nil
+      if hostname =~ /^\d/
+        res = @set.select{|v| v.hostname =~ /\D#{hostname}\D/}
+      else
+        res = @set.select{|v| v.hostname =~ /#{hostname}\D/}
+      end
+
+      case res.size
+      when 0
+        return nil
+      when 1
+        return res.first
+      else
+        return res
+      end
+    end
+
     # Get a Node in a NodeSet by its hostname
     #
     # Arguments

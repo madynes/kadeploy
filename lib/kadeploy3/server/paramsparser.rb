@@ -143,10 +143,15 @@ class ParamsParser
       # Create a nodeset
       param = Nodes::NodeSet.new(0)
       hosts.each do |host|
-        if node = @nodes.get_node_by_host(host)
-          param.push(node)
+        node = @nodes.get_node(host)
+        if node
+          if node.is_a?(Array)
+            error(APIError::INVALID_NODELIST,"Ambibuous node name '#{host}' that can refer to #{node.collect{|n| n.hostname}.join(' or ')}")
+          else
+            param.push(node)
+          end
         else
-          error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
+          error(APIError::INVALID_NODELIST,"The node '#{host}' does not exist")
         end
       end
     when :vlan
