@@ -1,9 +1,23 @@
 module Kadeploy
 
 module Kaconsole
+  def console_init_exec_context()
+    ret = init_exec_context()
+    ret.config = nil
+    ret
+  end
+
+  def console_free_exec_context(context)
+    context = free_exec_context(context)
+    context.config.free
+    context.config = nil
+    context
+  end
+
   def console_prepare(params,operation=:get)
-    context = init_exec_context()
+    context = console_init_exec_context()
     parse_params_default(params,context)
+    context.config = duplicate_config()
     context
   end
 
@@ -13,7 +27,9 @@ module Kaconsole
       parse_params({'node'=>node}) do |p|
         node = p.parse('node',String,:type=>:node,:mandatory=>true)
       end
-      { 'command' => node.cmd.console }
+      cmd = node.cmd.console || cexec.config.clusters[node.cluster].cmd_console
+      cmd = Nodes::NodeCmd.generate(cmd.dup,node)
+      { 'command' => cmd }
     else
       kaerror(APIError::INVALID_RIGHTS)
     end
