@@ -867,9 +867,9 @@ module Nodes
     def get_node(hostname)
       res = nil
       if hostname =~ /^\d/
-        res = @set.select{|v| v.hostname =~ /\D#{hostname}\D/}
+        res = @set.select{|v| v.hostname =~ /\D#{hostname}\D/ or v.hostname =~ /#{hostname}$/}
       else
-        res = @set.select{|v| v.hostname =~ /#{hostname}\D/}
+        res = @set.select{|v| v.hostname =~ /#{hostname}\D/ or v.hostname =~ /#{hostname}$/}
       end
 
       case res.size
