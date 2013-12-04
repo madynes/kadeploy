@@ -939,7 +939,7 @@ class Microstep < Automata::QueueTask
     end
     nodefile.unlink
 
-    @output.debug_command(cmd, out, err, status, @nodes)
+    @debugger.push(cmd,@nodes,out,err,status) if @debugger
     if (status != 0) then
       failed_microstep("Error while processing to the file broadcast with #{File.basename(cmd.split(' ')[0])} (exited with status #{status})")
       return false
@@ -1940,7 +1940,7 @@ class Microstep < Automata::QueueTask
       res = send_tarball_and_uncompress_with_kastafior(file,decompress)
     when :custom
       res = send_tarball_and_uncompress_with_custom(
-        context[:cluster].cmd_sendenv,file,decompress)
+        context[:cluster].cmd_sendenv.dup,file,decompress)
     end
     debug(3, "Broadcast time: #{Time.now.to_i - start}s") if res
     return res
