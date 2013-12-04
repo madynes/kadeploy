@@ -129,6 +129,22 @@ module Macrostep
     end
   end
 
+  class DeployBroadcastEnvKascade < DeployBroadcastEnv
+    def steps()
+      [
+        [ :send_environment, :kascade ],
+        [ :decompress_environment, :tree ],
+        [ :mount_deploy_part ],
+        [ :manage_admin_post_install, :tree ],
+        [ :manage_user_post_install, :tree ],
+        [ :check_kernel_files ],
+        [ :send_key, :tree ],
+        [ :install_bootloader ],
+        [ :sync ],
+      ]
+    end
+  end
+
   class DeployBroadcastEnvKastafior < DeployBroadcastEnv
     def steps()
       [

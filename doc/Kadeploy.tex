@@ -559,6 +559,9 @@ external:
   tar: --warning=no-timestamp
   kastafior:
     binary: /usr/bin/kastafior
+  kascade:
+    binary: /usr/bin/kascade
+    args: -v
 \end{verbatim}
 \end{small}
 
@@ -773,6 +776,12 @@ The information used to generate this filenames are the one specified for each n
   \item \ypath{/external/kastafior}
   \begin{itemize}
     \item \yfieldd{binary}{String}{kastafior} the command used to launch kastafior
+  \end{itemize}
+
+  \item \ypath{/external/kascade}
+  \begin{itemize}
+    \item \yfieldd{binary}{String}{kascade} the command used to launch kascade
+    \item \yfieldd{args}{String}{''} extra options for the kascade command
   \end{itemize}
 \end{itemize}
 
