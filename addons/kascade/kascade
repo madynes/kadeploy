@@ -251,6 +251,13 @@ File.readlines(options[:nodefile]).map do |line|
   ports << port.to_i
 end
 index = nodes.index(Socket.gethostname)
+if index==nil
+	ips=Socket.ip_address_list
+	index=nodes.find_index {|ip| ips.find_index{ |ip2| ip2.ip_address==ip}}
+end
+if index==nil
+	raise "I don't know who i am !"
+end
 
 # OPEN STREAMS
 if !options[:input]
