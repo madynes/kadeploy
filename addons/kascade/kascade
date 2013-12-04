@@ -145,7 +145,7 @@ if defined?options[:sshcommand] && options[:sshcommand]!=nil
       ssh_options[:keys]=v
     end
     opts.on("-q","--quied","Not used") {|v|}
-   
+  
   end.parse(sshargs)
   if !ssh_options_str.empty?
     tr=Net::SSH::Config.translate(ssh_options_str)
@@ -163,7 +163,7 @@ Net::SSH::Multi.start do |session|
   cmd = "echo #{fountain} > #{fountainPath} && echo #{nodesPorts} > #{nodesPath}"
   session.exec(cmd)
   session.loop
-  puts "HOST : " + Socket.gethostname
+  puts "HOST : " + Socket.gethostname if options[:verbose]
   time = Time.now - time
   puts "script forwarded in #{time}s" if options[:verbose]
   cmd = "ruby #{fountainPath} -o #{options[:output]} -O \"#{options[:outputcmd]}\" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose}"
@@ -177,17 +177,19 @@ Net::SSH::Multi.start do |session|
   start_thr.join
   time = Time.now - time
   totalTime = Time.now - start
-  puts "KASCADE :"
-  puts "\tFILE\t\t:\t#{options[:input]}"
-  puts "\tSIZE\t\t:\t#{File.size(options[:input])} bytes"
-  puts "\tNODES\t\t:\t#{nodes.length}"
-  puts "\tTRANSFER TIME\t:\t#{time} seconds"
-  puts "\tTOTAL TIME\t:\t#{totalTime} seconds"
+  if options[:verbose]
+    puts "KASCADE :"
+    puts "\tFILE\t\t:\t#{options[:input]}"
+    puts "\tSIZE\t\t:\t#{File.size(options[:input])} bytes"
+    puts "\tNODES\t\t:\t#{nodes.length}"
+    puts "\tTRANSFER TIME\t:\t#{time} seconds"
+    puts "\tTOTAL TIME\t:\t#{totalTime} seconds"
+  end
   if !report.empty?
     report.uniq!
     puts "#{report.length} errors has been reported, creating a report file : " + reportPath
     reportFile = File.new(reportPath, "w")
-    eportFile.write(report.join("\n"))  
+    reportFile.write(report.join("\n")) 
     reportFile.close
   end
   if options[:check]
@@ -224,13 +226,14 @@ require 'optparse'
 require 'open3'
 
 def connectClient(nodes,ports,index,verbose)
+  puts "try to connect index #{index}" if verbose
   client = nil
   attempts = 0
   while !client && nodes[index]
     begin
       client = TCPSocket.new(nodes[index], ports[index])
     rescue => e
-      puts "failed to connect to #{nodes[index]} with ports #{ports[index]}" if verbose
+      puts "failed to connect to #{nodes[index]} with ports #{ports[index]} exeception : #{e.to_s}" if verbose
       attempts += 1
       if attempts < 10
         puts "next attempt in 1s" if verbose
