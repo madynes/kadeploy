@@ -42,6 +42,7 @@ end.parse!
 # GENERATES TEMP FILE
 secureRandom = SecureRandom.hex
 fountainPath = "/tmp/kascade" + secureRandom + "fountain.rb"
+firstFountainPath = "/tmp/kascadef" + secureRandom + "fountain.rb"
 nodesPath = "/tmp/kascade" + secureRandom + "nodefile"
 reportPath = "/tmp/kascade" + secureRandom + "report"
 
@@ -94,7 +95,7 @@ nodesPorts = Shellwords.escape(nodesPorts)
 
 # FIRST FOUNTAIN
 fountain = Shellwords.escape(File.read(__FILE__).split(/^# FOUNTAIN/)[1])
-cmd = "echo #{fountain} > fountain.rb" 
+cmd = "echo #{fountain} > #{firstFountainPath}" 
 system(cmd)
 cmd = "echo #{nodesPorts} > #{nodesPath}"
 system(cmd)
@@ -129,8 +130,8 @@ Net::SSH::Multi.start do |session|
   puts "script forwarded in #{time}s" if options[:verbose]
   cmd = "ruby #{fountainPath} -o #{options[:output]} -O \"#{options[:outputcmd]}\" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose}"
   session.exec(cmd)
-  start_thr = Thread.new {
-    cmd = "ruby fountain.rb -i #{options[:input]} -o #{options[:output]} -O \"#{options[:outputcmd]}\" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose}"
+  start_thr = Thread.new { #firstfountain
+    cmd = "ruby #{firstFountainPath} -i #{options[:input]} -o #{options[:output]} -O \"#{options[:outputcmd]}\" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose}"
     time = Time.now
     system(cmd)
   }
