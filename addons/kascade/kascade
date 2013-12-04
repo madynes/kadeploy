@@ -30,6 +30,7 @@ OptionParser.new do |opts|
   opts.on("-C", "--[no-]checkmd5", "check md5sum") { |v| options[:checkmd5] = v }
   opts.on("-n", "--nodefile FILE", "node file") { |v| options[:nodefile] = v }
   opts.on("-s", "--[no-]sort", "sort the node file") { |v| options[:sort] = v }
+  opts.on("-S", "--ssh-command SSH", "parse ssh command") { |v| options[:sshcommand] = v }
   opts.on("-v", "--[no-]verbose", "run verbosely") { |v| options[:verbose] = v }
   opts.separator ""
   opts.separator "Common options :"
@@ -84,7 +85,7 @@ if options[:sort]
 end
 
 i = 0
-nodesPorts = nodes.map do |line| 
+nodesPorts = nodes.map do |line|
   port = options[:port].to_i + i + 1
   i += 1
   line = line.chomp + ":#{port}"
@@ -95,7 +96,7 @@ nodesPorts = Shellwords.escape(nodesPorts)
 
 # FIRST FOUNTAIN
 fountain = Shellwords.escape(File.read(__FILE__).split(/^# FOUNTAIN/)[1])
-cmd = "echo #{fountain} > #{firstFountainPath}" 
+cmd = "echo #{fountain} > #{firstFountainPath}"
 system(cmd)
 cmd = "echo #{nodesPorts} > #{nodesPath}"
 system(cmd)
@@ -117,10 +118,47 @@ report_thr = Thread.new {
   end
 }
 
+
+# =================== Parse ssh options ===================
+ssh_options={}
+if defined?options[:sshcommand] && options[:sshcommand]!=nil
+  class String
+    def numberize
+    Integer(self) rescue self
+    end
+  end
+  flip=false
+  sshargs=options[:sshcommand].split(/"/).collect{|t| flip!=flip; flip ? t : t.split(' ')}.flatten
+  ssh_options_str={}
+  OptionParser.new do |opts|
+    opts.on("-o", "--option OPTION", "puts option in ssh") do |v|
+      opts=v.split("=")
+      ssh_options_str[opts[0].downcase]=opts[1].numberize
+    end
+    opts.on("-p","--port PORT","set port")do |v|
+      ssh_options[:port]=v
+    end
+    opts.on("-l","--login LOGIN", "puts option in ssh") do |v|
+      ssh_options[:user]=v
+    end
+    opts.on("-i","--indentification FILE","identification file") do |v|
+      ssh_options[:keys]=v
+    end
+    opts.on("-q","--quied","Not used") {|v|}
+   
+  end.parse(sshargs)
+  if !ssh_options_str.empty?
+    tr=Net::SSH::Config.translate(ssh_options_str)
+    ssh_options.merge!(tr)
+  end
+  puts "options for ssh #{ssh_options}" if options[:verbose]
+end
+
+
 # ALL FOUNTAINS
 verbose = options[:verbose] ? "--verbose" : "--no-verbose"
 Net::SSH::Multi.start do |session|
-  nodes.each { |node| session.use(node) }
+  nodes.each { |node| session.use(node,ssh_options) }
   time = Time.now
   cmd = "echo #{fountain} > #{fountainPath} && echo #{nodesPorts} > #{nodesPath}"
   session.exec(cmd)
@@ -149,7 +187,7 @@ Net::SSH::Multi.start do |session|
     report.uniq!
     puts "#{report.length} errors has been reported, creating a report file : " + reportPath
     reportFile = File.new(reportPath, "w")
-    reportFile.write(report.join("\n"))   
+    eportFile.write(report.join("\n"))  
     reportFile.close
   end
   if options[:check]
@@ -252,11 +290,11 @@ File.readlines(options[:nodefile]).map do |line|
 end
 index = nodes.index(Socket.gethostname)
 if index==nil
-	ips=Socket.ip_address_list
-	index=nodes.find_index {|ip| ips.find_index{ |ip2| ip2.ip_address==ip}}
+  ips=Socket.ip_address_list
+  index=nodes.find_index {|ip| ips.find_index{ |ip2| ip2.ip_address==ip}}
 end
 if index==nil
-	raise "I don't know who i am !"
+  raise "I don't know who i am !"
 end
 
 # OPEN STREAMS
