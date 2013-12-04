@@ -1,8 +1,8 @@
 #!/usr/bin/ruby
 
+require 'rubygems'
 require 'optparse'
 require 'shellwords'
-require 'rubygems'
 require 'net/ssh'
 require 'net/ssh/multi'
 require 'socket'
