@@ -246,6 +246,12 @@ class Client
     }
   end
 
+  def self.parse_env_user(opt,options)
+    add_opt(opt,"-u", "--env-user USERNAME", /^\w+$/, "Specify the user that own the recorded environment") { |u|
+      options[:env_user] = u
+    }
+  end
+
   def self.parse_user(opt,options)
     add_opt(opt,"-u", "--user USERNAME", /^\w+$/, "Specify the user") { |u|
       options[:user] = u

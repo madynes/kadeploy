@@ -76,9 +76,9 @@ class KaenvsClient < Client
         :environment => {},
         :operation => nil,
         :env_desc => {},
+        :env_user => nil,
         :env_name => '',
         :env_version => nil,
-        :user => nil,
         :all_versions => false,
         :visibility_tag => nil,
         :files_to_move => {},
@@ -122,7 +122,7 @@ class KaenvsClient < Client
       add_opt(opt,"-t", "--visibility-tag TAG", ['public','private','shared'], "Set the visibility tag (private, shared, public)") { |v|
         options[:visibility_tag] = v
       }
-      parse_user(opt,options)
+      parse_env_user(opt,options)
       parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
@@ -195,11 +195,11 @@ class KaenvsClient < Client
     # set path
     path = api_path()
     if ![:add, :list, :'move-files'].include?(options[:operation])
-      path = File.join(path,options[:user]||USER)
+      path = File.join(path,options[:env_user]||USER)
       path = File.join(path,options[:env_name]) if options[:env_name]
       path = File.join(path,options[:env_version].to_s) if options[:env_version]
     elsif options[:operation] != :add
-      path = File.join(path,options[:user]) if options[:user]
+      path = File.join(path,options[:env_user]) if options[:env_user]
     end
 
     if [:add, :'update-image-checksum',:'update-postinstalls-checksum',:'update-preinstall-checksum',:'move-files'].include?(options[:operation])
