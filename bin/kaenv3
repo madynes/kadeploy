@@ -18,7 +18,35 @@ class KaenvsClient < Client
   end
 
   def print_short(env)
-    debug sprintf("%-21s %-7s %-11s %.35s%.3s\n", env['name'], env['version'], env['user'], env['description'],(env['description'].size>35 ? '...' : ''))
+    tot = 0
+    tot += (env['name'].size > 21 ? env['name'].size : 21)
+
+    format = "%-21s "
+    tmp = env['name'].size - 21
+    if tmp > 0
+      if tmp < 7
+        format << "%-#{7-tmp}s "
+        tot += (7-tmp)
+      else
+        format << "%s "
+        tot += env['version'].size
+      end
+    else
+      format << "%-7s "
+      tot += 7
+    end
+
+    format << "%-11s "
+    tot += (env['user'].size > 11 ? env['user'].size : 11)
+
+    tot += 3
+
+    if env['description'].size > (80-tot)
+      format << "%.#{80-tot-3}s...\n"
+    else
+      format << "%.#{80-tot}s\n"
+    end
+    debug sprintf(format,env['name'],env['version'],env['user'],env['description'])
   end
 
   def print_full(env)
