@@ -1,10 +1,10 @@
 #!/usr/bin/ruby
 
-
 NEST = 'nest'
 ROOT = 'root'
-RPM_MIRROR = 'http://ftp.ciril.fr/pub/linux/centos/6.1/os/x86_64/'
-INCLUDES = 'filesystem coreutils setup net-tools grep sed bash perl module-init-tools openssh-clients openssh-server util-linux dhclient bzip2 gzip kexec-tools parted.x86_64 busybox nc tar e2fsprogs grub yum rpm'
+RPM_MIRROR = 'http://ftp.ciril.fr/pub/linux/centos/6.5/os/x86_64/'
+INCLUDES = 'filesystem coreutils setup net-tools grep sed bash perl module-init-tools openssh-clients openssh-server util-linux dhclient bzip2 gzip kexec-tools parted.x86_64 busybox nc tar e2fsprogs grub yum rpm ruby rubygems kernel'
+
 
 def exec(cmd)
   system(cmd)
@@ -69,6 +69,8 @@ EOF
   exec("mkdir -p #{ROOT}/etc/kadeploy3/keys")
   exec("cp kadeploy_specific/ssh/id_deploy #{ROOT}/etc/kadeploy3/keys/")
   exec("chmod 400 #{ROOT}/etc/kadeploy3/keys/*")
+
+  exec("chroot #{ROOT} gem install --no-rdoc --no-ri net-ssh net-ssh-multi daemons")
 end
 
 TO_REMOVE = [
@@ -155,12 +157,12 @@ TO_REMOVE = [
             ]
 
 def make_rootfs
-  exec("febootstrap -i #{INCLUDES.split(" ").join(" -i ")} centos-6.1 #{ROOT} #{RPM_MIRROR}")
+  exec("febootstrap -i #{INCLUDES.split(" ").join(" -i ")} centos-6.5 #{ROOT} #{RPM_MIRROR}")
   # Minimize a bit the febootstrap
   exec("febootstrap-minimize #{ROOT}")
   TO_REMOVE.each { |entry| exec("rm -rf #{ROOT}/#{entry}") }
 
-  exec("mv #{ROOT}/boot/vmlinuz-* kernel")
+  exec("mv #{ROOT}/boot/vmlinuz-* vmlinuz")
 end
 
 def pack_rootfs(dest)
