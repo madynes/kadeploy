@@ -9,6 +9,7 @@ kadeploy (3.2.0~rc4-1) UNRELEASED; urgency=low
   * Create the /var/run/kadeploy3 directory in the server package
   * Modify the devel-package generator to work with the new init script
   * New Git snapshot based on v3.2.0_rc4.
+  * Add the Kascade binary in the server package
 
  -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Wed, 27 Nov 2013 10:37:29 +0100
 

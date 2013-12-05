@@ -9,4 +9,4 @@ To get more information about the configuration of the server and the client, pl
 
 You'll find the Kadeploy-VERSION.pdf file in /usr/share/doc/kadeploy-common/Kadeploy-VERSION.pdf.
 
-Note: if you want to use Kastafior to broadcast the environment files, you should decompress the /usr/share/doc/kadeploy/kastafior.gz binary in the /usr/bin directory and make the file executable.
+Note: if you want to use Kastafior or Kascade to broadcast the environment files, you should decompress the /usr/share/doc/kadeploy/[kastafior|kascade].gz binaries in the /usr/bin directory and make the files executable.
