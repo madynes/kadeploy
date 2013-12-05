@@ -65,7 +65,7 @@ EOF
   bashrc_file.close
 
   exec("mkdir -p #{ROOT}/root/.ssh")
-  exec("cat kadeploy_specific/ssh/id_deploy.pub >> #{ROOT}/root/.ssh/authorized_keys")
+  exec("cat kadeploy_specific/ssh/*.pub >> #{ROOT}/root/.ssh/authorized_keys")
   exec("mkdir -p #{ROOT}/etc/kadeploy3/keys")
   exec("cp kadeploy_specific/ssh/id_deploy #{ROOT}/etc/kadeploy3/keys/")
   exec("chmod 400 #{ROOT}/etc/kadeploy3/keys/*")
