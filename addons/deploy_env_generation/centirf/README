@@ -1,0 +1,12 @@
+This environement builder is tested with Centos 6.1 and 6.5
+
+Make sure that package ruby and febootstrap are installed.
+
+yum install -y febootstrap ruby 
+
+Make sure that you are connected to the internet.
+If you using proxy export http_proxy=ip.proxy:3128 to avoid resolution problems.
+
+When you are ready type : make all.
+
+The script build vmlinuz and initrd.
