@@ -1,5 +1,17 @@
 #!/usr/bin/ruby
 
+
+################################
+## Rev 1: 
+##    -Little less verbose
+##    -without -i take stay arguement after parse to input
+##     -put fountain.rb in tempory directory
+##    -parse ssh command to get connexion paramter for kadeploy
+##    -Add argument -m to set the master. (usefull for integration next version )
+##    -detection whoiam is improved with ip search
+## Rev 2: 
+##    -Use the rapport to communicate with kadeploy
+
 require 'rubygems'
 require 'optparse'
 require 'shellwords'
@@ -306,7 +318,7 @@ end
 if  koNodes.size ==0
   exit 0
 else 
-  if koNodes.size <= nodes.size
+  if koNodes.size < nodes.size
     exit 2
   else 
     exit 1
