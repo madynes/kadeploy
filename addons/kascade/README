@@ -1,0 +1,5 @@
+Kascade is a tool to send a file to a bunch of nodes in an HPC infrastructure.
+The software is developped in ruby and is based on the SSH protocol.
+As the Kastafior software, it establish a chain between the nodes and send files throught this chain.
+Contrary to kastafior this tool aims to be fault tolerant.
+The software also have some debugging and self-propagation capabilities.

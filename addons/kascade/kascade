@@ -11,6 +11,8 @@
 ##    -detection whoiam is improved with ip search
 ## Rev 2: 
 ##    -Use the rapport to communicate with kadeploy
+##    -Add agressive mod
+##    -Retries options
 
 require 'rubygems'
 require 'optparse'
@@ -21,6 +23,8 @@ require 'socket'
 require 'tempfile'
 require 'securerandom'
 require 'yaml'
+# set old yameler
+YAML::ENGINE.yamler = "syck"
 
 start = Time.now
 
@@ -32,7 +36,8 @@ options = {
   :okfile=>nil,
   :kofile=>nil,
   :master=>nil,
-  :sshcommand=>nil
+  :sshcommand=>nil,
+  :retries=>10
 }
 
 def killPort(port)
@@ -58,6 +63,7 @@ OptionParser.new do |opts|
   opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
   opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
   opts.on("-p", "--port PORT", "start port") { |v| options[:port] = v }
+  opts.on("-R", "--retry num", "Set number retry attemps, by default this value is 10 and each retry is performed after 1s") { |v| options[:retries] = v.to_i+1 }
   opts.on("-s", "--[no-]sort", "sort the node file") { |v| options[:sort] = v }
   opts.on("-S", "--ssh-command SSH", "parse ssh command") { |v| options[:sshcommand] = v }
   opts.on("-v", "--[no-]verbose", "run verbosely") { |v| $Verbose = v }
@@ -228,7 +234,7 @@ Net::SSH::Multi.start(:on_error => :ignore) do |session|
   time = Time.now - time
   puts "script forwarded in #{time}s" if $Verbose
 
-  commonOptions=" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose} #{options[:agressive] ? '-A' : ''}"
+  commonOptions=" -b #{options[:buffersize]} -s #{File.size(options[:input])} -R #{options[:retries]} -n #{nodesPath} #{verbose} #{options[:agressive] ? '-A' : ''}"
   
   cmd = "ruby #{fountainPath} -o #{options[:output]} -O \"#{options[:outputcmd]}\""+commonOptions
   session.exec(cmd)
@@ -344,7 +350,7 @@ def reporting(node,error=nil)
       reportClient.flush
       reportClient.close
 end
-def connectClient(nodes,ports,index)
+def connectClient(nodes,ports,index,retries)
   puts "try to connect index #{index}" if $Verbose
   client = nil
   attempts = 0
@@ -353,12 +359,12 @@ def connectClient(nodes,ports,index)
       client = TCPSocket.new(nodes[index], ports[index])
     rescue => e
       puts "failed to connect to #{nodes[index]} with ports #{ports[index]}" if $Verbose
-      $stderr.puts e
       attempts += 1
-      if attempts < 10
+      if attempts < retries
         puts "next attempt in 1s" if $Verbose
         sleep(1)
       else
+        $stderr.puts e
         puts "reporting #{nodes[index]}..." if $Verbose
         reporting(nodes[index],e.to_s)
         index += 1
@@ -394,13 +400,14 @@ def killPort(port)
 end
 options = {}
 OptionParser.new do |opts|
-  opts.on("-i", "--input [FILE]", "input file") { |v| options[:input] = v }
-  opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
   opts.on("-A", "--[no-]agressive", "kill process witch use the listen port") { |v| options[:agressive] = v }
-  opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
   opts.on("-b", "--buffersize SIZE", "buffer size") { |v| options[:buffersize] = v.to_i }
-  opts.on("-s", "--filesize SIZE", "file size") { |v| options[:filesize] = v.to_i }
+  opts.on("-i", "--input [FILE]", "input file") { |v| options[:input] = v }
   opts.on("-n", "--nodefile FILE", "node file") { |v| options[:nodefile] = v }
+  opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
+  opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
+  opts.on("-R", "--retry num", "Set number retry attemps, by default this value is 10 and each retry is performed after 1s") { |v| options[:retries] = v.to_i+1 }
+  opts.on("-s", "--filesize SIZE", "file size") { |v| options[:filesize] = v.to_i }
   opts.on("-v", "--[no-]verbose", "run verbosely") { |v| $Verbose = v }
 end.parse!
 
@@ -443,7 +450,7 @@ if !options[:input]
     if options[:outputcmd] != ""
       file,a,b = Open3.popen3(options[:outputcmd])
       redirect(a,$stdout)
-            redirect(b,$stderr)
+      redirect(b,$stderr)
       raise "operation failed : " + options[:outputcmd] if !file
     else
       file = File.open(options[:output], "w")
@@ -451,7 +458,7 @@ if !options[:input]
     end
   rescue => e
   reporting(nodes[index],"unable to open ouput #{e.to_s}")
-  exit -1
+  exit -1 if !$Verbose
   raise e
   end 
 
@@ -470,7 +477,7 @@ if !options[:input]
 else
   stream = File.open(options[:input], "r")
 end
-client, nextIndex = connectClient(nodes, ports, index.next)
+client, nextIndex = connectClient(nodes, ports, index.next,options[:retries])
 if client
   puts "connected to #{nodes[nextIndex]}" if $Verbose
 else
@@ -491,7 +498,7 @@ while !fin
       clientRecoverMode = true
       while clientRecoverMode
         client.close
-        client, nextIndex = connectClient(nodes, ports, nextIndex.next)
+        client, nextIndex = connectClient(nodes, ports, nextIndex.next,options[:retries])
         if client
           puts "RECOVER CLIENT -- connected to #{nodes[nextIndex]}, waiting for its recover point" if $Verbose
           recoverPoint = client.recv(100).to_i
@@ -507,7 +514,7 @@ while !fin
             clientRecoverMode = false
           rescue => e
             puts "RECOVER CLIENT -- connexion lost with #{nodes[nextIndex]}" if $Verbose
-      reporting(nodes[nextIndex],e.to_s)
+            reporting(nodes[nextIndex],e.to_s)
           end
         else
           puts "RECOVER CLIENT -- new last node" if $Verbose
