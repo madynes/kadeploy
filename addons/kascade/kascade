@@ -23,11 +23,19 @@ options = {
   :sshcommand=>nil
 }
 
+def killPort(port)
+    pidtokill = `lsof -t -i :#{port}`.strip
+    if pidtokill!=""
+      puts "kill pid #{pidtokill} because it using port #{port}" if $Verbose
+      Process.kill("KILL",pidtokill.to_i)
+    end
+end
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby #{__FILE__} [options]"
   opts.separator ""
   opts.separator "Specific options : "
   opts.on("-i", "--input FILE", "input file") { |v| options[:input] = v }
+  opts.on("-A", "--[no-]agressive", "kill process witch use the listen port") { |v| options[:agressive] = v }
   opts.on("-b", "--buffersize SIZE", "buffer sise") { |v| options[:buffersize] = v }
   opts.on("-c", "--check", "check the report")  { |v| options[:check] = v }
   opts.on("-C", "--[no-]checkmd5", "check md5sum") { |v| options[:checkmd5] = v }
@@ -119,6 +127,9 @@ system(cmd)
 # REPORT SERVER
 report = []
 koNodes={}
+if options[:agressiv]
+  killPort options[:port]
+end
 report_thr = Thread.new {
   reportPiece = ""
   begin 
@@ -362,10 +373,18 @@ def redirect(input,output)
     end
   end
 end
+def killPort(port)
+    pidtokill = `lsof -t -i :#{port}`.strip
+    if pidtokill!=""
+      puts "kill pid #{pidtokill} because it using port #{port}" if $Verbose
+      Process.kill("KILL",pidtokill.to_i)
+    end
+end
 options = {}
 OptionParser.new do |opts|
   opts.on("-i", "--input [FILE]", "input file") { |v| options[:input] = v }
   opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
+  opts.on("-A", "--[no-]agressive", "kill process witch use the listen port") { |v| options[:agressive] = v }
   opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
   opts.on("-b", "--buffersize SIZE", "buffer size") { |v| options[:buffersize] = v.to_i }
   opts.on("-s", "--filesize SIZE", "file size") { |v| options[:filesize] = v.to_i }
@@ -425,6 +444,9 @@ if !options[:input]
   end 
 
   begin
+  if options[:agressive]
+    killPort(ports[index])
+  end
     server = TCPServer.new(ports[index])
     puts "TCPServer open on port #{ports[index]}" if $Verbose
   rescue => e 
