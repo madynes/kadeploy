@@ -8,6 +8,7 @@ require 'net/ssh/multi'
 require 'socket'
 require 'tempfile'
 require 'securerandom'
+require 'yaml'
 
 start = Time.now
 
@@ -16,6 +17,8 @@ options = {
   :output => "/tmp/output",
   :buffersize => 1750*64, #1460*64
   :input=>nil,
+  :okfile=>nil,
+  :kofile=>nil,
   :master=>nil,
   :sshcommand=>nil
 }
@@ -28,6 +31,8 @@ OptionParser.new do |opts|
   opts.on("-b", "--buffersize SIZE", "buffer sise") { |v| options[:buffersize] = v }
   opts.on("-c", "--check", "check the report")  { |v| options[:check] = v }
   opts.on("-C", "--[no-]checkmd5", "check md5sum") { |v| options[:checkmd5] = v }
+  opts.on("-k", "--ok FILE", "list of node correctly deployed") { |v| options[:okfile] = v }
+  opts.on("-K", "--ko FILE", "list of node with error") { |v| options[:kofile] = v }
   opts.on("-m", "--master HOST", "Specify the master hostname") { |v| options[:master] = v }
   opts.on("-n", "--nodefile FILE", "node file") { |v| options[:nodefile] = v }
   opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
@@ -113,18 +118,41 @@ system(cmd)
 
 # REPORT SERVER
 report = []
+koNodes={}
 report_thr = Thread.new {
   reportPiece = ""
-  server = TCPServer.new(options[:port])
-  while reportPiece != "end" do
-    Thread.start(server.accept) do |reportSock|
-      reportPiece = reportSock.read
-      if reportPiece != "end"
-        puts "report received : " + reportPiece
-        report << reportPiece
-      end
-      reportSock.close
+  begin 
+    server = TCPServer.new(options[:port])
+        puts "[Reporting server]  launched"  if $Verbose
+    while reportPiece != "end" do
+      Thread.start(server.accept) do |reportSock|
+        laddr=reportSock.peeraddr(true)[2]
+        puts "[Reporting server] connected from #{laddr}"  if $Verbose
+        reportPiece = reportSock.gets.strip
+        puts "[Reporting server] report received from #{laddr}: #{reportPiece}" if $Verbose
+        if reportPiece != "end"
+    report << reportPiece
+    parts = reportPiece.split(' - ')
+    if parts.size > 1
+      koNodes[parts[0]]=parts[1,parts.size]*" - "
+    else
+      koNodes[parts[0]]="Unknown Error"
     end
+    reportSock.close
+        else 
+    reportSock.close
+    server.shutdown
+    break
+        end
+      end
+    end
+  rescue => e
+    if (reportPiece == "end")
+    puts "[Reporting server] closed"  if $Verbose
+  else
+    $stderr.puts e.to_s
+  end
+  
   end
 }
 
@@ -229,7 +257,50 @@ Net::SSH::Multi.start(:on_error => :ignore) do |session|
     end
   end
 end
+puts "Wait the reporting server ..." if $Verbose
+report_thr.join
 
+if options[:okfile]!=nil
+  oknode=[]
+  nodes.each do |node|
+    oknode << node if koNodes[node]==nil
+  end
+  if $Verbose
+    oknode.each do |node|
+      puts "[node Ok] #{node}"
+    end
+  end
+  begin
+    file=File.open(options[:okfile],"w")
+    file.puts oknode.to_yaml
+    file.close
+  rescue =>e
+    $stderr.puts "error during open file #{options[:okfile]} #{e.to_s}"
+  end
+end
+if options[:kofile]!=nil
+  if $Verbose
+    koNodes.each do |node,error|
+      puts "[node ko] #{node} - #{error}"
+    end
+  end
+  begin
+    file=File.open(options[:kofile],"w")
+    file.puts koNodes.to_yaml
+    file.close
+  rescue =>e
+    $stderr.puts "error during open file #{options[:kofile]} #{e.to_s}"
+  end
+end
+if  koNodes.size ==0
+  exit 0
+else 
+  if koNodes.size <= nodes.size
+    exit 2
+  else 
+    exit 1
+  end
+end
 =begin
 # FOUNTAIN
 
@@ -239,6 +310,17 @@ require 'socket'
 require 'optparse'
 require 'open3'
 
+def reporting(node,error=nil)
+      puts "report #{node} to #{$master}:#{$masterPort}" if $Verbose
+      reportClient = TCPSocket.new($master, $masterPort)
+      if error==nil
+        reportClient.write(node+"\n")
+      else
+        reportClient.write("#{node} - #{error}\n")
+      end
+      reportClient.flush
+      reportClient.close
+end
 def connectClient(nodes,ports,index)
   puts "try to connect index #{index}" if $Verbose
   client = nil
@@ -255,9 +337,7 @@ def connectClient(nodes,ports,index)
         sleep(1)
       else
         puts "reporting #{nodes[index]}..." if $Verbose
-        reportClient = TCPSocket.new(nodes[0], ports[0])
-        reportClient.write(nodes[index])
-        reportClient.close
+        reporting(nodes[index],e.to_s)
         index += 1
         attempts = 0
       end
@@ -275,6 +355,13 @@ def stack(list, e, max)
   list << e
 end
 
+def redirect(input,output)
+  Thread.new do
+    until (line = input.gets).nil? do
+      output.puts(line)
+    end
+  end
+end
 options = {}
 OptionParser.new do |opts|
   opts.on("-i", "--input [FILE]", "input file") { |v| options[:input] = v }
@@ -315,19 +402,35 @@ if index==nil
   index=nodes.find_index {|ip| ips.find_index{ |ip2| ip2.ip_address==ip}}
 end
 if index==nil
+  reporting(Socket.gethostname,"I don't know who i am !")
   raise "I don't know who i am !"
 end
 
 # OPEN STREAMS
 if !options[:input]
-  if options[:outputcmd] != ""
-    file,a,b = Open3.popen3(options[:outputcmd])
-    raise "operation failed : " + options[:outputcmd] if !file
-  else
-    file = File.open(options[:output], "w")
-    raise "failed to create " + options[:output] if !file
+  begin
+    if options[:outputcmd] != ""
+      file,a,b = Open3.popen3(options[:outputcmd])
+      redirect(a,$stdout)
+            redirect(b,$stderr)
+      raise "operation failed : " + options[:outputcmd] if !file
+    else
+      file = File.open(options[:output], "w")
+      raise "failed to create " + options[:output] if !file
+    end
+  rescue => e
+  reporting(nodes[index],"unable to open ouput #{e.to_s}")
+  exit -1
+  raise e
+  end 
+
+  begin
     server = TCPServer.new(ports[index])
     puts "TCPServer open on port #{ports[index]}" if $Verbose
+  rescue => e 
+    reporting(nodes[index],e.to_s.split('\n')[0])
+    exit -1
+    raise e
   end
   stream = server.accept
 else
@@ -370,9 +473,7 @@ while !fin
             clientRecoverMode = false
           rescue => e
             puts "RECOVER CLIENT -- connexion lost with #{nodes[nextIndex]}" if $Verbose
-            reportClient = TCPSocket.new(nodes[0], ports[0])
-            reportClient.write(nodes[nextIndex])
-            reportClient.close
+      reporting(nodes[nextIndex],e.to_s)
           end
         else
           puts "RECOVER CLIENT -- new last node" if $Verbose
@@ -390,9 +491,7 @@ while !fin
     fin = true
     puts "Transmission complete ( #{nbChunks} chunks )" if $Verbose
     if lastNode
-      reportClient = TCPSocket.new(nodes[0],ports[0])
-      reportClient.write("end")
-      reportClient.close
+      reporting("end")
     end
   else
     $stderr.puts "An error has occured ( #{bytes} / #{options[:filesize]} ) ( #{nbChunks} chunks ) -- now switching to Recover Mode" if $Verbose
