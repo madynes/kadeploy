@@ -16,6 +16,7 @@ require 'optparse'
 require 'net/http'
 require 'net/https'
 require 'timeout'
+require 'tempfile'
 require 'json'
 require 'yaml'
 

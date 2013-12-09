@@ -69,18 +69,18 @@ UPDATE_PATH_CHECK = {
     'src' => 'kadeploy_server.rb',
     'lib' => 'environment.rb',
     'libs' => 'common.rb',
-    'common_lib' => 'environment.rb',
-    'client_lib' => 'client.rb',
-    'server_lib' => 'automata.rb',
+    'common_lib' => 'common/environment.rb',
+    'client_lib' => 'client/client.rb',
+    'server_lib' => 'server/automata.rb',
   },
   'client' => {
     'bin' => '/usr/bin/kadeploy3',
-    'lib' => 'client.rb',
+    #'lib' => 'client.rb',
   },
   'server' => {
     'sbin' => '/usr/sbin/kadeploy3d',
     'init' => '/etc/init.d/kadeploy.*',
-    'lib' => 'automata.rb',
+    #'lib' => 'automata.rb',
   }
 }
 UPDATE_FORWARD_PORT = 2222
