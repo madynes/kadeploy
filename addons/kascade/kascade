@@ -194,8 +194,9 @@ if options[:sshcommand]!=nil
     Integer(self) rescue self
     end
   end
-  flip=false
-  sshargs=options[:sshcommand].split(/"/).collect{|t| flip!=flip; flip ? t : t.split(' ')}.flatten 
+  flip=true
+  #Split the ssh command by spaces which are not surrounded by double quote.
+  sshargs=options[:sshcommand].split(/"/).collect{|t| flip=!flip; flip ? t : t.split(' ')}.flatten 
   ssh_options_str={}
   OptionParser.new do |opts|
     opts.on("-o", "--option OPTION", "puts option in ssh") do |v|
