@@ -206,6 +206,8 @@ module Configuration
     attr_reader :vlan_hostname_suffix
     attr_reader :set_vlan_cmd
     attr_reader :kastafior
+    attr_reader :kascade
+    attr_reader :kascade_options
     attr_reader :secure_client
     attr_reader :autoclean_threshold
 
@@ -617,6 +619,11 @@ module Configuration
 
           cp.parse('kastafior') do
             @kastafior = cp.value('binary',String,'kastafior')
+          end
+
+          cp.parse('kascade') do
+            @kascade = cp.value('binary',String,'kascade')
+            @kascade_options = cp.value('args',String,'')
           end
 
           @mkfs_options = Hash.new

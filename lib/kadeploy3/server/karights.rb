@@ -71,10 +71,12 @@ module Karights
             if cexec.overwrite
               cexec.rights.delete(usr,cexec.nodes)
             else
-              kaerror(APIError::CONFLICTING_ELEMENTS,
-                "Some rights are already set for user #{usr}"\
-                " on nodes #{cexec.nodes.join(',')}"
-              )
+              if usr != cexec.username
+                kaerror(APIError::CONFLICTING_ELEMENTS,
+                  "Some rights are already set for user #{usr}"\
+                  " on nodes #{cexec.nodes.join(',')}"
+                )
+              end
             end
           end
         end

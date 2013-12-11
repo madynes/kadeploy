@@ -390,6 +390,8 @@ module Kaworkflow
           info[:nodes_ko] += workflow.nodes_ko.make_array_of_hostname
         end
       end
+      Nodes::sort_list(info[:nodes_ok])
+      Nodes::sort_list(info[:nodes_ko])
 
       if output
         info[:workflows].each_value do |workflow|

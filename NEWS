@@ -17,6 +17,9 @@
 * kadeploy3d launcher has be rewritten in ruby, new options available
   (see doc sec/4.2.1)
 * Clients has been rewritten in single-file ruby scripts
+* The debian packaging has been reworked to fit with the standards
+* It's now possible to use the Kascade software to send the environment
+  (see doc sec/2.4 and addons/kascade/README)
 
 !! Changes in configuration files !!
 * General configuration (doc sec/2.1)
@@ -27,6 +30,8 @@
   - It's now possible to specify options for tarballs manipulations
   - End of deployment/reboot/power hooks are now specified in the field 'hooks'
   - It's now possible to specify a threshold for the autoclean loop
+* Cluster specific configuration (doc sec/2.4)
+  - It's now possible to specify Kascade as BroadcastEnv method
 * Client configuration file (doc sec/3)
   - The connection to a specific server can be secure or not
 

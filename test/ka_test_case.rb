@@ -5,7 +5,7 @@ KADEPLOY_SECURE=ENV['KADEPLOY3_SECURE']||true
 USER=ENV['USER']
 
 $:.unshift KADEPLOY_LIBS
-require 'kadeploy3/execute'
+require 'kadeploy3/server/execute'
 require 'yaml'
 require 'test/unit'
 require 'rubygems'

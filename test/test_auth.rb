@@ -4,7 +4,7 @@ require 'test/unit'
 require 'tempfile'
 require 'tmpdir'
 require 'rubygems'
-require 'kadeploy3/http'
+require 'kadeploy3/common/http'
 
 class TestAuth < Test::Unit::TestCase
   include KaTestCase

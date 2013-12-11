@@ -280,7 +280,7 @@ module Rights
     def db_nodelist(nodes,field='node')
       tmp = nodes.dup
       tmp << '*'
-      Database::where_nodelist(nodes,field)
+      Database::where_nodelist(tmp,field)
     end
 
     def db_partlist(parts,nodes=nil,partfield='part',nodefield='node')

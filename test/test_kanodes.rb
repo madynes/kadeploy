@@ -5,7 +5,7 @@ require 'tempfile'
 require 'tmpdir'
 require 'yaml'
 require 'rubygems'
-require 'kadeploy3/http'
+require 'kadeploy3/common/http'
 
 class TestNodes < Test::Unit::TestCase
   include KaTestCase
