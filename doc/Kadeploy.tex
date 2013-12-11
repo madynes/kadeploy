@@ -559,6 +559,9 @@ external:
   tar: --warning=no-timestamp
   kastafior:
     binary: /usr/bin/kastafior
+  kascade:
+    binary: /usr/bin/kascade
+    args: -v
 \end{verbatim}
 \end{small}
 
@@ -773,6 +776,12 @@ The information used to generate this filenames are the one specified for each n
   \item \ypath{/external/kastafior}
   \begin{itemize}
     \item \yfieldd{binary}{String}{kastafior} the command used to launch kastafior
+  \end{itemize}
+
+  \item \ypath{/external/kascade}
+  \begin{itemize}
+    \item \yfieldd{binary}{String}{kascade} the command used to launch kascade
+    \item \yfieldd{args}{String}{''} extra options for the kascade command
   \end{itemize}
 \end{itemize}
 
@@ -1951,7 +1960,7 @@ Explanation of the fields used in the environment description:
 \end{itemize}
 
 \subsection{Kaconsole}\label{sec:kaconsole}
-Karights can be used by using the \texttt{kaconsole} command. It has only one use case that is opening a console on a given node, for instance:
+Kaconsole can be used by using the \texttt{kaconsole3} command. It has only one use case that is opening a console on a given node, for instance:
 \begin{verbatim}
 > kaconsole3 -m gdx-25.orsay.grid5000.fr
 \end{verbatim}

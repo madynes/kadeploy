@@ -1,36 +1,79 @@
 #!/usr/bin/ruby
 
+
+################################
+## Rev 1: 
+##    -Little less verbose
+##    -without -i take stay arguement after parse to input
+##     -put fountain.rb in tempory directory
+##    -parse ssh command to get connexion paramter for kadeploy
+##    -Add argument -m to set the master. (usefull for integration next version )
+##    -detection whoiam is improved with ip search
+## Rev 2: 
+##    -Use the reporting server to decide of end.
+##    -Add yaml file and different status to communicate with kadeploy
+##    -Add agressive mod
+##    -Retries options
+## rev 3:
+##    -Integration of Taktuk launcher
+##    -Integration of clushell launcher (in progress)
+##    -Improve the node sort
+
+
+require 'rubygems'
 require 'optparse'
 require 'shellwords'
-require 'rubygems'
 require 'net/ssh'
 require 'net/ssh/multi'
 require 'socket'
 require 'tempfile'
 require 'securerandom'
+require 'yaml'
+# set old yameler
+YAML::ENGINE.yamler = "syck"
 
 start = Time.now
 
 options = {
   :port => 10000,
-  :output => "/tmp/output",
-  :buffersize => 1750*64 #1460*64
+  :buffersize => 1750*64, #1460*64
+  :input=>nil,
+  :okfile=>nil,
+  :kofile=>nil,
+  :master=>nil,
+  :sshcommand=>nil,
+  :deploy=>:ssh,
+  :retries=>10
 }
 
+def killPort(port)
+  pidtokill = `lsof -t -i :#{port}`.strip
+  if pidtokill!=""
+    puts "kill pid #{pidtokill} because it using port #{port}" if $Verbose
+    Process.kill("KILL",pidtokill.to_i)
+  end
+end
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby #{__FILE__} [options]"
   opts.separator ""
   opts.separator "Specific options : "
-  opts.on("-i", "--input FILE", "input file") { |v| options[:input] = v }
-  opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
-  opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
+  opts.on("-A", "--[no-]agressive", "kill process witch use the listen port") { |v| options[:agressive] = v }
   opts.on("-b", "--buffersize SIZE", "buffer sise") { |v| options[:buffersize] = v }
-  opts.on("-p", "--port PORT", "start port") { |v| options[:port] = v }
   opts.on("-c", "--check", "check the report")  { |v| options[:check] = v }
   opts.on("-C", "--[no-]checkmd5", "check md5sum") { |v| options[:checkmd5] = v }
+  opts.on("-D", "--deploy [ssh,taktuk,clush]", [:ssh,:taktuk],"Choose deploy method. Ssh is default value") { |v| options[:deploy] = v }
+  opts.on("-i", "--input FILE", "input file") { |v| options[:input] = v }
+  opts.on("-k", "--ok FILE", "list of node correctly deployed") { |v| options[:okfile] = v }
+  opts.on("-K", "--ko FILE", "list of node with error") { |v| options[:kofile] = v }
+  opts.on("-m", "--master HOST", "Specify the master hostname") { |v| options[:master] = v }
   opts.on("-n", "--nodefile FILE", "node file") { |v| options[:nodefile] = v }
+  opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
+  opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
+  opts.on("-p", "--port PORT", "start port") { |v| options[:port] = v }
+  opts.on("-R", "--retry num", "Set number retry attemps, by default this value is 10 and each retry is performed after 1s") { |v| options[:retries] = v.to_i }
   opts.on("-s", "--[no-]sort", "sort the node file") { |v| options[:sort] = v }
-  opts.on("-v", "--[no-]verbose", "run verbosely") { |v| options[:verbose] = v }
+  opts.on("-S", "--ssh-command SSH", "parse ssh command") { |v| options[:sshcommand] = v }
+  opts.on("-v", "--[no-]verbose", "run verbosely") { |v| $Verbose = v }
   opts.separator ""
   opts.separator "Common options :"
   opts.on_tail("-h", "--help", "show this message") do
@@ -38,143 +81,257 @@ OptionParser.new do |opts|
     exit
   end
 end.parse!
+if options[:input]==nil
+  options[:input]=ARGV[0]
+end
+if options[:master]==nil
+  options[:master]=`hostname`.strip
+end
 
+if (options[:output]==nil && options[:outputcmd]==nil)
+  raise "Error: No output is defined"
+end
 # GENERATES TEMP FILE
 secureRandom = SecureRandom.hex
 fountainPath = "/tmp/kascade" + secureRandom + "fountain.rb"
+firstFountainPath = "/tmp/kascadef" + secureRandom + "fountain.rb"
 nodesPath = "/tmp/kascade" + secureRandom + "nodefile"
 reportPath = "/tmp/kascade" + secureRandom + "report"
 
 # READS NODEFILE
 begin
-  nodes = File.readlines(options[:nodefile])
+  nodes = File.readlines(options[:nodefile]).map{ |x| x.strip}
 rescue
   raise "Error : specified nodefile does not exists"
 end
 
 if options[:sort]
-  nodes2 = []
-  nodes.each do |n|
-    clusterAndNode, siteName = n.split(".")
-    clusterName, nodeNumber = clusterAndNode.split("-")
-    while nodeNumber && nodeNumber.size < 3
-      nodeNumber.insert(0, "0")
-    end
-    if nodeNumber
-      nodeNumber.insert(0, "-")
-    else
-      nodeNumber = ""
-    end
-    nodes2 << siteName + "." + clusterName + nodeNumber
-  end
-  nodes2.sort!
-  nodes = []
-  nodes2.each do |n|
-    siteName, clusterAndNode = n.split(".")
-    clusterName, nodeNumber = clusterAndNode.split("-")
-    if nodeNumber
-      nodeNumber = nodeNumber.to_i.to_s
-      nodeNumber.insert(0, "-")
-    else
-      nodeNumber = ""
-    end
-    nodes << clusterName + nodeNumber + "." + siteName + ".grid5000.fr"
-  end
+  nodes.sort_by!{|h| h.split('.').reverse.collect{|v| v.scan(/\d+|\p{alpha}+|\W+/).map!{|n| n.numberize}}.flatten}
 end
-
 i = 0
 nodesPorts = nodes.map do |line| 
   port = options[:port].to_i + i + 1
   i += 1
   line = line.chomp + ":#{port}"
 end
-nodesPorts = nodesPorts.unshift("#{Socket.gethostname}:#{options[:port]}").join("\n")
+nodesPorts = nodesPorts.unshift("#{options[:master]}:#{options[:port]}").join("\n")
 nodesPorts = Shellwords.escape(nodesPorts)
 
 
 # FIRST FOUNTAIN
 fountain = Shellwords.escape(File.read(__FILE__).split(/^# FOUNTAIN/)[1])
-cmd = "echo #{fountain} > fountain.rb" 
+cmd = "echo #{fountain} > #{firstFountainPath}" 
 system(cmd)
 cmd = "echo #{nodesPorts} > #{nodesPath}"
 system(cmd)
 
 # REPORT SERVER
 report = []
+koNodes={}
+if options[:agressive]
+  killPort options[:port]
+end
 report_thr = Thread.new {
   reportPiece = ""
-  server = TCPServer.new(options[:port])
-  while reportPiece != "end" do
-    Thread.start(server.accept) do |reportSock|
-      reportPiece = reportSock.read
-      if reportPiece != "end"
-        puts "report received : " + reportPiece
-        report << reportPiece
+  begin 
+    server = TCPServer.new(options[:port])
+    puts "[Reporting server]  launched"  if $Verbose
+    while reportPiece != "end" do
+      Thread.start(server.accept) do |reportSock|
+        laddr=reportSock.peeraddr(true)[2]
+        puts "[Reporting server] connected from #{laddr}"  if $Verbose
+        reportPiece = reportSock.gets.strip
+        puts "[Reporting server] report received from #{laddr}: #{reportPiece}" if $Verbose
+        if reportPiece != "end"
+          report << reportPiece
+          parts = reportPiece.split(' - ')
+          if parts.size > 1
+            koNodes[parts[0]]=parts[1,parts.size]*" - "
+          else
+            koNodes[parts[0]]="Unknown Error"
+          end
+          reportSock.close
+        else 
+          reportSock.close
+          server.shutdown
+          break
+        end
       end
-      reportSock.close
     end
+  rescue => e
+    if (reportPiece == "end")
+      puts "[Reporting server] closed"  if $Verbose
+    else
+      $stderr.puts e.to_s
+    end
+
   end
 }
 
-# ALL FOUNTAINS
-verbose = options[:verbose] ? "--verbose" : "--no-verbose"
-Net::SSH::Multi.start do |session|
-  nodes.each { |node| session.use(node) }
-  time = Time.now
-  cmd = "echo #{fountain} > #{fountainPath} && echo #{nodesPorts} > #{nodesPath}"
-  session.exec(cmd)
-  session.loop
-  puts "HOST : " + Socket.gethostname
-  time = Time.now - time
-  puts "script forwarded in #{time}s" if options[:verbose]
-  cmd = "ruby #{fountainPath} -o #{options[:output]} -O \"#{options[:outputcmd]}\" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose}"
-  session.exec(cmd)
-  start_thr = Thread.new {
-    cmd = "ruby fountain.rb -i #{options[:input]} -o #{options[:output]} -O \"#{options[:outputcmd]}\" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose}"
-    time = Time.now
-    system(cmd)
-  }
-  session.loop
-  start_thr.join
-  time = Time.now - time
-  totalTime = Time.now - start
+#Prepare commands
+verbose = $Verbose ? "--verbose" : "--no-verbose"
+commonOptions=" -b #{options[:buffersize]} -s #{File.size(options[:input])} -n #{nodesPath} #{verbose} -R #{options[:retries]} #{options[:agressive] ? '-A' : ''}"
+output=""
+if options[:output]==nil
+  output="-O \"#{options[:outputcmd]}\""
+else
+  output="-o #{options[:output]}"
+end
+commandFountain="ruby #{fountainPath} #{output} #{commonOptions}"
+
+Thread.new do #Disssemination
+  if options[:deploy]==:ssh
+    # =================== Parse ssh options =================== 
+    puts "Using ssh" if $Verbose
+    ssh_options={}
+    if options[:sshcommand]!=nil
+      class String
+        def numberize
+          Integer(self) rescue self
+        end
+      end
+      flip=true
+      #Split the ssh command string to obtain an array of arguement. This split is double quote compliant 
+      sshargs=options[:sshcommand].split(/"/).collect{|t| flip=!flip; flip ? t : t.split(' ')}.flatten 
+      ssh_options_str={}
+      OptionParser.new do |opts|
+        opts.on("-o", "--option OPTION", "puts option in ssh") do |v|
+          opts=v.split("=")
+          ssh_options_str[opts[0].downcase]=opts[1].numberize
+        end
+        opts.on("-p","--port PORT","set port")do |v|
+          ssh_options[:port]=v
+        end
+        opts.on("-l","--login LOGIN", "puts option in ssh") do |v|
+          ssh_options[:user]=v
+        end
+        opts.on("-i","--indentification FILE","identification file") do |v|
+          ssh_options[:keys]=v
+        end
+        opts.on("-q","--quied","Not used") {|v|}
+      end.parse(sshargs)
+      if !ssh_options_str.empty?
+        tr=Net::SSH::Config.translate(ssh_options_str)
+        ssh_options.merge!(tr)
+      end
+      puts "options for ssh #{ssh_options}" if $Verbose
+    end
+
+
+    # ALL FOUNTAINS
+    Net::SSH::Multi.start(:on_error => :ignore) do |session|
+      nodes.each { |node| session.use(node,ssh_options) }
+      time = Time.now
+      cmd = "echo #{fountain} > #{fountainPath} && echo #{nodesPorts} > #{nodesPath}"
+      session.exec(cmd)
+      session.loop
+      puts "HOST : " + Socket.gethostname if $Verbose
+      time = Time.now - time
+      puts "script forwarded in #{time}s" if $Verbose
+
+
+      cmd = "vruby #{fountainPath} -o #{options[:output]} -O \"#{options[:outputcmd]}\""+commonOptions
+      session.exec(commandFountain)
+
+      session.loop
+    end
+  else
+    if options[:deploy] == :taktuk
+      puts "Using Taktuk" if $Verbose
+      #================================================== TAKTUK
+      file = Tempfile.new('nodeWithoutport')
+      nodes.each do |node|
+        file.puts(node)
+      end
+      file.close
+      sshopt=""
+      if options[:sshcommand]!=nil
+        sshopt="-c \"#{options[:sshcommand]}\""
+      end
+      if $Verbose
+        statustream=""
+      else
+        statustream="-o status=-"
+      end
+      cmd="taktuk #{statustream} -s -f #{file.path} broadcast put [ #{firstFountainPath} ] [ #{fountainPath} ], broadcast put [ #{nodesPath} ] [ #{nodesPath} ], broadcast exec [ #{commandFountain} ]" 
+      #cmd += " > /dev/null" if ! $Verbose 
+      system(cmd)
+      File.unlink(file.path)
+    else
+       puts "Using ClusterShell" if $Verbose
+       #Cluster shell is comming but need multi connexion to copy and launch. The solution could be using echo instead copy. This is not a priority
+       raise "Not implemented yet"
+       nodeSet=`nodeset -f #{nodes*" "}`
+       cmd="clush -w #{nodeSet} --copy #{firstFountainPath} --dest #{fountainPath} --copy  #{nodesPath} --dest #{nodesPath} '#{commandFountain}'"
+       system(cmd)
+    end
+  end
+end
+
+cmd = "ruby #{firstFountainPath} -i #{options[:input]}"+commonOptions
+time = Time.now
+system(cmd)
+puts "Wait the reporting server ..." if $Verbose
+report_thr.join
+time = Time.now - time
+totalTime = Time.now - start
+if $Verbose
   puts "KASCADE :"
   puts "\tFILE\t\t:\t#{options[:input]}"
   puts "\tSIZE\t\t:\t#{File.size(options[:input])} bytes"
   puts "\tNODES\t\t:\t#{nodes.length}"
   puts "\tTRANSFER TIME\t:\t#{time} seconds"
   puts "\tTOTAL TIME\t:\t#{totalTime} seconds"
-  if !report.empty?
-    report.uniq!
-    puts "#{report.length} errors has been reported, creating a report file : " + reportPath
-    reportFile = File.new(reportPath, "w")
-    reportFile.write(report.join("\n"))   
-    reportFile.close
-  end
-  if options[:check]
-    nodes.map { |node| node.chomp! }
-    nodes.each do |node|
-      if report.include?(node)
-        puts node + "\t--\tNOT OK"
-      else
-        puts node + "\t--\tOK"
-      end
-    end
-  end
-  if options[:checkmd5]
-    if options[:outputcmd]
-      puts "Can't check MD5 Sum when output command is given"
-    else
-      ref = `md5sum #{options[:input]}`
-      puts "\nReference MD5 Sum : #{ref}"
-      cmd = "md5sum #{options[:output]}"
-      session.exec(cmd)
-      session.loop
-    end
-  end
+end
+if !report.empty?
+  report.uniq!
+  puts "#{report.length} errors has been reported, creating a report file : " + reportPath
+  reportFile = File.new(reportPath, "w")
+  reportFile.write(report.join("\n"))
+  reportFile.close
 end
 
-
+if options[:okfile]!=nil
+  oknode=[]
+  nodes.each do |node|
+    oknode << node if koNodes[node]==nil
+  end
+  if $Verbose
+    oknode.each do |node|
+      puts "[node Ok] #{node}"
+    end
+  end
+  begin
+    file=File.open(options[:okfile],"w")
+    file.puts oknode.to_yaml
+    file.close
+  rescue =>e
+    $stderr.puts "error during open file #{options[:okfile]} #{e.to_s}"
+  end
+end
+if options[:kofile]!=nil
+  if $Verbose
+    koNodes.each do |node,error|
+      puts "[node ko] #{node} - #{error}"
+    end
+  end
+  begin
+    file=File.open(options[:kofile],"w")
+    file.puts koNodes.to_yaml
+    file.close
+  rescue =>e
+    $stderr.puts "error during open file #{options[:kofile]} #{e.to_s}"
+  end
+end
+if  koNodes.size ==0
+  exit 0
+else 
+  if koNodes.size < nodes.size
+    exit 2
+  else 
+    exit 1
+  end
+end
 =begin
 # FOUNTAIN
 
@@ -184,23 +341,34 @@ require 'socket'
 require 'optparse'
 require 'open3'
 
-def connectClient(nodes,ports,index,verbose)
+def reporting(node,error=nil)
+  puts "report #{node} to #{$master}:#{$masterPort}" if $Verbose
+  reportClient = TCPSocket.new($master, $masterPort)
+  if error==nil
+    reportClient.write(node+"\n")
+  else
+    reportClient.write("#{node} - #{error}\n")
+  end
+  reportClient.flush
+  reportClient.close
+end
+def connectClient(nodes,ports,index,retries)
+  puts "try to connect index #{index}" if $Verbose
   client = nil
   attempts = 0
   while !client && nodes[index]
     begin
       client = TCPSocket.new(nodes[index], ports[index])
     rescue => e
-      puts "failed to connect to #{nodes[index]} with ports #{ports[index]}" if verbose
+      puts "failed to connect to #{nodes[index]} with ports #{ports[index]}" if $Verbose
       attempts += 1
-      if attempts < 10
-        puts "next attempt in 1s" if verbose
+      if attempts < retries
+        puts "next attempt in 1s" if $Verbose
         sleep(1)
       else
-        puts "reporting #{nodes[index]}..." if verbose
-        reportClient = TCPSocket.new(nodes[0], ports[0])
-        reportClient.write(nodes[index])
-        reportClient.close
+        $stderr.puts e
+        puts "reporting #{nodes[index]}..." if $Verbose
+        reporting(nodes[index],e.to_s)
         index += 1
         attempts = 0
       end
@@ -218,15 +386,34 @@ def stack(list, e, max)
   list << e
 end
 
-options = {}
+def redirect(input,output)
+  Thread.new do
+    until (line = input.gets).nil? do
+      output.puts(line)
+    end
+  end
+end
+def killPort(port)
+    pidtokill = `lsof -t -i :#{port}`.strip
+    if pidtokill!=""
+      puts "kill pid #{pidtokill} because it using port #{port}" if $Verbose
+      Process.kill("KILL",pidtokill.to_i)
+    end
+end
+options = { 
+  :outputcmd=>"",
+  :output=>"" 
+}
 OptionParser.new do |opts|
+  opts.on("-A", "--[no-]agressive", "kill process witch use the listen port") { |v| options[:agressive] = v }
+  opts.on("-b", "--buffersize SIZE", "buffer size") { |v| options[:buffersize] = v.to_i }
   opts.on("-i", "--input [FILE]", "input file") { |v| options[:input] = v }
   opts.on("-o", "--output [FILE]", "output file") { |v| options[:output] = v }
   opts.on("-O", "--outputcmd [CMD]", "output command") { |v| options[:outputcmd] = v }
-  opts.on("-b", "--buffersize SIZE", "buffer size") { |v| options[:buffersize] = v.to_i }
+  opts.on("-R", "--retry num", "Set number retry attemps, by default this value is 10 and each retry is performed after 1s") { |v| options[:retries] = v.to_i+1 }
   opts.on("-s", "--filesize SIZE", "file size") { |v| options[:filesize] = v.to_i }
   opts.on("-n", "--nodefile FILE", "node file") { |v| options[:nodefile] = v }
-  opts.on("-v", "--[no-]verbose", "run verbosely") { |v| options[:verbose] = v }
+  opts.on("-v", "--[no-]verbose", "run verbosely") { |v| $Verbose = v }
 end.parse!
 
 MAX_CHUNKS = 63
@@ -244,36 +431,64 @@ fin = false
 clientRecoverMode = false
 serverRecoverMode = false
 
+
 File.readlines(options[:nodefile]).map do |line|
   node, port = line.split(":")
-  nodes << node
+  nodes << node.strip
   ports << port.to_i
 end
+$master=nodes[0]
+$masterPort=ports[0]
 index = nodes.index(Socket.gethostname)
+if index==nil
+  ips=Socket.ip_address_list
+  index=nodes.find_index {|ip| ips.find_index{ |ip2| ip2.ip_address==ip}}
+end
+if index==nil
+  reporting(Socket.gethostname,"I don't know who i am !")
+  raise "I don't know who i am !"
+end
 
 # OPEN STREAMS
 if !options[:input]
-  if options[:outputcmd] != ""
-    file,a,b = Open3.popen3(options[:outputcmd])
-    raise "operation failed : " + options[:outputcmd] if !file
-  else
-    file = File.open(options[:output], "w")
-    raise "failed to create " + options[:output] if !file
+  begin
+    if options[:outputcmd] != ""
+      file,a,b = Open3.popen3(options[:outputcmd])
+      redirect(a,$stdout)
+      redirect(b,$stderr)
+      raise "operation failed : " + options[:outputcmd] if !file
+    else
+      file = File.open(options[:output], "w")
+      raise "failed to create " + options[:output] if !file
+    end
+  rescue => e
+  reporting(nodes[index],"unable to open ouput #{e.to_s}")
+  exit -1 if !$Verbose
+  raise e
+  end 
+
+  begin
+    if options[:agressive]
+      killPort(ports[index])
+    end
+    server = TCPServer.new(ports[index])
+    puts "TCPServer open on port #{ports[index]}" if $Verbose
+  rescue => e 
+    reporting(nodes[index],e.to_s.split('\n')[0])
+    exit -1
+    raise e
   end
-  server = TCPServer.new(ports[index])
-  puts "TCPServer open on port #{ports[index]}" if options[:verbose]
   stream = server.accept
 else
   stream = File.open(options[:input], "r")
 end
-client, nextIndex = connectClient(nodes, ports, index.next, options[:verbose])
+client, nextIndex = connectClient(nodes, ports, index.next,options[:retries])
 if client
-  puts "connected to #{nodes[nextIndex]}" if options[:verbose]
+  puts "connected to #{nodes[nextIndex]}" if $Verbose
 else
-  puts "last node of the chain" if options[:verbose]
+  puts "last node of the chain" if $Verbose
   lastNode = true
 end
-
 
 # FILE TRANSMISSION
 
@@ -283,35 +498,31 @@ while !fin
     begin
       client.write(buffer) if client
     rescue
-      puts "Failed to send data to #{nodes[nextIndex]} -- now switching to recover mode" if options[:verbose]
-      reportClient = TCPSocket.new(nodes[0], ports[0])
-      reportClient.write(nodes[nextIndex])
-      reportClient.close
+      $stderr.puts "Failed to send data to #{nodes[nextIndex]} -- now switching to recover mode" if $Verbose
+      reporting(nodes[nextIndex])
       clientRecoverMode = true
       while clientRecoverMode
         client.close
-        client, nextIndex = connectClient(nodes, ports, nextIndex.next, options[:verbose])
+        client, nextIndex = connectClient(nodes, ports, nextIndex.next,options[:retries])
         if client
-          puts "RECOVER CLIENT -- connected to #{nodes[nextIndex]}, waiting for its recover point" if options[:verbose]
+          puts "RECOVER CLIENT -- connected to #{nodes[nextIndex]}, waiting for its recover point" if $Verbose
           recoverPoint = client.recv(100).to_i
-          puts "RECOVER CLIENT -- recover point received : #{recoverPoint} / #{nbChunks}" if options[:verbose]
+          puts "RECOVER CLIENT -- recover point received : #{recoverPoint} / #{nbChunks}" if $Verbose
           delta = nbChunks - recoverPoint
           raise "Not enough chunks saved for recover" if delta > MAX_CHUNKS
           begin
             lastChunks.last(delta).each do |chunk|
               client.write(chunk)
-              puts "RECOVER CLIENT -- chunk resend ( #{chunk.length} bytes )" if options[:verbose]
+              puts "RECOVER CLIENT -- chunk resend ( #{chunk.length} bytes )" if $Verbose
             end
-            puts "RECOVER CLIENT -- end" if options[:verbose]
+            puts "RECOVER CLIENT -- end" if $Verbose
             clientRecoverMode = false
           rescue => e
-            puts "RECOVER CLIENT -- connexion lost with #{nodes[nextIndex]}" if options[:verbose]
-            reportClient = TCPSocket.new(nodes[0], ports[0])
-            reportClient.write(nodes[nextIndex])
-            reportClient.close
+            puts "RECOVER CLIENT -- connexion lost with #{nodes[nextIndex]}" if $Verbose
+      reporting(nodes[nextIndex],e.to_s)
           end
         else
-          puts "RECOVER CLIENT -- new last node" if options[:verbose]
+          puts "RECOVER CLIENT -- new last node" if $Verbose
           lastNode = true
           clientRecoverMode = false
         end
@@ -324,20 +535,18 @@ while !fin
     file.write(buffer) if file
   elsif bytes == options[:filesize]
     fin = true
-    puts "Transmission complete ( #{nbChunks} chunks )" if options[:verbose]
+    puts "Transmission complete ( #{nbChunks} chunks )" if $Verbose
     if lastNode
-      reportClient = TCPSocket.new(nodes[0],ports[0])
-      reportClient.write("end")
-      reportClient.close
+      reporting("end")
     end
   else
-    puts "An error has occured ( #{bytes} / #{options[:filesize]} ) ( #{nbChunks} chunks ) -- now switching to Recover Mode" if options[:verbose]
+    $stderr.puts "An error has occured ( #{bytes} / #{options[:filesize]} ) ( #{nbChunks} chunks ) -- now switching to Recover Mode" if $Verbose
     serverRecoverMode = true
     stream.close
     stream = server.accept
-    puts "RECOVER SERVER -- connected" if options[:verbose]
+    puts "RECOVER SERVER -- connected" if $Verbose
     stream.send("#{nbChunks}", 0)
-    puts "RECOVER SERVER -- recover points send to it : #{nbChunks}" if options[:verbose]
+    puts "RECOVER SERVER -- recover points send to it : #{nbChunks}" if $Verbose
     serverRecoverMode = false
   end
 end

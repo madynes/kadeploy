@@ -19,7 +19,7 @@ class KarebootClient < ClientWorkflow
   def self.load_options()
     global_load_options().merge(
       {
-        :operation => nil,
+        :operation => :simple,
         :env_name => nil,
         :env_version => nil, #By default we load the latest version
         :check_demolishing => false,
@@ -51,7 +51,7 @@ class KarebootClient < ClientWorkflow
       add_opt(opt,"-r", "--reboot-kind REBOOT_KIND", ['set_pxe', 'simple', 'deploy_env', 'recorded_env'], "Specify the reboot kind (set_pxe, simple, deploy_env, recorded_env)") { |k|
         options[:operation] = k.strip.downcase.to_sym
       }
-      parse_user(opt,options)
+      parse_env_user(opt,options)
       parse_vlan(opt,options)
       parse_pxe_profile(opt,options)
       parse_pxe_pattern(opt,options)
@@ -94,6 +94,21 @@ class KarebootClient < ClientWorkflow
       return false
     end
 
+    if options[:env_name] and options[:operation] != :recorded_env
+      error("The -e option can be only used with the recorded_env reboot kind")
+      return false
+    end
+
+    if options[:env_user] and options[:operation] != :recorded_env
+      error("The -u option can be only used with the recorded_env reboot kind")
+      return false
+    end
+
+    if options[:env_version] and options[:operation] != :recorded_env
+      error("The --env-version option can be only used with the recorded_env reboot kind")
+      return false
+    end
+
     true
   end
 
@@ -118,7 +133,7 @@ class KarebootClient < ClientWorkflow
     if options[:env_name]
       envname = options[:env_name]
       username = nil
-      username = options[:user] if options[:user]
+      username = options[:env_user] if options[:env_user]
 
       envs = get(api_path(username,:envs),{:user=>USER})
       envs.select!{|en| en['name'] == envname}

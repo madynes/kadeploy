@@ -60,9 +60,7 @@ class KarightsClient < Client
         p.strip!
         options[:parts] << p if p != '*'
       }
-      add_opt(opt,"-u", "--user USERNAME", /^\w+$/, "Specify the user") { |u|
-        options[:user] = u
-      }
+      parse_user(opt,options)
     end
   end
 

@@ -435,7 +435,7 @@ module Workflow
           instance[1] = 0
           instance[2] = eval("(#{context[:cluster].timeout_reboot_classical})+200").to_i
           debug(0,"Using classical reboot instead of kexec (#{macrosteps[0].name})")
-      end
+        end
         @tasks[1] << [ instance[0].to_sym ]
       end
 

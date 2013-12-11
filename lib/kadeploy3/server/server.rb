@@ -521,7 +521,7 @@ class KadeployServer
   end
 
   def get_nodes(*args)
-    cfg.common.nodes.make_array_of_hostname
+    Nodes::sort_list(cfg.common.nodes.make_array_of_hostname)
   end
 
   def get_clusters(*args)

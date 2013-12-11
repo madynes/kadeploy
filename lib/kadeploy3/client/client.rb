@@ -16,6 +16,7 @@ require 'optparse'
 require 'net/http'
 require 'net/https'
 require 'timeout'
+require 'tempfile'
 require 'json'
 require 'yaml'
 
@@ -243,6 +244,12 @@ class Client
   def self.parse_machine(opt,options)
     add_opt(opt,"-m", "--machine MACHINE", "The node to run on") { |m|
       load_machine(options[:nodes], m)
+    }
+  end
+
+  def self.parse_env_user(opt,options)
+    add_opt(opt,"-u", "--env-user USERNAME", /^\w+$/, "Specify the user that own the recorded environment") { |u|
+      options[:env_user] = u
     }
   end
 
@@ -701,6 +708,7 @@ class Client
         next if server.downcase == 'default'
         if options[:nodes]
           nodelist = get_nodelist(inf[0],inf[1],inf[2])
+          # Strict check when working on multi-server
           nodes = options[:nodes] & nodelist
           treated += nodes
         end
@@ -710,8 +718,15 @@ class Client
       info = options[:servers][options[:chosen_server]]
       if options[:nodes]
         nodelist = get_nodelist(info[0],info[1],info[2])
-        nodes = options[:nodes] & nodelist
-        treated += nodes
+        # Lazy check when not working on multi-server
+        nodes = options[:nodes]
+        options[:nodes].each do |node|
+          if node =~ /\[.*\]/
+            treated << node
+          else
+            treated << node unless nodelist.select{|n| n =~ /#{node}/}.empty?
+          end
+        end
       end
       $clients << self.new(nil,info[0],info[1],info[2],nodes)
     end

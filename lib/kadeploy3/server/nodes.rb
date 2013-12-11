@@ -7,6 +7,14 @@ module Nodes
   REGEXP_NODELIST = /\A([A-Za-z0-9\.\-]+\[#{REGEXP_LIST.source}\][A-Za-z0-9\.\-]*)\Z/
   REGEXP_IPLIST = /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[#{REGEXP_LIST.source}\])\Z/
 
+  def self.sort_list(nodes)
+    nodes.sort_by! do |h|
+      h.to_s.split('.').reverse.collect do |v|
+        v.scan(/\d+|\p{alpha}+/).map!{|n| Integer(n) rescue n}
+      end.flatten
+    end
+  end
+
   def self.get_states(db,nodes)
     where = nil
     args = nil
@@ -862,6 +870,24 @@ module Nodes
     # * return the number of clusters involved
     def get_nb_clusters
       return group_by_cluster.length
+    end
+
+    def get_node(hostname)
+      res = nil
+      if hostname =~ /^\d/
+        res = @set.select{|v| v.hostname =~ /\D#{hostname}\D/ or v.hostname =~ /#{hostname}$/}
+      else
+        res = @set.select{|v| v.hostname =~ /#{hostname}\D/ or v.hostname =~ /#{hostname}$/}
+      end
+
+      case res.size
+      when 0
+        return nil
+      when 1
+        return res.first
+      else
+        return res
+      end
     end
 
     # Get a Node in a NodeSet by its hostname

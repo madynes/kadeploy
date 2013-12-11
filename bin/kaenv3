@@ -18,7 +18,35 @@ class KaenvsClient < Client
   end
 
   def print_short(env)
-    debug sprintf("%-21s %-7s %-11s %.35s%.3s\n", env['name'], env['version'], env['user'], env['description'],(env['description'].size>35 ? '...' : ''))
+    tot = 0
+    tot += (env['name'].size > 21 ? env['name'].size : 21)
+
+    format = "%-21s "
+    tmp = env['name'].size - 21
+    if tmp > 0
+      if tmp < 7
+        format << "%-#{7-tmp}s "
+        tot += (7-tmp)
+      else
+        format << "%s "
+        tot += env['version'].size
+      end
+    else
+      format << "%-7s "
+      tot += 7
+    end
+
+    format << "%-11s "
+    tot += (env['user'].size > 11 ? env['user'].size : 11)
+
+    tot += 3
+
+    if env['description'].size > (80-tot)
+      format << "%.#{80-tot-3}s...\n"
+    else
+      format << "%.#{80-tot}s\n"
+    end
+    debug sprintf(format,env['name'],env['version'],env['user'],env['description'])
   end
 
   def print_full(env)
@@ -48,9 +76,9 @@ class KaenvsClient < Client
         :environment => {},
         :operation => nil,
         :env_desc => {},
+        :env_user => nil,
         :env_name => '',
         :env_version => nil,
-        :user => nil,
         :all_versions => false,
         :visibility_tag => nil,
         :files_to_move => {},
@@ -94,7 +122,7 @@ class KaenvsClient < Client
       add_opt(opt,"-t", "--visibility-tag TAG", ['public','private','shared'], "Set the visibility tag (private, shared, public)") { |v|
         options[:visibility_tag] = v
       }
-      parse_user(opt,options)
+      parse_env_user(opt,options)
       parse_env_version(opt,options)
       opt.separator ""
       opt.separator "Advanced options:"
@@ -167,11 +195,11 @@ class KaenvsClient < Client
     # set path
     path = api_path()
     if ![:add, :list, :'move-files'].include?(options[:operation])
-      path = File.join(path,options[:user]||USER)
+      path = File.join(path,options[:env_user]||USER)
       path = File.join(path,options[:env_name]) if options[:env_name]
       path = File.join(path,options[:env_version].to_s) if options[:env_version]
     elsif options[:operation] != :add
-      path = File.join(path,options[:user]) if options[:user]
+      path = File.join(path,options[:env_user]) if options[:env_user]
     end
 
     if [:add, :'update-image-checksum',:'update-postinstalls-checksum',:'update-preinstall-checksum',:'move-files'].include?(options[:operation])
