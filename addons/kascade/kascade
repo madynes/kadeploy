@@ -10,9 +10,15 @@
 ##    -Add argument -m to set the master. (usefull for integration next version )
 ##    -detection whoiam is improved with ip search
 ## Rev 2: 
-##    -Use the rapport to communicate with kadeploy
+##    -Use the reporting server to decide of end.
+##    -Add yaml file and different status to communicate with kadeploy
 ##    -Add agressive mod
 ##    -Retries options
+## rev 3:
+##    -Integration of Taktuk launcher
+##    -Integration of clushell launcher (in progress)
+##    -Improve the node sort
+
 
 require 'rubygems'
 require 'optparse'
@@ -100,35 +106,8 @@ rescue
 end
 
 if options[:sort]
-  nodes2 = []
-  nodes.each do |n|
-    clusterAndNode, siteName = n.split(".")
-    clusterName, nodeNumber = clusterAndNode.split("-")
-    while nodeNumber && nodeNumber.size < 3
-      nodeNumber.insert(0, "0")
-    end
-    if nodeNumber
-      nodeNumber.insert(0, "-")
-    else
-      nodeNumber = ""
-    end
-    nodes2 << siteName + "." + clusterName + nodeNumber
-  end
-  nodes2.sort!
-  nodes = []
-  nodes2.each do |n|
-    siteName, clusterAndNode = n.split(".")
-    clusterName, nodeNumber = clusterAndNode.split("-")
-    if nodeNumber
-      nodeNumber = nodeNumber.to_i.to_s
-      nodeNumber.insert(0, "-")
-    else
-      nodeNumber = ""
-    end
-    nodes << clusterName + nodeNumber + "." + siteName + ".grid5000.fr"
-  end
+  nodes.sort_by!{|h| h.split('.').reverse.collect{|v| v.scan(/\d+|\p{alpha}+|\W+/).map!{|n| n.numberize}}.flatten}
 end
-
 i = 0
 nodesPorts = nodes.map do |line| 
   port = options[:port].to_i + i + 1
