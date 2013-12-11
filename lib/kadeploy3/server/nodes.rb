@@ -8,7 +8,11 @@ module Nodes
   REGEXP_IPLIST = /\A(\d{1,3}\.\d{1,3}\.\d{1,3}\.\[#{REGEXP_LIST.source}\])\Z/
 
   def self.sort_list(nodes)
-    nodes.sort_by!{|v| v.to_s.scan(/\w+/).first.hash + v.to_s.scan(/\d+/).first.to_i}
+    nodes.sort_by! do |h|
+      h.to_s.split('.').reverse.collect do |v|
+        v.scan(/\d+|\p{alpha}+/).map!{|n| Integer(n) rescue n}
+      end.flatten
+    end
   end
 
   def self.get_states(db,nodes)
