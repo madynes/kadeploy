@@ -946,6 +946,9 @@ end
 # kastafior default config
 CFG_KASTAFIOR_BIN_FILE = '/usr/bin/kastafior'
 
+# kascade default config
+CFG_KASCADE_BIN_FILE = '/usr/bin/kascade'
+
 # frontend default config
 CFG_FRONTEND_USER = 'frontend'
 CFG_FRONTEND_USER_PASS = 'pass'
@@ -2026,12 +2029,13 @@ end
 
 options[:node_list]   = nil
 options[:host_list]   = nil
-options[:www_list]   = nil
+options[:www_list]    = nil
 options[:debpackages] = []
 options[:gempackages] = []
-options[:gateway]         = nil
+options[:gateway]     = nil
 options[:ssh_key]     = nil
-options[:kastafior]     = nil
+options[:kastafior]   = nil
+options[:kascade]     = nil
 options[:version]     = nil
 options[:daemon_kadeploy] = nil
 options[:update_file] = nil
@@ -2064,8 +2068,12 @@ optparse = OptionParser.new(USAGE) do |opts|
     options[:www_list] = n
   end
 
-  opts.on( '-k', '--kastafior <kastafior_file>', 'Use a specific version of kastafior' ) do |k|
+  opts.on( '', '--kastafior <kastafior_file>', 'Use a specific version of kastafior' ) do |k|
     options[:kastafior] = k
+  end
+
+  opts.on( '', '--kascade <kascade_file>', 'Use a specific version of kascade') do |k|
+    options[:kascade] = k
   end
 
   opts.on( '-i', '--ssh-key [<ssh_key_file>]', 'Specify the path of the ssh private key to use' ) do |k|
@@ -2185,6 +2193,14 @@ if options[:kastafior]
     options[:kastafior] = File.expand_path(options[:kastafior])
   else
     msg("kastafior file #{options[:kastafior]} not found",MSG_ERROR,true)
+  end
+end
+
+if options[:kascade]
+  if File.exists?(options[:kascade])
+    options[:kascade] = File.expand_path(options[:kascade])
+  else
+    msg("kascade file #{options[:kascade]} not found",MSG_ERROR,true)
   end
 end
 
@@ -3445,8 +3461,14 @@ sshgw.ssh(servername,'root') do |session|
         sexec(session,"cp -f #{File.join(tmpdir,'scripts','**','*')} #{CFG_KADEPLOY_CONF_PATH}")
 
         msg("Copying kastafior",MSG_INFO)
-        sexec(session,"cp -f #{File.join(tmpdir,'addons','kastafior','kastafior')} /usr/bin")
-        sexec(session,"chmod +x /usr/bin/kastafior")
+        sexec(session,"cp -f #{File.join(tmpdir,'addons','kastafior','kastafior')} #{CFG_KASTAFIOR_BIN_FILE}")
+        sexec(session,"chmod +x #{CFG_KASTAFIOR_BIN_FILE}")
+
+        if $version >= 8
+          msg("Copying kascade",MSG_INFO)
+          sexec(session,"cp -f #{File.join(tmpdir,'addons','kascade','kascade')} #{CFG_KASCADE_BIN_FILE}")
+          sexec(session,"chmod +x #{CFG_KASCADE_BIN_FILE}")
+        end
       end
 
       msg('Remove the temporary directory',MSG_INFO)
@@ -3457,6 +3479,13 @@ sshgw.ssh(servername,'root') do |session|
     else
       msg('Installing Kadeploy server/client',MSG_INFO)
       apt_install(session,[kapkg('server'),kapkg('client')],server)
+
+      if $version >= 8
+        sexec(session,"gzip -dc /usr/share/doc/kadeploy/kastafior.gz > #{CFG_KASTAFIOR_BIN_FILE}")
+        sexec(session,"chmod +x #{CFG_KASTAFIOR_BIN_FILE}")
+        sexec(session,"gzip -dc /usr/share/doc/kadeploy/kascade.gz > #{CFG_KASCADE_BIN_FILE}")
+        sexec(session,"chmod +x #{CFG_KASCADE_BIN_FILE}")
+      end
     end
 
     msg('Creating Kadeploy directories',MSG_INFO)
@@ -3556,6 +3585,11 @@ sshgw.ssh(servername,'root') do |session|
     if options[:kastafior]
       msg('Installing Kastafior',MSG_INFO)
       scp(servername,options[:kastafior],CFG_KASTAFIOR_BIN_FILE)
+    end
+
+    if options[:kascade]
+      msg('Installing Kascade',MSG_INFO)
+      scp(servername,options[:kascade],CFG_KASCADE_BIN_FILE)
     end
 
     if options[:update_file]

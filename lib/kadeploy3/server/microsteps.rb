@@ -137,6 +137,16 @@ class Microstep < Automata::QueueTask
     ret
   end
 
+  def get_nodeobj(nodes,str)
+    ret = nil
+    if context[:cluster].use_ip_to_deploy then
+      ret = nodes.get_node_by_ip(str)
+    else
+      ret = nodes.get_node_by_host(str)
+    end
+    ret
+  end
+
   def init_nodes(opts={})
     @nodes.set.each do |node|
       set_node(node,opts)
@@ -1044,6 +1054,81 @@ class Microstep < Automata::QueueTask
     end
   end
 
+  def send_tarball_and_uncompress_with_kascade(file, decompress)
+    node_set = Nodes::NodeSet.new
+    @nodes.linked_copy(node_set)
+
+    nodefile = Tempfile.new("kascade-nodefile")
+
+    node_set.make_sorted_array_of_nodes.each do |node|
+      nodefile.puts(get_nodeid(node))
+    end
+
+    nodefile.close
+
+    okfile = Tempfile.new("kascade-okfile")
+    okfile.close
+    kofile = Tempfile.new("kascade-kofile")
+    kofile.close
+
+    cmd = "#{context[:common].kascade} -i #{file} -n #{nodefile.path} -O '#{decompress}' -S '#{context[:common].taktuk_connector}' --ok #{okfile.path} --ko #{kofile.path} #{context[:common].kascade_options}" # -m Socket.gethostname()
+
+    @nodes_ok.clean()
+    status,out,err = nil
+    command(cmd,
+      :stdout_size => 1000,
+      :stderr_size => 1000
+    ) do |st,stdout,stderr|
+      status = st.exitstatus
+      out = stdout
+      err = stderr
+    end
+
+    if status == 0
+      okfile.unlink
+      kofile.unlink
+
+      @debugger.push(cmd,@nodes,out,err,status) if @debugger
+
+      node_set.linked_copy(@nodes_ok)
+
+      return true
+    else
+      oknodes = YAML.load_file(okfile.path)
+      okfile.unlink
+      konodes = YAML.load_file(kofile.path)
+      kofile.unlink
+
+      node_set.set.each do |node|
+        id = get_nodeid(node)
+        node.last_cmd_stdout = out
+
+        if oknodes.include?(id)
+          node.last_cmd_stderr = err
+          node.last_cmd_exit_status = 0
+
+          @nodes_ok.push(node)
+        elsif konodes.keys.include?(id)
+          @nodes_ko.push(node)
+          node.last_cmd_stderr = "KASCADE-ERROR: #{konodes[id].inspect}"
+          node.last_cmd_exit_status = status
+        else
+          @debugger.push(cmd,node_set) if @debugger
+          failed_microstep("Error while processing Kascade output files")
+          return false
+        end
+      end
+      oknodes.clear
+      oknodes = nil
+      konodes.clear
+      konodes = nil
+    end
+
+    @debugger.push(cmd,node_set) if @debugger
+
+    return true
+  end
+
   # Send a tarball with Bittorrent and uncompress it on the nodes
   #
   # Arguments
@@ -1938,6 +2023,8 @@ class Microstep < Automata::QueueTask
       res = send_tarball_and_uncompress_with_taktuk(:tree,file,decompress)
     when :kastafior
       res = send_tarball_and_uncompress_with_kastafior(file,decompress)
+    when :kascade
+      res = send_tarball_and_uncompress_with_kascade(file,decompress)
     when :custom
       res = send_tarball_and_uncompress_with_custom(
         context[:cluster].cmd_sendenv.dup,file,decompress)
