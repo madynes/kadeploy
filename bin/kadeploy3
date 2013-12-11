@@ -22,9 +22,9 @@ class KadeployClient < ClientWorkflow
         :environment => {},
         :env_kind => '',
         :env_desc => {},
+        :env_user => nil,
         :env_name => '',
         :env_version => nil, #By default we load the latest version
-        :user => nil,
         :block_device => nil,
         :deploy_part => nil,
         :boot_part => nil,
@@ -63,7 +63,7 @@ class KadeployClient < ClientWorkflow
       add_opt(opt,"-r", "--reformat-tmp FSTYPE", "Reformat the /tmp partition with the given filesystem type (this filesystem need to be supported by the deployment environment)") { |t|
         options[:reformat_tmp] = t
       }
-      parse_user(opt,options)
+      parse_env_user(opt,options)
       parse_vlan(opt,options)
       parse_pxe_profile(opt,options)
       parse_pxe_pattern(opt,options)
@@ -146,7 +146,7 @@ class KadeployClient < ClientWorkflow
     when :database
       envname = options[:env_name]
       username = nil
-      username = options[:user] if options[:user]
+      username = options[:env_user] if options[:env_user]
 
       tmp = {:user=>USER}
       tmp[:last] = true unless options[:env_version]
