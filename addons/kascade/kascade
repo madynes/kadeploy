@@ -16,7 +16,7 @@
 ##    -Retries options
 ## rev 3:
 ##    -Integration of Taktuk launcher
-##    -Integration of clushell launcher (in progress)
+##    -Integration of clushell launcher (in progress - test ssh paramter)
 ##    -Improve the node sort
 
 
@@ -61,7 +61,7 @@ OptionParser.new do |opts|
   opts.on("-b", "--buffersize SIZE", "buffer sise") { |v| options[:buffersize] = v }
   opts.on("-c", "--check", "check the report")  { |v| options[:check] = v }
   opts.on("-C", "--[no-]checkmd5", "check md5sum") { |v| options[:checkmd5] = v }
-  opts.on("-D", "--deploy [ssh,taktuk,clush]", [:ssh,:taktuk],"Choose deploy method. Ssh is default value") { |v| options[:deploy] = v }
+  opts.on("-D", "--deploy [ssh,taktuk,clush]", [:ssh,:taktuk,:clush],"Choose deploy method. Ssh is default value") { |v| options[:deploy] = v }
   opts.on("-i", "--input FILE", "input file") { |v| options[:input] = v }
   opts.on("-k", "--ok FILE", "list of node correctly deployed") { |v| options[:okfile] = v }
   opts.on("-K", "--ko FILE", "list of node with error") { |v| options[:kofile] = v }
@@ -229,13 +229,12 @@ Thread.new do #Disssemination
       time = Time.now - time
       puts "script forwarded in #{time}s" if $Verbose
 
-
-      cmd = "vruby #{fountainPath} -o #{options[:output]} -O \"#{options[:outputcmd]}\""+commonOptions
       session.exec(commandFountain)
 
       session.loop
     end
   else
+    sshopt=""
     if options[:deploy] == :taktuk
       puts "Using Taktuk" if $Verbose
       #================================================== TAKTUK
@@ -244,26 +243,24 @@ Thread.new do #Disssemination
         file.puts(node)
       end
       file.close
-      sshopt=""
       if options[:sshcommand]!=nil
         sshopt="-c \"#{options[:sshcommand]}\""
       end
-      if $Verbose
-        statustream=""
-      else
-        statustream="-o status=-"
-      end
-      cmd="taktuk #{statustream} -s -f #{file.path} broadcast put [ #{firstFountainPath} ] [ #{fountainPath} ], broadcast put [ #{nodesPath} ] [ #{nodesPath} ], broadcast exec [ #{commandFountain} ]" 
+      cmd="taktuk #{$Verbose?"":"-o status=-"} #{sshopt} -f #{file.path} broadcast put [ #{firstFountainPath} ] [ #{fountainPath} ], broadcast put [ #{nodesPath} ] [ #{nodesPath} ], broadcast exec [ #{commandFountain} ]" 
       #cmd += " > /dev/null" if ! $Verbose 
       system(cmd)
       File.unlink(file.path)
     else
+      #==================================== Cluster shell 
        puts "Using ClusterShell" if $Verbose
-       #Cluster shell is comming but need multi connexion to copy and launch. The solution could be using echo instead copy. This is not a priority
-       raise "Not implemented yet"
-       nodeSet=`nodeset -f #{nodes*" "}`
-       cmd="clush -w #{nodeSet} --copy #{firstFountainPath} --dest #{fountainPath} --copy  #{nodesPath} --dest #{nodesPath} '#{commandFountain}'"
-       system(cmd)
+       nodeSet=`nodeset -f #{nodes*" "}`.strip
+       if options[:sshcommand]!=nil
+         sshopt=options[:sshcommand].sub(/-i[' ']*/,'-oIdentityFile=')
+       end
+       incmd=Shellwords.escape("echo #{fountain} > #{fountainPath} && echo #{nodesPorts} > #{nodesPath} && #{commandFountain}")
+       cmd="clush -w '#{nodeSet}' #{$Verbose?"":"-q"} #{sshopt} #{incmd}" 
+       pid=fork{exec(cmd)}
+       Process.wait(pid)
     end
   end
 end
@@ -394,7 +391,7 @@ def redirect(input,output)
   end
 end
 def killPort(port)
-    pidtokill = `lsof -t -i :#{port}`.strip
+    pidtokill = %x[lsof -t -i :#{port}].strip
     if pidtokill!=""
       puts "kill pid #{pidtokill} because it using port #{port}" if $Verbose
       Process.kill("KILL",pidtokill.to_i)
