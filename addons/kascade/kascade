@@ -255,7 +255,7 @@ Thread.new do #Disssemination
        puts "Using ClusterShell" if $Verbose
        nodeSet=`nodeset -f #{nodes*" "}`.strip
        if options[:sshcommand]!=nil
-         sshopt=options[:sshcommand].sub(/-i[' ']*/,'-oIdentityFile=')
+         sshopt="--option='#{options[:sshcommand]}'"
        end
        incmd=Shellwords.escape("echo #{fountain} > #{fountainPath} && echo #{nodesPorts} > #{nodesPath} && #{commandFountain}")
        cmd="clush -w '#{nodeSet}' #{$Verbose?"":"-q"} #{sshopt} #{incmd}" 
