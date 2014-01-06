@@ -23,10 +23,11 @@ module Kaconsole
 
   def console_get(cexec,node)
     # TODO: kill the console when the user loose the rights
-    if cexec.rights.granted?(cexec.user,[node],'')
-      parse_params({'node'=>node}) do |p|
-        node = p.parse('node',String,:type=>:node,:mandatory=>true)
-      end
+    parse_params({'node'=>node}) do |p|
+      node = p.parse('node',String,:type=>:node,:mandatory=>true)
+    end
+
+    if cexec.rights.granted?(cexec.user,[node.hostname],'')
       cmd = node.cmd.console || cexec.config.clusters[node.cluster].cmd_console
       cmd = Nodes::NodeCmd.generate(cmd.dup,node)
       { 'command' => cmd }
