@@ -1,2 +1,3 @@
 /var/log/kadeploy3
 /var/run/kadeploy3d
+/etc/kadeploy3/keys
