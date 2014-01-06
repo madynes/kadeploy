@@ -8,6 +8,7 @@ Signal.trap("INT") do
 end
 
 require 'kadeploy3/client'
+$interactive = false
 
 module Kadeploy
 

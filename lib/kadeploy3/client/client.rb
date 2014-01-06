@@ -9,6 +9,7 @@ $httpd_thread = nil
 $killing = false
 $debug_mode = nil
 $debug_http = nil
+$interactive = true
 
 require 'thread'
 require 'uri'
@@ -744,7 +745,7 @@ class Client
     end
 
     status_thr = nil
-    if STDIN.tty? and !STDIN.closed?
+    if $interactive and STDIN.tty? and !STDIN.closed?
       status_thr = Thread.new do
         last_status = Time.now
         while true
