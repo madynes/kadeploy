@@ -42,11 +42,13 @@ class KadeployServer
       :deploy => Mutex.new,
       :reboot => Mutex.new,
       :power => Mutex.new,
+      :console => Mutex.new,
     }
     @workflows_info = {
       :deploy => {},
       :reboot => {},
       :power => {},
+      :console => {},
     }
     @httpd = nil
   end
@@ -281,19 +283,22 @@ class KadeployServer
       )
     end
 
+    @httpd.bind([:POST,:GET],API.path(:console),:filter,
+      :object=>self,:method=>:launch,
+      :args=>[1],:static=>[:console],:name=>[(2..-1)]
+    )
+
     args = {
       :envs => [(1..3)],
       :rights => [(1..3)],
       :nodes => [1],
       :stats => [(1..1)],
-      :console => [1],
     }
     names = {
       :envs => [(4..-1)],
       :rights => [(4..-1)],
       :nodes => [(2..-1)],
       :stats => [(2..-1)],
-      :console => [(2..-1)],
     }
 
     [:envs,:rights].each do |kind|
@@ -303,7 +308,7 @@ class KadeployServer
       )
     end
 
-    [:nodes,:stats,:console].each do |kind|
+    [:nodes,:stats].each do |kind|
       @httpd.bind([:GET],API.path(kind),:filter,
         :object=>self,:method=>:launch,
         :args=>args[kind],:static=>[kind],:name=>names[kind]
@@ -388,12 +393,14 @@ class KadeployServer
       raise
     end
 
-    # prepare the treatment
+    # Prepare the treatment (parse arguments, ...)
     options = run_method(kind,:prepare,params[:params],query)
     begin
+      # Authenticate the user
       authenticate!(params[:request],options)
 
-      # Only check rights if the method 'kind'_rights? is defined
+      # Check rights
+      # (only check rights if the method 'kind'_rights? is defined)
       check_rights = nil
       begin
         get_method(kind,:'rights?')
@@ -412,6 +419,7 @@ class KadeployServer
 
       run_method(kind,meth,options,*args) unless options.dry_run
     ensure
+      # Clean everything
       if options
         begin
           get_method(kind,:free_exec_context)
@@ -425,7 +433,7 @@ class KadeployServer
     end
   end
 
-  def workflow_create(kind,wid,info)
+  def workflow_create(kind,wid,info,workkind=nil)
     raise unless @workflows_locks[kind]
     raise unless @workflows_info[kind]
     raise unless @httpd
@@ -437,9 +445,17 @@ class KadeployServer
       else
         yield if block_given?
         @workflows_info[kind][wid] = info
+
+        static = nil
+        if workkind
+          static = workkind
+        else
+          static = [kind,:work]
+        end
+
         bind(kind,info,'resource') do |httpd,path|
           httpd.bind([:GET,:DELETE],path,:filter,:object=>self,:method =>:launch,
-            :args=>[1,3,5,7],:static=>[[kind,:work]],:name=>[2,4,6]
+            :args=>[1,3,5,7],:static=>[static],:name=>[2,4,6]
           )
         end
       end
@@ -453,7 +469,6 @@ class KadeployServer
   def workflow_get(kind,wid=nil)
     raise unless @workflows_locks[kind]
     raise unless @workflows_info[kind]
-
     error = nil
     ret = nil
     @workflows_locks[kind].synchronize do
