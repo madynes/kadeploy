@@ -111,6 +111,11 @@ module Rights
           existing.each do |n,p|
             treatment.call(to_add,n,p)
           end
+
+          # The nodes that did not have any rights
+          (nodes-existing.keys).each do |node|
+            to_add[node] = parts
+          end
         else
           nodes.each do |node|
             to_add[node] = parts
