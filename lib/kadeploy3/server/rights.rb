@@ -243,12 +243,13 @@ module Rights
       parts = ['*'] unless parts
 
       if rights.is_a?(Array)
-        parts[0].empty? or rights[0] == '*' or rights.sort == parts.sort
+        # check if rights includes parts
+        parts[0].empty? or rights[0] == '*' or (parts.sort-rights.sort).empty?
       elsif rights.is_a?(Hash)
         if nodes.sort == rights.keys.sort
           unless parts[0].empty?
             rights.each do |n,p|
-              return false if p[0] != '*' and parts.sort != p.sort
+              return false if p[0] != '*' and !(parts.sort-p.sort).empty?
             end
           end
           true
