@@ -52,10 +52,14 @@ module Kaconsole
     case operation
     when :create
       context.config = duplicate_config()
+
       parse_params(params) do |p|
         context.node = p.parse('node',String,:type=>:node,:mandatory=>true)
         context.nodelist = [context.node.hostname.dup]
       end
+
+      kaerror(APIError::INVALID_RIGHTS) \
+        unless context.rights.granted?(context.user,context.node,'')
     when :get
     when :delete
     else
@@ -70,8 +74,6 @@ module Kaconsole
   def console_rights?(cexec,operation,names,wid=nil,*args)
     case operation
     when :create
-      return (cexec.almighty_users.include?(cexec.user) \
-        or cexec.rights.granted?(cexec.user,cexec.node,''))
     when :get
       if wid and names
         workflow_get(:console,wid) do |info|
@@ -93,7 +95,6 @@ module Kaconsole
   end
 
   def console_create(cexec)
-    # TODO: kill the console when the user loose the rights
     info = cexec.info
     workflow_create(:console,info[:wid],info,:console)
     console_init_resources(cexec)
@@ -296,9 +297,11 @@ module Kaconsole
       client[:kill].synchronize do
         if client[:pid]
           Execute.kill_recursive(client[:pid])
-          PTY.check(client[:pid])
-          client[:pid] = nil
           sleep 2 # wait for the thread to clean itself
+          if client[:pid]
+            PTY.check(client[:pid])
+            client[:pid] = nil
+          end
         end
       end
 

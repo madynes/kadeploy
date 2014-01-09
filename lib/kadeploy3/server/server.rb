@@ -506,6 +506,40 @@ class KadeployServer
     ret
   end
 
+  # Kill workflows involving nodes
+  def workflows_kill(nodes)
+    nodes.each do |node|
+      [:deploy,:reboot,:power,:console].each do |kind|
+        if @workflows_locks[kind] and @workflows_info[kind]
+          to_clean = []
+          @workflows_locks[kind].synchronize do
+            @workflows_info[kind].each_pair do |wid,info|
+              if info[:nodelist].include?(node)
+                to_clean << wid
+                if kind == :console
+                  console_kill(info)
+                  console_free(info)
+                else
+                  run_wmethod(kind,:kill,info)
+                  run_wmethod(kind,:free,info)
+                end
+              end
+            end
+          end
+          to_clean.each do |wid|
+            if kind == :console
+              console_delete(nil,wid)
+            else
+              run_wmethod(kind,:delete,nil,wid)
+            end
+          end
+          to_clean.clear
+          to_clean = nil
+        end
+      end
+    end
+  end
+
   def workflows_clean()
     clean_threshold = cfg().common.autoclean_threshold
     [:deploy,:reboot,:power].each do |kind|
