@@ -200,7 +200,7 @@ operation 'Rights management' do
     # TODO: add examples
   end
 
-  resource :DELETE, '/rights/:username/:node?/:partition?' do
+  resource :DELETE, '/rights/:username/:node?/:partition?', "Remove some rights on some nodes.#{$cgi.br}If no more rights are remaining on some of the nodes, every operations (workflows) involving this nodes will be killed." do
     request do
       parameter ':username', :String, 'The name of the username to remove the rights to', true
       parameter ':node', :String, 'The node to remove the rights from', false

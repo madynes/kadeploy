@@ -8,10 +8,43 @@ Signal.trap("INT") do
 end
 
 require 'kadeploy3/client'
+require 'io/console' if RUBY_VERSION >= '1.9'
+
+$interactive = false
 
 module Kadeploy
 
 class KaconsoleClient < Client
+  ESCAPE_SEQ="\x1b\x1b\x1b\x1b"
+
+  def initialize(name,server,port,secure=false,nodes=nil)
+    super(name,server,port,secure,nodes)
+    @wid = nil
+    @resources = nil
+  end
+
+  def api_path(path=nil,kind=nil,*args)
+    if @resources
+      if @resources[path]
+        @resources[path]
+      else
+        if path
+          File.join(@resources['resource'],path,*args)
+        else
+          File.join(@resources['resource'],*args)
+        end
+      end
+    else
+      super(path,kind,*args)
+    end
+  end
+
+  def kill
+    super()
+    delete(api_path(),{:user=>USER}) if @wid
+  end
+
+
   def self.operation()
     'Node console'
   end
@@ -46,25 +79,104 @@ class KaconsoleClient < Client
 
   def run(options)
     params = init_params(options)
+    params[:node] = options[:nodes].first
 
-    get(File.join(api_path(),options[:nodes][0]),params)
+    ret = post(api_path(),params)
+    @wid = ret['wid']
+    @resources = ret['resources']
+
+    uri = URI(@resources['console'])
+    sock = nil
+
+    begin
+      sock = TCPSocket.new(uri.host,uri.port)
+      sock.setsockopt(Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1)
+    rescue Exception => e
+      error("Fail to connect to remote console #{uri.to_s} "\
+        "(#{e.class.name}: #{e.message})")
+    end
+
+    $stdout.puts "[Kaconsole] kill sequence: ^[^[^[^["
+
+    begin
+      threads = []
+      done = false
+
+      # From network to console
+      threads << Thread.new do
+        buf = String.new
+        until done do
+          begin
+            sock.sysread(4096,buf)
+            $stdout.write(buf)
+            $stdout.flush
+          rescue EOFError
+            done = true
+          end
+        end
+      end
+
+      # From console to network
+      threads << Thread.new do
+        i = 0
+        begin
+          $stdin.raw do |stdin|
+            until done do
+              # Manage escape sequence
+              if i >= ESCAPE_SEQ.size
+                done = true
+                break
+              end
+
+              c = stdin.read(1)
+
+              if c == ESCAPE_SEQ[i]
+                i += 1
+              else
+                i = 0
+              end
+
+              sock.syswrite(c)
+            end
+          end
+        ensure
+          $stdin.cooked!
+        end
+      end
+
+      begin
+        sleep SLEEP_PITCH
+        done = true if !done and get(api_path('resource'),params)['error']
+      end until done
+
+      threads.each do |thr|
+        thr.kill if thr.alive?
+        thr.join
+      end
+
+    ensure
+      sock.close
+    end
+
+    tmp = @resources
+    @resources = nil # disable api_path magic
+
+    # check that workflow stil exists (do not clean if already cleaned)
+    consoles = get(api_path(nil,:console),params)
+    if consoles.select{|v| v['id'] == @wid}.empty?
+      @wid = nil
+    else
+      @resources = tmp
+    end
+
+    get(api_path('resource'),params) if @wid
   end
 
   def result(options,ret)
-    # TODO: kill the console when the user loose the rights
-    # @killed -> check rights on nodes
-    @killed = false
-
-    pid = fork { exec(ret['command']) }
-
-    ret_wait = 0
-    until @killed
-      ret_wait = Process.waitpid(pid, Process::WNOHANG)
-      @killed = true if ret_wait == pid
-      sleep(1)
+    if @wid
+      get(api_path('error')) if ret['error']
+      delete(api_path())
     end
-
-    Process.kill("SIGKILL", pid) if ret_wait != pid
   end
 end
 

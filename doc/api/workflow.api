@@ -1,6 +1,6 @@
 operation 'Workflow-based operations' do
   type :Workflow, :Hash, 'The information related to the workflow of an operation (deployment,reboot,power)' do
-    field :id, :String, 'The id# of the operation (prefixed by "D-" for deployment, "R-" for reboot and "P-" for power)'
+    field :id, :String, 'The id# of the operation (prefixed by "D-" for deployment, "R-" for reboot, "P-" for power and "C-" for console)'
     field :user, :String, 'The user that initiated the operation'
     field :done, :Boolean, 'Set to true if the operation is done. Once an operation is done it\'s information should be removed from the API using the DELETE method.'
     field :error, :Boolean, 'Set to true if an error was encountered. The error message can be obtained by getting /%OPERATION/:id/error.'
