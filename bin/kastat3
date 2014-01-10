@@ -60,7 +60,7 @@ class KastatClient < Client
       add_opt(opt,"-s", "--retry-steps STEPS", Array, "Apply the retry filter on the given steps (1, 2 or 3)") { |s|
         options[:step_retries] = s
       }
-      add_opt(opt,"-w", "--workflow-id ID", "Get the stats of a specific deployment") { |w|
+      add_opt(opt,"-w", "--workflow-id ID", "Get the stats of a specific workflow") { |w|
         options[:wid] = w
       }
       add_opt(opt,"-x", "--date-min TIME", Time, "Get the stats from this date (yyyy-mm-dd hh:mm:ss)") { |d|

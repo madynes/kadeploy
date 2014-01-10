@@ -101,4 +101,13 @@ if RUBY_VERSION < '1.9'
       "%08x-%04x-%04x-%04x-%04x%08x" % ary
     end
   end
+
+  def STDIN.raw()
+    begin
+      system('stty raw -echo')
+      yield(STDIN)
+    ensure
+      system('stty -raw echo')
+    end
+  end
 end

@@ -34,6 +34,7 @@ module Rights
     protected
     def prepare(user=nil,nodes=nil,parts=nil)
       parts = [ parts ] if parts and !parts.is_a?(Array)
+      nodes = [ nodes.hostname ] if nodes.is_a?(Nodes::Node)
       nodes = nodes.make_array_of_hostname if nodes.is_a?(Nodes::NodeSet)
       nodes.uniq! if nodes.is_a?(Array)
       user = nil if user and user.empty?
@@ -110,6 +111,11 @@ module Rights
         elsif existing.is_a?(Hash)
           existing.each do |n,p|
             treatment.call(to_add,n,p)
+          end
+
+          # The nodes that did not have any rights
+          (nodes-existing.keys).each do |node|
+            to_add[node] = parts
           end
         else
           nodes.each do |node|
@@ -243,12 +249,13 @@ module Rights
       parts = ['*'] unless parts
 
       if rights.is_a?(Array)
-        parts[0].empty? or rights[0] == '*' or rights.sort == parts.sort
+        # check if rights includes parts
+        parts[0].empty? or rights[0] == '*' or (parts.sort-rights.sort).empty?
       elsif rights.is_a?(Hash)
         if nodes.sort == rights.keys.sort
           unless parts[0].empty?
             rights.each do |n,p|
-              return false if p[0] != '*' and parts.sort != p.sort
+              return false if p[0] != '*' and !(parts.sort-p.sort).empty?
             end
           end
           true

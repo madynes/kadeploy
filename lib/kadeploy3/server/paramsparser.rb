@@ -126,8 +126,8 @@ class ParamsParser
       error(APIError::INVALID_NODELIST,"Must be a single node") if Nodes::REGEXP_NODELIST =~ param
 
       # Get the node
-      unless param = @nodes.get_node_by_host(param)
-        error(APIError::INVALID_NODELIST,"The node #{host} does not exist")
+      unless param = @nodes.get_node(param)
+        error(APIError::INVALID_NODELIST,"The node #{param} does not exist")
       end
     when :nodeset
       # Get hostlist

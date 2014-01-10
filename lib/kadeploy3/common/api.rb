@@ -40,6 +40,8 @@ module API
         'R-'
       when :power
         'P-'
+      when :console
+        'C-'
       else
         raise
     end

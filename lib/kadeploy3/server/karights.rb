@@ -143,6 +143,20 @@ module Karights
     end
 
     if (ret = cexec.rights.delete(user,nodes,partitions))
+      # If the user do not have anymore rights on some nodes,
+      # kill current operations on these nodes
+      remaining = cexec.rights.get(user,nodes)
+      remaining = remaining[user] if remaining
+
+      nodes = nil
+      if remaining # Some rights remaining on nodes for the user
+        nodes = existing.keys - remaining.keys # The list of nodes with no more rights for the user
+      else # No more rights on existing nodes for the user
+        nodes = existing.keys
+      end
+
+      workflows_kill(nodes)
+
       ret
     else
       kaerror(APIError::NOTHING_MODIFIED)

@@ -81,7 +81,11 @@ module HTTPd
     attr_accessor :accept, :encoding
     def initialize(request)
       @request = request
-      @body = @request.body
+      if @request['Content-Length']
+        @body = @request.body
+      else
+        @body = ''
+      end
       @uri = @request.request_uri
       @accept = self.class.parse_header_list(@request['Accept'])
       @encoding = self.class.parse_header_list(@request['Accept-Encoding'])
