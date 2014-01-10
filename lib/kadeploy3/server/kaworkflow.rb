@@ -410,6 +410,7 @@ module Kaworkflow
     { :wid => info[:wid], :resources => info[:resources] }
   end
 
+  # TODO: implement it
   def work_modify(*args)
     error_invalid!
   end

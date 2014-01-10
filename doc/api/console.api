@@ -1,0 +1,151 @@
+operation 'Console' do
+  resource :POST, '/console', "Create a console binding. The server will create a TCP channel to bind the console inputs/outputs.#{$cgi.br} To create an interactive shell, you can use a command such as:#{$cgi.br}#{$cgi.tt{"stty raw -echo; nc #{$cgi.i{'HOST'}} #{$cgi.i{'PORT'}}; stty -raw echo"}}" do
+    request do
+      parameter :node, :String, 'The node to establish the console to'
+    end
+    response do
+      field :id, :String, 'The id# of the operation (prefixed by "C-")'
+      field :resources, :Hash, 'Resources related to the workflow' do
+        field :resource, :String, 'URI to the resource'
+        field :error, :String, 'URI to the error'
+        field :console, :String, 'URI to the TCP channel used to bind the console inputs/outputs'
+      end
+    end
+
+    example 'Require a console connection on node-1. You can then ',
+    <<-EOS ,
+      POST /console?user=frontend&node=node-1.testbed.lan HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 358
+      {
+        "wid": "C-a6efa265-56f7-4221-b41c-81f75bde4699",
+        "resources": {
+          "resource": "https://kadeploy.testbed.lan:25300/console/C-a6efa265-56f7-4221-b41c-81f75bde4699?user=frontend",
+          "error": "https://kadeploy.testbed.lan:25300/console/C-a6efa265-56f7-4221-b41c-81f75bde4699/error?user=frontend",
+          "console": "tcp://kadeploy.testbed.lan:36179"
+        }
+      }
+    EOS
+  end
+
+  resource :GET, '/console', 'Get the workflow information of every running operation of the kind console' do
+    request do
+    end
+    response do
+      field '#i', :Hash, 'Information about the workflow #i' do
+        field :id, :String, 'The id# of the operation (prefixed by "C-")'
+        field :user, :String, 'The user that initiated the operation'
+        field :node, :String, 'The node the console is open to'
+        field :attached, :Boolean, 'Set to true if the TCP channel is in use. Only available to the users that have the rights to consult the information about this operation.'
+        field :console_uri, :String, 'URI to the TCP channel used to bind the console inputs/outputs. Only available to the users that have the rights to consult the information about this operation.'
+        field :error, :Boolean, 'Set to true if an error was encountered. The error message can be obtained by getting /console/:id/error. Only available to the users that have the rights to consult the information about this operation.'
+        field :time, :Float, 'The time elapsed since the start of the operation.'
+      end
+    end
+
+    example 'Get the list of consoles',
+    <<-EOS ,
+      GET /console?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 371
+      [
+        {
+          "id": "C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805",
+          "user": "frontend",
+          "node": "node-1.testbed.lan",
+          "error": false,
+          "attached": false,
+          "console_uri": "tcp://kadeploy.testbed.lan:49768",
+          "time": 27.85
+        },
+        {
+          "id": "C-05d949ea-f213-4285-8efc-0c1a407df757",
+          "user": "root",
+          "node": "node-2.testbed.lan",
+          "error": false
+        }
+      ]
+    EOS
+  end
+
+  resource :GET, '/console/:id', 'Get the workflow information of an operation' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response do
+      field :id, :String, 'The id# of the operation (prefixed by "C-")'
+      field :user, :String, 'The user that initiated the operation'
+      field :node, :String, 'The node the console is open to'
+      field :attached, :Boolean, 'Set to true if the TCP channel is in use. Only available to the users that have the rights to consult the information about this operation.'
+      field :console_uri, :String, 'URI to the TCP channel used to bind the console inputs/outputs. Only available to the users that have the rights to consult the information about this operation.'
+      field :error, :Boolean, 'Set to true if an error was encountered. The error message can be obtained by getting /console/:id/error. Only available to the users that have the rights to consult the information about this operation.'
+      field :time, :Float, 'The time elapsed since the start of the operation.'
+    end
+
+    example 'Get information about a console',
+    <<-EOS ,
+      GET /console/C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 216
+      {
+        "id": "C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805",
+        "user": "frontend",
+        "node": "node-1.testbed.lan",
+        "error": false,
+        "attached": false,
+        "console_uri": "tcp://kadeploy.testbed.lan:49768",
+        "time": 146.69
+      }
+    EOS
+  end
+
+  resource :GET, '/console/:id/error', 'Get the error of an operation (the "error" field was set to true on the workflow\'s info)' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response :String, 'text/plain' do
+      field '', :String, 'The error message'
+      code 404,'File not found, the workflow :id cannot be found'
+    end
+  end
+
+  resource :DELETE, '/console/:id', 'Destroy a console binding (the TCP channel will be closed).' do
+    request do
+      parameter ':id', :String, 'The id# of the operation'
+    end
+    response do
+      field :id, :String, 'The id# of the operation (prefixed by "C-")'
+    end
+
+    example 'Destroy a console binding',
+    <<-EOS ,
+      DELETE /console/C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 53
+      {
+        "wid": "C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805"
+      }
+    EOS
+
+  end
+end

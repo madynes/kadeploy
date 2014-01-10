@@ -34,6 +34,7 @@ module Rights
     protected
     def prepare(user=nil,nodes=nil,parts=nil)
       parts = [ parts ] if parts and !parts.is_a?(Array)
+      nodes = [ nodes.hostname ] if nodes.is_a?(Nodes::Node)
       nodes = nodes.make_array_of_hostname if nodes.is_a?(Nodes::NodeSet)
       nodes.uniq! if nodes.is_a?(Array)
       user = nil if user and user.empty?

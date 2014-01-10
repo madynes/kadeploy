@@ -57,6 +57,7 @@ class Client
 
   def self.error(msg='',abrt=true,code=1)
     unless $killing
+      $stdin.cooked! if $stdin.respond_to?(:cooked!)
       $stderr.puts msg if msg and !msg.empty?
       self.kill
       exit!(code||1) if abrt

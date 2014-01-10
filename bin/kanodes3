@@ -38,11 +38,14 @@ class KanodesClient < Client
       add_opt(opt,"-r", "--get-reboots-status", "Get the status of running reboot operations") {
         options[:operation] = :get_status_reboot
       }
-      add_opt(opt,"-o", "--get-all-status", "Get the status of all running operations") {
-        options[:operation] = :get_status_all
-      }
       add_opt(opt,"-p", "--get-powers-status", "Get the status of running power operations") {
         options[:operation] = :get_status_power
+      }
+      add_opt(opt,"-c", "--get-consoles-status", "Get the status of open consoles") {
+        options[:operation] = :get_status_console
+      }
+      add_opt(opt,"-a", "--get-all-status", "Get the status of all running operations") {
+        options[:operation] = :get_status_all
       }
       parse_machinefile(opt,options)
       parse_machine(opt,options)
@@ -53,13 +56,13 @@ class KanodesClient < Client
   end
 
   def self.check_options(options)
-    unless [:get_state,:get_status_deploy,:get_status_reboot,:get_status_power,:get_status_all].include?(options[:operation])
+    unless [:get_state,:get_status_deploy,:get_status_reboot,:get_status_power,:get_status_console,:get_status_all].include?(options[:operation])
       error("You must choose an operation")
       return false
     end
 
     case options[:operation]
-    when :get_status_deploy,:get_status_reboot,:get_status_power,:get_status_all
+    when :get_status_deploy,:get_status_reboot,:get_status_power,:get_status_console,:get_status_all
       if !options[:nodes].empty?
         error('Node list is useless when gathering deployment statuses')
         return false
@@ -88,11 +91,14 @@ class KanodesClient < Client
       path = api_path(options[:wid],:reboot)
     when :get_status_power
       path = api_path(options[:wid],:power)
+    when :get_status_console
+      path = api_path(options[:wid],:console)
     when :get_status_all
       path = []
       path << api_path(options[:wid],:deploy)
       path << api_path(options[:wid],:reboot)
       path << api_path(options[:wid],:power)
+      path << api_path(options[:wid],:console)
     else
       raise
     end
