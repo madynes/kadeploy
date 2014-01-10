@@ -8,7 +8,7 @@ Signal.trap("INT") do
 end
 
 require 'kadeploy3/client'
-require 'io/console'
+require 'io/console' if RUBY_VERSION >= '1.9'
 
 $interactive = false
 
