@@ -1,4 +1,98 @@
 operation 'Statistics' do
-  resource :GET, '/stats', 'Gather statistics' do
+  resource :GET, '/stats/%OPERATION?', 'Gather statistics. The operation can be set to deploy, reboot, power or an empty value' do
+    request do
+      parameter :kind, :String, 'The kind of statistics', true, :expected => ['all','failure_rates'], :default => 'all'
+      parameter :nodes, :Array, 'The list of nodes to gather the statistics about'
+      parameter :fields, Array, 'The fields to be displayed', true, :expected=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'], :default=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error']
+      parameter :sort, Array, 'The fields to sort results by', true, :expected=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error'], :default=>['wid','user','hostname','step1','step2','step3','timeout_step1','timeout_step2','timeout_step3','retry_step1','retry_step2','retry_step3','start','step1_duration','step2_duration','step3_duration','env','md5','success','error']
+      parameter :min_failure_rate, :Float, "The list of nodes which have a specified minimum failure-rate (between 0 and 1). This filter have to be used with the kind #{$cgi.i{'failure_rates'}}"
+      parameter :date_min, :String, 'Statistics from a specific date date (RFC 2616 format)'
+      parameter :date_max, :String, 'Statistics to a specific date date (RFC 2616 format)'
+      parameter :wid, :String, 'Specify the workflow #id'
+      parameter :min_retries, :Integer, 'Statistics about the nodes that need at least NB attempts to perform specific steps'
+      parameter :step_retries, :Array, 'Apply the retry filter on the given steps', :expected => [1,2,3]
+    end
+
+    response :String, 'gzipped text/csv or application/json' do
+      field '#line', :String, "A line in the format specified by the #{$cgi.i{'fields'}} parameter"
+      code 404,'File not found, invalid operation'
+    end
+
+    example 'Gather all statistics',
+    <<-EOS ,
+      GET /stats?user=frontend HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/csv
+      Content-Encoding: gzip
+      Content-Length: 241
+      ---GUNZIPPED---
+      D-9a87115b-eb7f-45e4-90f2-bec00ccc5dab,frontend,node-1.testbed.lan,SetDeploymentEnvUntrusted,BroadcastEnvKastafior,BootNewEnvKexec,200,200,200,0,0,0,1389347228,165,68,46,debian-base:1,,true,
+      D-9a87115b-eb7f-45e4-90f2-bec00ccc5dab,frontend,node-2.testbed.lan,SetDeploymentEnvUntrusted,BroadcastEnvKastafior,BootNewEnvKexec,200,200,200,0,0,0,1389347228,165,68,46,debian-base:1,,true,
+      R-6d5d2255-f533-44a5-a191-ec69fc5f17b9,frontend,node-1.testbed.lan,Simple,,,0,0,0,0,0,0,1389347638,106,0,0,,,true,
+      R-f6aedfae-12fa-42dd-9c18-6278a9b5ad9d,frontend,node-1.testbed.lan,Simple,,,0,0,0,0,0,0,1389348342,112,0,0,,,true,
+      R-f6aedfae-12fa-42dd-9c18-6278a9b5ad9d,frontend,node-2.testbed.lan,Simple,,,0,0,0,0,0,0,1389348342,112,0,0,,,true,
+      P-0073d9d7-d25f-46b1-9b95-d9c4fd52484b,frontend,node-1.testbed.lan,Off,,,0,0,0,0,0,0,1389348732,10,0,0,,,true,
+      P-0073d9d7-d25f-46b1-9b95-d9c4fd52484b,frontend,node-2.testbed.lan,Off,,,0,0,0,0,0,0,1389348732,10,0,0,,,true,
+      P-130b8e01-9025-483e-9cb3-2216ea66156d,frontend,node-1.testbed.lan,On,,,0,0,0,0,0,0,1389348781,3,0,0,,,true,
+      P-130b8e01-9025-483e-9cb3-2216ea66156d,frontend,node-2.testbed.lan,On,,,0,0,0,0,0,0,1389348781,3,0,0,,,true,
+      ---------------
+    EOS
+
+    example 'Gather deployments statistics',
+    <<-EOS ,
+      GET /stats/deploy?user=frontend HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/csv
+      Content-Encoding: gzip
+      Content-Length: 179
+      ---GUNZIPPED---
+      D-9a87115b-eb7f-45e4-90f2-bec00ccc5dab,frontend,node-1.testbed.lan,SetDeploymentEnvUntrusted,BroadcastEnvKastafior,BootNewEnvKexec,200,200,200,0,0,0,1389347228,165,68,46,debian-base:1,,true,
+      D-9a87115b-eb7f-45e4-90f2-bec00ccc5dab,frontend,node-2.testbed.lan,SetDeploymentEnvUntrusted,BroadcastEnvKastafior,BootNewEnvKexec,200,200,200,0,0,0,1389347228,165,68,46,debian-base:1,,true,
+      ---------------
+    EOS
+
+    example 'Gather the list of nodes with a specific failure rate',
+    <<-EOS ,
+      GET /stats?user=frontend&kind=failure_rates&min_failure_rate=0.0 HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 60
+      {
+        "node-1.testbed.lan": 0.0,
+        "node-2.testbed.lan": 0.0
+      }
+    EOS
+
+    example 'Gather all statistics to a specific date',
+    <<-EOS ,
+      GET /stats?user=frontend&kind=all&date_max=Fri%2C+10+Jan+2014+10%3A10%3A00+GMT HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: text/csv
+      Content-Encoding: gzip
+      Content-Length: 264
+      ---GUNZIPPED---
+      D-9a87115b-eb7f-45e4-90f2-bec00ccc5dab,frontend,node-1.testbed.lan,SetDeploymentEnvUntrusted,BroadcastEnvKastafior,BootNewEnvKexec,200,200,200,0,0,0,1389347228,165,68,46,debian-base:1,,true,
+      D-9a87115b-eb7f-45e4-90f2-bec00ccc5dab,frontend,node-2.testbed.lan,SetDeploymentEnvUntrusted,BroadcastEnvKastafior,BootNewEnvKexec,200,200,200,0,0,0,1389347228,165,68,46,debian-base:1,,true,
+      R-6d5d2255-f533-44a5-a191-ec69fc5f17b9,frontend,node-1.testbed.lan,Simple,,,0,0,0,0,0,0,1389347638,106,0,0,,,true,
+      R-f6aedfae-12fa-42dd-9c18-6278a9b5ad9d,frontend,node-1.testbed.lan,Simple,,,0,0,0,0,0,0,1389348342,112,0,0,,,true,
+      R-f6aedfae-12fa-42dd-9c18-6278a9b5ad9d,frontend,node-2.testbed.lan,Simple,,,0,0,0,0,0,0,1389348342,112,0,0,,,true,
+      ---------------
+    EOS
   end
 end
