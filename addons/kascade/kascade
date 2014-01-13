@@ -21,6 +21,8 @@
 ## rev 4:
 ##    -Fusion of both script
 ##    -Taktuk become by default
+## rev 5:
+##    -Add protocol
 
 
 require 'rubygems'
@@ -33,9 +35,23 @@ require 'tempfile'
 require 'securerandom'
 require 'yaml'
 require 'open3'
+require 'pp'
 # set old yameler
 YAML::ENGINE.yamler = 'syck'
 
+VERSION='v1.5'
+KEYWORDS = {
+    :HELLO => "HELLO-Kascade-#{VERSION}", #Hand shake to be sure
+    :GET => 'GET', #ask data from offset
+    :GET_PARTIAL => 'PGET', #ask number of data from offset
+    :DATA => 'DATA', #Transfert the data
+    :FORGET => 'FORGET', #the data asked is too old
+    :QUIT => 'QUIT', #abord transfer
+    :PASSED => 'PASSED', #inform all packet is passed useful in future version
+    :REPORTING => 'REPORT',
+    :FORGET_ERROR => 'FERROR', #?
+    :END => 'END',
+}
 
 $log= Logger.new(STDERR)
 $log.level=Logger::ERROR
@@ -54,6 +70,26 @@ class String
   end
 end
 
+def read_cmd(stream)
+  line = stream.recv(100,Socket::MSG_WAITALL)
+  raise 'unexpected close' if line==nil || line=='' || line.size!=100
+  line.strip!
+  $log.debug "command #{line} is received"
+  line.split(' ')
+end
+
+def version_check(client)
+  return true unless $config[:handshake]
+  send_cmd(client,KEYWORDS[:HELLO])
+  version=read_cmd(client)[0]
+  return true if version == KEYWORDS[:HELLO]
+  $log.error ("Bad protocol version : #{version}")
+  false
+end
+
+def send_cmd(stream, *cmd)
+  stream.send((cmd*' ').ljust(100), 0)
+end
 
 def kill_port(port)
   pid_to_kill = `lsof -t -i :#{port}`.strip
@@ -68,18 +104,24 @@ def get_nodes_list
   $config[:nodeList].map { |node| node.split(':')[0] }
 end
 
+
 def connect(line)
-  $log.info "Try to connect #{line}"
+  $log.debug "Try to connect #{line}"
   host=line.split(':')
   host[1]=$config[:port] if host[1]==nil
+  con=TCPSocket.new(host[0], host[1])
+  $log.info "connection successful to #{line}"
+  con
+end
+
+def connect_try(line)
   $config[:retries].downto(0) do |i|
     begin
-      ret= TCPSocket.new(host[0], host[1])
-      return ret
+      return connect(line)
     rescue Exception => e
       $log.debug e
-      raise e if i==0
-      $log.warn("retry to connect #{i} : #{e.to_s}")
+      raise e if 0==i
+      $log.warn("retry  #{i} on node #{line} : #{e.to_s}")
       sleep 1
     end
   end
@@ -96,16 +138,24 @@ def open_tcp_server(line = $config[:nodeList][$config[:who_i_am]])
 end
 
 class Stack
+  attr_reader :max_obj, :min_obj, :max_byte, :min_byte
+
   def initialize(size)
     @obj=Array.new(size)
     @min_obj=0
     @max_obj=-1
+    @min_byte=0
+    @max_byte=0
   end
 
   def push(obj)
     @max_obj+=1
+    @max_byte+=obj.size
     i=@max_obj%@obj.size
-    @min_obj+=1 if @obj[i]!=nil
+    if @obj[i]!=nil
+      @min_obj+=1
+      @min_byte+=obj.size
+    end
     @obj[i]=obj
   end
 
@@ -114,69 +164,156 @@ class Stack
     @obj[i%@obj.size]
   end
 
+  def get_all_limit(i, j)
+    raise 'Nothing in stack' if i>@max_obj || i<@min_obj
+    while i<=@max_obj && i<=j
+      yield(@obj[i%@obj.size])
+      i+=1
+    end
+  end
+
+  def get_all_byte(i)
+    raise 'Nothing in stack' if i>@max_byte || i<@min_byte
+    get_all(i/obj[0].size)
+  end
+
   def get_all(i)
     raise 'Nothing in stack' if i>@max_obj || i<@min_obj
     while i<=@max_obj
       yield(@obj[i%@obj.size])
       i+=1
     end
+  end
+end
 
+class Output
+  attr_reader :queue
+
+  def initialize(e)
+    @stream=nil
+    @threads=[]
+  end
+
+  def reader
+    @queue=SizedQueue.new($config[:buffer_in_memory])
+    @threads << Thread.new do
+      begin
+        while (buff=@queue.pop)!=nil
+          @stream.write(buff)
+        end
+        @stream.close
+      rescue Exception => e
+        $log.debug(e)
+      end
+    end
+  end
+
+  def quit
+    close
+  end
+
+  def close
+    @stream.close
+    #try
+    @threads.each do |th|
+      th.join
+    end
+  end
+end
+
+class StreamOutput < Output
+  attr_reader :stream, :queue
+
+  def initialize(cmd)
+    super
+    @cmd = cmd
+  end
+
+  def redirect(input, output)
+    threads<<Thread.new do
+      until (line = input.gets).nil? do
+        output.puts(line)
+      end
+    end
+  end
+
+  def init
+    @stream, @out_stream, @err_stream, @wait_thr=Open3.popen3(@cmd)
+    threads<<@wait_thr
+    redirect(@out_stream, $stdout)
+    redirect(@err_stream, $stderr)
+    reader
+  end
+
+  def quit
+    Process.kill('INT', @wait_thr.pid)
+    super
+  end
+
+  def arg
+    "-O #{@cmd}"
+  end
+end
+
+class FileOutput < Output
+  attr_reader :stream, :queue
+
+  def initialize(file_name=$stdout)
+    @file_name=file_name
+    super
+  end
+
+  def init
+    if @file_name.is_a?(String)
+      @stream=File.open(@file_name, 'w')
+    else
+      @stream=@file_name
+    end
+    reader
+  end
+
+  def close
+    @stream.close
+  end
+
+  def quit
+    close
+    #rm file ?
+  end
+
+  def arg
+    "-o #{@file_name}"
   end
 end
 
 # REPORT SERVER
-class ReportServer
-  attr_reader :report, :nodes_ko
+class Report
+  attr_reader :errors
 
   def initialize
-    @report = []
-    @nodes_ko={}
-    start
+    @errors={}
   end
 
-  def start
-
-    @report_thr = Thread.new {
-      report_piece = ''
-      begin
-        server = open_tcp_server($config[:master])
-        $log.info '[Reporting server]  launched'
-        while report_piece != 'end' do
-          Thread.start(server.accept) do |reportSock|
-            address=reportSock.peeraddr(true)[2]
-            $log.info "[Reporting server] connected from #{address}"
-            report_piece = reportSock.gets.strip
-            $log.info "[Reporting server] report received from #{address}: #{report_piece}"
-            if report_piece != 'end'
-              if report_piece != nil
-                parts = report_piece.split(' - ')
-                if parts.size > 1
-                  nodes_ko[parts[0]]=parts[1, parts.size]*' - '
-                else
-                  nodes_ko[parts[0]]='Unknown Error'
-                end
-              end
-              reportSock.close
-            else
-              reportSock.close
-              server.shutdown
-              break
-            end
-          end
-        end
-      rescue => e
-        $log.debug e
-        if report_piece == 'end'
-          $log.info '[Reporting server] closed'
-        else
-          $log.error e
-        end
-      end
-    }
+  def receive_report(binary)
+    @errors.merge!(YAML.load(binary))
   end
 
-  def join
-    @report_thr.join
+  def add_error(host, error)
+    @errors[host]=error
+  end
+
+  def send_report_master
+    $log.info 'I am the last and i send report to master'
+    client = connect($config[:master])
+    send_reporting(client)
+    client.close
+  end
+
+  def send_reporting(stream)
+    data=errors.to_yaml
+    send_cmd(stream,KEYWORDS[:REPORTING],data.size)
+    stream.write(data)
+    $log.debug 'report sent'
   end
 
   def write_yaml_file(file_name, object)
@@ -185,7 +322,6 @@ class ReportServer
       file.puts object.to_yaml
       file.close
     rescue => e
-      $log.debug e
       $log.error "error during open file #{file_name} #{e.to_s}"
     end
   end
@@ -193,24 +329,23 @@ class ReportServer
   def log_report(head, table)
     if $log.info?
       table.each do |node, error|
-        $log.info "[#{head}] #{node}#{error==nil ? '' : ' - '+error}"
+        $log.info "[#{head}] #{node}#{error==nil ? '' : ' - '+error.to_s}"
       end
     end
   end
 
   def make_report_files
     if $config[:ok_file]!=nil
-      ok_node=$config[:nodeList].select { |n| @nodes_ko[n]==nil }
+      ok_node=$config[:nodeList].select { |n| @errors[n]==nil }
       log_report('node ok', ok_node)
       write_yaml_file($config[:ok_file], ok_node)
     end
     if $config[:ko_file]!=nil
-      log_report('node ko', @nodes_ko)
-      write_yaml_file($config[:ko_file], @nodes_ko)
+      log_report('node ko', @errors)
+      write_yaml_file($config[:ko_file], @errors)
     end
   end
 end
-
 
 class Deploy
   def start
@@ -234,13 +369,8 @@ class Deploy
     @nodes_ports = Shellwords.escape($config[:nodeList]*"\n")
 
     #Prepare commands
-    @common_options=" -b #{$config[:buffer_size]} -f #{$config[:filesize]} -n #{@nodes_path} -v #{$log.level} -R #{$config[:retries]} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -D none"
-    if $config[:output]==''
-      @output="-O \"#{$config[:output_cmd]}\""
-    else
-      @output="-o #{$config[:output]}"
-    end
-    @command_fountain="ruby #{@fountain_path} #{@output} #{@common_options}"
+    @common_options=" -b #{$config[:buffer_size]} -n #{@nodes_path} -v #{$log.level} -R #{$config[:retries]} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -D none"
+    @command_fountain="ruby #{@fountain_path} #{$config[:output].arg} #{@common_options}"
   end
 
   def get_fountain_shell
@@ -271,7 +401,7 @@ class Ssh < Deploy
         opts.on('-i', '--identification FILE', 'identification file') do |v|
           ssh_options[:keys]=v
         end
-        opts.on('-q', '--quiet', 'Not used') { | |}
+        opts.on('-q', '--quiet', 'Not used') {}
       end.parse(ssh_args)
       unless ssh_options_str.empty?
         tr=Net::SSH::Config.translate(ssh_options_str)
@@ -341,166 +471,357 @@ class Clush < Deploy
   end
 end
 
-class Fountain
-  def reporting(node, error=nil)
-    $log.info "report #{node} to #{$config[:master]} #{error}"
-    report_client = connect($config[:master])
-    if error==nil
-      report_client.write(node+"\n")
-    else
-      report_client.write("#{node} - #{error}\n")
-    end
-    report_client.flush
-    report_client.close
+class ReadException < Exception
+  attr_reader :byte_readed
+
+  def initialize(byte_readed)
+    @byte_readed=byte_readed
   end
+end
+class ForgetException < Exception
 
-  def connect_client(index)
-    if index < $config[:nodeList].size
-      begin
-        node_line=$config[:nodeList][index]
-        return connect(node_line), index
-      rescue Exception => e
-        $log.error("failure after #{$config[:retries]} tries on '#{node_line}'")
-        $log.debug e
-        reporting(node_line, e.to_s)
-        index +=1
-        retry if index < $config[:nodeList].size
-      end
-    end
-    return nil, index
-  end
+end
+class WriteException < Exception
+  attr_reader :exception
 
-  def redirect(input, output)
-    Thread.new do
-      until (line = input.gets).nil? do
-        output.puts(line)
-      end
-    end
-  end
-
-
-  def start
-    index = $config[:who_i_am]+1
-    server = nil
-    recover_point = 0
-    nb_chunks = 0
-    last_chunks = Stack.new($config[:chunk_in_memory])
-    bytes = 0
-    last_node = $config[:nodeList].size-1 == $config[:who_i_am]
-    fin = false
-    client_recover_mode = false
-    popen_thread=nil
-
-# OPEN STREAMS
-    if $config[:input]
-      stream = File.open($config[:input], 'r')
-    else
-      begin
-        if $config[:output_cmd] != ''
-          file, a, b, popen_thread = Open3.popen3($config[:output_cmd])
-          redirect(a, $stdout)
-          redirect(b, $stderr)
-          raise 'operation failed : ' + $config[:output_cmd] unless file
-        else
-          file = File.open($config[:output], 'w')
-          raise 'failed to create ' + $config[:output] unless file
-        end
-      rescue => e
-        $log.debug e
-        reporting($config[:nodeList][$config[:who_i_am]], "unable to open output #{e.to_s}")
-        raise e
-      end
-      begin
-        server = open_tcp_server
-      rescue => e
-        $log.debug e
-        reporting($config[:nodeList][$config[:who_i_am]], e.to_s.strip)
-        exit -1
-        raise e
-      end
-      stream = server.accept
-    end
-    client, index = connect_client(index) unless last_node
-    unless client
-      $log.info 'last node of the chain'
-      last_node = true
-    end
-
-# FILE TRANSMISSION
-
-    until fin
-      buffer = stream.read($config[:buffer_size])
-      if buffer
-        begin
-          client.write(buffer) if client
-        rescue Exception => e
-          $log.info "Failed to send data to #{$config[:nodeList][index]} -- now switching to recover mode"
-          $log.debug e
-          reporting($config[:nodeList][index], e.to_s)
-          index+=1
-          client_recover_mode = true
-          while client_recover_mode
-            client.close
-            client, index = connect_client(index)
-            if client
-              $log.info "RECOVER CLIENT -- connected to #{$config[:nodeList][index]}, waiting for its recover point"
-              recover_point = client.recv(100).to_i
-              $log.info "RECOVER CLIENT -- recover point received : #{recover_point} / #{nb_chunks}"
-              delta = nb_chunks - recover_point
-              raise 'Not enough chunks saved for recover' if delta > $config[:chunk_in_memory]
-              begin
-                last_chunks.get_all(recover_point) do |chunk|
-                  client.write(chunk)
-                  $log.debug "RECOVER CLIENT -- chunk resend ( #{chunk.length} bytes )"
-                end
-                $log.info 'RECOVER CLIENT -- end'
-                client_recover_mode = false
-              rescue => e
-                $log.debug e
-                $log.info "RECOVER CLIENT -- connexion lost with #{$config[:nodeList][index]}"
-                reporting($config[:nodeList][index], e.to_s)
-              end
-            else
-              $log.info 'RECOVER CLIENT -- new last node'
-              last_node = true
-              client_recover_mode = false
-            end
-          end
-          retry
-        end
-        nb_chunks += 1
-        last_chunks.push(buffer)
-        bytes += buffer.length
-        file.write(buffer) if file
-      elsif bytes == $config[:filesize]
-        fin = true
-        $log.info "Transmission complete ( #{nb_chunks} chunks )"
-        if last_node
-          reporting('end')
-        end
-      else
-        $log.info "An error has occured ( #{bytes} / #{$config[:filesize]} ) ( #{nb_chunks} chunks ) -- now switching to Recover Mode"
-        stream.close
-        stream = server.accept
-        $log.info 'RECOVER SERVER -- connected'
-        stream.send("#{nb_chunks}", 0)
-        $log.info "RECOVER SERVER -- recover points send to it : #{nb_chunks}"
-      end
-    end
-
-    # CLOSE STREAMS
-    stream.close
-    client.close if client
-    file.close if file
-    server.close if server
-    popen_thread.join if popen_thread
-  end
-
-  def initialize
-    start
+  def initialize(exception)
+    @exception=exception
   end
 end
 
+class FirstFountain
+  attr_reader :report
+
+  def initialize
+    @index=0
+    @passed=false
+    @last_node=false
+    @report=Report.new
+    if $config[:input]==nil # from standard input
+      $log.info 'using standard input'
+      @input=nil
+      read_input_thread
+      @stack=Stack.new($config[:chunk_in_memory])
+    else
+      $log.info "using  '#{$config[:input]}'"
+      @input=File.open($config[:input])
+      @stack=nil
+    end
+    @chunk_size=$config[:buffer_size]*$config[:chunk_size]
+    master_server
+    start_sender
+  end
+
+  def wait_passed(output_stream)
+    cmd=read_cmd(output_stream)
+    if (cmd[0]!=KEYWORDS[:PASSED])
+      raise "Bad Keyword #{cmd[0]}"
+    end
+  end
+  def retries
+    if @last_node
+      yield nil,0
+    else
+      begin
+        begin
+          if @output_stream
+            yield @output_stream,@byte_need_to_send
+            return
+          else
+            @output_stream=connect_try($config[:nodeList][@index])
+            #while true
+              cmd=read_cmd(@output_stream)
+              case cmd[0]
+                when KEYWORDS[:GET]
+                  @byte_need_to_send=cmd[1].to_i
+                  begin
+                    yield @output_stream,@byte_need_to_send
+                  rescue ForgetException => e
+                    $log.debug(e)
+                  end
+                  return
+                when KEYWORDS[:PASSED]
+                  $log.info('file passed')
+                  @passed=true
+                  @output_stream.close
+                  return
+                else
+                  $log.debug "#{cmd[0]} instead GET or PASSED"
+                  raise "Bad Keyword '#{cmd[0]}'"
+              end
+            #end
+          end
+        rescue ReadException => ex_read
+          $log.debug(ex_read)
+          raise ex_read
+        rescue Exception => e
+          $log.debug e
+          @report.add_error($config[:nodeList][@index], e)
+          @index+=1
+          @retries=$config[:retries]
+          @last_node=$config[:nodeList].size==@index
+          @output_stream=nil
+          $log.error("#{e.to_s}")
+          $log.debug(e)
+        end
+      end while !@last_node && !@passed
+    end
+  end
+
+  def start_sender
+    retries do |output_stream,byte_need_to_send|
+      if output_stream
+        send_data(output_stream, byte_need_to_send)
+        report.send_reporting(output_stream)
+        wait_passed(output_stream)
+      end
+    end
+    turnoff_master_server if @last_node
+  end
+
+  def read_input_thread
+    @pop=SizedQueue.new($config[:chunk_in_memory]) #times chunk_size ?
+    @in_th=Thread.new do
+      begin
+        until $stdin.eof? do
+          @pop.push($stdin.read(@chunk_size))
+        end
+        @pop.push(nil)
+      rescue Exception => e
+        $log.error e
+      end
+    end
+  end
+
+  def send_chunk(output_stream, chunk)
+    send_cmd(output_stream, KEYWORDS[:DATA], chunk.size)
+    output_stream.send(chunk, 0)
+    chunk.size
+  end
+
+  def send_data(output_stream, byte_from)
+    if $config[:input].nil? # input stream
+      cut=byte_from%@chunk_size
+      i=byte_from/@chunk_size
+      if @stack.min_obj>i
+        send_cmd(KEYWORDS[:FORGET], min)
+      else
+        while @stack.max_obj>i # looking for in memory
+          chunk=get(i)
+          if cut>0
+            chunk=chunk[cut: -1]
+            cut=0
+          end
+          send_chunk(output_stream, chunk)
+          i+=1
+        end
+        while (chunk=@pop.pop).nil? #read
+          send_chunk(output_stream, chunk)
+          @stack.push(chunk)
+        end
+      end
+    else #File input
+      input=@input
+      size=input.size
+      buffer_size=$config[:buffer_size]
+      chunk_size=$config[:chunk_size]
+      @input.seek(byte_from, IO::SEEK_SET)
+      while size > 0
+        data_size=[chunk_size, size].min
+        send_cmd(output_stream, KEYWORDS[:DATA], data_size)
+        size-=data_size
+        while data_size > 0
+          output_stream.send(input.read(buffer_size), 0)
+          data_size -=buffer_size
+        end
+      end
+    end
+  end
+
+  def send_data_master(output_stream, byte_from, byte_to)
+    if $config[:input]
+      input=File.open($config[:input])
+      input.seek(byte_from, IO::SEEK_SET)
+      data_size=[byte_to-byte_from, input.size-byte_from].min
+      send_cmd(output_stream, KEYWORDS[:DATA], data_size)
+      output_stream.send(input.read(data_size), 0)
+      input.close
+    else
+      if byte_from<@stack.min_byte
+        send_cmd(output_stream, KEYWORDS[:FORGET], @stack.min_byte)
+      else
+        data_size=[byte_to-byte_from, @stack.max_byte-byte_from].min
+        send_cmd(output_stream, KEYWORDS[:DATA], data_size)
+        #i=byte_from/@chunk_size
+        while data_size>0
+          #chunk=@stack.get(i)
+          # if chunk>
+          #i+=1
+          raise 'not implemented yet'
+        end
+      end
+    end
+  end
+
+  def turnoff_master_server
+    @run_master_server=false
+    @master_server.shutdown
+    report.make_report_files
+  end
+
+  def master_server
+    @run_master_server=true
+    @master_server_thread=Thread.new do
+      begin
+        @master_server=open_tcp_server($config[:master])
+        while @run_master_server
+          Thread.start(@master_server.accept) do |client|
+            begin
+              $log.info("#{client.peeraddr(true)[2]} is connected in master")
+              cmd=read_cmd(client)
+              case cmd[0]
+                when KEYWORDS[:GET_PARTIAL]
+                  send_data_master(client, cmd[1].to_i, cmd[2].to_i)
+                when KEYWORDS[:REPORTING]
+                  report.receive_report(client.read(cmd[1].to_i))
+                  turnoff_master_server
+                else
+                  $log.error("Reader has relieve unknown command #{cmd[0]}")
+              end
+            rescue Exception => ex
+              $log.error(ex)
+            end
+            client.close
+          end
+        end
+      rescue Exception => ex
+        $log.error ex if @run_master_server
+        $log.info 'master server was shunted down'
+      end
+    end
+  end
+  def join
+    @master_server_thread.join
+  end
+end
+
+
+class Fountain < FirstFountain
+  def initialize
+    @index=$config[:who_i_am]+1
+    @last_node=$config[:nodeList].size-1==$config[:who_i_am]
+    @server=open_tcp_server
+    @bytes_readed=0
+    @report=Report.new
+    $config[:output].init
+    start_receiver
+  end
+
+  def start_receiver
+    stack=Stack.new($config[:buffer_in_memory])
+    input_stream=@server.accept
+    send_cmd(input_stream,KEYWORDS[:GET], stack.max_byte)
+
+    begin
+      begin
+        cmd=read_cmd(input_stream)
+        case cmd[0]
+          when KEYWORDS[:DATA] #
+            chunk_transmission(input_stream, stack, cmd[1].to_i)
+          when KEYWORDS[:FORGET] # try to contact the master
+            master=connect $config[:master]
+            send_cmd(master, KEYWORDS[:GET_PARTIAL], @bytes_readed, answer[1]) #{@chunk_offset}\n")
+            answer=read_cmd(master)
+            case answer[0]
+              when KEYWORDS[:FORGET] #You loose
+                master.close
+                @game_over=true
+                break
+              when KEYWORDS[:DATA]
+                begin
+                  chunk_transmission(master, stack, answer[1].to_i)
+                  @chunk_read+=1
+                  answer=read_cmd(master)
+                end while answer[0]==KEYWORDS[:DATA]
+              else
+                $log.error("Master send unknown command #{answer[0]}")
+            end
+          when KEYWORDS[:QUIT]
+            $log.info('quitting...')
+            @report.add_error($config[:nodeList][$config[:who_i_am]], 'EXITED')
+            $config[:QUIT]=1
+            retries do |output_stream|
+              output_stream.send_cmd(KEYWORDS[:QUIT])
+            end
+          when KEYWORDS[:REPORTING]
+            report.receive_report(input_stream.read cmd[1].to_i)
+            retries do |output_stream|
+              if output_stream
+                @report.send_reporting(output_stream)
+                wait_passed(output_stream)
+              else
+                @report.send_report_master
+              end
+            end
+            $log.info "Report #{@report.errors.size} element(s)"
+            send_cmd(input_stream,KEYWORDS[:PASSED])
+            $log.debug('Passed Send')
+            break
+          else
+            $log.error("Reader has relieve unknown command #{cmd[0]}")
+            break
+        end
+      rescue Exception => ex
+        $log.debug ex
+        input_stream.close
+        input_stream=@server.accept
+        send_cmd(input_stream,KEYWORDS[:GET], stack.max_byte)
+      end
+    end while true
+  end
+
+#try this
+  def chunk_transmission(input_stream, stack, size)
+    buffer_size=$config[:buffer_size]
+    file=$config[:output].queue
+    byte_remaining=size
+    retries do |output_stream,from_byte|
+      if from_byte < stack.min_byte
+        send_cmd(output_stream, KEYWORDS[:FORGET], stack.min_byte)
+        raise "forget #{from_byte} < #{stack.min_byte}"
+      end
+      if stack.max_byte > from_byte && output_stream
+        send_cmd(output_stream, KEYWORDS[:DATA], stack.max_byte-from_byte)
+        stack.get_all_byte(from_byte) do |buff|
+          output_stream.send(buff, 0)
+        end
+      end
+      send_cmd(output_stream, KEYWORDS[:DATA], size) if byte_remaining==size && output_stream
+      while byte_remaining > 0
+        read_needed=[buffer_size, byte_remaining].min
+        buffer = input_stream.recv(read_needed, Socket::MSG_WAITALL)
+        if buffer && buffer.size==read_needed
+          byte_remaining-=buffer.size
+          begin
+            output_stream.send(buffer, 0) if output_stream
+          rescue Exception => e #Write failure, ask new forwarder
+            file.push(buffer)
+            stack.push(buffer)
+            raise e
+          end
+          file.push(buffer)
+          stack.push(buffer)
+        else #read failure wait new forwarder.
+          raise ReadException.new(size-byte_remaining)
+        end
+      end
+    end
+  end
+
+  def join
+
+  end
+end
 
 # CONFIGURATION
 $config = {
@@ -513,10 +834,10 @@ $config = {
     :ssh_command => nil,
     :deploy => Taktuk.new,
     :retries => 10,
-    :output_cmd => '',
-    :output => '',
+    :output => FileOutput.new($stdout),
     :who_i_am => nil,
-    :chunk_in_memory => 128
+    :buffer_in_memory => 128,
+    :chunk_size => 160
 }
 
 
@@ -525,8 +846,9 @@ OptionParser.new do |opts|
   opts.separator ''
   opts.separator 'Specific options : '
   opts.on('-A', '--[no-]aggressive', 'kill process which use the listen port') { |v| $config[:aggressive] = v }
-  opts.on('-b', '--buffer-size SIZE', 'buffer size') { |v| $config[:buffer_size] = v.to_i }
-  opts.on('-C', '--[no-]check-md5', 'check md5sum') { |v| $config[:check_md5] = v }
+  opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default : #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
+  opts.on('-c', '--[no-]check-md5', 'check md5sum') { |v| $config[:check_md5] = v }
+  opts.on('-C', '--chunk-size SIZE', "how much buffer readed before read next header (default : #{$config[:chunk_size]})")
   opts.on('-D', '--deploy [ssh,taktuk,clush]', [:ssh, :taktuk, :clush, :none], 'Choose deploy method. Ssh is default value') do |v|
     case v
       when :ssh
@@ -541,7 +863,7 @@ OptionParser.new do |opts|
         raise "deploy type #{v} does not available"
     end
   end
-  opts.on('-f', '--filesize SIZE', 'file size') { |v| $config[:filesize] = v.to_i }
+  opts.on('-H', '--[no-]disable-handshake', 'disable the handshake') { |v| $config[:handshake]=!v }
   opts.on('-i', '--input FILE', 'input file') do |v|
     $config[:input] = v
     $config[:who_i_am]=-1
@@ -561,8 +883,8 @@ OptionParser.new do |opts|
     end
   end
   opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
-  opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = v }
-  opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output_cmd] = v }
+  opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
+  opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = StreamOutput.new(v) }
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
   opts.on('-R', '--retry num', 'Set number retry attempts, by default this value is 10 and each retry is performed after 1s') { |v| $config[:retries] = v.to_i }
   opts.on('-s', '--[no-]sort', 'sort the node file') { |v| $config[:sort] = v }
@@ -592,8 +914,6 @@ end.parse!
 if $config[:master]==nil
   $config[:master]=`hostname`.strip
 end
-fatal_error 'Error: No output is defined' if $config[:output]=='' && $config[:output_cmd]==''
-fatal_error 'No node to deploy' if $config[:nodeList]==nil || $config[:nodeList].size==0
 
 if $config[:who_i_am].nil?
   my_list = $config[:nodeList].map { |l| l.split(':')[0] }
@@ -610,25 +930,22 @@ if $config[:who_i_am].nil?
   $config[:who_i_am]=who
 end
 
-fatal_error 'Error: i am no in node list' if $config[:who_i_am] >= $config[:nodeList].size
 
 #### --- MAIN
-
-if $config[:who_i_am]==-1 # master
-  report=ReportServer.new
-else
-  report=nil
-end
 $config[:deploy].start if $config[:deploy]!=nil && $config[:who_i_am]==-1
+
 time_before_fountain = Time.now
 
-Fountain.new
-
-if report!=nil
-  $log.info 'Wait the reporting server ...'
-  report.join
-  report.make_report_files
+if $config[:who_i_am]==-1 # master
+  $log.info 'I am the master'
+  fountain=FirstFountain.new
+else
+  $log.info "I am number #{$config[:who_i_am]}"
+  fountain=Fountain.new
 end
+
+$log.info 'fountain exited'
+fountain.join
 time_before_fountain = Time.now - time_before_fountain
 total_time = Time.now - beginning_time
 if $config[:who_i_am]==-1 && $log.info?
