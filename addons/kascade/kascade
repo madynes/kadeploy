@@ -151,7 +151,7 @@ class Stack
   def push(obj)
     @max_obj+=1
     @max_byte+=obj.size
-    i=@max_obj%@obj.size
+    i=@max_obj % @obj.size
     if @obj[i]!=nil
       @min_obj+=1
       @min_byte+=obj.size
@@ -161,26 +161,26 @@ class Stack
 
   def get(i)
     return nil if i>@max_obj || i<@min_obj
-    @obj[i%@obj.size]
+    @obj[i % @obj.size]
   end
 
   def get_all_limit(i, j)
     raise 'Nothing in stack' if i>@max_obj || i<@min_obj
     while i<=@max_obj && i<=j
-      yield(@obj[i%@obj.size])
+      yield(@obj[i % @obj.size])
       i+=1
     end
   end
 
   def get_all_byte(i)
     raise 'Nothing in stack' if i>@max_byte || i<@min_byte
-    get_all(i/obj[0].size)
+    get_all(i / @obj[0].size)
   end
 
   def get_all(i)
     raise 'Nothing in stack' if i>@max_obj || i<@min_obj
     while i<=@max_obj
-      yield(@obj[i%@obj.size])
+      yield(@obj[i % @obj.size])
       i+=1
     end
   end
@@ -230,7 +230,7 @@ class StreamOutput < Output
   end
 
   def redirect(input, output)
-    threads<<Thread.new do
+    @threads<<Thread.new do
       until (line = input.gets).nil? do
         output.puts(line)
       end
@@ -239,7 +239,7 @@ class StreamOutput < Output
 
   def init
     @stream, @out_stream, @err_stream, @wait_thr=Open3.popen3(@cmd)
-    threads<<@wait_thr
+    @threads<<@wait_thr
     redirect(@out_stream, $stdout)
     redirect(@err_stream, $stderr)
     reader
@@ -601,7 +601,7 @@ class FirstFountain
 
   def send_data(output_stream, byte_from)
     if $config[:input].nil? # input stream
-      cut=byte_from%@chunk_size
+      cut=byte_from % @chunk_size
       i=byte_from/@chunk_size
       if @stack.min_obj>i
         send_cmd(KEYWORDS[:FORGET], min)
