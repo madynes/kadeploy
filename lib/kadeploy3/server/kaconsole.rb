@@ -290,7 +290,12 @@ module Kaconsole
     if client and client.alive?
       sleep 1 unless client[:sock]
 
-      client[:sock].syswrite("\n[Kaconsole] client killed\n") if client[:sock]
+      if client[:sock]
+        begin
+          client[:sock].syswrite("\n[Kaconsole] client killed\n")
+        rescue
+        end
+      end
 
       sleep 1 unless client[:pid]
 
@@ -315,7 +320,10 @@ module Kaconsole
         end
       end
 
-      client[:sock].close if client[:sock] and !client[:sock].closed?
+      if client[:sock] and !client[:sock].closed?
+        client[:sock].close
+        client[:sock] = nil
+      end
     end
   end
 end
