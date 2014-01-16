@@ -272,16 +272,15 @@ module Workflow
       @nodes_brk.linked_copy(nodes_ok)
     end
 
-    def retry!(task)
-      log("retry_step#{task.idx+1}",nil, task.nodes, :increment => true)
+    def retry!(task,nodeset)
+      log("retry_step#{task.idx+1}",nil,nodeset,:increment=>true)
     end
 
     def timeout!(task)
-      debug(1,
-        "Timeout in #{task.name} before the end of the step, "\
-        "let's kill the instance",
-        task.nsid
-      )
+      log("step#{task.idx+1}_duration",task.context[:local][:timeout]||0,
+        (task.nodes.empty? ? task.nodes_done : task.nodes))
+      debug(1,"Timeout in the #{task.name} step, let's kill the instance",
+        task.nsid)
       task.nodes.set_error_msg("Timeout in the #{task.name} step")
     end
 
@@ -290,7 +289,7 @@ module Workflow
       @logger.dump
       @nodes.set_state('aborted', nil, context[:database], context[:user])
       debug(2," * Kill a #{self.class.opname()} instance")
-      debug(0,"#{self.class.opname().capitalize} aborted by user")
+      debug(0,"#{self.class.opname().capitalize} aborted")
     end
 
     private
