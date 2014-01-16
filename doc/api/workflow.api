@@ -15,7 +15,7 @@ operation 'Workflow-based operations' do
     end
     field :nodes, :'Hash/Array', 'If the user have the rights to consult the information, a list of nodes ordered by state will be returned otherwise an Array of the nodes involved in the operation will be returned' do
       field :ok, :Array, 'The list of nodes that have finish the operation successfully'
-      field :ko, :Array, 'The list of nodes that have finish the operation with an error'
+      field :ko, :Array, 'The list of nodes that have finish the operation with an error. The error message of each node can be obtained by getting /%OPERATION/:id/state.'
       field :processing, :Array, 'The list of nodes that are still processing the operation'
     end
 
@@ -590,7 +590,7 @@ operation 'Workflow-based operations' do
     EOS
   end
 
-  resource :GET, '/%OPERATION/:id/state', 'Get the state of every nodes in a specific operation' do
+  resource :GET, '/%OPERATION/:id/state', 'Get the state of every nodes in a specific operation. Available when the operation is done.' do
     request do
       parameter ':id', :String, 'The id# of the operation'
     end
@@ -599,6 +599,7 @@ operation 'Workflow-based operations' do
         field :macro, :String, 'The macro-step operation the node is performing'
         field :micro, :String, 'The micro-step operation the node is performing'
         field :state, :String, 'The state of the node'
+        field :error, :String, 'If the node is KO, contains the error message'
       end
       code 404,'File not found, the workflow :id cannot be found'
     end
@@ -647,6 +648,32 @@ operation 'Workflow-based operations' do
           "macro": "Off",
           "micro": "power",
           "state": "ok"
+        }
+      }
+    EOS
+
+    example 'Get state of a deployment that failed',
+    <<-EOS ,
+      GET /power/D-b55916dc-30db-4979-8c67-d83fb1b2cad4/state?user=frontend HTTP/1.1
+      Accept: text/plain, application/json
+      Host: kadeploy.testbed.lan:25300
+    EOS
+    <<-EOS
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      Content-Length: 412
+      {
+        "node-1.testbed.lan": {
+          "macro": "SetDeploymentEnvUntrusted",
+          "micro": "reboot",
+          "state": "ko",
+          "error": "SetDeploymentEnvUntrusted-reboot: very_hard_reboot command is not provided"
+        },
+        "node-2.testbed.lan": {
+          "macro": "SetDeploymentEnvUntrusted",
+          "micro": "reboot",
+          "state": "ko",
+          "error": "SetDeploymentEnvUntrusted-reboot: very_hard_reboot command is not provided"
         }
       }
     EOS

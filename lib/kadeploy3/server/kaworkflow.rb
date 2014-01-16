@@ -549,11 +549,13 @@ module Kaworkflow
       run_wmethod(kind,:kill,info)
       run_wmethod(kind,:free,info)
       info[:output].free if info[:output]
-      info[:output] = nil
+      info.delete(:output)
       info[:debugger].free if info[:debugger]
-      info[:debugger] = nil
-      info[:environment] = nil
-      # :thread
+      info.delete(:debugger)
+      info[:state].free if info[:state]
+      info.delete(:state)
+      info.delete(:environment)
+      info.delete(:thread)
       # ...
 
       GC.start
@@ -599,19 +601,11 @@ module Kaworkflow
       info.delete(:workflows)
       info[:threads].clear if info[:threads]
       info.delete(:threads)
-      #info[:thread] = nil
 
       info[:outputfile].free if info[:outputfile]
       info.delete(:outputfile)
       info[:loggerfile].free if info[:loggerfile]
       info.delete(:loggerfile)
-
-      #info[:output].free if info[:output]
-      #info.delete(:output)
-      #info[:debugger].free if info[:debugger]
-      #info.delete(:debugger)
-      info[:state].free if info[:state]
-      info.delete(:state)
 
       info[:database].free if info[:database]
       info.delete(:database)
