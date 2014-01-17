@@ -1173,17 +1173,19 @@ class ClientWorkflow < Client
 
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
+      states = get(api_path('state'))
       delete(api_path()) if @wid
       @resources = nil
 
-      res
+      [ res, states ]
     else
       debug "#{@wid} #{@resources['resource']}\n"
       nil
     end
   end
 
-  def result(options,res)
+  def result(options,ret)
+    res,states = ret
     unless res['error']
       # Success
       if res['nodes']['ok'] and !res['nodes']['ok'].empty?
@@ -1197,7 +1199,9 @@ class ClientWorkflow < Client
       # Fail
       if res['nodes']['ko'] and !res['nodes']['ko'].empty?
         debug "The #{self.class.operation().downcase} failed on nodes"
-        debug res['nodes']['ko'].join("\n")
+        res['nodes']['ko'].each do |node|
+          debug "#{node} (#{states[node]['error'] if states[node]})\n"
+        end
         File.open(options[:nodes_ko_file],'w+') do |f|
           f.puts res['nodes']['ko'].join("\n")
         end if options[:nodes_ko_file]
