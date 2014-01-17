@@ -37,11 +37,35 @@ module Kaworkflow
 
   def work_free_exec_context(kind,context)
     context = free_exec_context(context)
+
+    context.config = nil
     context.nodes.free if context.nodes
     context.nodes = nil
-    context.config = nil
+    context.nodelist = nil
+    context.steps = []
+    context.force = false
+    context.breakpoint = nil
+    context.custom_operations = nil
+    context.verbose_level = nil
+    context.debug = false
+    context.output = nil
     context.outputfile = nil
+    context.logger = nil
     context.loggerfile = nil
+    if [:deploy,:reboot].include?(kind)
+      context.pxe = nil
+      context.client = nil
+      context.environment = nil
+      context.env_kind = nil
+      context.block_device = nil
+      context.deploy_part = nil
+      context.key = nil
+      context.boot_part = nil
+      context.vlan_id = nil
+      context.vlan_addr = nil
+      context.timeout_reboot_classical = nil
+    end
+
     context
   end
 
@@ -263,6 +287,8 @@ module Kaworkflow
     info = cexec.info
     workflow_create(kind,info[:wid],info)
     run_wmethod(kind,:init_resources,cexec)
+    cexecdup = cexec.dup
+    cexecdup.nodes = nil
 
     info[:thread] = Thread.new do
       context = {
@@ -273,7 +299,7 @@ module Kaworkflow
         :states => info[:state],
         :nodesets_id => 0,
 
-        :execution => cexec,
+        :execution => cexecdup,
         :common => info[:config].common,
         :caches => info[:config].caches,
         :cluster => nil,
@@ -318,20 +344,20 @@ module Kaworkflow
           context[:cluster_prefix] = ''
         end
 
-        cexec.outputfile.prefix = "#{context[:wid]}|#{cexec.user} -> " if cexec.outputfile
+        info[:outputfile].prefix = "#{context[:wid]}|#{info[:user]} -> " if info[:outputfile]
         context[:output] = Debug::OutputControl.new(
-          cexec.verbose_level || info[:config].common.verbose_level,
-          cexec.outputfile,
+          context[:execution].verbose_level || info[:config].common.verbose_level,
+          info[:outputfile],
           context[:cluster_prefix]
         )
         context[:logger] = Debug::Logger.new(
-          cexec.nodelist,
-          cexec.user,
+          info[:nodelist],
+          info[:user],
           context[:wid],
           Time.now,
-          (context[:execution].environment ? "#{context[:execution].environment.name}:#{context[:execution].environment.version.to_s}" : nil),
-          (context[:execution].environment and context[:execution].environment.id < 0),
-          cexec.loggerfile,
+          (info[:environment] ? "#{info[:environment].name}:#{info[:environment].version.to_s}" : nil),
+          (info[:environment] and info[:environment].id < 0),
+          info[:loggerfile],
           (info[:config].common.log_to_db ? context[:database] : nil)
         )
 
@@ -404,6 +430,8 @@ module Kaworkflow
       yield(info) if block_given?
 
       # Clean everything
+      free_exec_context(context[:execution])
+      wipe_exec_context(context[:execution])
       run_wmethod(kind,:free,info)
     end
 
