@@ -150,8 +150,8 @@ module Database
         Timeout.timeout(60) do
           @dbh = Mysql.init
           @dbh.options(Mysql::SET_CHARSET_NAME,'utf8')
-          @dbh.reconnect = true
           @dbh.real_connect(host, user, passwd, base)
+          @dbh.reconnect = true
         end
       rescue Timeout::Error
         $stderr.puts "MySQL error: Timeout when connecting to DB (#{user}@#{host}/#{base})"
