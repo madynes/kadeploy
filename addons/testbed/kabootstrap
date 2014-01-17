@@ -3611,6 +3611,7 @@ sshgw.ssh(servername,'root') do |session|
     msg('Setting up hostnames hack',MSG_INFO)
     scp(servername,$sshkeyfile,CFG_KADEPLOY_HOSTNAMES_SSHKEY)
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_SSHKEY}")
+    sexec(session,"chmod 600 #{CFG_KADEPLOY_HOSTNAMES_SSHKEY}")
 
     count = 0
     sexecbig(session) do |cmds|
