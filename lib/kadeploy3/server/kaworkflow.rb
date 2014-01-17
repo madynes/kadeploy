@@ -351,7 +351,7 @@ module Kaworkflow
           context[:cluster_prefix]
         )
         context[:logger] = Debug::Logger.new(
-          info[:nodelist],
+          nodeset.make_array_of_hostname,
           info[:user],
           context[:wid],
           Time.now,
@@ -431,7 +431,7 @@ module Kaworkflow
 
       # Clean everything
       free_exec_context(context[:execution])
-      wipe_exec_context(context[:execution])
+      #wipe_exec_context(context[:execution]) # Bug -> clear strings,arrays,..., to be re-enabled if there is some memory leak issues
       run_wmethod(kind,:free,info)
     end
 
@@ -567,7 +567,7 @@ module Kaworkflow
     unless info[:freed]
       info[:thread].kill if info[:thread] and info[:thread].alive?
       info[:threads].each_value{|thread| thread.kill} if info[:threads]
-      if info[:workflows]
+      if info[:workflows] and !info[:done]
         info[:workflows].each_value do |workflow|
           begin
             workflow.kill
