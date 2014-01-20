@@ -608,10 +608,10 @@ class Taktuk < Deploy
     else
       ssh_opt=''
     end
-    cmd="taktuk #{ssh_opt} -f #{file.path} broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
+    cmd="taktuk #{ssh_opt} -f #{file.path} -t 1 broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
     $log.info 'launching: '+cmd
     system(cmd)
-    cmd="taktuk #{$log.info? ? '' : '-o status=-'} -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' #{ssh_opt} -f #{file.path}  broadcast exec [ #{@command_fountain} ]"
+    cmd="taktuk #{$log.info? ? '' : '-o status=-'} -t 1 -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' #{ssh_opt} -f #{file.path}  broadcast exec [ #{@command_fountain} ]"
     $log.info 'launching: '+cmd
     system(cmd)
   end
