@@ -111,13 +111,9 @@ end
 
 def connect_to(host, port)
   $log.debug "Try to connect #{host}:#{port}"
-  begin
-    Timeout::timeout($config[:timeout]) {
-      TCPSocket.new(host, port)
-    }
-  rescue Timeout::Error
-    raise Timeout::Error.new("#{host}:#{port} connexion timed out")
-  end
+  Timeout::timeout($config[:timeout]) {
+    TCPSocket.new(host, port)
+  }
 end
 
 def connect(line)
@@ -146,7 +142,7 @@ def connect_try(line)
   $config[:retries].downto(0) do |i|
     begin
       return connect(line)
-    rescue Errno::EHOSTUNREACH,Timeout::Error => ex
+    rescue Errno::EHOSTUNREACH, Timeout::Error => ex
       #TODO : don't retry on timeout is a good behavior ?
       $log.debug ex
       raise ex
@@ -529,8 +525,8 @@ class Deploy
 
     @nodes_ports = Shellwords.escape($config[:nodeList]*"\n")
 
-    #Prepare commands
-    @common_options="-D none -M -b #{$config[:buffer_size]} -n #{@nodes_path} -v #{$log.level} -R #{$config[:retries]} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
+    #Prepare commands : Behaviour intermediate node have retries 1 and 2 or only 2 ?
+    @common_options="-D none -M -b #{$config[:buffer_size]} -n #{@nodes_path} -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
     @command_fountain="ruby #{@fountain_path} #{@common_options} #{$config[:output].arg}"
   end
 
@@ -609,10 +605,10 @@ class Taktuk < Deploy
       ssh_opt=''
     end
     cmd="taktuk #{ssh_opt} -f #{file.path} -t 1 broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
-    $log.info 'launching: '+cmd
+    $log.debug 'launching: '+cmd
     system(cmd)
     cmd="taktuk #{$log.info? ? '' : '-o status=-'} -t 1 -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' #{ssh_opt} -f #{file.path}  broadcast exec [ #{@command_fountain} ]"
-    $log.info 'launching: '+cmd
+    $log.debug 'launching: '+cmd
     system(cmd)
   end
 
@@ -627,9 +623,13 @@ class Clush < Deploy
     else
       ssh_opt=''
     end
-    in_cmd=Shellwords.escape("echo #{get_fountain_shell} > #{@fountain_path} && echo #{@nodes_ports} > #{@nodes_path} && #{@command_fountain}")
-    cmd="clush -w '#{node_set}' #{$log.info? ? '' : '-q'} #{ssh_opt} #{in_cmd}"
-    #Avoid the shell interpretation in system call
+    clush = "clush -w '#{node_set}' #{$log.info? ? '' : '-q'} #{ssh_opt}"
+    cmd="#{clush} --copy #{__FILE__} --dest #{@fountain_path} "
+    $log.debug 'launching: '+cmd
+    system(cmd)
+    in_cmd=Shellwords.escape("echo #{@nodes_ports} > #{@nodes_path} && #{@command_fountain}")
+    cmd="#{clush} #{in_cmd}"
+    $log.debug 'launching: '+cmd
     pid=fork { exec(cmd) }
     Process.wait(pid)
   end
@@ -712,9 +712,10 @@ class AbstractFountain
           $log.debug(ex_read)
           raise ex_read
         rescue Exception => e
+          host=$config[:nodeList][@index]
           $log.debug (e)
-          $log.error("#{e.to_s}")
-          @report.add_error($config[:nodeList][@index], e)
+          $log.error("#{e.to_s} with #{host}")
+          @report.add_error(host, e)
           @index+=1
           @retries=$config[:retries]
           @output_stream=nil
@@ -1088,7 +1089,8 @@ $config = {
     :master => nil,
     :ssh_command => nil,
     :deploy => Taktuk.new,
-    :retries => 3,
+    :retries => 10,
+    :retries2 => [10, 0],
     :output => FileOutput.new($stdout),
     :who_i_am => -1,
     :buffer_in_memory => 1600,
@@ -1147,12 +1149,13 @@ OptionParser.new do |opts|
   opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
   opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = PipeOutput.new(v) }
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
-  opts.on('-R', '--retry num', 'Set number retry attempts, by default this value is 10 and each retry is performed after 1s') { |v| $config[:retries] = v.to_i }
+  opts.on('-r', '--retry NUM', "Set number retry attempts, by default this value is #{$config[:retries]} and each retry is performed after 1s") { |v| $config[:retries] = v.to_i }
+  opts.on('-R', '--retry2 TIME,retries', Array, "Set new retries number after time second default is #{$config[:retries2][0]},#{$config[:retries2][1]} ") { |v| $config[:retries2] = v }
   opts.on('-s', '--[no-]sort', 'sort the node file') { |v| $config[:sort] = v }
   opts.on('-S', '--ssh-command SSH', 'parse ssh command') { |v| $config[:ssh_command] = v }
   opts.on('-t', '--timeout NUM', "Timeout to connect or send/receive a buffer (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
   opts.on('-u', '--number-of-buffer NB', "Number of max buffer stored (default: #{$config[:buffer_in_memory]})") { |v| $config[:buffer_in_memory]=v.to_i }
-  opts.on('-v', '--verbose [warn,info,debug]', 'run verbosely') do |v|
+  opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
     case v
       when 'warn'
         $log.level=Logger::WARN
@@ -1160,6 +1163,8 @@ OptionParser.new do |opts|
         $log.level=Logger::DEBUG
       when 'info'
         $log.level=Logger::INFO
+      when 'fatal'
+        $log.level=Logger::FATAL
       else
         $log.level=v.to_i
     end
@@ -1204,6 +1209,18 @@ unless $config[:master]
 end
 
 #### --- MAIN
+if $config[:retries2][0].to_i > 0 && $config[:retries2][1].to_i >= 0
+  Thread.new do
+    sleep($config[:retries2][0].to_i)
+    $config[:retries]=$config[:retries2][1].to_i
+    $log.info("retries pass to #{$config[:retries]}")
+
+  end
+else
+  $log.info('second timeout is not activated')
+end
+
+
 $config[:deploy].start if $config[:deploy]!=nil && $config[:who_i_am]==-1
 
 time_before_fountain = Time.now
