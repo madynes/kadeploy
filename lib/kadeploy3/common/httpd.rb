@@ -357,9 +357,9 @@ module HTTPd
         response['Content-Type'] = 'text/plain'
         response['Allow'] = (@allowed + [:HEAD]).collect{|m|m.to_s}.join(',')
       end
-      res << "\n" if response['Content-Type'] == 'text/plain'
-      # Force encoding to UTF-8
       if response['Content-Type'] == 'text/plain'
+        res += "\n"
+        # Force encoding to UTF-8
         response['Content-Type'] << '; charset=utf-8'
         res.encode!('UTF-8', {:invalid => :replace, :undef => :replace})
       end
