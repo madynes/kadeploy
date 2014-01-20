@@ -111,9 +111,13 @@ end
 
 def connect_to(host, port)
   $log.debug "Try to connect #{host}:#{port}"
-  Timeout::timeout($config[:timeout]) {
-    TCPSocket.new(host, port)
-  }
+  begin
+    Timeout::timeout($config[:timeout]) {
+      TCPSocket.new(host, port)
+    }
+  rescue Timeout::Error => ex
+    raise Timeout::Error.new("#{host}:#{port} connexion timed out")
+  end
 end
 
 def connect(line)
@@ -1019,13 +1023,13 @@ class Fountain < AbstractFountain
         raise ForgetException.new(from_byte, cyclic_buffer.min_byte)
       end
       while output_stream && cyclic_buffer.max_byte > @byte_need_to_send
-        send_size=[cyclic_buffer.max_byte-@byte_need_to_send+1,@chunk_size-@byte_need_to_send%@chunk_size].min
+        send_size=[cyclic_buffer.max_byte-@byte_need_to_send+1, @chunk_size-@byte_need_to_send%@chunk_size].min
         to_size=@byte_need_to_send+send_size-1
         if @before_next_sender_header==0
           send_cmd(output_stream, KEYWORDS[:DATA], send_size)
           @before_next_sender_header=send_size
         end
-        cyclic_buffer.get_byte_from_to(@byte_need_to_send,to_size) do |buff|
+        cyclic_buffer.get_byte_from_to(@byte_need_to_send, to_size) do |buff|
           send_with_timeout(output_stream, buff)
         end
         @before_next_sender_header-=send_size
@@ -1094,7 +1098,7 @@ $config = {
     :wait_deploy => false,
     :mr_proper => false,
     :modified_node_list => false,
-    :check_master=>true
+    :check_master => true
 }
 
 
