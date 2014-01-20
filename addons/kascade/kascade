@@ -115,7 +115,7 @@ def connect_to(host, port)
     Timeout::timeout($config[:timeout]) {
       TCPSocket.new(host, port)
     }
-  rescue Timeout::Error => ex
+  rescue Timeout::Error
     raise Timeout::Error.new("#{host}:#{port} connexion timed out")
   end
 end
@@ -146,7 +146,7 @@ def connect_try(line)
   $config[:retries].downto(0) do |i|
     begin
       return connect(line)
-    rescue Timeout::Error => ex
+    rescue Errno::EHOSTUNREACH,Timeout::Error => ex
       #TODO : don't retry on timeout is a good behavior ?
       $log.debug ex
       raise ex
