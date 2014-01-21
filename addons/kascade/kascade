@@ -504,19 +504,25 @@ end
 class Deploy
 
   def start
+    @thread=nil
     prefab
+    deploy
+  end
+
+  def thread_catch_errors(*arg)
     @thread=Thread.new do
       begin
-        deploy
+        yield arg
       rescue Exception => e
         $log.error e
       end
     end
-
-    def join
-      @thread.join if @thread
-    end
   end
+
+  def join
+    @thread.join if @thread
+  end
+
 
   def prefab
     @secure_random = SecureRandom.hex
@@ -533,12 +539,13 @@ class Deploy
   def get_fountain_shell
     Shellwords.escape(File.read(__FILE__))
   end
+
 end
 
 class Ssh < Deploy
   def deploy
     $log.info 'Using ssh'
-    ssh_options={}
+    ssh_options={:timeout=>1}
     if $config[:ssh_command]!=nil
       flip=true
       #Split the ssh command string to obtain an array of argument. This split is double quote compliant
@@ -569,18 +576,20 @@ class Ssh < Deploy
 
 
     # ALL FOUNTAINS
-    Net::SSH::Multi.start(:on_error => :ignore) do |session|
-      get_nodes_list.each { |node| session.use(node, ssh_options) }
-      time = Time.now
-      cmd = "echo #{get_fountain_shell} > #{@fountain_path} && echo #{@nodes_ports} > #{@nodes_path}"
-      session.exec(cmd)
-      session.loop
-      time = Time.now - time
-      $log.info "script forwarded in #{time}s"
+    thread_catch_errors do
+      Net::SSH::Multi.start(:on_error => :ignore) do |session|
+        get_nodes_list.each { |node| session.use(node, ssh_options) }
+        time = Time.now
+        cmd = "echo #{get_fountain_shell} > #{@fountain_path} && echo #{@nodes_ports} > #{@nodes_path}"
+        session.exec(cmd)
+        session.loop
+        time = Time.now - time
+        $log.info "script forwarded in #{time}s"
 
-      session.exec(@command_fountain)
+        session.exec(@command_fountain)
 
-      session.loop
+        session.loop
+      end
     end
   end
 end
@@ -604,14 +613,17 @@ class Taktuk < Deploy
     else
       ssh_opt=''
     end
-    cmd="taktuk #{ssh_opt} -f #{file.path} -t 1 broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
+    taktuk_common="taktuk  -t 1 #{ssh_opt}  #{$log.info? ? '' : '-o status=-'} -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' -f #{file.path}"
+    cmd="#{taktuk_common} broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
     $log.debug 'launching: '+cmd
     system(cmd)
-    cmd="taktuk #{$log.info? ? '' : '-o status=-'} -t 1 -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' #{ssh_opt} -f #{file.path}  broadcast exec [ #{@command_fountain} ]"
+    cmd="#{taktuk_common} broadcast exec [ #{@command_fountain} ]"
     $log.debug 'launching: '+cmd
-    system(cmd)
+    thread_catch_errors do
+      system(cmd)
+    end
+    $log.debug 'taktuk finished'
   end
-
 end
 
 class Clush < Deploy
@@ -623,15 +635,18 @@ class Clush < Deploy
     else
       ssh_opt=''
     end
-    clush = "clush -w '#{node_set}' #{$log.info? ? '' : '-q'} #{ssh_opt}"
+    clush = "clush -t 1 -w '#{node_set}' #{$log.info? ? '' : '-q'} #{ssh_opt}"
     cmd="#{clush} --copy #{__FILE__} --dest #{@fountain_path} "
     $log.debug 'launching: '+cmd
     system(cmd)
     in_cmd=Shellwords.escape("echo #{@nodes_ports} > #{@nodes_path} && #{@command_fountain}")
     cmd="#{clush} #{in_cmd}"
     $log.debug 'launching: '+cmd
-    pid=fork { exec(cmd) }
-    Process.wait(pid)
+    @pid=fork { exec(cmd) }
+  end
+
+  def join
+    Process.wait(@pid)
   end
 end
 
