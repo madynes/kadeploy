@@ -428,6 +428,9 @@ def cfg_kadeploy_conf()
     }
     if $version >= 8
       ret['authentication'] = {
+        'acl' => {
+          'whitelist' => ['localhost'],
+        },
         'certificate' => {
           'ca_cert' => CFG_CA_CERT,
           'whitelist' => [$services[:kadeploy][:fqdn],$services[:frontend][:fqdn]],

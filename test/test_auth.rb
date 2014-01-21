@@ -24,15 +24,20 @@ class TestAuth < Test::Unit::TestCase
     ) if @wid
   end
 
-  def get(path,data=nil)
+  def get(path,data=nil,server=KADEPLOY_SERVER,port=KADEPLOY_PORT,secure=KADEPLOY_SECURE)
     begin
       Kadeploy::HTTP::Client.request(
-        KADEPLOY_SERVER,KADEPLOY_PORT,KADEPLOY_SECURE,
+        server,port,secure
         Kadeploy::HTTP::Client.gen_request(:GET,path,data,:json,:json)
       )
     rescue Exception => e
       assert(false,e.message)
     end
+  end
+
+  def test_acl()
+    ret = get("/power?user=#{USER}",nil,'localhost')
+    assert(!ret.select{|v| v['id'] == @wid}.empty?,ret.to_yaml)
   end
 
   def test_ident()

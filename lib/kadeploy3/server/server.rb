@@ -238,26 +238,21 @@ class KadeployServer
   end
 
   def authenticate!(request,options)
+    # Authentication with ACL
+    if cfg.static[:auth][:acl]
+      ok,msg = cfg.static[:auth][:acl].auth!(HTTPd.get_sockaddr(request))
+      return if ok
+    end
     # Authentication with certificate
     if cfg.static[:auth][:cert] and options.cert
       ok,msg = cfg.static[:auth][:cert].auth!(
         HTTPd.get_sockaddr(request), :cert => options.cert)
       error_unauthorized!("Authentication failed: #{msg}") unless ok
-      # TODO: necessary ?
-      #unless config.common.almighty_env_users.include?(options.user)
-      #  error_unauthorized!("Authentication failed: "\
-      #    "only almighty user can be authenticated with the secret key")
-      #end
     # Authentication by secret key
     elsif cfg.static[:auth][:secret_key] and options.secret_key
       ok,msg = cfg.static[:auth][:secret_key].auth!(
         HTTPd.get_sockaddr(request), :key => options.secret_key)
       error_unauthorized!("Authentication failed: #{msg}") unless ok
-      # TODO: necessary ?
-      #unless config.common.almighty_env_users.include?(options.user)
-      #  error_unauthorized!("Authentication failed: "\
-      #    "only almighty user can be authenticated with the secret key")
-      #end
     # Authentication with Ident
     elsif cfg.static[:auth][:ident]
       ok,msg = cfg.static[:auth][:ident].auth!(

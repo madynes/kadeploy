@@ -584,6 +584,8 @@ external:
     \item \yfieldd{purge\_deployment\_timer}{Integer}{900} limeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
   \end{itemize}
 
+  \item \ypath{/authentication/acl} Access Control List based authentication. When using ACL authentication, specifying a whitelist is mandatory.
+
   \item \ypath{/authentication/certificate} authentication the certificate of a Certification Authority, at least a public key or a x509 certificate as to be specified.
   \begin{itemize}
     \item \yfield{ca\_cert}{String} the path to a file containing the x509 certificate of the Certification Authority.
