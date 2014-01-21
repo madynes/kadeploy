@@ -16,7 +16,7 @@ class KadeployServer
   include Kanodes
   include Kaconsole
 
-  attr_reader :host, :port, :secure, :cert, :private_key, :logfile, :window_managers, :httpd
+  attr_reader :host, :port, :secure, :local, :cert, :private_key, :logfile, :window_managers, :httpd
 
   def initialize()
     @config = load_config()
@@ -24,6 +24,7 @@ class KadeployServer
     @host = @config.static[:host]
     @port = @config.static[:port]
     @secure = @config.static[:secure]
+    @local = @config.static[:local]
     @private_key = @config.static[:private_key]
     @cert = @config.static[:cert]
     @logfile = @config.static[:logfile]

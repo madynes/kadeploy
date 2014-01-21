@@ -471,6 +471,7 @@ authentication:
     - kadeploy.mydomain.tld
 security:
   secure_server: true
+  local_only: false
   #certificate: cert.pem
   #private_key:
   #  algorithm: RSA
@@ -603,6 +604,7 @@ external:
   \item \ypath{/security}
   \begin{itemize}
     \item \yfieldd{secure\_server}{Boolean}{true} launch the server in secure (SSL) mode
+    \item \yfieldd{local\_only}{Boolean}{false} only listen for local connection (\ypath{/authentication/*/whitelist} fields become useless)
     \item \yfieldd{certificate}{String}{''} path to an x509 certificate that will be used to launch secure connections. If none is specified and the secure mode is enabled, a self-signed certificate will be generated.
     \item \yfieldd{force\_secure\_client}{Boolean}{false} specify if files have to be exported to the server using a secured connection (see section \ref{sec:api_files_export}).
   \end{itemize}
