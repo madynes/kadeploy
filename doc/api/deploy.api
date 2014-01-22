@@ -60,18 +60,18 @@ operation 'Deployment' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 749
+      Content-Length: 545
       {
         "wid": "D-bf5608b0-9354-446b-a648-c3abaa3cab95",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs",
+          "resource": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95",
+          "log": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs",
           "logs": {
-            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster"
+            "griffon-cluster": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error"
+          "state": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state",
+          "status": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status",
+          "error": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error"
         }
       }
     EOS
@@ -124,18 +124,18 @@ operation 'Deployment' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 759
+      Content-Length: 555
       {
         "wid": "D-abbaa88c-243e-42fb-8c5a-9332918a6ee1",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/logs",
+          "resource": "/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1",
+          "log": "/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/logs",
           "logs": {
-            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/logs/griffon-cluster"
+            "griffon-cluster": "/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/logs/griffon-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/error"
+          "state": "/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/state",
+          "status": "/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/status",
+          "error": "/deployment/D-abbaa88c-243e-42fb-8c5a-9332918a6ee1/error"
         }
       }
     EOS
@@ -187,18 +187,18 @@ operation 'Deployment' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 749
+      Content-Length: 545
       {
         "wid": "D-2669bedd-82f2-4be6-b090-a0837ad4e0a9",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/logs",
+          "resource": "/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9",
+          "log": "/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/logs",
           "logs": {
-            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/logs/griffon-cluster"
+            "griffon-cluster": "/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/logs/griffon-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/error"
+          "state": "/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/state",
+          "status": "/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/status",
+          "error": "/deployment/D-2669bedd-82f2-4be6-b090-a0837ad4e0a9/error"
         }
       }
     EOS
@@ -239,18 +239,18 @@ operation 'Deployment' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 761
+      Content-Length: 557
       {
         "wid": "D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/logs",
+          "resource": "/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc",
+          "log": "/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/logs/graphene-cluster"
+            "graphene-cluster": "/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/error"
+          "state": "/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/state",
+          "status": "/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/status",
+          "error": "/deployment/D-af1a66b0-c18c-4dc3-a4ee-73e6502bc5fc/error"
         }
       }
     EOS
@@ -303,18 +303,18 @@ operation 'Deployment' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 761
+      Content-Length: 557
       {
         "wid": "D-facf0b49-20b0-4891-838e-06ee04c8045f",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/logs",
+          "resource": "/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f",
+          "log": "/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/logs/graphene-cluster"
+            "graphene-cluster": "/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/error"
+          "state": "/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/state",
+          "status": "/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/status",
+          "error": "/deployment/D-facf0b49-20b0-4891-838e-06ee04c8045f/error"
         }
       }
     EOS

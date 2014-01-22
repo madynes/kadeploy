@@ -29,18 +29,18 @@ operation 'Power operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 731
+      Content-Length: 527
       {
         "wid": "P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8",
-          "log": "https://kadeploy.testbed.lan:25300/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/logs",
+          "resource": "/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8",
+          "log": "/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/logs/graphene-cluster"
+            "graphene-cluster": "/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/state",
-          "status": "https://kadeploy.testbed.lan:25300/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/status",
-          "error": "https://kadeploy.testbed.lan:25300/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/error"
+          "state": "/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/state",
+          "status": "/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/status",
+          "error": "/power/P-eae4fb69-c130-40a6-8c2a-f0a45fa8d6e8/error"
         }
       }
     EOS
@@ -65,18 +65,18 @@ operation 'Power operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 731
+      Content-Length: 527
       {
         "wid": "P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b",
-          "log": "https://kadeploy.testbed.lan:25300/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/logs",
+          "resource": "/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b",
+          "log": "/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/logs/graphene-cluster"
+            "graphene-cluster": "/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/state",
-          "status": "https://kadeploy.testbed.lan:25300/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/status",
-          "error": "https://kadeploy.testbed.lan:25300/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/error"
+          "state": "/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/state",
+          "status": "/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/status",
+          "error": "/power/P-2dbf2f2d-6e15-4e8a-8cb7-57ac4bb86a9b/error"
         }
       }
     EOS
@@ -100,18 +100,18 @@ operation 'Power operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 731
+      Content-Length: 527
       {
         "wid": "P-1c609d50-b304-4c46-bcd9-ebda4eb9d369",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369",
-          "log": "https://kadeploy.testbed.lan:25300/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/logs",
+          "resource": "/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369",
+          "log": "/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/logs/graphene-cluster"
+            "graphene-cluster": "/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/state",
-          "status": "https://kadeploy.testbed.lan:25300/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/status",
-          "error": "https://kadeploy.testbed.lan:25300/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/error"
+          "state": "/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/state",
+          "status": "/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/status",
+          "error": "/power/P-1c609d50-b304-4c46-bcd9-ebda4eb9d369/error"
         }
       }
     EOS

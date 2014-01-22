@@ -22,12 +22,12 @@ operation 'Console' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 330
+      Content-Length: 262
       {
         "wid": "C-a6efa265-56f7-4221-b41c-81f75bde4699",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/console/C-a6efa265-56f7-4221-b41c-81f75bde4699",
-          "error": "https://kadeploy.testbed.lan:25300/console/C-a6efa265-56f7-4221-b41c-81f75bde4699/error",
+          "resource": "/console/C-a6efa265-56f7-4221-b41c-81f75bde4699",
+          "error": "/console/C-a6efa265-56f7-4221-b41c-81f75bde4699/error",
           "console": "tcp://kadeploy.testbed.lan:36179"
         }
       }

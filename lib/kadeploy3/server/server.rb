@@ -150,7 +150,7 @@ class KadeployServer
       instpath = File.join(info[:wid],path||'')
       unless multi
         path = API.path(kind,instpath)
-        info[:resources][resource] = API.ppath(kind,@httpd.url,instpath)
+        info[:resources][resource] = API.ppath(kind,'/',instpath)
         if block_given?
           yield(@httpd,path)
           info[:bindings] << path
@@ -161,7 +161,7 @@ class KadeployServer
           minstpath = File.join(instpath,res)
           path = API.path(kind,minstpath)
           info[:resources][resource][res] = HTTP::Client.path_params(
-            API.ppath(kind,@httpd.url,minstpath),{:user=>info[:user]})
+            API.ppath(kind,'/',minstpath),{:user=>info[:user]})
           if block_given?
             yield(@httpd,path,res)
             info[:bindings] << path

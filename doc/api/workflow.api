@@ -179,18 +179,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 759
+      Content-Length: 555
       {
         "wid": "D-bf5608b0-9354-446b-a648-c3abaa3cab95",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs",
+          "resource": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95",
+          "log": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs",
           "logs": {
-            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster"
+            "griffon-cluster": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error"
+          "state": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state",
+          "status": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status",
+          "error": "/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error"
         }
       }
     EOS
@@ -215,18 +215,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 737
+      Content-Length: 533
       {
         "wid": "R-6b7950ee-8889-4e0a-810e-9cb8db5286f7",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7",
-          "log": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs",
+          "resource": "/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7",
+          "log": "/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs/graphene-cluster"
+            "graphene-cluster": "/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/state",
-          "status": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/status",
-          "error": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/error"
+          "state": "/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/state",
+          "status": "/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/status",
+          "error": "/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/error"
         }
       }
     EOS
@@ -250,18 +250,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 731
+      Content-Length: 527
       {
         "wid": "P-e69b39a2-8b5b-416e-b016-7139b5a7e255",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255",
-          "log": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs",
+          "resource": "/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255",
+          "log": "/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs/graphene-cluster"
+            "graphene-cluster": "/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/state",
-          "status": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/status",
-          "error": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/error"
+          "state": "/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/state",
+          "status": "/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/status",
+          "error": "/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/error"
         }
       }
     EOS
@@ -333,18 +333,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 759
+      Content-Length: 555
       {
         "wid": "D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs",
+          "resource": "/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d",
+          "log": "/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs/graphene-cluster"
+            "graphene-cluster": "/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/state",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/status",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/error"
+          "state": "/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/state",
+          "status": "/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/status",
+          "error": "/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/error"
         }
       }
     EOS

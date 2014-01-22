@@ -49,18 +49,18 @@ operation 'Reboot operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 737
+      Content-Length: 533
       {
         "wid": "R-27714bc3-860d-40e7-8371-b7419f6c9021",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021",
-          "log": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/logs",
+          "resource": "/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021",
+          "log": "/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/logs/graphene-cluster"
+            "graphene-cluster": "/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/state",
-          "status": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/status",
-          "error": "https://kadeploy.testbed.lan:25300/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/error"
+          "state": "/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/state",
+          "status": "/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/status",
+          "error": "/reboot/R-27714bc3-860d-40e7-8371-b7419f6c9021/error"
         }
       }
     EOS
@@ -87,18 +87,18 @@ operation 'Reboot operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 737
+      Content-Length: 533
       {
         "wid": "R-52269f0e-1a5b-4f23-8cbf-0f17b166c420",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420",
-          "log": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/logs",
+          "resource": "/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420",
+          "log": "/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/logs/graphene-cluster"
+            "graphene-cluster": "/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/state",
-          "status": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/status",
-          "error": "https://kadeploy.testbed.lan:25300/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/error"
+          "state": "/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/state",
+          "status": "/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/status",
+          "error": "/reboot/R-52269f0e-1a5b-4f23-8cbf-0f17b166c420/error"
         }
       }
     EOS
@@ -131,18 +131,18 @@ operation 'Reboot operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 737
+      Content-Length: 533
       {
         "wid": "R-7b52716a-2b72-4c66-b725-dc9f1726d0a6",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6",
-          "log": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/logs",
+          "resource": "/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6",
+          "log": "/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/logs/graphene-cluster"
+            "graphene-cluster": "/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/state",
-          "status": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/status",
-          "error": "https://kadeploy.testbed.lan:25300/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/error"
+          "state": "/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/state",
+          "status": "/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/status",
+          "error": "/reboot/R-7b52716a-2b72-4c66-b725-dc9f1726d0a6/error"
         }
       }
     EOS
@@ -178,18 +178,18 @@ operation 'Reboot operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 737
+      Content-Length: 533
       {
         "wid": "R-759f3f78-9742-47e6-b67e-c12b6750c2e4",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4",
-          "log": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/logs",
+          "resource": "/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4",
+          "log": "/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/logs/graphene-cluster"
+            "graphene-cluster": "/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/state",
-          "status": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/status",
-          "error": "https://kadeploy.testbed.lan:25300/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/error"
+          "state": "/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/state",
+          "status": "/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/status",
+          "error": "/reboot/R-759f3f78-9742-47e6-b67e-c12b6750c2e4/error"
         }
       }
     EOS
