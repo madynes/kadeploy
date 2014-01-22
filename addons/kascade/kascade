@@ -613,7 +613,7 @@ class Taktuk < Deploy
     else
       ssh_opt=''
     end
-    taktuk_common="taktuk  -t 1 #{ssh_opt}  #{$log.info? ? '' : '-o status=-'} -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' -f #{file.path}"
+    taktuk_common="taktuk  -t 1 -d -1 -w 100 #{ssh_opt}  #{$log.info? ? '' : '-o status=-'} -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' -f #{file.path}"
     cmd="#{taktuk_common} broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
     $log.debug 'launching: '+cmd
     system(cmd)
