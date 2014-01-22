@@ -20,9 +20,10 @@ operation 'Statistics' do
 
     example 'Gather all statistics',
     <<-EOS ,
-      GET /stats?user=frontend HTTP/1.1
+      GET /stats HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -44,9 +45,10 @@ operation 'Statistics' do
 
     example 'Gather deployments statistics',
     <<-EOS ,
-      GET /stats/deploy?user=frontend HTTP/1.1
+      GET /stats/deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -61,9 +63,10 @@ operation 'Statistics' do
 
     example 'Gather the list of nodes with a specific failure rate',
     <<-EOS ,
-      GET /stats?user=frontend&kind=failure_rates&min_failure_rate=0.0 HTTP/1.1
+      GET /stats?kind=failure_rates&min_failure_rate=0.0 HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -77,9 +80,10 @@ operation 'Statistics' do
 
     example 'Gather all statistics to a specific date',
     <<-EOS ,
-      GET /stats?user=frontend&kind=all&date_max=Fri%2C+10+Jan+2014+10%3A10%3A00+GMT HTTP/1.1
+      GET /stats?kind=all&date_max=Fri%2C+10+Jan+2014+10%3A10%3A00+GMT HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK

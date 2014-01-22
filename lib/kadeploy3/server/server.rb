@@ -150,8 +150,7 @@ class KadeployServer
       instpath = File.join(info[:wid],path||'')
       unless multi
         path = API.path(kind,instpath)
-        info[:resources][resource] = HTTP::Client.path_params(
-          API.ppath(kind,@httpd.url,instpath),{:user=>info[:user]})
+        info[:resources][resource] = API.ppath(kind,@httpd.url,instpath)
         if block_given?
           yield(@httpd,path)
           info[:bindings] << path
@@ -184,11 +183,12 @@ class KadeployServer
     end
   end
 
-  def init_exec_context()
+  def init_exec_context(auth={})
+    raise if !auth[:user] or auth[:user].empty?
     ret = OpenStruct.new
-    ret.user = nil
-    ret.secret_key = nil
-    ret.cert = nil
+    ret.user = auth[:user]
+    ret.secret_key = auth[:secret_key]
+    ret.cert = auth[:cert]
     ret.database = database_handler()
     ret.rights = rights_handler(ret.database)
     ret.almighty_users = cfg.common.almighty_env_users.dup
@@ -221,10 +221,6 @@ class KadeployServer
 
   def parse_params_default(params,context)
     parse_params(params) do |p|
-      # Check user/key
-      context.user = p.parse('user',String,:mandatory=>:unauthorized).strip
-      context.secret_key = p.parse('secret_key',String)
-      context.cert = p.parse('cert',Array,:type=>:x509)
       context.dry_run = p.parse('dry_run',nil,:toggle=>true)
     end
   end
@@ -237,37 +233,57 @@ class KadeployServer
     parser = nil
   end
 
-  def authenticate!(request,options)
+  def parse_auth_header(req,key,error=true)
+    val = req["#{cfg.static[:auth_headers_prefix]}#{key}"]
+    val = nil if val.is_a?(String) and val.empty?
+    if error and !val
+      error_unauthorized!("Authentication failed: no #{key.downcase} specified"\
+        " in the #{cfg.static[:auth_headers_prefix]}#{key} HTTP header")
+    end
+    val
+  end
+
+  def authenticate!(request)
+    ret = {
+      :user => parse_auth_header(request,'User'),
+      :cert => parse_auth_header(request,'Certificate',false),
+      :secret_key => parse_auth_header(request,'Secret-Key',false),
+    }
     # Authentication with ACL
     if cfg.static[:auth][:acl]
       ok,msg = cfg.static[:auth][:acl].auth!(HTTPd.get_sockaddr(request))
-      return if ok
+      return ret if ok
     end
     # Authentication with certificate
-    if cfg.static[:auth][:cert] and options.cert
+    if cfg.static[:auth][:cert] and ret[:cert]
+      parse_params({'cert' => ret[:cert]}) do |p|
+        ret[:cert] = p.parse('cert',String,:type=>:x509)
+      end
       ok,msg = cfg.static[:auth][:cert].auth!(
-        HTTPd.get_sockaddr(request), :cert => options.cert)
+        HTTPd.get_sockaddr(request), :cert => ret[:cert])
       error_unauthorized!("Authentication failed: #{msg}") unless ok
     # Authentication by secret key
-    elsif cfg.static[:auth][:secret_key] and options.secret_key
+    elsif cfg.static[:auth][:secret_key] and ret[:secret_key]
       ok,msg = cfg.static[:auth][:secret_key].auth!(
-        HTTPd.get_sockaddr(request), :key => options.secret_key)
+        HTTPd.get_sockaddr(request), :key => ret[:secret_key])
       error_unauthorized!("Authentication failed: #{msg}") unless ok
     # Authentication with Ident
     elsif cfg.static[:auth][:ident]
       ok,msg = cfg.static[:auth][:ident].auth!(
-        HTTPd.get_sockaddr(request), :user => options.user, :port => @httpd.port)
+        HTTPd.get_sockaddr(request), :user => ret[:user], :port => @httpd.port)
       error_unauthorized!("Authentication failed: #{msg}") unless ok
     else
       error_unauthorized!("Authentication failed: valid methods are "\
         "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
     end
+    ret
   end
 
   def config_httpd_bindings(httpd)
     # GET
     @httpd = httpd
-    @httpd.bind([:GET],'/version',:content,cfg.common.version.dup)
+    @httpd.bind([:GET],'/version',:content,cfg.common.version)
+    @httpd.bind([:GET],'/auth_headers_prefix',:content,cfg.static[:auth_headers_prefix])
     @httpd.bind([:GET],'/info',:method,:object=>self,:method=>:get_users_info)
     @httpd.bind([:GET],'/clusters',:method,:object=>self,:method=>:get_clusters)
     #@httpd.bind([:GET],'/nodes',:method,:object=>self,:method=>:get_nodes)
@@ -389,12 +405,16 @@ class KadeployServer
       raise
     end
 
-    # Prepare the treatment (parse arguments, ...)
-    options = run_method(kind,:prepare,params[:params],query)
-    begin
-      # Authenticate the user
-      authenticate!(params[:request],options)
+    # Authenticate the user
+    auth = authenticate!(params[:request])
 
+    options = init_exec_context(auth)
+    auth = nil
+    parse_params_default(params[:params],options)
+
+    # Prepare the treatment (parse arguments, ...)
+    options = run_method(kind,:prepare,params[:params],query,options)
+    begin
       # Check rights
       # (only check rights if the method 'kind'_rights? is defined)
       check_rights = nil

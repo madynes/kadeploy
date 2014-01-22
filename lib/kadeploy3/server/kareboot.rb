@@ -1,15 +1,15 @@
 module Kadeploy
 
 module Kareboot
-  def reboot_init_exec_context()
-    ret = work_init_exec_context(:reboot)
+  def reboot_init_exec_context(ret)
+    ret = work_init_exec_context(:reboot,ret)
     ret.operation = nil
     ret.level = nil
     ret
   end
 
-  def reboot_prepare(params,operation=:create)
-    context = work_prepare(:reboot,params,operation)
+  def reboot_prepare(params,operation=:create,context)
+    context = work_prepare(:reboot,params,operation,context)
 
     case operation
     when :create

@@ -143,6 +143,7 @@ operation 'Workflow-based operations' do
     #   POST /deployment HTTP/1.1
     #   Accept: text/plain, application/json
     #   Host: kadeploy.testbed.lan:25300
+    #   X-Auth-User: frontend
     #   Content-Type: application/json
     #   Content-Length: ...
     # EOS
@@ -157,10 +158,10 @@ operation 'Workflow-based operations' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
       Content-Type: application/json
-      Content-Length: 318
+      Content-Length: 298
       {
-        "user": "frontend",
         "nodes": [
           "node-1.testbed.lan",
           "node-2.testbed.lan"
@@ -178,18 +179,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 843
+      Content-Length: 759
       {
         "wid": "D-bf5608b0-9354-446b-a648-c3abaa3cab95",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95?user=frontend",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs?user=frontend",
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs",
           "logs": {
-            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster?user=frontend"
+            "griffon-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/logs/griffon-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state?user=frontend",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status?user=frontend",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error?user=frontend"
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/state",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/status",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-bf5608b0-9354-446b-a648-c3abaa3cab95/error"
         }
       }
     EOS
@@ -199,10 +200,10 @@ operation 'Workflow-based operations' do
       POST /reboot HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
       Content-Type: application/json
-      Content-Length: 132
+      Content-Length: 112
       {
-        "user": "frontend",
         "nodes": [
           "node-1.testbed.lan",
           "node-2.testbed.lan"
@@ -214,18 +215,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 821
+      Content-Length: 737
       {
         "wid": "R-6b7950ee-8889-4e0a-810e-9cb8db5286f7",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7?user=frontend",
-          "log": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs?user=frontend",
+          "resource": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7",
+          "log": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs/graphene-cluster?user=frontend"
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/state?user=frontend",
-          "status": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/status?user=frontend",
-          "error": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/error?user=frontend"
+          "state": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/state",
+          "status": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/status",
+          "error": "https://kadeploy.testbed.lan:25300/reboot/R-6b7950ee-8889-4e0a-810e-9cb8db5286f7/error"
         }
       }
     EOS
@@ -235,10 +236,10 @@ operation 'Workflow-based operations' do
       PUT /power HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
       Content-Type: application/json
-      Content-Length: 112
+      Content-Length: 92
       {
-        "user": "frontend",
         "nodes": [
           "node-1.testbed.lan",
           "node-2.testbed.lan"
@@ -249,18 +250,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 815
+      Content-Length: 731
       {
         "wid": "P-e69b39a2-8b5b-416e-b016-7139b5a7e255",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255?user=frontend",
-          "log": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs?user=frontend",
+          "resource": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255",
+          "log": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs/graphene-cluster?user=frontend"
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/state?user=frontend",
-          "status": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/status?user=frontend",
-          "error": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/error?user=frontend"
+          "state": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/state",
+          "status": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/status",
+          "error": "https://kadeploy.testbed.lan:25300/power/P-e69b39a2-8b5b-416e-b016-7139b5a7e255/error"
         }
       }
     EOS
@@ -270,10 +271,10 @@ operation 'Workflow-based operations' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
       Content-Type: application/json
-      Content-Length: 1380
+      Content-Length: 1360
       {
-        "user": "frontend",
         "nodes": [
           "node-1.testbed.lan",
           "node-2.testbed.lan"
@@ -332,18 +333,18 @@ operation 'Workflow-based operations' do
     <<-EOS
       HTTP/1.1 200 OK
       Content-Type: application/json
-      Content-Length: 845
+      Content-Length: 759
       {
         "wid": "D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d",
         "resources": {
-          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d?user=frontend",
-          "log": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs?user=frontend",
+          "resource": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d",
+          "log": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs",
           "logs": {
-            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs/graphene-cluster?user=frontend"
+            "graphene-cluster": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/logs/graphene-cluster"
           },
-          "state": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/state?user=frontend",
-          "status": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/status?user=frontend",
-          "error": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/error?user=frontend"
+          "state": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/state",
+          "status": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/status",
+          "error": "https://kadeploy.testbed.lan:25300/deployment/D-4fd6eeae-d0c3-4d29-ac58-691dd114a63d/error"
         }
       }
     EOS
@@ -357,9 +358,10 @@ operation 'Workflow-based operations' do
     end
     example 'Get the list of current deployments',
     <<-EOS ,
-      GET /deployment?user=frontend HTTP/1.1
+      GET /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -413,9 +415,10 @@ operation 'Workflow-based operations' do
 
     example 'Gather a specific deployment status',
     <<-EOS ,
-      GET /deployment/D-bed42b5d-f667-4701-adf3-2be22dfe7853?user=frontend HTTP/1.1
+      GET /deployment/D-bed42b5d-f667-4701-adf3-2be22dfe7853 HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -459,9 +462,10 @@ operation 'Workflow-based operations' do
 
     example 'Gather a specific deployment logs',
     <<-EOS ,
-      GET /deployment/D-f98782d7-f45b-4895-8bf5-80fd421e5d8d/logs?user=frontend HTTP/1.1
+      GET /deployment/D-f98782d7-f45b-4895-8bf5-80fd421e5d8d/logs HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -477,9 +481,10 @@ operation 'Workflow-based operations' do
 
     example 'Gather logs of a specific cluster',
     <<-EOS ,
-      GET /deployment/D-f98782d7-f45b-4895-8bf5-80fd421e5d8d/logs/graphene-cluster?user=frontend HTTP/1.1
+      GET /deployment/D-f98782d7-f45b-4895-8bf5-80fd421e5d8d/logs/graphene-cluster HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -523,9 +528,10 @@ operation 'Workflow-based operations' do
 
     example 'Get debugs of every nodes',
     <<-EOS ,
-      GET /deployment/D-1267f271-d078-491a-9e2e-f2bfed571c4d/debugs?user=frontend HTTP/1.1
+      GET /deployment/D-1267f271-d078-491a-9e2e-f2bfed571c4d/debugs HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -555,9 +561,10 @@ operation 'Workflow-based operations' do
 
     example 'Get debugs of a specific node',
     <<-EOS ,
-      GET /deployment/D-1267f271-d078-491a-9e2e-f2bfed571c4d/debugs/node-1.testbed.lan?user=frontend HTTP/1.1
+      GET /deployment/D-1267f271-d078-491a-9e2e-f2bfed571c4d/debugs/node-1.testbed.lan HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -606,9 +613,10 @@ operation 'Workflow-based operations' do
 
     example 'Get state of a specific deployment',
     <<-EOS ,
-      GET /deployment/D-877303c3-e838-4cbf-b7e3-c9862baab93f/state?user=frontend HTTP/1.1
+      GET /deployment/D-877303c3-e838-4cbf-b7e3-c9862baab93f/state HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -630,9 +638,10 @@ operation 'Workflow-based operations' do
 
     example 'Get state of a specific power operation',
     <<-EOS ,
-      GET /power/P-d31fa2c1-d686-4b94-a639-21476a876d64/state?user=frontend HTTP/1.1
+      GET /power/P-d31fa2c1-d686-4b94-a639-21476a876d64/state HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -654,9 +663,10 @@ operation 'Workflow-based operations' do
 
     example 'Get state of a deployment that failed',
     <<-EOS ,
-      GET /power/D-b55916dc-30db-4979-8c67-d83fb1b2cad4/state?user=frontend HTTP/1.1
+      GET /power/D-b55916dc-30db-4979-8c67-d83fb1b2cad4/state HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -700,9 +710,10 @@ operation 'Workflow-based operations' do
 
     example 'Get the status of a specific deployment',
     <<-EOS ,
-      GET /deployment/D-877303c3-e838-4cbf-b7e3-c9862baab93f/status?user=frontend HTTP/1.1
+      GET /deployment/D-877303c3-e838-4cbf-b7e3-c9862baab93f/status HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -731,9 +742,10 @@ operation 'Workflow-based operations' do
 
     example 'Get the status of a specific power operation',
     <<-EOS ,
-      GET /power/P-d31fa2c1-d686-4b94-a639-21476a876d64/status?user=frontend HTTP/1.1
+      GET /power/P-d31fa2c1-d686-4b94-a639-21476a876d64/status HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -772,9 +784,10 @@ operation 'Workflow-based operations' do
 
     example 'Gather information about a deployment error',
     <<-EOS ,
-      GET /deployment/D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51/error?user=frontend HTTP/1.1
+      GET /deployment/D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51/error HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 400 Bad Request
@@ -797,9 +810,10 @@ operation 'Workflow-based operations' do
 
     example 'Cancel a specific deployment',
     <<-EOS ,
-      DELETE /deployment/D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51?user=frontend HTTP/1.1
+      DELETE /deployment/D-ec823946-b4fc-4a1f-b7fb-4c24b6a9ef51 HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Auth-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK

@@ -17,8 +17,8 @@ module Kadeploy
 class KaconsoleClient < Client
   ESCAPE_SEQ="\x1b\x1b\x1b\x1b"
 
-  def initialize(name,server,port,secure=false,nodes=nil)
-    super(name,server,port,secure,nodes)
+  def initialize(name,server,port,secure,auth_headers_prefix,nodes=nil)
+    super(name,server,port,secure,auth_headers_prefix,nodes)
     @wid = nil
     @resources = nil
   end
@@ -41,7 +41,7 @@ class KaconsoleClient < Client
 
   def kill
     super()
-    delete(api_path(),{:user=>USER}) if @wid
+    delete(api_path()) if @wid
   end
 
 

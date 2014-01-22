@@ -23,9 +23,10 @@ operation 'Nodes information' do
 
     example 'Get the status of every nodes',
       <<-EOS ,
-        GET /nodes?user=frontend HTTP/1.1
+        GET /nodes HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Auth-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -55,9 +56,10 @@ operation 'Nodes information' do
 
     example 'Get the status of a specific node',
       <<-EOS ,
-        GET /nodes/node-1.testbed.lan?user=frontend HTTP/1.1
+        GET /nodes/node-1.testbed.lan HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Auth-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -76,9 +78,10 @@ operation 'Nodes information' do
 
     example 'Get the list of nodes',
       <<-EOS ,
-        GET /nodes?user=frontend&list HTTP/1.1
+        GET /nodes?list HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Auth-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK

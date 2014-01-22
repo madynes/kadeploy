@@ -1,16 +1,14 @@
 module Kadeploy
 
 module Kanodes
-  def nodes_init_exec_context()
-    ret = init_exec_context()
+  def nodes_init_exec_context(ret)
     ret.nodes = nil
     ret.list = nil
     ret
   end
 
-  def nodes_prepare(params,operation=:get)
-    context = nodes_init_exec_context()
-    parse_params_default(params,context)
+  def nodes_prepare(params,operation=:get,context)
+    context = nodes_init_exec_context(context)
 
     parse_params(params) do |p|
       # Check nodelist
