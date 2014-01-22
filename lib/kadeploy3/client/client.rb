@@ -10,6 +10,8 @@ $killing = false
 $debug_mode = nil
 $debug_http = nil
 $interactive = true
+$http_user = nil
+$http_password = nil
 
 require 'thread'
 require 'uri'
@@ -20,6 +22,7 @@ require 'timeout'
 require 'tempfile'
 require 'json'
 require 'yaml'
+require 'io/console' if RUBY_VERSION >= '1.9'
 
 
 module Kadeploy
@@ -58,7 +61,7 @@ class Client
 
   def self.error(msg='',code=1)
     unless $killing
-      $stdin.cooked! if $stdin.respond_to?(:cooked!)
+      $stdin.cooked! if $stdin.respond_to?(:cooked!) and STDIN.tty? and !STDIN.closed?
       $stderr.puts msg if msg and !msg.empty?
       self.kill
       exit!(code||1)
@@ -483,7 +486,6 @@ class Client
     end
     host = @server unless host
     port = @port unless port
-    # TODO: add secret_key if necessary
     headers = {"#{@auth_headers_prefix}User" => USER}
     begin
       HTTP::Client::get(host,port,path,@secure,nil,accept_type,parse,headers)
@@ -497,7 +499,6 @@ class Client
     path = "#{path}?#{query}" if query
     host = @server unless host
     port = @port unless port
-    # TODO: add secret_key if necessary
     headers = {"#{@auth_headers_prefix}User" => USER}
     begin
       HTTP::Client::post(host,port,path,data,@secure,content_type,accept_type,parse,headers)
@@ -511,7 +512,6 @@ class Client
     path = "#{path}?#{query}" if query
     host = @server unless host
     port = @port unless port
-    # TODO: add secret_key if necessary
     headers = {"#{@auth_headers_prefix}User" => USER}
     begin
       HTTP::Client::put(host,port,path,data,@secure,content_type,accept_type,parse,headers)
@@ -529,7 +529,6 @@ class Client
     end
     host = @server unless host
     port = @port unless port
-    # TODO: add secret_key if necessary
     headers = {"#{@auth_headers_prefix}User" => USER}
     begin
       HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse,headers)
@@ -544,7 +543,6 @@ class Client
   end
 
   def self.get_nodelist(server,port,secure,auth_headers_prefix)
-    # TODO: add secret_key if necessary
     path = HTTP::Client.path_params('/nodes',{:user => USER,:list=>true})
     get(server,port,path,secure,{"#{auth_headers_prefix}User"=>USER})
   end
@@ -673,6 +671,21 @@ class Client
       }
       add_opt(opt,"--[no-]dry-run", "Perform a dry run") { |v|
         options[:dry_run] = v
+      }
+      add_opt(opt,"--password [PASSWORD]", "Provide a password for HTTP Basic authentication (read from STDIN if not specified)") { |p|
+        unless p
+          error("Error: no password specified and invalid STDIN") if !STDIN.tty? or STDIN.closed?
+          $stdout.write('Password: ')
+          $stdout.flush
+          if $stdin.respond_to?(:noecho)
+            $stdin.noecho{|stdin| p = stdin.gets}
+          else
+            p = $stdin.gets
+          end
+          $stdout.puts
+        end
+        $http_user = USER.dup.freeze
+        $http_password = p.dup.freeze
       }
       opt.separator ""
       yield(opt,options)

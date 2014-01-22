@@ -32,11 +32,12 @@ module HTTPd
   MAX_CONTENT_SIZE = 1048576 # 1 MB
 
   class HTTPError < Exception
-    attr_reader :code
-    def initialize(code,name,msg=nil)
+    attr_reader :code,:headers
+    def initialize(code,name,msg=nil,headers=nil)
       super(msg)
       @code = code
       @name = name
+      @headers = headers
     end
 
     def message
@@ -45,28 +46,28 @@ module HTTPd
     end
   end
   class InvalidError < HTTPError
-    def initialize(msg=nil)
-      super(405,'Method Not Allowed',msg)
+    def initialize(msg=nil,headers=nil)
+      super(405,'Method Not Allowed',msg,headers)
     end
   end
   class NotFoundError < HTTPError
-    def initialize(msg=nil)
-      super(404,'File Not Found',msg)
+    def initialize(msg=nil,headers=nil)
+      super(404,'File Not Found',msg,headers)
     end
   end
   class UnauthorizedError < HTTPError
-    def initialize(msg=nil)
-      super(401,'Unauthorized',msg)
+    def initialize(msg=nil,headers=nil)
+      super(401,'Unauthorized',msg,headers)
     end
   end
   class ForbiddenError < HTTPError
-    def initialize(msg=nil)
-      super(403,'Forbidden',msg)
+    def initialize(msg=nil,headers=nil)
+      super(403,'Forbidden',msg,headers)
     end
   end
   class UnsupportedError < HTTPError
-    def initialize(msg=nil)
-      super(415,'Unsupported Media Type',msg)
+    def initialize(msg=nil,headers=nil)
+      super(415,'Unsupported Media Type',msg,headers)
     end
   end
 
@@ -331,6 +332,7 @@ module HTTPd
         rescue HTTPError => e
           res = e.message
           response.status = e.code
+          e.headers.each_pair{|k,v| response[k] = v} if e.headers
           response['Content-Type'] = 'text/plain'
           if e.is_a?(InvalidError)
             response['Allow'] = @allowed.collect{|m|m.to_s}.join(',')

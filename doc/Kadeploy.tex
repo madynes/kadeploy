@@ -460,8 +460,9 @@ authentication:
     whitelist:
     - 192.168.0.0/24
     - kadeploy.mydomain.tld
-  #secret_key:
-  #  key: mysecretkey
+  #http_basic:
+  #  dbfile: kadeploy.htpasswd
+  #  realm: Kadeploy
   #  whitelist:
   #  - frontend.mydomain.tld
   #  - 192.168.0.4
@@ -603,9 +604,10 @@ external:
     \item \yfield{file}{String} the path to a file containing the public key of the Certification Authority.
   \end{itemize}
 
-  \item \ypath{/authentication/secret\_key} authentication using a secret key.
+  \item \ypath{/authentication/http\_basic} authentication using the HTTP Basic Authentication method (see RFC 2617).
   \begin{itemize}
-    \item \yfield{key}{String} The secret key that has to be specified by the user to be identified.
+    \item \yfield{dbfile}{String} The file containing a database of user/passwords (his file can be generated using tools such as \texttt{htpasswd}).
+    \item \yfieldd{realm}{String}{SERVERS\_URL} Overwrite the realm value with a custom one (for sample, if the service is accessed throught a proxy).
   \end{itemize}
   \item \ypath{/authentication/ident} authentication using the Ident protocol (see RFC 1413) on the client machine. When using Ident authentication, specifying a whitelist is mandatory.
   \item \ypath{/authentication/*/[whitelist]} For each authentication method, a whitelist can be specified. Authentication atempts will only be allowed from the specified hosts. The whitelist is an array of hosts (Strings). Hosts can be specified by IP address, IP address with CIDR notation, hostname and Regular Expression (using the char \texttt{/} as prefix and suffix of the expression).

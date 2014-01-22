@@ -1,6 +1,7 @@
 require 'thread'
 require 'securerandom'
 require 'ostruct'
+require 'base64'
 
 
 module Kadeploy
@@ -130,7 +131,11 @@ class KadeployServer
   end
 
   def error_unauthorized!(msg=nil)
-    raise HTTPd::UnauthorizedError.new(msg)
+    headers = nil
+    if cfg.static[:auth][:http_basic]
+      headers = {'WWW-Authenticate' => "Basic realm=\"#{cfg.static[:auth][:http_basic].realm}\""}
+    end
+    raise HTTPd::UnauthorizedError.new(msg,headers)
   end
 
   def error_forbidden!(msg=nil)
@@ -183,12 +188,10 @@ class KadeployServer
     end
   end
 
-  def init_exec_context(auth={})
-    raise if !auth[:user] or auth[:user].empty?
+  def init_exec_context(user)
+    raise if !user or user.empty?
     ret = OpenStruct.new
-    ret.user = auth[:user]
-    ret.secret_key = auth[:secret_key]
-    ret.cert = auth[:cert]
+    ret.user = user.dup
     ret.database = database_handler()
     ret.rights = rights_handler(ret.database)
     ret.almighty_users = cfg.common.almighty_env_users.dup
@@ -202,8 +205,6 @@ class KadeployServer
     context.almighty_users.clear if context.almighty_users
     context.almighty_users = nil
     context.database = nil
-    context.secret_key = nil
-    context.cert = nil
     context.rights = nil
     context.info = nil
     context.dry_run = nil
@@ -244,39 +245,46 @@ class KadeployServer
   end
 
   def authenticate!(request)
-    ret = {
-      :user => parse_auth_header(request,'User'),
-      :cert => parse_auth_header(request,'Certificate',false),
-      :secret_key => parse_auth_header(request,'Secret-Key',false),
-    }
+    user = parse_auth_header(request,'User',false)
+
     # Authentication with ACL
-    if cfg.static[:auth][:acl]
+    if cfg.static[:auth][:acl] and user
       ok,msg = cfg.static[:auth][:acl].auth!(HTTPd.get_sockaddr(request))
-      return ret if ok
+      return user if ok
     end
-    # Authentication with certificate
-    if cfg.static[:auth][:cert] and ret[:cert]
-      parse_params({'cert' => ret[:cert]}) do |p|
-        ret[:cert] = p.parse('cert',String,:type=>:x509)
+
+    # Authentication by HTTP Basic Authentication (RFC 2617)
+    if request['Authorization'] and cfg.static[:auth][:http_basic]
+      ok,msg = cfg.static[:auth][:http_basic].auth!(
+        HTTPd.get_sockaddr(request), :req=>request)
+      error_unauthorized!("Authentication failed: #{msg}") unless ok
+      user = request.user
+    elsif user and !user.empty?
+      user = parse_auth_header(request,'User')
+      cert = parse_auth_header(request,'Certificate',false)
+
+      # Authentication with certificate
+      if cfg.static[:auth][:cert] and cert
+        ok,msg = cfg.static[:auth][:cert].auth!(
+          HTTPd.get_sockaddr(request), :cert=>Base64.strict_decode64(cert))
+        error_unauthorized!("Authentication failed: #{msg}") unless ok
+      # Authentication with Ident
+      elsif cfg.static[:auth][:ident]
+        ok,msg = cfg.static[:auth][:ident].auth!(
+          HTTPd.get_sockaddr(request), :user=>user, :port=>@httpd.port)
+        error_unauthorized!("Authentication failed: #{msg}") unless ok
+      else
+        error_unauthorized!("Authentication failed: valid methods are "\
+          "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
       end
-      ok,msg = cfg.static[:auth][:cert].auth!(
-        HTTPd.get_sockaddr(request), :cert => ret[:cert])
-      error_unauthorized!("Authentication failed: #{msg}") unless ok
-    # Authentication by secret key
-    elsif cfg.static[:auth][:secret_key] and ret[:secret_key]
-      ok,msg = cfg.static[:auth][:secret_key].auth!(
-        HTTPd.get_sockaddr(request), :key => ret[:secret_key])
-      error_unauthorized!("Authentication failed: #{msg}") unless ok
-    # Authentication with Ident
-    elsif cfg.static[:auth][:ident]
-      ok,msg = cfg.static[:auth][:ident].auth!(
-        HTTPd.get_sockaddr(request), :user => ret[:user], :port => @httpd.port)
-      error_unauthorized!("Authentication failed: #{msg}") unless ok
     else
-      error_unauthorized!("Authentication failed: valid methods are "\
-        "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
+      error = "Authentication failed: no user specified "\
+        "in the #{cfg.static[:auth_headers_prefix]}User HTTP header"
+      error << " or using the HTTP Basic Authentication method" if cfg.static[:auth][:http_basic]
+      error_unauthorized!(error)
     end
-    ret
+
+    user
   end
 
   def config_httpd_bindings(httpd)
@@ -406,10 +414,9 @@ class KadeployServer
     end
 
     # Authenticate the user
-    auth = authenticate!(params[:request])
+    user = authenticate!(params[:request])
 
-    options = init_exec_context(auth)
-    auth = nil
+    options = init_exec_context(user)
     parse_params_default(params[:params],options)
 
     # Prepare the treatment (parse arguments, ...)

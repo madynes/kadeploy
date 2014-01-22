@@ -4,6 +4,7 @@ require 'fileutils'
 require 'resolv'
 require 'ipaddr'
 require 'yaml'
+require 'webrick'
 
 module Kadeploy
 
@@ -262,6 +263,28 @@ module Configuration
           )
         end
 
+        cp.parse('network',true) do
+          cp.parse('vlan',true) do
+            @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
+            @set_vlan_cmd = cp.value('set_cmd',String,'')
+          end
+
+          cp.parse('ports') do
+            static[:port] = cp.value(
+              'kadeploy_server',Fixnum,KADEPLOY_PORT
+            )
+            @ssh_port = cp.value('ssh',Fixnum,22)
+            @test_deploy_env_port = cp.value(
+              'test_deploy_env',Fixnum,KADEPLOY_PORT
+            )
+          end
+
+          @kadeploy_tcp_buffer_size = cp.value(
+            'tcp_buffer_size',Fixnum,8192
+          )
+          static[:host] = cp.value('server_hostname',String)
+        end
+
         cp.parse('security') do |info|
           static[:secure] = cp.value('secure_server',
             [TrueClass,FalseClass],true)
@@ -386,7 +409,6 @@ module Configuration
             end
 
             unless public_key
-              # TODO: Load from relative directory after the patch is applied
               cert = cp.value('ca_cert',String,'',
                 { :type => 'file', :readable => true, :prefix => Config.dir()})
               if cert.empty?
@@ -413,17 +435,24 @@ module Configuration
             end
           end
 
-          cp.parse('secret_key',false) do |inf|
+          cp.parse('http_basic',false) do |inf|
             next if inf[:empty]
             static[:auth] = {} unless static[:auth]
-            static[:auth][:secret_key] = SecretKeyAuthentication.new(
-              cp.value('key',String))
+            dbfile = cp.value('dbfile',String,nil,
+              { :type => 'file', :readable => true, :prefix => Config.dir()})
+            begin
+              dbfile = WEBrick::HTTPAuth::Htpasswd.new(dbfile)
+            rescue Exception => e
+              raise ArgumentError.new(Parser.errmsg(inf[:path],"Unable to load htpasswd file: #{e.message}"))
+            end
+            static[:auth][:http_basic] = HTTPBasicAuthentication.new(dbfile,
+              cp.value('realm',String,"http#{'s' if static[:secure]}://#{static[:host]}:#{static[:port]}"))
             if static[:local]
-              static[:auth][:secret_key].whitelist << parse_hostname.call('localhost',inf[:path])
+              static[:auth][:http_basic].whitelist << parse_hostname.call('localhost',inf[:path])
             else
               cp.parse('whitelist',false,Array) do |info|
                 next if info[:empty]
-                static[:auth][:secret_key].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+                static[:auth][:http_basic].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
               end
             end
           end
@@ -441,7 +470,8 @@ module Configuration
               end
             end
           end
-          if static[:auth] and static[:auth].empty?
+
+          if !static[:auth] or static[:auth].empty?
             raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
           end
         end
@@ -483,28 +513,6 @@ module Configuration
             )
             static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
           end
-        end
-
-        cp.parse('network',true) do
-          cp.parse('vlan',true) do
-            @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
-            @set_vlan_cmd = cp.value('set_cmd',String,'')
-          end
-
-          cp.parse('ports') do
-            static[:port] = cp.value(
-              'kadeploy_server',Fixnum,KADEPLOY_PORT
-            )
-            @ssh_port = cp.value('ssh',Fixnum,22)
-            @test_deploy_env_port = cp.value(
-              'test_deploy_env',Fixnum,KADEPLOY_PORT
-            )
-          end
-
-          @kadeploy_tcp_buffer_size = cp.value(
-            'tcp_buffer_size',Fixnum,8192
-          )
-          static[:host] = cp.value('server_hostname',String)
         end
 
         cp.parse('windows') do
