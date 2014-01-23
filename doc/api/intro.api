@@ -138,6 +138,8 @@ introduction do
         XnMuLyV1FQ==
         -----END CERTIFICATE-----
     EOS
+    paragraph $cgi.b{'Authentication by ACL'}
+    paragraph "If your machine's hostname is in the server's Access Control List, it will be trust without any further verifications."
   end
 
   section 'Errors management' do

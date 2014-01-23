@@ -346,6 +346,16 @@ module Configuration
             addr
           end
 
+          cp.parse('acl',false) do |inf|
+            next if inf[:empty]
+            static[:auth] = {} unless static[:auth]
+            static[:auth][:acl] = ACLAuthentication.new()
+            cp.parse('whitelist',true,Array) do |info|
+              next if info[:empty]
+              static[:auth][:acl].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            end
+          end
+
           cp.parse('certificate',false) do |inf|
             next if inf[:empty]
             public_key = nil

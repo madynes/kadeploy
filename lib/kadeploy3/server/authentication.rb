@@ -50,6 +50,20 @@ class Authentication
   end
 end
 
+class ACLAuthentication < Authentication
+  def auth!(source_sock,params={})
+    return [check_host?(source_sock),UNTRUSTED_SOURCE]
+  end
+
+  def ==(auth)
+    if auth.is_a?(self.class)
+      @whitelist == auth.whitelist
+    else
+      false
+    end
+  end
+end
+
 class SecretKeyAuthentication < Authentication
   def initialize(secret_key)
     super()
