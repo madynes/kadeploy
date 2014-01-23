@@ -262,6 +262,57 @@ module Configuration
           )
         end
 
+        cp.parse('security') do |info|
+          static[:secure] = cp.value('secure_server',
+            [TrueClass,FalseClass],true)
+
+          static[:local] = cp.value('local_only',
+            [TrueClass,FalseClass],false)
+
+          cp.parse('private_key',false) do |inf|
+            next if inf[:empty]
+            file = cp.value('file',String,'',
+              { :type => 'file', :readable => true, :prefix => Config.dir()})
+            kind = cp.value('algorithm',String,nil,['RSA','DSA','EC'])
+            next if file.empty?
+            begin
+              case kind
+              when 'RSA'
+                static[:private_key] = OpenSSL::PKey::RSA.new(File.read(file))
+              when 'DSA'
+                static[:private_key] = OpenSSL::PKey::DSA.new(File.read(file))
+              when 'EC'
+                static[:private_key] = OpenSSL::PKey::EC.new(File.read(file))
+              else
+                raise
+              end
+            rescue Exception => e
+              raise ArgumentError.new(Parser.errmsg(inf[:path],"Unable to load #{kind} private key: #{e.message}"))
+            end
+          end
+          cert = cp.value('certificate',String,'',
+            { :type => 'file', :readable => true, :prefix => Config.dir()})
+          if cert and !cert.empty?
+            begin
+              static[:cert] = OpenSSL::X509::Certificate.new(File.read(cert))
+            rescue Exception => e
+              raise ArgumentError.new(Parser.errmsg(info[:path],"Unable to load x509 cert file: #{e.message}"))
+            end
+          end
+
+          if static[:cert]
+            unless static[:private_key]
+              raise ArgumentError.new(Parser.errmsg(info[:path],"You have to specify the private key associated with the x509 certificate"))
+            end
+            unless static[:cert].check_private_key(static[:private_key])
+              raise ArgumentError.new(Parser.errmsg(info[:path],"The private key does not match with the x509 certificate"))
+            end
+          end
+
+          @secure_client = cp.value('force_secure_client',
+            [TrueClass,FalseClass],false)
+        end
+
         cp.parse('authentication') do |nfo|
           # 192.168.0.42
           # 192.168.0.0/24
@@ -338,9 +389,13 @@ module Configuration
 
             static[:auth] = {} unless static[:auth]
             static[:auth][:cert] = CertificateAuthentication.new(public_key)
-            cp.parse('whitelist',false,Array) do |info|
-              next if info[:empty]
-              static[:auth][:cert].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            if static[:local]
+              static[:auth][:cert].whitelist << parse_hostname.call('localhost',inf[:path])
+            else
+              cp.parse('whitelist',false,Array) do |info|
+                next if info[:empty]
+                static[:auth][:cert].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              end
             end
           end
 
@@ -349,9 +404,13 @@ module Configuration
             static[:auth] = {} unless static[:auth]
             static[:auth][:secret_key] = SecretKeyAuthentication.new(
               cp.value('key',String))
-            cp.parse('whitelist',false,Array) do |info|
-              next if info[:empty]
-              static[:auth][:secret_key].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            if static[:local]
+              static[:auth][:secret_key].whitelist << parse_hostname.call('localhost',inf[:path])
+            else
+              cp.parse('whitelist',false,Array) do |info|
+                next if info[:empty]
+                static[:auth][:secret_key].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              end
             end
           end
 
@@ -359,62 +418,18 @@ module Configuration
             next if inf[:empty]
             static[:auth] = {} unless static[:auth]
             static[:auth][:ident] = IdentAuthentication.new
-            cp.parse('whitelist',true,Array) do |info|
-              next if info[:empty]
-              static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            if static[:local]
+              static[:auth][:ident].whitelist << parse_hostname.call('localhost',inf[:path])
+            else
+              cp.parse('whitelist',true,Array) do |info|
+                next if info[:empty]
+                static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              end
             end
           end
           if static[:auth] and static[:auth].empty?
             raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
           end
-        end
-
-        cp.parse('security') do |info|
-          static[:secure] = cp.value('secure_server',
-            [TrueClass,FalseClass],true)
-
-          cp.parse('private_key',false) do |inf|
-            next if inf[:empty]
-            file = cp.value('file',String,'',
-              { :type => 'file', :readable => true, :prefix => Config.dir()})
-            kind = cp.value('algorithm',String,nil,['RSA','DSA','EC'])
-            next if file.empty?
-            begin
-              case kind
-              when 'RSA'
-                static[:private_key] = OpenSSL::PKey::RSA.new(File.read(file))
-              when 'DSA'
-                static[:private_key] = OpenSSL::PKey::DSA.new(File.read(file))
-              when 'EC'
-                static[:private_key] = OpenSSL::PKey::EC.new(File.read(file))
-              else
-                raise
-              end
-            rescue Exception => e
-              raise ArgumentError.new(Parser.errmsg(inf[:path],"Unable to load #{kind} private key: #{e.message}"))
-            end
-          end
-          cert = cp.value('certificate',String,'',
-            { :type => 'file', :readable => true, :prefix => Config.dir()})
-          if cert and !cert.empty?
-            begin
-              static[:cert] = OpenSSL::X509::Certificate.new(File.read(cert))
-            rescue Exception => e
-              raise ArgumentError.new(Parser.errmsg(info[:path],"Unable to load x509 cert file: #{e.message}"))
-            end
-          end
-
-          if static[:cert]
-            unless static[:private_key]
-              raise ArgumentError.new(Parser.errmsg(info[:path],"You have to specify the private key associated with the x509 certificate"))
-            end
-            unless static[:cert].check_private_key(static[:private_key])
-              raise ArgumentError.new(Parser.errmsg(info[:path],"The private key does not match with the x509 certificate"))
-            end
-          end
-
-          @secure_client = cp.value('force_secure_client',
-            [TrueClass,FalseClass],false)
         end
 
         cp.parse('logs') do

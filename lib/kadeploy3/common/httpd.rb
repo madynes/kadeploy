@@ -526,11 +526,12 @@ module HTTPd
 
   class Server
     attr_reader :host, :port, :logs
-    def initialize(host='',port=0,secure=true,cert=nil,private_key=nil,dh_seeds={},httpd_logfile=nil)
+    def initialize(host='',port=0,secure=true,local=false,cert=nil,private_key=nil,dh_seeds={},httpd_logfile=nil)
       raise if cert and !private_key
       @host = host || ''
       @port = port || 0
       @secure = secure
+      @local = local
       @cert = cert
       @private_key = private_key
       # A list of DH seeds instances for SSL per-session key exchange purpose
@@ -573,6 +574,13 @@ module HTTPd
         :MaxClients => MAX_CLIENTS,
         :DoNotReverseLookup => true,
       }
+
+      if @local
+        @host = 'localhost'
+        opts[:BindAddress] = 'localhost'
+      else
+        opts[:BindAddress] = '0.0.0.0'
+      end
 
       if @logs[:httpd]
         opts[:Logger] = WEBrick::Log.new(@logs[:httpd])
