@@ -39,7 +39,7 @@ operation 'Deployment' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 298
       {
@@ -81,7 +81,7 @@ operation 'Deployment' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 825
       {
@@ -145,7 +145,7 @@ operation 'Deployment' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 784
       {
@@ -208,7 +208,7 @@ operation 'Deployment' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 704
       {
@@ -260,7 +260,7 @@ operation 'Deployment' do
       POST /deployment HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 648
       {

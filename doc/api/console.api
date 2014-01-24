@@ -17,7 +17,7 @@ operation 'Console' do
       POST /console?node=node-1.testbed.lan HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -54,7 +54,7 @@ operation 'Console' do
       GET /console HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -99,7 +99,7 @@ operation 'Console' do
       GET /console/C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805 HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -140,7 +140,7 @@ operation 'Console' do
       DELETE /console/C-ef80f906-da3f-4c24-acb7-f6ecd3a7e805 HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK

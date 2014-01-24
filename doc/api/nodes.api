@@ -26,7 +26,7 @@ operation 'Nodes information' do
         GET /nodes HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -59,7 +59,7 @@ operation 'Nodes information' do
         GET /nodes/node-1.testbed.lan HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -81,7 +81,7 @@ operation 'Nodes information' do
         GET /nodes?list HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK

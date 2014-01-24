@@ -451,7 +451,7 @@ rights:
   purge_deployment_timer: 900
 authentication:
   global:
-    headers_prefix: X-Auth-
+    headers_prefix: X-Kadeploy-
   certificate:
     #ca_public_key:
     #  algorithm: RSA
@@ -589,7 +589,7 @@ external:
 
   \item \ypath{/authentication/global} Define global configuration for authentication methods.
   \begin{itemize}
-    \item \yfieldd{headers\_prefix}{String}{X-Auth-} Clients have to provide authentication information through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Auth-User}, \texttt{X-Auth-Certificate})
+    \item \yfieldd{headers\_prefix}{String}{X-Kadeploy-} Clients have to provide authentication information through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Kadeploy-User}, \texttt{X-Kadeploy-Certificate})
   \end{itemize}
 
   \item \ypath{/authentication/acl} Access Control List based authentication. When using ACL authentication, specifying a whitelist is mandatory.
@@ -1512,7 +1512,7 @@ servers:
   - name: lille
     hostname: frontend.lille.grid5000.fr
     port: 25300
-    auth_headers_prefix: X-Auth-
+    auth_headers_prefix: X-Kadeploy-
   - name: nancy
     hostname: nancy.lille.grid5000.fr
     port: 25300
@@ -1528,7 +1528,7 @@ servers:
     \item \yfield{hostname}{String} the Kadeploy server hostname
     \item \yfield{port}{Integer} the port the Kadeploy server is listening on
     \item \yfieldd{secure}{Boolean}{true} specify if the server use a secure connection
-    \item \yfieldd{auth\_headers\_prefix}{String}{''} The client provides authentication information to the server through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Auth-User}). This setting depends on the server's configuration. When not specified (empty), the client do an extra GET HTTP request on the server to determine this value.
+    \item \yfieldd{auth\_headers\_prefix}{String}{''} The client provides authentication information to the server through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Kadeploy-User}). This setting depends on the server's configuration. When not specified (empty), the client do an extra GET HTTP request on the server to determine this value.
   \end{itemize}
 \end{itemize}
 

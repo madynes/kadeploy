@@ -201,7 +201,7 @@ operation 'Environments management' do
         POST /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
         Content-Type: application/json
         Content-Length: 731
         {
@@ -275,7 +275,7 @@ operation 'Environments management' do
         POST /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
         Content-Type: application/json
         Content-Length: 301
         {
@@ -325,7 +325,7 @@ operation 'Environments management' do
         POST /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
         Content-Type: application/json
         Content-Length: 657
         {
@@ -426,7 +426,7 @@ operation 'Environments management' do
         GET /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -499,7 +499,7 @@ operation 'Environments management' do
         GET /environments/frontend HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -592,7 +592,7 @@ operation 'Environments management' do
         GET /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -627,7 +627,7 @@ operation 'Environments management' do
         GET /environments/frontend/debian-custom/1 HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -662,7 +662,7 @@ operation 'Environments management' do
         GET /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -737,7 +737,7 @@ operation 'Environments management' do
         PUT /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
         Content-Type: application/json
         Content-Length: 30
         {
@@ -774,7 +774,7 @@ operation 'Environments management' do
         PUT /environments/frontend/debian-custom?update_image_checksum HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -824,7 +824,7 @@ operation 'Environments management' do
         PUT /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
         Content-Type: application/json
         Content-Length: 96
         {
@@ -898,7 +898,7 @@ operation 'Environments management' do
         DELETE /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -951,7 +951,7 @@ operation 'Environments management' do
         DELETE /environments/frontend/debian-custom/2 HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK

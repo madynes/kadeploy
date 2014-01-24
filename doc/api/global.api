@@ -11,7 +11,7 @@ operation 'Global information' do
         GET /clusters HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -63,7 +63,7 @@ operation 'Global information' do
         GET /info HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -175,7 +175,7 @@ operation 'Global information' do
         GET /version HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
-        X-Auth-User: frontend
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
