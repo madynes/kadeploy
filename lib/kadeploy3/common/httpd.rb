@@ -306,6 +306,10 @@ module HTTPd
             res = 'true'
             response['Content-Type'] = 'text/plain'
           elsif ret.is_a?(File)
+            # Ugly hack since Webrick filehandler automatically closes files
+            ret.close unless ret.closed?
+            ret = res = open(ret.path,'rb')
+
             st = ret.stat
             response['ETag'] = sprintf("\"%x-%x-%x\"",st.ino,st.size,
               st.mtime.to_i)

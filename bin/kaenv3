@@ -189,18 +189,8 @@ class KaenvsClient < Client
     return true
   end
 
-  def run(options)
-    params = init_params(options)
-
-    # set path
-    path = api_path()
-    if ![:add, :list, :'move-files'].include?(options[:operation])
-      path = File.join(path,options[:env_user]||USER)
-      path = File.join(path,options[:env_name]) if options[:env_name]
-      path = File.join(path,options[:env_version].to_s) if options[:env_version]
-    elsif options[:operation] != :add
-      path = File.join(path,options[:env_user]) if options[:env_user]
-    end
+  def self.prepare(options)
+    params = super(options)
 
     if [:add, :'update-image-checksum',:'update-postinstalls-checksum',:'update-preinstall-checksum',:'move-files'].include?(options[:operation])
       # Check if the environment contains local files
@@ -213,7 +203,7 @@ class KaenvsClient < Client
       else
         tmp = params.dup
         tmp[:last] = true unless options[:env_version]
-        desc = get(path,tmp)[0]
+        desc = get2(options,api_path,tmp).first
       end
       add_localfiles(desc)
 
@@ -221,12 +211,44 @@ class KaenvsClient < Client
       params[:client] = http_export_files(options[:secure]) unless $files.empty?
     end
 
+    case options[:operation]
+      when :add
+        params[:environment] = options[:env_desc]
+      when :'update-image-checksum'
+        params[:update_image_checksum] = true
+      when :'update-postinstalls-checksum'
+        params[:update_postinstalls_checksum] = true
+      when :'update-preinstall-checksum'
+        params[:update_preinstall_checksum] = true
+      when :'set-visibility-tag'
+        params[:visibility] = options[:visibility_tag]
+      when :'toggle-destructive-tag'
+        params[:toggle_destructive] = true
+      when :'move-files'
+        params[:update_files] = options[:files_to_move]
+    end
+
+    params[:last] = true unless options[:all_versions]
+
+    params
+  end
+
+  def run(options,params)
+    # set path
+    path = api_path()
+    if ![:add, :list, :'move-files'].include?(options[:operation])
+      path = File.join(path,options[:env_user]||USER)
+      path = File.join(path,options[:env_name]) if options[:env_name]
+      path = File.join(path,options[:env_version].to_s) if options[:env_version]
+    elsif options[:operation] != :add
+      path = File.join(path,options[:env_user]) if options[:env_user]
+    end
+
     method = nil
 
     case options[:operation]
       when :add
         method = :POST
-        params[:environment] = options[:env_desc]
       when :list
         method = :GET
       when :delete
@@ -235,27 +257,19 @@ class KaenvsClient < Client
         method = :GET
       when :'update-image-checksum'
         method = :PUT
-        params[:update_image_checksum] = true
       when :'update-postinstalls-checksum'
         method = :PUT
-        params[:update_postinstalls_checksum] = true
       when :'update-preinstall-checksum'
         method = :PUT
-        params[:update_preinstall_checksum] = true
       when :'set-visibility-tag'
         method = :PUT
-        params[:visibility] = options[:visibility_tag]
       when :'toggle-destructive-tag'
         method = :PUT
-        params[:toggle_destructive] = true
       when :'move-files'
         method = :PUT
-        params[:update_files] = options[:files_to_move]
       else
         raise
     end
-
-    params[:last] = true unless options[:all_versions]
 
     case method
       when :GET

@@ -86,27 +86,35 @@ class KarightsClient < Client
     return true
   end
 
-  def run(options)
-    params = init_params(options)
+  def self.prepare(options)
+    params = super(options)
 
     params[:overwrite] = true if options[:overwrite]
 
+    case options[:operation]
+      when :add
+        params[:username] = options[:user]
+        params[:partitions] = options[:parts] if !options[:parts].empty?
+      when :delete
+        params[:partitions] = options[:parts] if !options[:parts].empty?
+    end
+
+    params
+  end
+
+  def run(options,params)
+    params[:nodes] = nodes() if nodes()
     path = api_path()
     method = nil
     case options[:operation]
       when :add
         method = :POST
-        params[:username] = options[:user]
-        params[:nodes] = nodes() if nodes()
-        params[:partitions] = options[:parts] if !options[:parts].empty?
       when :show
         method = :GET
         path = File.join(path,options[:user]) if options[:user]
       when :delete
         method = :DELETE
         path = File.join(path,options[:user])
-        params[:nodes] = nodes() if nodes()
-        params[:partitions] = options[:parts] if !options[:parts].empty?
       else
         raise
     end

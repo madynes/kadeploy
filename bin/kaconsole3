@@ -74,13 +74,17 @@ class KaconsoleClient < Client
       error("You can only choose one node")
       return false
     end
+
     true
   end
 
-  def run(options)
-    params = init_params(options)
+  def self.prepare(options)
+    params = super(options)
     params[:node] = options[:nodes].first
+    params
+  end
 
+  def run(options,params)
     ret = post(api_path(),params)
     @wid = ret['wid']
     @resources = ret['resources']
