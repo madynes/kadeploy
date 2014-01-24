@@ -8,9 +8,10 @@ operation 'Global information' do
 
     example 'Get the list of clusters',
       <<-EOS ,
-        GET /clusters?user=frontend HTTP/1.1
+        GET /clusters HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -21,6 +22,14 @@ operation 'Global information' do
           "graphene-cluster"
         ]
       EOS
+  end
+
+  resource :GET, '/auth_headers_prefix', 'Get information about the authentication HTTP headers of the running service' do
+    request do
+    end
+    response :String, 'text/plain' do
+      field '', :String, 'The prefix that have to be specified in the HTTP headers when doing a request (for authentication purpose)'
+    end
   end
 
   resource :GET, '/info', 'Get information about the configuration of the running service' do
@@ -51,9 +60,10 @@ operation 'Global information' do
 
     example 'Get information about the service\'s configuration',
       <<-EOS ,
-        GET /info?user=frontend HTTP/1.1
+        GET /info HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -162,9 +172,10 @@ operation 'Global information' do
 
     example 'Get the version of the server "kadeploy.testbed.lan"',
       <<-EOS ,
-        GET /version?user=frontend HTTP/1.1
+        GET /version HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK

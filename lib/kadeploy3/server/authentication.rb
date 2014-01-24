@@ -3,12 +3,13 @@ require 'resolv'
 require 'timeout'
 require 'socket'
 require 'openssl'
+require 'webrick'
 
 module Kadeploy
 
 class Authentication
   UNTRUSTED_SOURCE='Trying to authenticate from an untrusted source'
-  INVALID_PARAMS='Invalid authentication parameters'
+  INVALID_PARAMS='Invalid authentication credentials'
 
   attr_reader :whitelist
 
@@ -50,21 +51,50 @@ class Authentication
   end
 end
 
-class SecretKeyAuthentication < Authentication
-  def initialize(secret_key)
+class ACLAuthentication < Authentication
+  def auth!(source_sock,params={})
+    return [check_host?(source_sock),UNTRUSTED_SOURCE]
+  end
+
+  def ==(auth)
+    if auth.is_a?(self.class)
+      @whitelist == auth.whitelist
+    else
+      false
+    end
+  end
+end
+
+class HTTPBasicAuthentication < Authentication
+  attr_reader :realm
+
+  def initialize(dbfile,realm)
     super()
-    @secret_key = secret_key.freeze
+    @dbfile = dbfile
+    @realm = realm.freeze
+    @authenticator = WEBrick::HTTPAuth::BasicAuth.new({
+      :Realm => @realm,
+      :UserDB => @dbfile,
+      :AutoReloadUserDB => true,
+    })
   end
 
   def auth!(source_sock,params={})
     return [false,UNTRUSTED_SOURCE] unless check_host?(source_sock)
 
-    [params[:key] == @secret_key,"#{INVALID_PARAMS} '#{params[:key]}'"]
+    ret = nil
+    begin
+      @authenticator.authenticate(params[:req],{})
+      ret = true
+    rescue
+      ret = false
+    end
+    [ret,INVALID_PARAMS]
   end
 
   def ==(auth)
     if auth.is_a?(self.class)
-      (@secret_key == auth.instance_variable_get(:@secret_key) and @whitelist == auth.whitelist)
+      (@dbfile == auth.instance_variable_get(:@dbfile) and (@realm == auth.realm) and @whitelist == auth.whitelist)
     else
       false
     end
@@ -80,7 +110,14 @@ class CertificateAuthentication < Authentication
   def auth!(source_sock,params={})
     return [false,UNTRUSTED_SOURCE] unless check_host?(source_sock)
 
-    [params[:cert].verify(@public_key),INVALID_PARAMS]
+    cert = nil
+    begin
+      cert = OpenSSL::X509::Certificate.new(params[:cert])
+    rescue Exception => e
+      return [false,"Invalid x509 certificate (#{e.message})"]
+    end
+
+    [cert.verify(@public_key),INVALID_PARAMS]
   end
 
   def ==(auth)

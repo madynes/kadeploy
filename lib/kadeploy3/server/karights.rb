@@ -1,17 +1,15 @@
 module Kadeploy
 
 module Karights
-  def rights_init_exec_context()
-    ret = init_exec_context()
+  def rights_init_exec_context(ret)
     ret.nodes = nil
     ret.partitions = nil
     ret.username = nil
     ret
   end
 
-  def rights_prepare(params,operation)
-    context = rights_init_exec_context()
-    parse_params_default(params,context)
+  def rights_prepare(params,operation,context)
+    context = rights_init_exec_context(context)
 
     parse_params(params) do |p|
       # Check nodelist

@@ -5,6 +5,7 @@ require 'tempfile'
 require 'tmpdir'
 require 'rubygems'
 require 'kadeploy3/common/http'
+require 'base64'
 
 class TestAuth < Test::Unit::TestCase
   include KaTestCase
@@ -20,44 +21,44 @@ class TestAuth < Test::Unit::TestCase
   def teardown
     Kadeploy::HTTP::Client.request(
       KADEPLOY_SERVER,KADEPLOY_PORT,KADEPLOY_SECURE,
-      Kadeploy::HTTP::Client.gen_request(:DELETE,"/power/#{@wid}?user=#{USER}")
+      Kadeploy::HTTP::Client.gen_request(:DELETE,"/power/#{@wid}",
+        nil,nil,nil,{"#{KADEPLOY_AUTH_HEADER}User"=>USER})
     ) if @wid
   end
 
-  def get(path,data=nil)
+  def get(path,headers=nil,http_auth=nil,server=KADEPLOY_SERVER,port=KADEPLOY_PORT,secure=KADEPLOY_SECURE)
+    headers = {} unless headers
+    headers = {"#{KADEPLOY_AUTH_HEADER}User"=>USER}.merge!(headers) if !http_auth
     begin
-      Kadeploy::HTTP::Client.request(
-        KADEPLOY_SERVER,KADEPLOY_PORT,KADEPLOY_SECURE,
-        Kadeploy::HTTP::Client.gen_request(:GET,path,data,:json,:json)
-      )
+      req = Kadeploy::HTTP::Client.gen_request(:GET,path,nil,nil,nil,headers)
+      req.basic_auth(http_auth[:user],http_auth[:password]) if http_auth
+      Kadeploy::HTTP::Client.request(server,port,secure,req)
     rescue Exception => e
       assert(false,e.message)
     end
   end
 
+  def test_acl()
+    ret = get("/power",nil,nil,'localhost')
+    assert(!ret.select{|v| v['id'] == @wid}.empty?,ret.to_yaml)
+  end
+
   def test_ident()
-    ret = get("/power?user=#{USER}")
+    ret = get("/power")
     assert(!ret.select{|v| v['id'] == @wid}.empty?,ret.to_yaml)
   end
 
   def test_cert()
-    data = {
-      :user => 'root',
-      :cert => File.read(KADEPLOY_CERT_FILE),
-    }
-    ret = get("/power",data)
+    cert = Base64.strict_encode64(File.read(KADEPLOY_CERT_FILE))
+    ret = get("/power",{"#{KADEPLOY_AUTH_HEADER}Certificate"=>cert})
     elem = ret.select{|v| v['id'] == @wid}
     assert(!elem.empty?,ret.to_yaml)
     elem = elem[0]
     assert(elem.keys.include?('time'),"Get state did not return the admin view\n"+ret.to_yaml)
   end
 
-  def test_secret_key()
-    data = {
-      :user => 'root',
-      :secret_key => KADEPLOY_SECRET_KEY,
-    }
-    ret = get("/power",data)
+  def test_http_basic()
+    ret = get("/power",nil,{:user=>USER,:password=>KADEPLOY_SECRET_KEY})
     elem = ret.select{|v| v['id'] == @wid}
     assert(!elem.empty?,ret.to_yaml)
     elem = elem[0]

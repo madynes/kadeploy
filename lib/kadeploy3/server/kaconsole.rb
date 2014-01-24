@@ -4,8 +4,7 @@ require 'socket'
 require 'pty'
 
 module Kaconsole
-  def console_init_exec_context()
-    ret = init_exec_context()
+  def console_init_exec_context(ret)
     ret.config = nil
     ret
   end
@@ -45,9 +44,9 @@ module Kaconsole
     context
   end
 
-  def console_prepare(params,operation=:get)
-    context = console_init_exec_context()
-    parse_params_default(params,context)
+  def console_prepare(params,operation,context)
+    context = console_init_exec_context(context)
+    operation ||= :get
 
     case operation
     when :create
@@ -290,7 +289,12 @@ module Kaconsole
     if client and client.alive?
       sleep 1 unless client[:sock]
 
-      client[:sock].syswrite("\n[Kaconsole] client killed\n") if client[:sock]
+      if client[:sock]
+        begin
+          client[:sock].syswrite("\n[Kaconsole] client killed\n")
+        rescue
+        end
+      end
 
       sleep 1 unless client[:pid]
 
@@ -315,7 +319,10 @@ module Kaconsole
         end
       end
 
-      client[:sock].close if client[:sock] and !client[:sock].closed?
+      if client[:sock] and !client[:sock].closed?
+        client[:sock].close
+        client[:sock] = nil
+      end
     end
   end
 end

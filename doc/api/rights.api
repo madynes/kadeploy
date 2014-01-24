@@ -27,6 +27,7 @@ operation 'Rights management' do
       POST /rights HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 89
       {
@@ -55,6 +56,7 @@ operation 'Rights management' do
       POST /rights?user=root&overwrite HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 136
       {
@@ -102,6 +104,7 @@ operation 'Rights management' do
       GET /rights?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -129,6 +132,7 @@ operation 'Rights management' do
       GET /rights/frontend?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -151,6 +155,7 @@ operation 'Rights management' do
       GET /rights/frontend/node-1.testbed.lan?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -170,6 +175,7 @@ operation 'Rights management' do
       GET /rights/frontend?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 66
       {
@@ -220,6 +226,7 @@ operation 'Rights management' do
       DELETE /rights/frontend?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -239,6 +246,7 @@ operation 'Rights management' do
       DELETE /rights/frontend/node-1.testbed.lan?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -258,6 +266,7 @@ operation 'Rights management' do
       DELETE /rights/frontend?user=root HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 66
       {
@@ -288,6 +297,7 @@ operation 'Rights management' do
       DELETE /rights/frontend?user=root&nodes=node-1.testbed.lan&partitions=%2Fdev%2Fsda3 HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK

@@ -4,6 +4,7 @@ require 'fileutils'
 require 'resolv'
 require 'ipaddr'
 require 'yaml'
+require 'webrick'
 
 module Kadeploy
 
@@ -262,116 +263,34 @@ module Configuration
           )
         end
 
-        cp.parse('authentication') do |nfo|
-          # 192.168.0.42
-          # 192.168.0.0/24
-          # domain.tld
-          # /^.*\.domain.tld$/
-          parse_hostname = Proc.new do |hostname,path|
-            addr = nil
-            begin
-              # Check if IP address
-              addr = IPAddr.new(hostname)
-            rescue ArgumentError
-              # Check if Regexp
-              if /\A\/(.*)\/\Z/ =~ hostname
-                begin
-                  addr = Regexp.new(Regexp.last_match(1))
-                rescue
-                  raise ArgumentError.new(Parser.errmsg(path,"Invalid regexp #{hostname}"))
-                end
-              end
-            end
-            # Resolv hostname
-            if addr.nil?
-              begin
-                addr = IPAddr.new(Resolv.getaddress(hostname))
-              rescue Resolv::ResolvError
-                raise ArgumentError.new(Parser.errmsg(path,"Cannot resolv hostname #{hostname}"))
-              rescue Exception => e
-                raise ArgumentError.new(Parser.errmsg(path,"Invalid hostname #{hostname.inspect} (#{e.message})"))
-              end
-            end
-            addr
+        cp.parse('network',true) do
+          cp.parse('vlan',true) do
+            @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
+            @set_vlan_cmd = cp.value('set_cmd',String,'')
           end
 
-          cp.parse('certificate',false) do |inf|
-            next if inf[:empty]
-            public_key = nil
-            cp.parse('ca_public_key',false) do |info|
-              next if info[:empty]
-              file = cp.value('file',String,'',
-                { :type => 'file', :readable => true, :prefix => Config.dir()})
-              next if file.empty?
-              kind = cp.value('algorithm',String,nil,['RSA','DSA','EC'])
-              begin
-                case kind
-                when 'RSA'
-                  public_key = OpenSSL::PKey::RSA.new(File.read(file))
-                when 'DSA'
-                  public_key = OpenSSL::PKey::DSA.new(File.read(file))
-                when 'EC'
-                  public_key = OpenSSL::PKey::EC.new(File.read(file))
-                else
-                  raise
-                end
-              rescue Exception => e
-                raise ArgumentError.new(Parser.errmsg(nfo[:path],"Unable to load #{kind} public key: #{e.message}"))
-              end
-            end
-
-            unless public_key
-              # TODO: Load from relative directory after the patch is applied
-              cert = cp.value('ca_cert',String,'',
-                { :type => 'file', :readable => true, :prefix => Config.dir()})
-              if cert.empty?
-                raise ArgumentError.new(Parser.errmsg(nfo[:path],"At least a certificate or a public key have to be specified"))
-              else
-                begin
-                  cert = OpenSSL::X509::Certificate.new(File.read(cert))
-                  public_key = cert.public_key
-                rescue Exception => e
-                  raise ArgumentError.new(Parser.errmsg(nfo[:path],"Unable to load x509 cert file: #{e.message}"))
-                end
-              end
-            end
-
-            static[:auth] = {} unless static[:auth]
-            static[:auth][:cert] = CertificateAuthentication.new(public_key)
-            cp.parse('whitelist',false,Array) do |info|
-              next if info[:empty]
-              static[:auth][:cert].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
-            end
+          cp.parse('ports') do
+            static[:port] = cp.value(
+              'kadeploy_server',Fixnum,KADEPLOY_PORT
+            )
+            @ssh_port = cp.value('ssh',Fixnum,22)
+            @test_deploy_env_port = cp.value(
+              'test_deploy_env',Fixnum,KADEPLOY_PORT
+            )
           end
 
-          cp.parse('secret_key',false) do |inf|
-            next if inf[:empty]
-            static[:auth] = {} unless static[:auth]
-            static[:auth][:secret_key] = SecretKeyAuthentication.new(
-              cp.value('key',String))
-            cp.parse('whitelist',false,Array) do |info|
-              next if info[:empty]
-              static[:auth][:secret_key].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
-            end
-          end
-
-          cp.parse('ident',false) do |inf|
-            next if inf[:empty]
-            static[:auth] = {} unless static[:auth]
-            static[:auth][:ident] = IdentAuthentication.new
-            cp.parse('whitelist',true,Array) do |info|
-              next if info[:empty]
-              static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
-            end
-          end
-          if static[:auth] and static[:auth].empty?
-            raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
-          end
+          @kadeploy_tcp_buffer_size = cp.value(
+            'tcp_buffer_size',Fixnum,8192
+          )
+          static[:host] = cp.value('server_hostname',String)
         end
 
         cp.parse('security') do |info|
           static[:secure] = cp.value('secure_server',
             [TrueClass,FalseClass],true)
+
+          static[:local] = cp.value('local_only',
+            [TrueClass,FalseClass],false)
 
           cp.parse('private_key',false) do |inf|
             next if inf[:empty]
@@ -417,6 +336,146 @@ module Configuration
             [TrueClass,FalseClass],false)
         end
 
+        cp.parse('authentication') do |nfo|
+          # 192.168.0.42
+          # 192.168.0.0/24
+          # domain.tld
+          # /^.*\.domain.tld$/
+          parse_hostname = Proc.new do |hostname,path|
+            addr = nil
+            begin
+              # Check if IP address
+              addr = IPAddr.new(hostname)
+            rescue ArgumentError
+              # Check if Regexp
+              if /\A\/(.*)\/\Z/ =~ hostname
+                begin
+                  addr = Regexp.new(Regexp.last_match(1))
+                rescue
+                  raise ArgumentError.new(Parser.errmsg(path,"Invalid regexp #{hostname}"))
+                end
+              end
+            end
+            # Resolv hostname
+            if addr.nil?
+              begin
+                addr = IPAddr.new(Resolv.getaddress(hostname))
+              rescue Resolv::ResolvError
+                raise ArgumentError.new(Parser.errmsg(path,"Cannot resolv hostname #{hostname}"))
+              rescue Exception => e
+                raise ArgumentError.new(Parser.errmsg(path,"Invalid hostname #{hostname.inspect} (#{e.message})"))
+              end
+            end
+            addr
+          end
+
+          cp.parse('global',false) do |info|
+            static[:auth_headers_prefix] = cp.value('headers_prefix',String,'X-Kadeploy-')
+          end
+
+          cp.parse('acl',false) do |inf|
+            next if inf[:empty]
+            static[:auth] = {} unless static[:auth]
+            static[:auth][:acl] = ACLAuthentication.new()
+            cp.parse('whitelist',true,Array) do |info|
+              next if info[:empty]
+              static[:auth][:acl].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+            end
+          end
+
+          cp.parse('certificate',false) do |inf|
+            next if inf[:empty]
+            public_key = nil
+            cp.parse('ca_public_key',false) do |info|
+              next if info[:empty]
+              file = cp.value('file',String,'',
+                { :type => 'file', :readable => true, :prefix => Config.dir()})
+              next if file.empty?
+              kind = cp.value('algorithm',String,nil,['RSA','DSA','EC'])
+              begin
+                case kind
+                when 'RSA'
+                  public_key = OpenSSL::PKey::RSA.new(File.read(file))
+                when 'DSA'
+                  public_key = OpenSSL::PKey::DSA.new(File.read(file))
+                when 'EC'
+                  public_key = OpenSSL::PKey::EC.new(File.read(file))
+                else
+                  raise
+                end
+              rescue Exception => e
+                raise ArgumentError.new(Parser.errmsg(nfo[:path],"Unable to load #{kind} public key: #{e.message}"))
+              end
+            end
+
+            unless public_key
+              cert = cp.value('ca_cert',String,'',
+                { :type => 'file', :readable => true, :prefix => Config.dir()})
+              if cert.empty?
+                raise ArgumentError.new(Parser.errmsg(nfo[:path],"At least a certificate or a public key have to be specified"))
+              else
+                begin
+                  cert = OpenSSL::X509::Certificate.new(File.read(cert))
+                  public_key = cert.public_key
+                rescue Exception => e
+                  raise ArgumentError.new(Parser.errmsg(nfo[:path],"Unable to load x509 cert file: #{e.message}"))
+                end
+              end
+            end
+
+            static[:auth] = {} unless static[:auth]
+            static[:auth][:cert] = CertificateAuthentication.new(public_key)
+            if static[:local]
+              static[:auth][:cert].whitelist << parse_hostname.call('localhost',inf[:path])
+            else
+              cp.parse('whitelist',false,Array) do |info|
+                next if info[:empty]
+                static[:auth][:cert].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              end
+            end
+          end
+
+          cp.parse('http_basic',false) do |inf|
+            next if inf[:empty]
+            static[:auth] = {} unless static[:auth]
+            dbfile = cp.value('dbfile',String,nil,
+              { :type => 'file', :readable => true, :prefix => Config.dir()})
+            begin
+              dbfile = WEBrick::HTTPAuth::Htpasswd.new(dbfile)
+            rescue Exception => e
+              raise ArgumentError.new(Parser.errmsg(inf[:path],"Unable to load htpasswd file: #{e.message}"))
+            end
+            static[:auth][:http_basic] = HTTPBasicAuthentication.new(dbfile,
+              cp.value('realm',String,"http#{'s' if static[:secure]}://#{static[:host]}:#{static[:port]}"))
+            if static[:local]
+              static[:auth][:http_basic].whitelist << parse_hostname.call('localhost',inf[:path])
+            else
+              cp.parse('whitelist',false,Array) do |info|
+                next if info[:empty]
+                static[:auth][:http_basic].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              end
+            end
+          end
+
+          cp.parse('ident',false) do |inf|
+            next if inf[:empty]
+            static[:auth] = {} unless static[:auth]
+            static[:auth][:ident] = IdentAuthentication.new
+            if static[:local]
+              static[:auth][:ident].whitelist << parse_hostname.call('localhost',inf[:path])
+            else
+              cp.parse('whitelist',true,Array) do |info|
+                next if info[:empty]
+                static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              end
+            end
+          end
+
+          if !static[:auth] or static[:auth].empty?
+            raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
+          end
+        end
+
         cp.parse('logs') do
           static[:logfile] = cp.value(
             'logfile',String,'',
@@ -454,28 +513,6 @@ module Configuration
             )
             static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
           end
-        end
-
-        cp.parse('network',true) do
-          cp.parse('vlan',true) do
-            @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
-            @set_vlan_cmd = cp.value('set_cmd',String,'')
-          end
-
-          cp.parse('ports') do
-            static[:port] = cp.value(
-              'kadeploy_server',Fixnum,KADEPLOY_PORT
-            )
-            @ssh_port = cp.value('ssh',Fixnum,22)
-            @test_deploy_env_port = cp.value(
-              'test_deploy_env',Fixnum,KADEPLOY_PORT
-            )
-          end
-
-          @kadeploy_tcp_buffer_size = cp.value(
-            'tcp_buffer_size',Fixnum,8192
-          )
-          static[:host] = cp.value('server_hostname',String)
         end
 
         cp.parse('windows') do

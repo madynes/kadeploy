@@ -114,7 +114,8 @@ module HTTP
       end
     end
 
-    def self.request(server,port,secure=true,request=nil,parse=true)
+    def self.request(server,port,secure=true,request=nil,parse=nil)
+      parse = true if parse.nil?
       res = nil
       connect(server,port,secure) do |client|
         begin
@@ -203,13 +204,17 @@ module HTTP
       end
     end
 
-    def self.gen_request(kind,path,data=nil,content_type=:json,accept_type=:json)
+    def self.gen_request(kind,path,data=nil,content_type=nil,accept_type=nil,headers=nil)
+      content_type ||= :json
+      accept_type ||= :json
+
       header = { 'Accept' => content_type(accept_type) }
       if data
         data = content_cast(content_type,data)
         header['Content-Type'] = content_type(content_type)
         header['Content-Length'] = data.size.to_s
       end
+      header.merge!(headers) if headers
 
       ret = nil
       case kind
@@ -226,24 +231,25 @@ module HTTP
       end
 
       ret.body = data if data
+      ret.basic_auth($http_user,$http_password) if $http_user and $http_password
 
       ret
     end
 
-    def self.get(server,port,path,secure=true,content_type=:json,accept_type=:json,parse=true)
-      request(server,port,secure,gen_request(:GET,path,nil,nil,accept_type),parse)
+    def self.get(server,port,path,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
+      request(server,port,secure,gen_request(:GET,path,nil,nil,accept_type,headers),parse)
     end
 
-    def self.post(server,port,path,data,secure=true,content_type=:json,accept_type=:json,parse=true)
-      request(server,port,secure,gen_request(:POST,path,data,content_type,accept_type),parse)
+    def self.post(server,port,path,data,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
+      request(server,port,secure,gen_request(:POST,path,data,content_type,accept_type,headers),parse)
     end
 
-    def self.put(server,port,path,data,secure=true,content_type=:json,accept_type=:json,parse=true)
-      request(server,port,secure,gen_request(:PUT,path,data,content_type,accept_type),parse)
+    def self.put(server,port,path,data,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
+      request(server,port,secure,gen_request(:PUT,path,data,content_type,accept_type,headers),parse)
     end
 
-    def self.delete(server,port,path,secure=true,content_type=:json,accept_type=:json,parse=true)
-      request(server,port,secure,gen_request(:DELETE,path,nil,nil,accept_type),parse)
+    def self.delete(server,port,path,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
+      request(server,port,secure,gen_request(:DELETE,path,nil,nil,accept_type,headers),parse)
     end
   end
 end

@@ -215,7 +215,7 @@ module Automata
     def timeout!(task)
     end
 
-    def retry!(task)
+    def retry!(task,nodeset)
     end
 
     def split!(nsid0,nsid1,ns1,nsid2,ns2)
@@ -595,7 +595,7 @@ module Automata
                 newtask[:idx] = curtask.idx
                 newtask[:subidx] = curtask.subidx
                 newtask[:context][:local][:retries] += 1
-                retry!(curtask)
+                retry!(curtask,query[:nodes])
               else
                 tasks = tasks()
                 if multi_task?(curtask.idx,tasks) \
@@ -603,6 +603,7 @@ module Automata
                   newtask[:idx] = curtask.idx
                   newtask[:subidx] = curtask.subidx + 1
                   newtask[:context][:local][:retries] = 0
+                  retry!(curtask,query[:nodes])
                 else
                   curtask.mutex.synchronize do
                     fail_task(curtask,query[:nodes],query[:nsid])

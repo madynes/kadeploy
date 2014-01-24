@@ -1,16 +1,16 @@
 module Kadeploy
 
 module Kapower
-  def power_init_exec_context()
-    ret = work_init_exec_context(:power)
+  def power_init_exec_context(ret)
+    ret = work_init_exec_context(:power,ret)
     ret.operation = nil
     ret.level = nil
     ret
   end
 
-  def power_prepare(params,operation=:create)
-    context = work_prepare(:power,params,operation)
-    parse_params_default(params,context)
+  def power_prepare(params,operation,context)
+    context = work_prepare(:power,params,operation,context)
+    operation ||= :create
 
     case operation
     when :modify

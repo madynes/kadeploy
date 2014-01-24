@@ -244,9 +244,9 @@ module Debug
         "timeout_step1" => 0,
         "timeout_step2" => 0,
         "timeout_step3" => 0,
-        "retry_step1" => -1,
-        "retry_step2" => -1,
-        "retry_step3" => -1,
+        "retry_step1" => 0,
+        "retry_step2" => 0,
+        "retry_step3" => 0,
         "start" => start,
         "step1_duration" => 0,
         "step2_duration" => 0,
@@ -289,6 +289,7 @@ module Debug
       nodeset.set.each do |node|
         state = states.get(node.hostname)
         node.last_cmd_stderr = "#{state[:macro]}-#{state[:micro]}: #{node.last_cmd_stderr}"
+        states.set(node.hostname,nil,nil,'ko',node.last_cmd_stderr)
         @nodes[node.hostname]["error"] = node.last_cmd_stderr
       end
     end

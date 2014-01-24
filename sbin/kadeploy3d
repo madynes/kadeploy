@@ -250,7 +250,8 @@ end
 begin
   $stderr = $stdout
   $httpd = Kadeploy::HTTPd::Server.new($kadeploy.host,$kadeploy.port,
-    $kadeploy.secure,$kadeploy.cert,$kadeploy.private_key,dh_seeds)
+    $kadeploy.secure,$kadeploy.local,$kadeploy.cert,$kadeploy.private_key,
+    dh_seeds)
   $stderr = STDERR
 
   $kadeploy_logfiles[:httpd] = $httpd.logs[:httpd]

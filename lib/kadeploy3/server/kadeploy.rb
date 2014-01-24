@@ -3,8 +3,8 @@ require 'uri'
 module Kadeploy
 
 module Kadeploy
-  def deploy_init_exec_context()
-    ret = work_init_exec_context(:deploy)
+  def deploy_init_exec_context(ret)
+    ret = work_init_exec_context(:deploy,ret)
     ret.reformat_tmp = nil
     ret.disable_kexec = false
     ret.disable_bootloader_install = false
@@ -13,8 +13,9 @@ module Kadeploy
     ret
   end
 
-  def deploy_prepare(params,operation=:create)
-    context = work_prepare(:deploy,params,operation)
+  def deploy_prepare(params,operation,context)
+    context = work_prepare(:deploy,params,operation,context)
+    operation ||= :create
 
     # Check user
     parse_params_default(params,context)

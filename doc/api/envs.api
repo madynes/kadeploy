@@ -64,7 +64,6 @@ operation 'Environments management' do
           "filesystem": "ext4",
           "partition_type": 0,
           "multipart": false,
-          "user": "frontend"
         }
       EOS
 
@@ -103,7 +102,6 @@ operation 'Environments management' do
     sample \
       <<-EOS
         {
-          "user": "frontend",
           "environment": {
             "name": "debian-base",
             "version": 2,
@@ -203,10 +201,10 @@ operation 'Environments management' do
         POST /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
         Content-Type: application/json
-        Content-Length: 751
+        Content-Length: 731
         {
-          "user": "frontend",
           "client": "http://frontend.testbed.lan:12345",
           "environment": {
             "name": "debian-base",
@@ -277,10 +275,10 @@ operation 'Environments management' do
         POST /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
         Content-Type: application/json
-        Content-Length: 321
+        Content-Length: 301
         {
-          "user": "frontend",
           "environment": {
             "name": "debian-base",
             "os": "linux",
@@ -327,10 +325,10 @@ operation 'Environments management' do
         POST /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
         Content-Type: application/json
-        Content-Length: 677
+        Content-Length: 657
         {
-          "user": "frontend",
           "environment": {
             "name": "debian-base",
             "version": 2,
@@ -425,9 +423,10 @@ operation 'Environments management' do
 
     example 'Get the list of all visible environments',
       <<-EOS ,
-        GET /environments?user=frontend HTTP/1.1
+        GET /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -497,9 +496,10 @@ operation 'Environments management' do
 
     example 'Get the list of the environments a specified user can see',
       <<-EOS ,
-        GET /environments/frontend?user=frontend HTTP/1.1
+        GET /environments/frontend HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -589,9 +589,10 @@ operation 'Environments management' do
 
     example 'Get the description of a specific environment',
       <<-EOS ,
-        GET /environments/frontend/debian-custom?user=frontend HTTP/1.1
+        GET /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -623,9 +624,10 @@ operation 'Environments management' do
 
     example 'Get the description of a specific version of a specific environment',
       <<-EOS ,
-        GET /environments/frontend/debian-custom/1?user=frontend HTTP/1.1
+        GET /environments/frontend/debian-custom/1 HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -657,9 +659,10 @@ operation 'Environments management' do
 
     example 'Get the description of every versions of a specific environment',
       <<-EOS ,
-        GET /environments/frontend/debian-custom?user=frontend HTTP/1.1
+        GET /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -734,10 +737,10 @@ operation 'Environments management' do
         PUT /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
         Content-Type: application/json
-        Content-Length: 50
+        Content-Length: 30
         {
-          "user": "frontend",
           "visibility": "shared"
         }
       EOS
@@ -768,9 +771,10 @@ operation 'Environments management' do
 
     example 'Tell the server to gather the new checksum of the image\'s archive',
       <<-EOS ,
-        PUT /environments/frontend/debian-custom?user=frontend&update_image_checksum HTTP/1.1
+        PUT /environments/frontend/debian-custom?update_image_checksum HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -820,6 +824,7 @@ operation 'Environments management' do
         PUT /environments HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
         Content-Type: application/json
         Content-Length: 96
         {
@@ -890,9 +895,10 @@ operation 'Environments management' do
 
     example 'Delete every versions of a specific environment',
       <<-EOS ,
-        DELETE /environments/frontend/debian-custom?user=frontend HTTP/1.1
+        DELETE /environments/frontend/debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
@@ -942,9 +948,10 @@ operation 'Environments management' do
 
     example 'Delete a specific version of an environment',
       <<-EOS ,
-        DELETE /environments/frontend/debian-custom/2?user=frontend HTTP/1.1
+        DELETE /environments/frontend/debian-custom/2 HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
+        X-Kadeploy-User: frontend
       EOS
       <<-EOS
         HTTP/1.1 200 OK
