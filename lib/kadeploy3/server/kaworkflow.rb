@@ -176,13 +176,15 @@ module Kaworkflow
             context.vlan_addr = {}
             context.nodelist.each do |hostname|
               host,domain = hostname.split('.',2)
-              vlan_hostname = "#{host}#{context.config.common.vlan_hostname_suffix}"\
-                ".#{domain}".gsub!('VLAN_ID', context.vlan_id)
+              vlan_hostname = "#{host}#{context.config.common.vlan_hostname_suffix}.#{domain}"
+              vlan_hostname.gsub!('VLAN_ID', context.vlan_id)
+
               begin
-                context.vlan_addr = dns.getaddress(vlan_hostname).to_s
+                context.vlan_addr[hostname] = dns.getaddress(vlan_hostname).to_s
               rescue Resolv::ResolvError
                 kaerror(APIError::INVALID_VLAN,"Cannot resolv #{vlan_hostname}")
               end
+              kaerror(APIError::INVALID_VLAN,"Resolv error #{vlan_hostname}") if !context.vlan_addr[hostname] or context.vlan_addr[hostname].empty?
             end
             dns.close
             dns = nil
