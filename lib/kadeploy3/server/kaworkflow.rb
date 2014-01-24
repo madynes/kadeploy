@@ -119,8 +119,9 @@ module Kaworkflow
     end
   end
 
-  def work_prepare(kind,params,operation=:create,context)
+  def work_prepare(kind,params,operation,context)
     context = run_wmethod(kind,:init_exec_context,context)
+    operation ||= :create
 
     case operation
     when :create, :modify

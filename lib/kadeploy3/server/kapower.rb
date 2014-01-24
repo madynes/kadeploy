@@ -8,8 +8,9 @@ module Kapower
     ret
   end
 
-  def power_prepare(params,operation=:create,context)
+  def power_prepare(params,operation,context)
     context = work_prepare(:power,params,operation,context)
+    operation ||= :create
 
     case operation
     when :modify

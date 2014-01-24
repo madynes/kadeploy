@@ -8,8 +8,9 @@ module Kareboot
     ret
   end
 
-  def reboot_prepare(params,operation=:create,context)
+  def reboot_prepare(params,operation,context)
     context = work_prepare(:reboot,params,operation,context)
+    operation ||= :create
 
     case operation
     when :create

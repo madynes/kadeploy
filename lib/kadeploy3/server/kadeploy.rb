@@ -13,8 +13,9 @@ module Kadeploy
     ret
   end
 
-  def deploy_prepare(params,operation=:create,context)
+  def deploy_prepare(params,operation,context)
     context = work_prepare(:deploy,params,operation,context)
+    operation ||= :create
 
     # Check user
     parse_params_default(params,context)

@@ -44,8 +44,9 @@ module Kaconsole
     context
   end
 
-  def console_prepare(params,operation=:get,context)
+  def console_prepare(params,operation,context)
     context = console_init_exec_context(context)
+    operation ||= :get
 
     case operation
     when :create

@@ -7,8 +7,9 @@ module Kanodes
     ret
   end
 
-  def nodes_prepare(params,operation=:get,context)
+  def nodes_prepare(params,operation,context)
     context = nodes_init_exec_context(context)
+    operation ||= :get
 
     parse_params(params) do |p|
       # Check nodelist

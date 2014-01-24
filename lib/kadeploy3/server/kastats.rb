@@ -10,8 +10,9 @@ module Kastats
     ret
   end
 
-  def stats_prepare(params,operation=:get,context)
+  def stats_prepare(params,operation,context)
     context = stats_init_exec_context(context)
+    operation ||= :get
 
     parse_params(params) do |p|
       # Check nodelist
