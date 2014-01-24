@@ -116,13 +116,12 @@ introduction do
     EOS
 
     paragraph $cgi.b{'Authentication by password'}
-    paragraph "The second authentication method is the authentication by password (from trusted machines). In order to authenticate with such a method it's necessary to specify the password in the 'Secret-Key' request's header. Here is some examples:"
+    paragraph "The second authentication method is the authentication by password (from trusted machines) using the HTTP Basic Authentication method (RFC 2617). In order to authenticate with such a method it's necessary to specify the user and password as a base64 string in the 'Authorization' request's header. Here is some examples:"
     paragraph html_code <<-EOS
       GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
-      X-Auth-Secret-Key: mypassword
+      Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
     EOS
     paragraph $cgi.b{'Authentication by certificate'}
     paragraph "To be able to authenticate using a (x509) certificate it's necessary to provide a base64 encoded x509 certificate that was signed with the server's private key in the 'Certificate' request's header. Here is an example:"

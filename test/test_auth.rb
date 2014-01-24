@@ -26,21 +26,20 @@ class TestAuth < Test::Unit::TestCase
     ) if @wid
   end
 
-  def get(path,headers=nil,server=KADEPLOY_SERVER,port=KADEPLOY_PORT,secure=KADEPLOY_SECURE)
+  def get(path,headers=nil,http_auth=nil,server=KADEPLOY_SERVER,port=KADEPLOY_PORT,secure=KADEPLOY_SECURE)
     headers = {} unless headers
-    headers = {"#{KADEPLOY_AUTH_HEADER}User"=>USER}.merge!(headers)
+    headers = {"#{KADEPLOY_AUTH_HEADER}User"=>USER}.merge!(headers) if !http_auth
     begin
-      Kadeploy::HTTP::Client.request(
-        server,port,secure,
-        Kadeploy::HTTP::Client.gen_request(:GET,path,nil,:json,:json,headers)
-      )
+      req = Kadeploy::HTTP::Client.gen_request(:GET,path,nil,nil,nil,headers)
+      req.basic_auth(http_auth[:user],http_auth[:password]) if http_auth
+      Kadeploy::HTTP::Client.request(server,port,secure,req)
     rescue Exception => e
       assert(false,e.message)
     end
   end
 
   def test_acl()
-    ret = get("/power",nil,'localhost')
+    ret = get("/power",nil,nil,'localhost')
     assert(!ret.select{|v| v['id'] == @wid}.empty?,ret.to_yaml)
   end
 
@@ -58,9 +57,8 @@ class TestAuth < Test::Unit::TestCase
     assert(elem.keys.include?('time'),"Get state did not return the admin view\n"+ret.to_yaml)
   end
 
-  def test_secret_key()
-    ret = get("/power",
-      {"#{KADEPLOY_AUTH_HEADER}Secret-Key"=>KADEPLOY_SECRET_KEY})
+  def test_http_basic()
+    ret = get("/power",nil,{:user=>USER,:password=>KADEPLOY_SECRET_KEY})
     elem = ret.select{|v| v['id'] == @wid}
     assert(!elem.empty?,ret.to_yaml)
     elem = elem[0]

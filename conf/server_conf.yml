@@ -10,13 +10,16 @@ rights:
   kind: db
   almighty_users: root,deploy
 authentication:
-  certificate:
-    ca_cert: /etc/ssl/private/testbed-ca.pem
+  acl:
+    whitelist:
+    - localhost
+  http_basic:
+    dbfile: /etc/kadeploy3/kadeploy.htpasswd
     whitelist:
     - kadeploy.testbed.lan
     - frontend.testbed.lan
-  secret_key:
-    key: KADEPLOY-SECRET-KEY
+  certificate:
+    ca_cert: /etc/ssl/private/testbed-ca.pem
     whitelist:
     - kadeploy.testbed.lan
     - frontend.testbed.lan

@@ -231,6 +231,7 @@ module HTTP
       end
 
       ret.body = data if data
+      ret.basic_auth($http_user,$http_password) if $http_user and $http_password
 
       ret
     end
