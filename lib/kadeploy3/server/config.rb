@@ -370,7 +370,7 @@ module Configuration
           end
 
           cp.parse('global',false) do |info|
-            static[:auth_headers_prefix] = cp.value('headers_prefix',String,'X-Auth-')
+            static[:auth_headers_prefix] = cp.value('headers_prefix',String,'X-Kadeploy-')
           end
 
           cp.parse('acl',false) do |inf|

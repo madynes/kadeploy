@@ -23,7 +23,7 @@ operation 'Statistics' do
       GET /stats HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -48,7 +48,7 @@ operation 'Statistics' do
       GET /stats/deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -66,7 +66,7 @@ operation 'Statistics' do
       GET /stats?kind=failure_rates&min_failure_rate=0.0 HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK
@@ -83,7 +83,7 @@ operation 'Statistics' do
       GET /stats?kind=all&date_max=Fri%2C+10+Jan+2014+10%3A10%3A00+GMT HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     <<-EOS
       HTTP/1.1 200 OK

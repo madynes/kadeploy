@@ -7,7 +7,7 @@ introduction do
       POST /deploy?nodes=node-1.testbed.lan&nodes=node-2.testbed.lan HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
 
     paragraph $cgi.b{"Specifying parameters in the query's body"}
@@ -16,7 +16,7 @@ introduction do
       POST /deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 73
       {
@@ -32,7 +32,7 @@ introduction do
       POST /deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/x-yaml
       Content-Length: 47
       ---
@@ -53,7 +53,7 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     paragraph html_code <<-EOS
       HTTP/1.1 200 OK
@@ -70,7 +70,7 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: application/x-yaml
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     paragraph html_code <<-EOS
       HTTP/1.1 200 OK
@@ -87,7 +87,7 @@ introduction do
       Accept: application/x-yaml
       Accept-Encoding: gzip
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
     paragraph html_code <<-EOS
       HTTP/1.1 200 OK
@@ -104,7 +104,7 @@ introduction do
 
   section 'Authentication' do
     paragraph "To access API resources an authentication is needed. There is four different methods to authenticate when accessing a ressource. Depending on the server's configuration it will be possible to use -at least- one of this methods."
-    paragraph "Authentication parameters are given in the HTTP headers of the request. A prefix can be set to this parameters, this prefix default to 'X-Auth' but it can be set to another value (see #{$cgi.a(:href=>'#GET/auth_headers_prefix'){'GET /auth_headers_prefix'}})."
+    paragraph "Authentication parameters are given in the HTTP headers of the request. A prefix can be set to this parameters, this prefix default to 'X-Kadeploy' but it can be set to another value (see #{$cgi.a(:href=>'#GET/auth_headers_prefix'){'GET /auth_headers_prefix'}})."
 
     paragraph $cgi.b{'Authentication using the IDENT protocol'}
     paragraph "The first authentication method is based on the IDENT protocol. When a request will be received on the server, it will first check if the request is coming from a trusted machine then it will contact the IDENT server of this machine in order to be sure that the username specified in the 'User' request's header is actually corresponding to the user on the machine that initiated the request. In order to be authenticated with this method, no extra parameters have to be providen, an IDENT server just have to be set up on the machine that is used to initiate the request. Here is an example:"
@@ -112,7 +112,7 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
 
     paragraph $cgi.b{'Authentication by password'}
@@ -129,8 +129,8 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
-      X-Auth-Certificate: MIIEIzCCAwugAwIBAgIBGTANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQ...XnMuLyV1FQ==
+      X-Kadeploy-User: frontend
+      X-Kadeploy-Certificate: MIIEIzCCAwugAwIBAgIBGTANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQ...XnMuLyV1FQ==
     EOS
     paragraph $cgi.b{'Authentication by ACL'}
     paragraph "If your machine's hostname is in the server's Access Control List, it will be trust without any further verifications. Here is an example:"
@@ -138,7 +138,7 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
     EOS
   end
 
@@ -211,7 +211,7 @@ introduction do
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 301
       {
@@ -232,7 +232,7 @@ introduction do
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 731
       {
@@ -262,7 +262,7 @@ introduction do
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 657
       {

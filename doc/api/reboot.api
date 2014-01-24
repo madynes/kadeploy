@@ -34,7 +34,7 @@ operation 'Reboot operations' do
       POST /reboot HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 112
       {
@@ -70,7 +70,7 @@ operation 'Reboot operations' do
       POST /reboot HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 229
       {
@@ -108,7 +108,7 @@ operation 'Reboot operations' do
       POST /reboot HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 311
       {
@@ -152,7 +152,7 @@ operation 'Reboot operations' do
       POST /reboot HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
-      X-Auth-User: frontend
+      X-Kadeploy-User: frontend
       Content-Type: application/json
       Content-Length: 613
       {
