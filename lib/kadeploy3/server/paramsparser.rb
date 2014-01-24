@@ -104,6 +104,7 @@ class ParamsParser
 
     case opts[:type]
     when :x509
+      param = Base64.strict_decode64(param)
       param = param.join("\n") if param.is_a?(Array)
       begin
         param = OpenSSL::X509::Certificate.new(param)

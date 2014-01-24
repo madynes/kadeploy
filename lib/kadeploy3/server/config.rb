@@ -346,6 +346,10 @@ module Configuration
             addr
           end
 
+          cp.parse('global',false) do |info|
+            static[:auth_headers_prefix] = cp.value('headers_prefix',String,'X-Auth-')
+          end
+
           cp.parse('acl',false) do |inf|
             next if inf[:empty]
             static[:auth] = {} unless static[:auth]

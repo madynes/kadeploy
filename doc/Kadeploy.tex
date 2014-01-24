@@ -450,6 +450,8 @@ rights:
   almighty_users: root,superuser
   purge_deployment_timer: 900
 authentication:
+  global:
+    headers_prefix: X-Auth-
   certificate:
     #ca_public_key:
     #  algorithm: RSA
@@ -582,6 +584,11 @@ external:
     \item \yfieldd{kind}{String}{db} authentication kind (use db for a true rights management or dummy to bypass the rights management)
     \item \yfieldd{almighty\_users}{String}{root} list of users allowed to perform special operations on the environments like publishing environments or moving files
     \item \yfieldd{purge\_deployment\_timer}{Integer}{900} limeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
+  \end{itemize}
+
+  \item \ypath{/authentication/global} Define global configuration for authentication methods.
+  \begin{itemize}
+    \item \yfieldd{headers\_prefix}{String}{X-Auth-} Clients have to provide authentication information through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Auth-User}, \texttt{X-Auth-Certificate})
   \end{itemize}
 
   \item \ypath{/authentication/acl} Access Control List based authentication. When using ACL authentication, specifying a whitelist is mandatory.
@@ -1503,6 +1510,7 @@ servers:
   - name: lille
     hostname: frontend.lille.grid5000.fr
     port: 25300
+    auth_headers_prefix: X-Auth-
   - name: nancy
     hostname: nancy.lille.grid5000.fr
     port: 25300
@@ -1518,6 +1526,7 @@ servers:
     \item \yfield{hostname}{String} the Kadeploy server hostname
     \item \yfield{port}{Integer} the port the Kadeploy server is listening on
     \item \yfieldd{secure}{Boolean}{true} specify if the server use a secure connection
+    \item \yfieldd{auth\_headers\_prefix}{String}{''} The client provides authentication information to the server through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Auth-User}). This setting depends on the server's configuration. When not specified (empty), the client do an extra GET HTTP request on the server to determine this value.
   \end{itemize}
 \end{itemize}
 

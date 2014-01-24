@@ -148,7 +148,7 @@ class KadeployClient < ClientWorkflow
       username = nil
       username = options[:env_user] if options[:env_user]
 
-      tmp = {:user=>USER}
+      tmp = {}
       tmp[:last] = true unless options[:env_version]
       envs = get(api_path(username,:envs),tmp)
       envs.select!{|en| en['name'] == envname}

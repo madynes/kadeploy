@@ -3,8 +3,7 @@ module Kadeploy
 module Kaworkflow
   WORKFLOW_STATUS_CHECK_PITCH=1
 
-  def work_init_exec_context(kind)
-    ret = init_exec_context()
+  def work_init_exec_context(kind,ret)
     ret.config = nil
     ret.info = nil
     ret.nodes = nil
@@ -120,9 +119,8 @@ module Kaworkflow
     end
   end
 
-  def work_prepare(kind,params,operation=:create)
-    context = run_wmethod(kind,:init_exec_context)
-    parse_params_default(params,context)
+  def work_prepare(kind,params,operation=:create,context)
+    context = run_wmethod(kind,:init_exec_context,context)
 
     case operation
     when :create, :modify

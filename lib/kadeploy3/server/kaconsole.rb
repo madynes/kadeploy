@@ -4,8 +4,7 @@ require 'socket'
 require 'pty'
 
 module Kaconsole
-  def console_init_exec_context()
-    ret = init_exec_context()
+  def console_init_exec_context(ret)
     ret.config = nil
     ret
   end
@@ -45,9 +44,8 @@ module Kaconsole
     context
   end
 
-  def console_prepare(params,operation=:get)
-    context = console_init_exec_context()
-    parse_params_default(params,context)
+  def console_prepare(params,operation=:get,context)
+    context = console_init_exec_context(context)
 
     case operation
     when :create

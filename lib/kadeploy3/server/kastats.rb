@@ -1,8 +1,7 @@
 module Kadeploy
 
 module Kastats
-  def stats_init_exec_context()
-    ret = init_exec_context()
+  def stats_init_exec_context(ret)
     ret.nodes = nil
     ret.kind = nil
     ret.filters = {}
@@ -11,9 +10,8 @@ module Kastats
     ret
   end
 
-  def stats_prepare(params,operation=:get)
-    context = stats_init_exec_context()
-    parse_params_default(params,context)
+  def stats_prepare(params,operation=:get,context)
+    context = stats_init_exec_context(context)
 
     parse_params(params) do |p|
       # Check nodelist
