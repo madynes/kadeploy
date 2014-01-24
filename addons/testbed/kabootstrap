@@ -140,6 +140,7 @@ CFG_KADEPLOY_CERT = File.join(CFG_KADEPLOY_CONF_PATH,'kadeploy.pem')
 CFG_KADEPLOY_PRIVATE_KEY = File.join(CFG_KADEPLOY_CONF_PATH,'kadeploy.key')
 CFG_KADEPLOY_ADMIN_CERT = File.join(CFG_KADEPLOY_CONF_PATH,'admin.pem')
 CFG_KADEPLOY_ADMIN_PRIVATE_KEY = File.join(CFG_KADEPLOY_CONF_PATH,'admin.key')
+CFG_KADEPLOY_DBFILE = File.join(CFG_KADEPLOY_CONF_PATH,'kadeploy.htpasswd')
 CFG_KADEPLOY_HOSTNAMES_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'hostnames')
 CFG_KADEPLOY_KVM_PROCS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'kvmprocs')
 CFG_KADEPLOY_KVM_HOSTS_PATH = File.join(CFG_KADEPLOY_VAR_PATH,'kvmhosts')
@@ -428,12 +429,15 @@ def cfg_kadeploy_conf()
     }
     if $version >= 8
       ret['authentication'] = {
+        'acl' => {
+          'whitelist' => ['localhost'],
+        },
         'certificate' => {
           'ca_cert' => CFG_CA_CERT,
           'whitelist' => [$services[:kadeploy][:fqdn],$services[:frontend][:fqdn]],
         },
-        'secret_key' => {
-          'key' => 'KADEPLOY',
+        'http_basic' => {
+          'dbfile' => CFG_KADEPLOY_DBFILE,
           'whitelist' => [$services[:kadeploy][:fqdn],$services[:frontend][:fqdn]],
         },
         'ident' => {
@@ -3611,6 +3615,7 @@ sshgw.ssh(servername,'root') do |session|
     msg('Setting up hostnames hack',MSG_INFO)
     scp(servername,$sshkeyfile,CFG_KADEPLOY_HOSTNAMES_SSHKEY)
     sexec(session,"chown #{CFG_KADEPLOY_USER}:#{CFG_KADEPLOY_USER} #{CFG_KADEPLOY_HOSTNAMES_SSHKEY}")
+    sexec(session,"chmod 600 #{CFG_KADEPLOY_HOSTNAMES_SSHKEY}")
 
     count = 0
     sexecbig(session) do |cmds|
@@ -3626,6 +3631,11 @@ sshgw.ssh(servername,'root') do |session|
     if $version >= 8
       msg('Installing identd',MSG_INFO)
       apt_install(session,'oidentd',server)
+
+      msg('Creating htpasswd user db',server)
+      apt_install(session,'apache2-utils',server)
+      sexec(session,"htpasswd -bcd #{CFG_KADEPLOY_DBFILE} #{CFG_KADEPLOY_USER} KADEPLOY")
+      sexec(session,"htpasswd -bd #{CFG_KADEPLOY_DBFILE} #{CFG_FRONTEND_USER} KADEPLOY")
 
       msg('Installing openssl',MSG_INFO)
       apt_install(session,'openssl',server)

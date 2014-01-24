@@ -450,6 +450,8 @@ rights:
   almighty_users: root,superuser
   purge_deployment_timer: 900
 authentication:
+  global:
+    headers_prefix: X-Kadeploy-
   certificate:
     #ca_public_key:
     #  algorithm: RSA
@@ -458,8 +460,9 @@ authentication:
     whitelist:
     - 192.168.0.0/24
     - kadeploy.mydomain.tld
-  #secret_key:
-  #  key: mysecretkey
+  #http_basic:
+  #  dbfile: kadeploy.htpasswd
+  #  realm: Kadeploy
   #  whitelist:
   #  - frontend.mydomain.tld
   #  - 192.168.0.4
@@ -471,6 +474,7 @@ authentication:
     - kadeploy.mydomain.tld
 security:
   secure_server: true
+  local_only: false
   #certificate: cert.pem
   #private_key:
   #  algorithm: RSA
@@ -583,6 +587,13 @@ external:
     \item \yfieldd{purge\_deployment\_timer}{Integer}{900} limeout used to consider that a deployment is finished. This is used to avoid several deployment on the same nodes at the same time.
   \end{itemize}
 
+  \item \ypath{/authentication/global} Define global configuration for authentication methods.
+  \begin{itemize}
+    \item \yfieldd{headers\_prefix}{String}{X-Kadeploy-} Clients have to provide authentication information through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Kadeploy-User}, \texttt{X-Kadeploy-Certificate})
+  \end{itemize}
+
+  \item \ypath{/authentication/acl} Access Control List based authentication. When using ACL authentication, specifying a whitelist is mandatory.
+
   \item \ypath{/authentication/certificate} authentication the certificate of a Certification Authority, at least a public key or a x509 certificate as to be specified.
   \begin{itemize}
     \item \yfield{ca\_cert}{String} the path to a file containing the x509 certificate of the Certification Authority.
@@ -593,9 +604,10 @@ external:
     \item \yfield{file}{String} the path to a file containing the public key of the Certification Authority.
   \end{itemize}
 
-  \item \ypath{/authentication/secret\_key} authentication using a secret key.
+  \item \ypath{/authentication/http\_basic} authentication using the HTTP Basic Authentication method (see RFC 2617).
   \begin{itemize}
-    \item \yfield{key}{String} The secret key that has to be specified by the user to be identified.
+    \item \yfield{dbfile}{String} The file containing a database of user/passwords (his file can be generated using tools such as \texttt{htpasswd}).
+    \item \yfieldd{realm}{String}{SERVERS\_URL} Overwrite the realm value with a custom one (for sample, if the service is accessed throught a proxy).
   \end{itemize}
   \item \ypath{/authentication/ident} authentication using the Ident protocol (see RFC 1413) on the client machine. When using Ident authentication, specifying a whitelist is mandatory.
   \item \ypath{/authentication/*/[whitelist]} For each authentication method, a whitelist can be specified. Authentication atempts will only be allowed from the specified hosts. The whitelist is an array of hosts (Strings). Hosts can be specified by IP address, IP address with CIDR notation, hostname and Regular Expression (using the char \texttt{/} as prefix and suffix of the expression).
@@ -603,6 +615,7 @@ external:
   \item \ypath{/security}
   \begin{itemize}
     \item \yfieldd{secure\_server}{Boolean}{true} launch the server in secure (SSL) mode
+    \item \yfieldd{local\_only}{Boolean}{false} only listen for local connection (\ypath{/authentication/*/whitelist} fields become useless)
     \item \yfieldd{certificate}{String}{''} path to an x509 certificate that will be used to launch secure connections. If none is specified and the secure mode is enabled, a self-signed certificate will be generated.
     \item \yfieldd{force\_secure\_client}{Boolean}{false} specify if files have to be exported to the server using a secured connection (see section \ref{sec:api_files_export}).
   \end{itemize}
@@ -1499,6 +1512,7 @@ servers:
   - name: lille
     hostname: frontend.lille.grid5000.fr
     port: 25300
+    auth_headers_prefix: X-Kadeploy-
   - name: nancy
     hostname: nancy.lille.grid5000.fr
     port: 25300
@@ -1514,6 +1528,7 @@ servers:
     \item \yfield{hostname}{String} the Kadeploy server hostname
     \item \yfield{port}{Integer} the port the Kadeploy server is listening on
     \item \yfieldd{secure}{Boolean}{true} specify if the server use a secure connection
+    \item \yfieldd{auth\_headers\_prefix}{String}{''} The client provides authentication information to the server through HTTP headers, this is the prefix for each information kind (sample of authentication header information with the default setting: \texttt{X-Kadeploy-User}). This setting depends on the server's configuration. When not specified (empty), the client do an extra GET HTTP request on the server to determine this value.
   \end{itemize}
 \end{itemize}
 

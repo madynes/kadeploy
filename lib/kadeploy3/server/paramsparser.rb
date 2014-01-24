@@ -1,4 +1,3 @@
-require 'openssl'
 require 'uri'
 require 'time'
 
@@ -103,13 +102,6 @@ class ParamsParser
     end
 
     case opts[:type]
-    when :x509
-      param = param.join("\n") if param.is_a?(Array)
-      begin
-        param = OpenSSL::X509::Certificate.new(param)
-      rescue Exception => e
-        error(errno,"invalid x509 certificate (#{e.message})")
-      end
     when :uri
       begin
         param = URI.parse(param)

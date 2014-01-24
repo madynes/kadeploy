@@ -32,11 +32,12 @@ module HTTPd
   MAX_CONTENT_SIZE = 1048576 # 1 MB
 
   class HTTPError < Exception
-    attr_reader :code
-    def initialize(code,name,msg=nil)
+    attr_reader :code,:headers
+    def initialize(code,name,msg=nil,headers=nil)
       super(msg)
       @code = code
       @name = name
+      @headers = headers
     end
 
     def message
@@ -45,28 +46,28 @@ module HTTPd
     end
   end
   class InvalidError < HTTPError
-    def initialize(msg=nil)
-      super(405,'Method Not Allowed',msg)
+    def initialize(msg=nil,headers=nil)
+      super(405,'Method Not Allowed',msg,headers)
     end
   end
   class NotFoundError < HTTPError
-    def initialize(msg=nil)
-      super(404,'File Not Found',msg)
+    def initialize(msg=nil,headers=nil)
+      super(404,'File Not Found',msg,headers)
     end
   end
   class UnauthorizedError < HTTPError
-    def initialize(msg=nil)
-      super(401,'Unauthorized',msg)
+    def initialize(msg=nil,headers=nil)
+      super(401,'Unauthorized',msg,headers)
     end
   end
   class ForbiddenError < HTTPError
-    def initialize(msg=nil)
-      super(403,'Forbidden',msg)
+    def initialize(msg=nil,headers=nil)
+      super(403,'Forbidden',msg,headers)
     end
   end
   class UnsupportedError < HTTPError
-    def initialize(msg=nil)
-      super(415,'Unsupported Media Type',msg)
+    def initialize(msg=nil,headers=nil)
+      super(415,'Unsupported Media Type',msg,headers)
     end
   end
 
@@ -331,6 +332,7 @@ module HTTPd
         rescue HTTPError => e
           res = e.message
           response.status = e.code
+          e.headers.each_pair{|k,v| response[k] = v} if e.headers
           response['Content-Type'] = 'text/plain'
           if e.is_a?(InvalidError)
             response['Allow'] = @allowed.collect{|m|m.to_s}.join(',')
@@ -357,9 +359,9 @@ module HTTPd
         response['Content-Type'] = 'text/plain'
         response['Allow'] = (@allowed + [:HEAD]).collect{|m|m.to_s}.join(',')
       end
-      res << "\n" if response['Content-Type'] == 'text/plain'
-      # Force encoding to UTF-8
       if response['Content-Type'] == 'text/plain'
+        res += "\n"
+        # Force encoding to UTF-8
         response['Content-Type'] << '; charset=utf-8'
         res.encode!('UTF-8', {:invalid => :replace, :undef => :replace})
       end
@@ -526,11 +528,12 @@ module HTTPd
 
   class Server
     attr_reader :host, :port, :logs
-    def initialize(host='',port=0,secure=true,cert=nil,private_key=nil,dh_seeds={},httpd_logfile=nil)
+    def initialize(host='',port=0,secure=true,local=false,cert=nil,private_key=nil,dh_seeds={},httpd_logfile=nil)
       raise if cert and !private_key
       @host = host || ''
       @port = port || 0
       @secure = secure
+      @local = local
       @cert = cert
       @private_key = private_key
       # A list of DH seeds instances for SSL per-session key exchange purpose
@@ -573,6 +576,13 @@ module HTTPd
         :MaxClients => MAX_CLIENTS,
         :DoNotReverseLookup => true,
       }
+
+      if @local
+        @host = 'localhost'
+        opts[:BindAddress] = 'localhost'
+      else
+        opts[:BindAddress] = '0.0.0.0'
+      end
 
       if @logs[:httpd]
         opts[:Logger] = WEBrick::Log.new(@logs[:httpd])

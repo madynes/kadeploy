@@ -135,7 +135,7 @@ class KarebootClient < ClientWorkflow
       username = nil
       username = options[:env_user] if options[:env_user]
 
-      envs = get(api_path(username,:envs),{:user=>USER})
+      envs = get(api_path(username,:envs))
       envs.select!{|en| en['name'] == envname}
       error("The environment '#{envname}' does not exist") if envs.size <= 0
       envs.sort_by!{|en| en['version']}

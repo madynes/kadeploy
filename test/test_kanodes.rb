@@ -44,7 +44,8 @@ class TestNodes < Test::Unit::TestCase
     ensure
       Kadeploy::HTTP::Client.request(
         KADEPLOY_SERVER,KADEPLOY_PORT,KADEPLOY_SECURE,
-        Kadeploy::HTTP::Client.gen_request(:DELETE,"/power/#{wid}?user=#{USER}")
+        Kadeploy::HTTP::Client.gen_request(:DELETE,"/power/#{wid}",
+          nil,nil,nil,{"#{KADEPLOY_AUTH_HEADER}User"=>USER})
       )
     end
   end

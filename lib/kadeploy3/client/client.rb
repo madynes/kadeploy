@@ -10,6 +10,8 @@ $killing = false
 $debug_mode = nil
 $debug_http = nil
 $interactive = true
+$http_user = nil
+$http_password = nil
 
 require 'thread'
 require 'uri'
@@ -20,6 +22,7 @@ require 'timeout'
 require 'tempfile'
 require 'json'
 require 'yaml'
+require 'io/console' if RUBY_VERSION >= '1.9'
 
 
 module Kadeploy
@@ -34,11 +37,12 @@ class Client
   @@terminal_width = nil
   attr_reader :name, :nodes
 
-  def initialize(name,server,port,secure=false,nodes=nil)
+  def initialize(name,server,port,secure,auth_headers_prefix,nodes=nil)
     @name = name
     @server = server
     @port = port
     @secure = secure
+    @auth_headers_prefix = auth_headers_prefix
     @nodes = nodes
   end
 
@@ -55,17 +59,18 @@ class Client
     )
   end
 
-  def self.error(msg='',abrt=true,code=1)
+  def self.error(msg='',code=1)
     unless $killing
-      $stdin.cooked! if $stdin.respond_to?(:cooked!)
+      $stdin.cooked! if $stdin.respond_to?(:cooked!) and STDIN.tty? and !STDIN.closed?
       $stderr.puts msg if msg and !msg.empty?
       self.kill
-      exit!(code||1) if abrt
+      exit!(code||1)
     end
+    raise
   end
 
-  def error(msg='',abrt=true,code=1)
-    self.class.error(debug(msg,false),abrt,code)
+  def error(msg='',code=1)
+    self.class.error(debug(msg,false),code)
   end
 
   def self.kill()
@@ -109,10 +114,13 @@ class Client
       cp = Configuration::Parser.new(config)
 
       cp.parse('servers',true,Array) do
+        tmp = cp.value('auth_headers_prefix',String,'')
+        tmp = nil if tmp.empty?
         servers[cp.value('name',String)] = [
           cp.value('hostname',String),
           cp.value('port',Fixnum),
-          cp.value('secure',[TrueClass,FalseClass],true)
+          cp.value('secure',[TrueClass,FalseClass],true),
+          tmp
         ]
       end
       servers['default'] = cp.value('default',String,nil,servers.keys)
@@ -299,10 +307,15 @@ class Client
 
     # Check if servers specified in the config file are reachable
     if options[:multi_server]
+      unreachables = []
       options[:servers].each_pair do |server,inf|
         next if server.downcase == "default"
-        error("The #{server} server is unreachable",false) unless PortScanner::is_open?(inf[0], inf[1])
+        unless PortScanner::is_open?(inf[0], inf[1])
+          debug("The #{server} server is unreachable")
+          unreachables << server
+        end
       end
+      unreachables.each{|server| options[:servers].delete(server)}
     else
       info = options[:servers][options[:chosen_server]]
       error("Unknown server #{info[0]}") unless info
@@ -366,6 +379,10 @@ class Client
     end
   end
 
+  def self.debug(msg='',io=$stdout)
+    io.puts msg
+  end
+
   def debug(msg='',print=true,io=$stdout)
     if @name
       tmp = ''
@@ -382,7 +399,6 @@ class Client
     end
   end
 
-  # Checks if the environment contains local files
   def add_localfiles(env)
     localfiles = []
     if env.is_a?(Array)
@@ -445,81 +461,90 @@ class Client
     [uri.host,uri.port,uri.path,uri.query]
   end
 
-  def self.get(host,port,path,secure=false)
-    HTTP::Client::get(host,port,path,secure)
-  end
-
-  def get(uri,params=nil,accept_type=:json,parse=true)
-    host,port,path,query = parse_uri(uri)
-    if query
-      path = "#{path}?#{query}"
-    elsif params
-      path = HTTP::Client.path_params(path,params)
-    end
-    host = @server unless host
-    port = @port unless port
-    begin
-      HTTP::Client::get(host,port,path,@secure,nil,accept_type,parse)
-    rescue HTTP::ClientError => e
-      error(e.message,true,e.code)
-    end
-  end
-
-  def post(uri,data,content_type=:json,accept_type=:json,parse=true)
-    host,port,path,query = parse_uri(uri)
-    path = "#{path}?#{query}" if query
-    host = @server unless host
-    port = @port unless port
-    begin
-      HTTP::Client::post(host,port,path,data,@secure,content_type,accept_type,parse)
-    rescue HTTP::ClientError => e
-      error(e.message,true,e.code)
-    end
-  end
-
-  def put(uri,data,content_type=:json,accept_type=:json,parse=true)
-    host,port,path,query = parse_uri(uri)
-    path = "#{path}?#{query}" if query
-    host = @server unless host
-    port = @port unless port
-    begin
-      HTTP::Client::put(host,port,path,data,@secure,content_type,accept_type,parse)
-    rescue HTTP::ClientError => e
-      error(e.message,true,e.code)
-    end
-  end
-
-  def delete(uri,params=nil,accept_type=:json,parse=true)
-    host,port,path,query = parse_uri(uri)
-    if query
-      path = "#{path}?#{query}"
-    elsif params
-      path = HTTP::Client.path_params(path,params)
-    end
-    host = @server unless host
-    port = @port unless port
-    begin
-      HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse)
-    rescue HTTP::ClientError => e
-      error(e.message,true,e.code)
-    end
-  end
-
-  def self.get_nodelist(server,port,secure=true)
-    nodelist = nil
+  def self.get(host,port,path,secure,headers=nil)
+    ret = nil
     begin
       Timeout.timeout(8) do
-        path = HTTP::Client.path_params('/nodes',{:user => USER,:list=>true})
-        nodelist = HTTP::Client::get(server,port,path,secure)
+        ret = HTTP::Client::get(host,port,path,secure,nil,nil,nil,headers)
       end
     rescue Timeout::Error
-      error("Cannot check the nodes on the #{server} server")
+      error("Request timeout: cannot GET #{path} on the #{server} server")
     rescue Errno::ECONNRESET
       error("The #{server} server refused the connection on port #{port}")
     rescue HTTP::ClientError => e
       error(e.message)
     end
-    nodelist
+    ret
+  end
+
+  def get(uri,params=nil,accept_type=nil,parse=nil)
+    host,port,path,query = parse_uri(uri)
+    if query
+      path = "#{path}?#{query}"
+    elsif params
+      path = HTTP::Client.path_params(path,params)
+    end
+    host = @server unless host
+    port = @port unless port
+    headers = {"#{@auth_headers_prefix}User" => USER}
+    begin
+      HTTP::Client::get(host,port,path,@secure,nil,accept_type,parse,headers)
+    rescue HTTP::ClientError => e
+      error(e.message,e.code)
+    end
+  end
+
+  def post(uri,data,content_type=nil,accept_type=nil,parse=nil)
+    host,port,path,query = parse_uri(uri)
+    path = "#{path}?#{query}" if query
+    host = @server unless host
+    port = @port unless port
+    headers = {"#{@auth_headers_prefix}User" => USER}
+    begin
+      HTTP::Client::post(host,port,path,data,@secure,content_type,accept_type,parse,headers)
+    rescue HTTP::ClientError => e
+      error(e.message,e.code)
+    end
+  end
+
+  def put(uri,data,content_type=nil,accept_type=nil,parse=nil)
+    host,port,path,query = parse_uri(uri)
+    path = "#{path}?#{query}" if query
+    host = @server unless host
+    port = @port unless port
+    headers = {"#{@auth_headers_prefix}User" => USER}
+    begin
+      HTTP::Client::put(host,port,path,data,@secure,content_type,accept_type,parse,headers)
+    rescue HTTP::ClientError => e
+      error(e.message,e.code)
+    end
+  end
+
+  def delete(uri,params=nil,accept_type=nil,parse=nil)
+    host,port,path,query = parse_uri(uri)
+    if query
+      path = "#{path}?#{query}"
+    elsif params
+      path = HTTP::Client.path_params(path,params)
+    end
+    host = @server unless host
+    port = @port unless port
+    headers = {"#{@auth_headers_prefix}User" => USER}
+    begin
+      HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse,headers)
+    rescue HTTP::ClientError => e
+      error(e.message,e.code)
+    end
+  end
+
+  def self.get_auth_headers_prefix(server,port,secure=true)
+    tmp = get(server,port,'/auth_headers_prefix',secure)
+    tmp.strip if tmp
+  end
+
+  def self.get_nodelist(server,port,secure,auth_headers_prefix)
+    path = HTTP::Client.path_params('/nodes',{:user => USER,:list=>true})
+    get(server,port,path,secure,{"#{auth_headers_prefix}User"=>USER})
   end
 
   def self.term_size()
@@ -647,6 +672,21 @@ class Client
       add_opt(opt,"--[no-]dry-run", "Perform a dry run") { |v|
         options[:dry_run] = v
       }
+      add_opt(opt,"--password [PASSWORD]", "Provide a password for HTTP Basic authentication (read from STDIN if not specified)") { |p|
+        unless p
+          error("Error: no password specified and invalid STDIN") if !STDIN.tty? or STDIN.closed?
+          $stdout.write('Password: ')
+          $stdout.flush
+          if $stdin.respond_to?(:noecho)
+            $stdin.noecho{|stdin| p = stdin.gets}
+          else
+            p = $stdin.gets
+          end
+          $stdout.puts
+        end
+        $http_user = USER.dup.freeze
+        $http_password = p.dup.freeze
+      }
       opt.separator ""
       yield(opt,options)
     end
@@ -674,7 +714,7 @@ class Client
   end
 
   def init_params(options)
-    ret = { :user => USER }
+    ret = { }
     ret[:dry_run] = options[:dry_run] if options[:dry_run]
     ret
   end
@@ -708,18 +748,26 @@ class Client
     if options[:multi_server]
       options[:servers].each_pair do |server,inf|
         next if server.downcase == 'default'
+        inf[3] = get_auth_headers_prefix(inf[0],inf[1],inf[2]) unless inf[3]
         if options[:nodes]
-          nodelist = get_nodelist(inf[0],inf[1],inf[2])
+          nodelist = get_nodelist(inf[0],inf[1],inf[2],inf[3])
+          unless nodelist # Just in case a server give an empty answer
+            error("Ignoring the server #{inf[0]} (empty answer)",false)
+            next
+          end
           # Strict check when working on multi-server
           nodes = options[:nodes] & nodelist
+          next if nodes.empty? # it's useless to contact this server
           treated += nodes
         end
-        $clients << self.new(server,inf[0],inf[1],inf[2],nodes)
+        $clients << self.new(server,inf[0],inf[1],inf[2],inf[3],nodes)
+        break if options[:nodes] and treated.sort == options[:nodes].sort
       end
     else
       info = options[:servers][options[:chosen_server]]
+      info[3] = get_auth_headers_prefix(info[0],info[1],info[2]) unless info[3]
       if options[:nodes]
-        nodelist = get_nodelist(info[0],info[1],info[2])
+        nodelist = get_nodelist(info[0],info[1],info[2],info[3])
         # Lazy check when not working on multi-server
         nodes = options[:nodes]
         options[:nodes].each do |node|
@@ -730,7 +778,7 @@ class Client
           end
         end
       end
-      $clients << self.new(nil,info[0],info[1],info[2],nodes)
+      $clients << self.new(nil,info[0],info[1],info[2],info[3],nodes)
     end
 
     # Check that every nodes was treated
@@ -813,8 +861,8 @@ end
 class ClientWorkflow < Client
   attr_reader :wid
 
-  def initialize(name,server,port,secure=false,nodes=nil)
-    super(name,server,port,secure,nodes)
+  def initialize(name,server,port,secure,auth_headers_prefix,nodes=nil)
+    super(name,server,port,secure,auth_headers_prefix,nodes)
     @wid = nil
     @resources = nil
     @start_time = nil
@@ -838,7 +886,7 @@ class ClientWorkflow < Client
 
   def kill
     super()
-    delete(api_path(),{:user=>USER}) if @wid
+    delete(api_path()) if @wid
   end
 
   def self.load_file(file)
@@ -1173,17 +1221,19 @@ class ClientWorkflow < Client
 
       debug "#{self.class.operation()}#{" ##{@wid}" if @wid} done\n\n"
 
+      states = get(api_path('state'))
       delete(api_path()) if @wid
       @resources = nil
 
-      res
+      [ res, states ]
     else
       debug "#{@wid} #{@resources['resource']}\n"
       nil
     end
   end
 
-  def result(options,res)
+  def result(options,ret)
+    res,states = ret
     unless res['error']
       # Success
       if res['nodes']['ok'] and !res['nodes']['ok'].empty?
@@ -1197,7 +1247,9 @@ class ClientWorkflow < Client
       # Fail
       if res['nodes']['ko'] and !res['nodes']['ko'].empty?
         debug "The #{self.class.operation().downcase} failed on nodes"
-        debug res['nodes']['ko'].join("\n")
+        res['nodes']['ko'].each do |node|
+          debug "#{node} (#{states[node]['error'] if states[node]})\n"
+        end
         File.open(options[:nodes_ko_file],'w+') do |f|
           f.puts res['nodes']['ko'].join("\n")
         end if options[:nodes_ko_file]

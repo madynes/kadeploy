@@ -1,8 +1,7 @@
 module Kadeploy
 
 module Kaenvs
-  def envs_init_exec_context()
-    ret = init_exec_context()
+  def envs_init_exec_context(ret)
     ret.client = nil
     ret.username = nil
     ret.environment = nil
@@ -10,9 +9,8 @@ module Kaenvs
     ret
   end
 
-  def envs_prepare(params,operation)
-    context = envs_init_exec_context()
-    parse_params_default(params,context)
+  def envs_prepare(params,operation,context)
+    context = envs_init_exec_context(context)
 
     case operation
     when :create

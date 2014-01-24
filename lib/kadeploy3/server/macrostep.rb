@@ -183,11 +183,8 @@ module Macrostep
     end
 
     def timeout!(task)
-      debug(1,
-        "Timeout in #{task.name} before the end of the step, "\
-        "let's kill the instance",
-        task.nsid
-      )
+      debug(1,"Timeout in the #{task.name} step, let's kill the instance",
+        task.nsid)
       task.nodes.set_error_msg("Timeout in the #{task.name} step")
       nodes.set.each do |node|
         node.state = "KO"

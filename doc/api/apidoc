@@ -560,9 +560,8 @@ end
 def request(type=:Hash,content='application/json',&block)
   raise $current.class.name unless $current.is_a?(Resource)
   req = $current.request(type,content)
-  req.parameter(:user,:String,'The user that initiated the request',true)
-  req.parameter(:secret_key,:String,'The secret key used to authenticate the user',false)
-  req.parameter(:cert,:String,'The x509 certificate used to authenticate the user',false)
+  # Add a mandatory field
+  #req.parameter(:user,:String,'The user that initiated the request',true)
   parse(req,&block)
 end
 

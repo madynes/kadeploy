@@ -4,9 +4,10 @@ introduction do
     paragraph "The following examples are equivalent:"
     paragraph $cgi.b{"Specifying parameters in the query's URI"}
     paragraph html_code <<-EOS
-      POST /deploy?user=frontent&nodes=node-1.testbed.lan&nodes=node-2.testbed.lan HTTP/1.1
+      POST /deploy?nodes=node-1.testbed.lan&nodes=node-2.testbed.lan HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
 
     paragraph $cgi.b{"Specifying parameters in the query's body"}
@@ -15,10 +16,10 @@ introduction do
       POST /deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
-      Content-Length: 93
+      Content-Length: 73
       {
-        "user": "frontend",
         "nodes": [
           "node-1.testbed.lan",
           "node-2.testbed.lan"
@@ -31,10 +32,10 @@ introduction do
       POST /deploy HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/x-yaml
-      Content-Length: 70
+      Content-Length: 47
       ---
-      user: frontend
       nodes:
       - node-1.testbed.lan
       - node-2.testbed.lan
@@ -52,6 +53,7 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     paragraph html_code <<-EOS
       HTTP/1.1 200 OK
@@ -68,6 +70,7 @@ introduction do
       GET /nodes HTTP/1.1
       Accept: application/x-yaml
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     paragraph html_code <<-EOS
       HTTP/1.1 200 OK
@@ -84,6 +87,7 @@ introduction do
       Accept: application/x-yaml
       Accept-Encoding: gzip
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
     paragraph html_code <<-EOS
       HTTP/1.1 200 OK
@@ -99,44 +103,42 @@ introduction do
   end
 
   section 'Authentication' do
-    paragraph "To access API resources an authentication is needed. There is tree different methods to authenticate when accessing a ressource. Depending on the server's configuration it will be possible to use one of this methods."
+    paragraph "To access API resources an authentication is needed. There is four different methods to authenticate when accessing a ressource. Depending on the server's configuration it will be possible to use -at least- one of this methods."
+    paragraph "Authentication parameters are given in the HTTP headers of the request. A prefix can be set to this parameters, this prefix default to 'X-Kadeploy' but it can be set to another value (see #{$cgi.a(:href=>'#GET/auth_headers_prefix'){'GET /auth_headers_prefix'}})."
+
     paragraph $cgi.b{'Authentication using the IDENT protocol'}
-    paragraph "The first authentication method is based on the IDENT protocol. When a request will be received on the server, it will first check if the request is coming from a trusted machine then it will contact the IDENT server of this machine in order to be sure that the user specified in the 'user' request's parameter is actually corresponding to the user on the machine that initiated the request. In order to be authenticated with this method, no extra parameters have to be providen, an IDENT server just have to be set up on the machine that is used to initiate the request."
-    paragraph $cgi.b{'Authentication by password'}
-    paragraph "The second authentication method is the authentication by password (from trusted machines). In order to authenticate with such a method it's necessary to specify the password in the 'secret_key' request parameter. Here is some examples:"
+    paragraph "The first authentication method is based on the IDENT protocol. When a request will be received on the server, it will first check if the request is coming from a trusted machine then it will contact the IDENT server of this machine in order to be sure that the username specified in the 'User' request's header is actually corresponding to the user on the machine that initiated the request. In order to be authenticated with this method, no extra parameters have to be providen, an IDENT server just have to be set up on the machine that is used to initiate the request. Here is an example:"
     paragraph html_code <<-EOS
-      GET /nodes?user=frontend&secret_key=mypassword HTTP/1.1
+      GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
+
+    paragraph $cgi.b{'Authentication by password'}
+    paragraph "The second authentication method is the authentication by password (from trusted machines) using the HTTP Basic Authentication method (RFC 2617). In order to authenticate with such a method it's necessary to specify the user and password as a base64 string in the 'Authorization' request's header. Here is some examples:"
     paragraph html_code <<-EOS
-      GET /nodes?user=frontend HTTP/1.1
+      GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      Content-Type: application/json
-      Content-Length: 32
-      {
-        "secret_key": "mypassword"
-      }
+      Authorization: Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==
     EOS
     paragraph $cgi.b{'Authentication by certificate'}
-    paragraph "To be able to authenticate using a (x509) certificate it's necessary to provide an x509 certificate that was signed with the server's private key in the field 'cert'. Here is an example:"
+    paragraph "To be able to authenticate using a (x509) certificate it's necessary to provide a base64 encoded x509 certificate that was signed with the server's private key in the 'Certificate' request's header. Here is an example:"
     paragraph html_code <<-EOS
-      GET /nodes?user=frontend HTTP/1.1
+      GET /nodes HTTP/1.1
       Accept: */*
       Host: kadeploy.testbed.lan:25300
-      Content-Type: application/x-yaml
-      Content-Length: 1561
-      ---
-      cert: |-
-        -----BEGIN CERTIFICATE-----
-        MIIEIzCCAwugAwIBAgIBGTANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQGEwJVUzET
-        MBEGA1UEChMKQXBwbGUgSW5jLjEmMCQGA1UECxMdQXBwbGUgQ2VydGlmaWNhdGlv
-        ...
-        zJEdOusjWv6lLZf3e7vWh0ZChetSPSayY6i0scqP9Mzis8hH4L+aWYP62phTKoL1
-        fGUuldkzXfXtZcwxN8VaBOhr4eeIA0p1npsoy0pAiGVDdd3LOiUjxZ5X+C7O0qmS
-        XnMuLyV1FQ==
-        -----END CERTIFICATE-----
+      X-Kadeploy-User: frontend
+      X-Kadeploy-Certificate: MIIEIzCCAwugAwIBAgIBGTANBgkqhkiG9w0BAQUFADBiMQswCQYDVQQ...XnMuLyV1FQ==
+    EOS
+    paragraph $cgi.b{'Authentication by ACL'}
+    paragraph "If your machine's hostname is in the server's Access Control List, it will be trust without any further verifications. Here is an example:"
+    paragraph html_code <<-EOS
+      GET /nodes HTTP/1.1
+      Accept: */*
+      Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
     EOS
   end
 
@@ -209,10 +211,10 @@ introduction do
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
-      Content-Length: 321
+      Content-Length: 301
       {
-        "user": "frontend",
         "environment": {
           "name": "debian-base",
           ...
@@ -230,10 +232,10 @@ introduction do
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
-      Content-Length: 751
+      Content-Length: 731
       {
-        "user": "frontend",
         "client": "http://frontend.testbed.lan:12345",
         "environment": {
           "name": "debian-base",
@@ -260,10 +262,10 @@ introduction do
       POST /environments HTTP/1.1
       Accept: text/plain, application/json
       Host: kadeploy.testbed.lan:25300
+      X-Kadeploy-User: frontend
       Content-Type: application/json
-      Content-Length: 677
+      Content-Length: 657
       {
-        "user": "frontend",
         "environment": {
           "name": "debian-base",
           ...
@@ -301,10 +303,9 @@ introduction do
       POST /sample HTTP/1.1
       Accept: text/plain, application/json
       Content-Type: application/json
-      Content-Length: 101
+      Content-Length: 81
       {
         "myhash": {
-          "user": "frontend",
           "size": 42,
           "option": true,
           "setting": null
