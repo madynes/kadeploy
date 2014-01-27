@@ -462,7 +462,7 @@ module Kaworkflow
       end
 
       ret = {
-        :id => info[:wid],
+        :wid => info[:wid],
         :user => info[:user],
         :done => done,
         :error => error,

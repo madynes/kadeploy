@@ -40,18 +40,18 @@ class TestAuth < Test::Unit::TestCase
 
   def test_acl()
     ret = get("/power",nil,nil,'localhost')
-    assert(!ret.select{|v| v['id'] == @wid}.empty?,ret.to_yaml)
+    assert(!ret.select{|v| v['wid'] == @wid}.empty?,ret.to_yaml)
   end
 
   def test_ident()
     ret = get("/power")
-    assert(!ret.select{|v| v['id'] == @wid}.empty?,ret.to_yaml)
+    assert(!ret.select{|v| v['wid'] == @wid}.empty?,ret.to_yaml)
   end
 
   def test_cert()
     cert = Base64.strict_encode64(File.read(KADEPLOY_CERT_FILE))
     ret = get("/power",{"#{KADEPLOY_AUTH_HEADER}Certificate"=>cert})
-    elem = ret.select{|v| v['id'] == @wid}
+    elem = ret.select{|v| v['wid'] == @wid}
     assert(!elem.empty?,ret.to_yaml)
     elem = elem[0]
     assert(elem.keys.include?('time'),"Get state did not return the admin view\n"+ret.to_yaml)
@@ -59,7 +59,7 @@ class TestAuth < Test::Unit::TestCase
 
   def test_http_basic()
     ret = get("/power",nil,{:user=>USER,:password=>KADEPLOY_SECRET_KEY})
-    elem = ret.select{|v| v['id'] == @wid}
+    elem = ret.select{|v| v['wid'] == @wid}
     assert(!elem.empty?,ret.to_yaml)
     elem = elem[0]
     assert(elem.keys.include?('time'),"Get state did not return the admin view\n"+ret.to_yaml)
