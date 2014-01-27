@@ -4,6 +4,7 @@ operation 'Workflow-based operations' do
     field :user, :String, 'The user that initiated the operation'
     field :done, :Boolean, 'Set to true if the operation is done. Once an operation is done it\'s information should be removed from the API using the DELETE method.'
     field :error, :Boolean, 'Set to true if an error was encountered. The error message can be obtained by getting /%OPERATION/:id/error.'
+    field :start_time, :Integer, 'The start time (POSIX time) of the operation'
     field :logs, :Boolean, 'New logs available for polling (see /%OPERATION/:id/logs). Only available to the users that have the rights to consult the information about this operation.'
     field :debugs, :Boolean, 'New debugs available for polling (see /%OPERATION/:id/debugs). Only available to the users that have the rights to consult the information about this operation.'
     field :time, :Float, 'The time elapsed since the start of the operation. Only available to the users that have the rights to consult the information about this operation.'

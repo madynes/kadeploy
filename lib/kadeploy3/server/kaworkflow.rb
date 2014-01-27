@@ -466,6 +466,7 @@ module Kaworkflow
         :user => info[:user],
         :done => done,
         :error => error,
+        :start_time => info[:start_time].to_i,
       }
 
       if cexec.almighty_users.include?(cexec.user) or cexec.user == info[:user]
