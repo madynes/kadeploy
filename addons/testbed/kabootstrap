@@ -3632,7 +3632,7 @@ sshgw.ssh(servername,'root') do |session|
       msg('Installing identd',MSG_INFO)
       apt_install(session,'oidentd',server)
 
-      msg('Creating htpasswd user db',server)
+      msg('Creating htpasswd user db',MSG_INFO)
       apt_install(session,'apache2-utils',server)
       sexec(session,"htpasswd -bcd #{CFG_KADEPLOY_DBFILE} #{CFG_KADEPLOY_USER} KADEPLOY")
       sexec(session,"htpasswd -bd #{CFG_KADEPLOY_DBFILE} #{CFG_FRONTEND_USER} KADEPLOY")
