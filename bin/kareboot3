@@ -131,22 +131,16 @@ class KarebootClient < ClientWorkflow
     params[:check_destructive] = options[:check_demolishing] if options[:check_demolishing]
 
     if options[:env_name]
+      username = options[:env_user] || ''
       envname = options[:env_name]
-      username = nil
-      username = options[:env_user] if options[:env_user]
+      envversion = options[:env_version] || ''
 
-      envs = get2(options,api_path(username,:envs))
-      envs.select!{|en| en['name'] == envname}
+      tmp = {}
+      tmp[:last] = true unless options[:env_version]
+      envs = get2(options,api_path("/#{username}/#{envname}/#{envversion}",:envs),tmp)
       error("The environment '#{envname}' does not exist") if envs.size <= 0
-      envs.sort_by!{|en| en['version']}
+      env = envs.first
 
-      if options[:env_version]
-        envs.select!{|en| en['version'] == options[:env_version]}
-        error("The environment '#{envname}' does not exist in version #{options[:env_version]}") if envs.size <= 0
-        env = envs.first
-      else
-        env = envs.last
-      end
       params[:environment] = {
         :user => env['user'],
         :name => env['name'],

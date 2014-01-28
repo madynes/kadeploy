@@ -145,8 +145,8 @@ module Kaenvs
           name,
           version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           cexec.user,
-          (cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
-          false
+          true,
+          true
         )
       else
         error_not_found!
