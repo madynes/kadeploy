@@ -190,36 +190,34 @@ First of all , you have to uncompress the Kadeploy tarball.
 \noindent Then, if you want to install the server part, just execute:
 \begin{small}
 \begin{verbatim}
-> make install_common
-> make install_server
+> rake install_server
 \end{verbatim}
 \end{small}
 
 \noindent If you want to install the client part, execute:
 \begin{small}
 \begin{verbatim}
-> make install_common
-> make install_client
+> rake install_client
 \end{verbatim}
 \end{small}
 
 \noindent If you want to install the server part and the client part on the same host, execute:
 \begin{small}
 \begin{verbatim}
-> make install_all
+> rake install
 \end{verbatim}
 \end{small}
 
 \noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and Fedora (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
 \begin{small}
 \begin{verbatim}
-> make install_all DISTRIB=fedora
+> rake install[root_dir,fedora]
 \end{verbatim}
 \end{small}
 or if you do not install the server side on the same machine than the client side:
 \begin{small}
 \begin{verbatim}
-> make install_server DISTRIB=fedora
+> rake install_server[root_dir,fedora]
 \end{verbatim}
 \end{small}
 
@@ -228,7 +226,7 @@ or if you do not install the server side on the same machine than the client sid
 \noindent Finally, Kadeploy can be simply uninstalled by executing:
 \begin{small}
 \begin{verbatim}
-> make uninstall
+> rake uninstall
 \end{verbatim}
 \end{small}
 
@@ -247,16 +245,16 @@ The following installation method works only an Debian based distribution.
 \noindent Then you must generate the packages. So you have to execute:
 \begin{small}
 \begin{verbatim}
-> make deb
+> rake deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, \texttt{kadeploy-client-\version.deb}, and \texttt{kadeploy-server-\version.deb}.
+This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, \texttt{kadeploy-client-\version.deb}, and \texttt{kadeploy-\version.deb}.
 \subsubsection{Installation}
-\noindent On the server side, you have to install the \texttt{kadeploy-common-\version.deb} and \texttt{kadeploy-server-\version.deb} packages.
+\noindent On the server side, you have to install the \texttt{kadeploy-common-\version.deb} and \texttt{kadeploy-\version.deb} packages.
 \begin{small}
 \begin{Verbatim}[commandchars=\\\{\}]
 > dpkg -i kadeploy-common-\version.deb
-> dpkg -i kadeploy-server-\version.deb
+> dpkg -i kadeploy-\version.deb
 \end{Verbatim}
 \end{small}
 
@@ -273,7 +271,7 @@ This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, 
 \begin{Verbatim}[commandchars=\\\{\}]
 > dpkg -i kadeploy-common-\version.deb
 > dpkg -i kadeploy-client-\version.deb
-> dpkg -i kadeploy-server-\version.deb
+> dpkg -i kadeploy-\version.deb
 \end{Verbatim}
 \end{small}
 
@@ -293,7 +291,7 @@ The following installation method works only an Fedora based distribution. We as
 \noindent Then you must generate the packages. So you have to execute with root rights:
 \begin{small}
 \begin{verbatim}
-> make rpm
+> rake rpm
 \end{verbatim}
 \end{small}
 This will generate three rpm package in the RPMS package of your build environment, for instance: \texttt{kadeploy-client-\version.noarch.rpm}, \texttt{kadeploy-server-\version.noarch.rpm}, and \texttt{kadeploy-common-\version.noarch.rpm}.
@@ -334,7 +332,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \noindent or in background using the rc script:
 \begin{small}
 \begin{verbatim}
-> /etc/init.d/kadeploy3d start
+> /etc/init.d/kadeploy start
 \end{verbatim}
 \end{small}
 
