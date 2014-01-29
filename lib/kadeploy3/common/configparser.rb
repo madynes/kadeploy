@@ -245,7 +245,7 @@ module Configuration
       return if args[:disable]
       if args[:prefix]
         tmp = Pathname.new(val)
-        val.gsub!(val,File.join(args[:prefix],val)) if !tmp.absolute?
+        val.gsub!(val,File.join(args[:prefix],val)) if !tmp.absolute? and !val.empty?
       end
       val.gsub!(val,File.join(val,args[:suffix])) if args[:suffix]
       if File.exists?(val)
@@ -283,8 +283,8 @@ module Configuration
 
     def customcheck_dir(val, fieldname, args)
       return if args[:disable]
-      val = File.join(args[:prefix],val) if args[:prefix]
-      val = File.join(val,args[:suffix]) if args[:suffix]
+      val = File.join(args[:prefix],val) if args[:prefix] and !val.empty?
+      val = File.join(val,args[:suffix]) if args[:suffix] and !val.empty?
       if File.exist?(val)
         if File.directory?(val)
           if args[:writable]
