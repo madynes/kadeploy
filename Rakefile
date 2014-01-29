@@ -183,7 +183,7 @@ end
 def delete_dir(dir)
   dir = INSTALL[dir][:dir] if dir.is_a?(Symbol)
   dir = File.join(@root_dir,dir) if @root_dir
-  system("rmdir #{dir.to_s}")
+  system("rmdir -p #{dir.to_s}")
 end
 
 def installf(kind,file,filename=nil)
