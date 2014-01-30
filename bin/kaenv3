@@ -242,7 +242,7 @@ class KaenvsClient < Client
     # set path
     path = api_path()
     if ![:add, :list, :'move-files'].include?(options[:operation])
-      path = File.join(path,options[:env_user]||USER)
+      path = File.join(path,"/#{options[:env_user]||''}/")
       path = File.join(path,options[:env_name]) if options[:env_name]
       path = File.join(path,options[:env_version].to_s) if options[:env_version]
     elsif options[:operation] != :add
