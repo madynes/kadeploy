@@ -945,7 +945,7 @@ class ClientWorkflow < Client
         return false
       end
     when 'http','https'
-      options[:key] = file
+      file
     else
       error("Invalid protocol '#{kind}'")
       return false
