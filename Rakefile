@@ -87,6 +87,12 @@ INSTALL = {
     :group => DEPLOY_USER,
     :mode => '770',
   },
+  :run => {
+    :dir => '/var/log/kadeploy3d',
+    :user => DEPLOY_USER,
+    :group => 'root',
+    :mode => '755',
+  },
   :conf => {
     :dir => '/etc/kadeploy3',
     :user => 'root',
@@ -424,6 +430,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy3d'))
 
   create_dir(:log)
+  create_dir(:run)
 
   create_dir(:lib)
   installf(:lib,:'kadeploy3/server.rb')
@@ -471,6 +478,11 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   logs = File.join(@root_dir,logs) if @root_dir
   sh "rm -f #{logs}"
   delete_dir(:log)
+
+  runs = File.join(INSTALL[:run][:dir],'*')
+  runs = File.join(@root_dir,runs) if @root_dir
+  sh "rm -f #{runs}"
+  delete_dir(:run)
 end
 
 desc "Install kastafior"
