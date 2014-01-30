@@ -165,8 +165,10 @@ module Kaenvs
       envs.collect do |env|
         env.to_hash.merge!({'user'=>env.user})
       end
-    else
+    elsif name or version
       error_not_found!
+    else
+      []
     end
   end
 
