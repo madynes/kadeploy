@@ -29,14 +29,13 @@
 require 'rubygems'
 require 'optparse'
 require 'shellwords'
-require 'net/ssh'
-require 'net/ssh/multi'
+require 'timeout'
+require 'logger'
 require 'socket'
 require 'tempfile'
 require 'securerandom'
 require 'yaml'
 require 'open3'
-require 'pp'
 
 # set old yameler
 YAML::ENGINE.yamler = 'syck'
@@ -545,6 +544,8 @@ end
 class Ssh < Deploy
   def deploy
     $log.info 'Using ssh'
+    require 'net/ssh'
+    require 'net/ssh/multi'
     ssh_options={:timeout=>1}
     if $config[:ssh_command]!=nil
       flip=true
@@ -1122,7 +1123,7 @@ $config = {
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby #{__FILE__} [options]"
   opts.separator ''
-  opts.separator 'Specific options : '
+  opts.separator 'options : '
   opts.on('-A', '--[no-]aggressive', 'kill process which use the listen port') { |v| $config[:aggressive] = v }
   opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default : #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
   opts.on('-c', '--disable-check-master', 'disable check master in node list') { |v| $config[:check_master] = false }
@@ -1187,7 +1188,6 @@ OptionParser.new do |opts|
   opts.on('-w', '--[no-}wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
   opts.on('-W', '--who-i-am NUM', 'number of node it is non number parameter activate the auto-detection') { |v| $config[:who_i_am] = Integer(v) rescue nil }
   opts.separator ''
-  opts.separator 'Common options :'
   opts.on_tail('-?', '--help', 'show this message') do
     puts opts
     exit

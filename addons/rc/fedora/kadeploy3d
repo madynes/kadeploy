@@ -28,7 +28,8 @@ RETVAL=0
 
 start() {
 	      echo -n "Starting $prog: "
-	      [ -e $pidfile ] && [ -e /proc/`cat $pidfile` ] && echo "Daemon already running" && return 1
+        [ -d $rundir ] || (mkdir $rundir && chown $user $rundir)
+	[ -e $pidfile ] && [ -e /proc/`cat $pidfile` ] && echo "Daemon already running" && return 1
         [ -e $pidfile ] || ( touch $pidfile && chown $user:$user $pidfile )
         daemon --pidfile=${pidfile} --user=$user "$kadeploy3d $args"
 	      RETVAL=$?
