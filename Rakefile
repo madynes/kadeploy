@@ -491,6 +491,12 @@ task :install_kastafior, [:root_dir,:distrib] => [:prepare] do
   installf(:bin,File.join(D[:addons],'kastafior','kastafior'))
 end
 
+desc "Install kascade"
+task :install_kascade, [:root_dir,:distrib] => [:prepare] do
+  create_dir(:bin)
+  installf(:bin,File.join(D[:addons],'kascade','kascade'))
+end
+
 desc "Clean the build directory"
 task :build_clean do
   sh "rm -Rf #{D[:build]}"
