@@ -278,6 +278,11 @@ class KadeployServer
           "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
       end
     else
+      if cfg.static[:auth][:ident]
+        user,_ = cfg.static[:auth][:ident].auth!(
+          HTTPd.get_sockaddr(request), :port=>@httpd.port)
+        return user if user and user.is_a?(String) and !user.empty?
+      end
       error = "Authentication failed: no user specified "\
         "in the #{cfg.static[:auth_headers_prefix]}User HTTP header"
       error << " or using the HTTP Basic Authentication method" if cfg.static[:auth][:http_basic]
