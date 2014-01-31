@@ -592,7 +592,7 @@ external:
 
   \item \ypath{/authentication/acl} Access Control List based authentication. When using ACL authentication, specifying a whitelist is mandatory.
 
-  \item \ypath{/authentication/certificate} authentication the certificate of a Certification Authority, at least a public key or a x509 certificate as to be specified.
+  \item \ypath{/authentication/certificate} authentication based on the certificate of a Certification Authority (the username must be providden in the CN subject's field), at least a public key or a x509 certificate as to be specified.
   \begin{itemize}
     \item \yfield{ca\_cert}{String} the path to a file containing the x509 certificate of the Certification Authority.
   \end{itemize}

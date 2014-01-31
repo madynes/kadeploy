@@ -266,7 +266,7 @@ class KadeployServer
       # Authentication with certificate
       if cfg.static[:auth][:cert] and cert
         ok,msg = cfg.static[:auth][:cert].auth!(
-          HTTPd.get_sockaddr(request), :cert=>Base64.strict_decode64(cert))
+          HTTPd.get_sockaddr(request), :user=>user, :cert=>Base64.strict_decode64(cert))
         error_unauthorized!("Authentication failed: #{msg}") unless ok
       # Authentication with Ident
       elsif cfg.static[:auth][:ident]
@@ -278,9 +278,15 @@ class KadeployServer
           "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
       end
     else
+      # Authentication with Ident
       if cfg.static[:auth][:ident]
         user,_ = cfg.static[:auth][:ident].auth!(
           HTTPd.get_sockaddr(request), :port=>@httpd.port)
+        return user if user and user.is_a?(String) and !user.empty?
+      # Authentication with certificate
+      elsif cfg.static[:auth][:cert] and cert
+        user,_ = cfg.static[:auth][:cert].auth!(
+          HTTPd.get_sockaddr(request), :cert=>Base64.strict_decode64(cert))
         return user if user and user.is_a?(String) and !user.empty?
       end
       error = "Authentication failed: no user specified "\

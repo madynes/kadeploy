@@ -3659,7 +3659,7 @@ sshgw.ssh(servername,'root') do |session|
 
       msg('Creating x509 certificate and private key for admins and sign it with CA',MSG_INFO)
       reqfile = "#{CFG_KADEPLOY_ADMIN_CERT}.csr"
-      sexec(session,"openssl req -new -nodes -subj /CN=#{$services[:frontend][:fqdn]} -out #{reqfile} -keyform RSA -keyout #{CFG_KADEPLOY_ADMIN_PRIVATE_KEY}")
+      sexec(session,"openssl req -new -nodes -subj /CN=#{CFG_FRONTEND_USER} -out #{reqfile} -keyform RSA -keyout #{CFG_KADEPLOY_ADMIN_PRIVATE_KEY}")
       sexec(session,"openssl x509 -req -in #{reqfile} -CA #{CFG_CA_CERT} -CAkey #{CFG_CA_PRIVATE_KEY} -CAcreateserial -out #{CFG_KADEPLOY_ADMIN_CERT}")
       sexec(session,"rm -f #{reqfile}")
       sexec(session,"chown 755 #{CFG_KADEPLOY_ADMIN_CERT}")

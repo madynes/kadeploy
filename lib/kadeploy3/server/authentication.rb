@@ -116,7 +116,18 @@ class CertificateAuthentication < Authentication
       return [false,"Invalid x509 certificate (#{e.message})"]
     end
 
-    [cert.verify(@public_key),INVALID_PARAMS]
+    cns = nil
+    if cert.verify(@public_key)
+      cns = cert.subject.to_a.select{|v| v[0] == 'CN'}.collect{|v| v[1]}
+    else
+      return [false,"The certificate was not signed by the trusted CA"]
+    end
+
+    if params[:user]
+      [cns.include?(params[:user]),'Specified user does not match with the certificate\'s CN']
+    else
+      [cns.first,nil]
+    end
   end
 
   def ==(auth)
