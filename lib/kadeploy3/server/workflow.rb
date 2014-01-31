@@ -461,7 +461,7 @@ module Workflow
         elsif !context[:cluster].deploy_supported_fs.include?(context[:execution].environment.filesystem)
           setclassical.call(
             instance,
-            "Using classical reboot instead of kexec since the filesystem of the boot partition is not supported (#{macrosteps[2].name})"
+            "Using classical reboot instead of kexec since the filesystem is not supported by the deployment environment (#{macrosteps[2].name})"
           )
         elsif context[:execution].disable_kexec
           setclassical.call(
@@ -475,6 +475,17 @@ module Workflow
 
       @tasks.each do |macro|
         macro = macro[0] if macro.size == 1
+      end
+
+      # Some extra debugs
+      cexec = context[:execution]
+      unless context[:cluster].deploy_supported_fs.include?(cexec.environment.filesystem)
+        debug(0,"Disable some micro-steps since the filesystem is not supported by the deployment environment")
+      end
+
+      if cexec.block_device and !cexec.block_device.empty? \
+        and (!cexec.deploy_part or cexec.deploy_part.empty?)
+        debug(0,"Deploying on block device, disable format micro-steps")
       end
     end
 
