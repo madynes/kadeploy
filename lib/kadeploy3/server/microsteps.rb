@@ -1094,10 +1094,17 @@ class Microstep < Automata::QueueTask
 
       return true
     else
-      oknodes = YAML.load_file(okfile.path)
-      okfile.unlink
-      konodes = YAML.load_file(kofile.path)
-      kofile.unlink
+      begin
+        oknodes = YAML.load_file(okfile.path)
+        okfile.unlink
+        konodes = YAML.load_file(kofile.path)
+        kofile.unlink
+      rescue
+        oknodes = []
+        tmp = node_set.make_sorted_array_of_nodes.collect{|n| get_nodeid(n)}
+        konodes = Hash[tmp.zip [err]*tmp.size]
+        tmp = nil
+      end
 
       node_set.set.each do |node|
         id = get_nodeid(node)
