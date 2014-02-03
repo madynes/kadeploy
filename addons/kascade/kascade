@@ -1163,8 +1163,13 @@ OptionParser.new do |opts|
         $log.level=Logger::INFO
       when 'fatal'
         $log.level=Logger::FATAL
-      else
+      when (Logger::DEBUG.to_s)..(Logger::FATAL.to_s)
         $log.level=v.to_i
+      when nil
+        $log.level=Logger::INFO
+      else
+        $log.level=Logger::INFO
+        $log.info("Invalid log level '#{v}'. Using 'info'.")
     end
   end
   opts.on('-?', '--help', 'show this message') do
