@@ -548,6 +548,9 @@ class Ssh < Deploy
     require 'net/ssh/multi'
     ssh_options={:timeout=>1}
     if $config[:ssh_command]!=nil
+      # FIXME that code is super-ugly. instead we should provide several options for SSH things
+      #       we want to support changing. But, well, there's .ssh/config, too...
+      # FIXME we don't support running kascade with oarsh
       flip=true
       #Split the ssh command string to obtain an array of argument. This split is double quote compliant
       ssh_args=$config[:ssh_command].split(/"/).collect { |t| flip=!flip; flip ? t : t.split(' ') }.flatten
