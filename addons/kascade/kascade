@@ -253,7 +253,7 @@ class CyclicBuffer
   def push(new_obj)
     @max_obj+=1
     @max_byte+=new_obj.size
-    i=@max_obj%@buffer.size
+    i=@max_obj % @buffer.size
     if @buffer[i]!=nil
       @min_obj+=1
       @min_byte+=new_obj.size
@@ -263,7 +263,7 @@ class CyclicBuffer
 
   def get(i)
     return nil if i>@max_obj || i<@min_obj
-    @buffer[i%@buffer.size]
+    @buffer[i % @buffer.size]
   end
 
   def get_from_to(i, j)
@@ -294,7 +294,7 @@ class CyclicBuffer
     byte=@max_byte-i+1
     j=@max_obj
     while byte>0 do
-      byte-=@buffer[j%@buffer.size].size
+      byte-=@buffer[j % @buffer.size].size
       j-=1
     end
     j+=1
@@ -304,7 +304,7 @@ class CyclicBuffer
   def get_all_byte(i)
     raise 'Nothing in stack' if i>@max_byte || i<@min_byte
     j, offset=index(i)
-    yield(@buffer[j%@buffer.size][offset..-1])
+    yield(@buffer[j % @buffer.size][offset..-1])
     if j<@max_obj
       get_all(j+1) do |b|
         yield(b)
@@ -316,7 +316,7 @@ class CyclicBuffer
   def get_all(i)
     raise 'Nothing in stack' if i>@max_obj || i<@min_obj
     while i<=@max_obj
-      yield(@buffer[i%@buffer.size])
+      yield(@buffer[i % @buffer.size])
       i+=1
     end
   end
@@ -1040,7 +1040,7 @@ class Fountain < AbstractFountain
         raise ForgetException.new(from_byte, cyclic_buffer.min_byte)
       end
       while output_stream && cyclic_buffer.max_byte > @byte_need_to_send
-        send_size=[cyclic_buffer.max_byte-@byte_need_to_send+1, @chunk_size-@byte_need_to_send%@chunk_size].min
+        send_size=[cyclic_buffer.max_byte-@byte_need_to_send+1, @chunk_size-@byte_need_to_send % @chunk_size].min
         to_size=@byte_need_to_send+send_size-1
         if @before_next_sender_header==0
           send_cmd(output_stream, KEYWORDS[:DATA], send_size)
