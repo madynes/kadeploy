@@ -85,7 +85,7 @@ def version_check(client)
   send_cmd(client, KEYWORDS[:HELLO])
   version=read_cmd(client)[0]
   return true if version == KEYWORDS[:HELLO]
-  $log.error ("Bad protocol version : #{version}")
+  $log.error ("Bad protocol version: #{version}")
   false
 end
 
@@ -148,7 +148,7 @@ def connect_try(line)
     rescue Exception => e
       $log.debug e
       raise e if 0==i
-      $log.warn("retry  #{i} on node #{line} : #{e.to_s}")
+      $log.warn("retry  #{i} on node #{line}: #{e.to_s}")
       sleep 1
     end
   end
@@ -1123,11 +1123,11 @@ $config = {
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby #{__FILE__} [options]"
   opts.separator ''
-  opts.separator 'options : '
+  opts.separator 'Options: '
   opts.on('-A', '--[no-]aggressive', 'kill process which use the listen port') { |v| $config[:aggressive] = v }
-  opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default : #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
+  opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default: #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
   opts.on('-c', '--disable-check-master', 'disable check master in node list') { |v| $config[:check_master] = false }
-  opts.on('-C', '--chunk-size SIZE', "how much buffer readed before read next header (default : #{$config[:chunk_size]})")
+  opts.on('-C', '--chunk-size SIZE', "how much buffer readed before read next header (default: #{$config[:chunk_size]})")
   opts.on('-D', '--deploy [ssh,taktuk,clush]', [:ssh, :taktuk, :clush, :none], 'Choose deploy method. Ssh is default value') do |v|
     case v
       when :ssh
@@ -1158,7 +1158,7 @@ OptionParser.new do |opts|
     begin
       $config[:nodeList] = File.readlines(v).map { |l| l.strip }
     rescue Exception => ex
-      fatal_error "Error : could not open #{v} file: #{ex.to_s}"
+      fatal_error "Error: could not open #{v} file: #{ex.to_s}"
     end
   end
   opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
