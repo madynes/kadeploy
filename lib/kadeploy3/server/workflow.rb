@@ -228,6 +228,10 @@ module Workflow
     def break!(task,nodeset)
       @nodes_brk.set_state(self.class.operation('ed'),nil,
         context[:database],context[:user])
+      @nodes_brk.set.each do |node|
+        context[:states].set(node.hostname,nil,nil,'brk')
+        context[:states].unset(node.hostname,:macro,:micro,:error)
+      end
       log('success', true, nodeset)
       debug(1,"Breakpoint reached for #{nodeset.to_s_fold}",task.nsid)
     end
@@ -235,6 +239,10 @@ module Workflow
     def success!(task,nodeset)
       @nodes_ok.set_state(self.class.operation('ed'),nil,
         context[:database],context[:user])
+      @nodes_ok.set.each do |node|
+        context[:states].set(node.hostname,nil,nil,'ok')
+        context[:states].unset(node.hostname,:macro,:micro,:error)
+      end
       log('success', true, nodeset)
       debug(1,
         "End of #{self.class.opname()} for #{nodeset.to_s_fold} "\
@@ -246,6 +254,9 @@ module Workflow
     def fail!(task,nodeset)
       @nodes_ko.set_state(self.class.operation('_failed'),nil,
         context[:database],context[:user])
+      @nodes_ko.set.each do |node|
+        context[:states].set(node.hostname,nil,nil,'ko')
+      end
       log('success', false, nodeset)
       @logger.error(nodeset,context[:states])
       debug(1,
