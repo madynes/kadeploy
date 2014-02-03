@@ -1224,7 +1224,7 @@ if $config[:who_i_am]==-1 && $config[:check_master]
   index=detect_who_i_am
   if index
     $config[:nodeList].delete_at(index)
-    $log.warn 'master is in nodes list, remove it'
+    $log.warn 'master node is in the nodes list, removing it'
     $config[:modified_node_list]=true
   end
 end
