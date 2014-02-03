@@ -63,7 +63,7 @@ beginning_time = Time.now
 # Tools box
 def fatal_error(message)
   $log.fatal message
-  exit -1
+  exit(1)
 end
 
 class String
@@ -1276,7 +1276,7 @@ if $config[:who_i_am]==-1 # master
   ping=PingServer.new($config[:master])
   fountain=FirstFountain.new
 else
-  Signal.trap('INT') { exit! -1 }
+  Signal.trap('INT') { exit! 1 }
   ping=PingServer.new
   $log.info "I am number #{$config[:who_i_am]}"
   fountain=Fountain.new
