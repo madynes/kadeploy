@@ -1134,7 +1134,45 @@ OptionParser.new do |opts|
   opts.separator ' * Cloning a disk partition using dd, streaming Kascade\'s standard input:'
   opts.separator '   dd if=/dev/sda2 | gzip | kascade -N n2,n3,n4 -O \'gunzip | dd of=/dev/sda2\''
   opts.separator ''
-  opts.separator 'Options: '
+  opts.separator 'Main options:'
+  opts.on('-i', '--input FILE', 'input file') do |v|
+    $config[:input] = v
+    fatal_error "file #{v} does not exist" unless File.exist?(v)
+    $config[:filesize]=File.size(v)
+  end
+  opts.on('-k', '--ok FILE', 'list of successful nodes') { |v| $config[:ok_file] = v }
+  opts.on('-K', '--ko FILE', 'list of failed nodes') { |v| $config[:ko_file] = v }
+  opts.on('-n', '--node-file FILE', 'node file') do |v|
+    $config[:nodeFile]=v
+    begin
+      $config[:nodeList] = File.readlines(v).map { |l| l.strip }
+    rescue Exception => ex
+      fatal_error "Error: could not open #{v} file: #{ex.to_s}"
+    end
+  end
+  opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
+  opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
+  opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = PipeOutput.new(v) }
+  opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
+    case v
+      when 'warn'
+        $log.level=Logger::WARN
+      when 'debug'
+        $log.level=Logger::DEBUG
+      when 'info'
+        $log.level=Logger::INFO
+      when 'fatal'
+        $log.level=Logger::FATAL
+      else
+        $log.level=v.to_i
+    end
+  end
+  opts.on('-?', '--help', 'show this message') do
+    puts opts
+    exit
+  end
+  opts.separator ''
+  opts.separator 'Performance & tuning options:'
   opts.on('-A', '--[no-]aggressive', 'kill the process using the listening port') { |v| $config[:aggressive] = v }
   opts.on('-b', '--buffer-size SIZE', "read buffer size, in bytes (default: #{$config[:buffer_size]})") { |v| $config[:buffer_size] = v.to_i }
   opts.on('-c', '--disable-check-master', 'disable check master in node list') { |v| $config[:check_master] = false }
@@ -1154,27 +1192,8 @@ OptionParser.new do |opts|
     end
   end
   opts.on('-H', '--[no-]disable-handshake', 'disable the handshake') { |v| $config[:handshake]=!v }
-  opts.on('-i', '--input FILE', 'input file') do |v|
-    $config[:input] = v
-    fatal_error "file #{v} does not exist" unless File.exist?(v)
-    $config[:filesize]=File.size(v)
-  end
-  opts.on('-k', '--ok FILE', 'list of successful nodes') { |v| $config[:ok_file] = v }
-  opts.on('-K', '--ko FILE', 'list of failed nodes') { |v| $config[:ko_file] = v }
   opts.on('-m', '--master HOST', 'Specify the master hostname') { |v| $config[:master] = v }
   opts.on('-M', '--[no-]mr-proper', 'delete the script and node list') { |v| $config[:mr_proper] = v }
-  opts.on('-n', '--node-file FILE', 'node file') do |v|
-    # READS NODE FILE
-    $config[:nodeFile]=v
-    begin
-      $config[:nodeList] = File.readlines(v).map { |l| l.strip }
-    rescue Exception => ex
-      fatal_error "Error: could not open #{v} file: #{ex.to_s}"
-    end
-  end
-  opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
-  opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
-  opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = PipeOutput.new(v) }
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
   opts.on('-r', '--retry NUM', "Set number retry attempts, by default this value is #{$config[:retries]} and each retry is performed after 1s") { |v| $config[:retries] = v.to_i }
   opts.on('-R', '--retry2 TIME,retries', Array, "Set new retries number after time second default is #{$config[:retries2][0]},#{$config[:retries2][1]} ") { |v| $config[:retries2] = v }
@@ -1182,26 +1201,8 @@ OptionParser.new do |opts|
   opts.on('-S', '--ssh-command SSH', 'custom ssh command (experimental)') { |v| $config[:ssh_command] = v }
   opts.on('-t', '--timeout NUM', "Timeout for connection and buffer send/receive (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
   opts.on('-u', '--number-of-buffer NB', "Number of max buffer stored (default: #{$config[:buffer_in_memory]})") { |v| $config[:buffer_in_memory]=v.to_i }
-  opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
-    case v
-      when 'warn'
-        $log.level=Logger::WARN
-      when 'debug'
-        $log.level=Logger::DEBUG
-      when 'info'
-        $log.level=Logger::INFO
-      when 'fatal'
-        $log.level=Logger::FATAL
-      else
-        $log.level=v.to_i
-    end
-  end
   opts.on('-w', '--[no-]wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
   opts.on('-W', '--who-i-am NUM', 'master node\'s index in the node list') { |v| $config[:who_i_am] = Integer(v) rescue nil }
-  opts.on_tail('-?', '--help', 'show this message') do
-    puts opts
-    exit
-  end
 end.parse!
 
 
