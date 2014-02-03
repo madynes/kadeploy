@@ -1210,6 +1210,9 @@ OptionParser.new do |opts|
   opts.on('-W', '--who-i-am NUM', 'master node\'s index in the node list') { |v| $config[:who_i_am] = Integer(v) rescue nil }
 end.parse!
 
+if $config[:nodeList].nil?
+  fatal_error("No nodes list specified. See kascade -?")
+end
 
 if $config[:sort]
   $config[:modified_node_list]=true
