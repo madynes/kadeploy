@@ -192,13 +192,18 @@ def delete_dir(dir)
   system("rmdir -p #{dir.to_s}")
 end
 
-def installf(kind,file,filename=nil)
+def installf(kind,file,filename=nil,override=true)
   file = File.join(D[kind],file.to_s) if file.is_a?(Symbol)
   inst = INSTALL[kind]
   raise file if !inst or !File.exist?(file)
   dest = inst[:dir]
-  dest = File.join(dest,filename) if filename
+  if filename
+    dest = File.join(dest,filename) 
+  else
+    dest = File.join(dest,File.basename(file))
+  end
   dest = File.join(@root_dir,dest) if @root_dir
+  dest +='.dist' if !override && File.exist?(dest)
   sh "install -o #{inst[:user]} -g #{inst[:group]} -m #{inst[:mode]} #{file} #{dest}"
 end
 
@@ -207,7 +212,7 @@ def uninstallf(kind,file,filename=nil)
   dest = INSTALL[kind][:dir]
   dest = File.join(dest,filename) if filename
   dest = File.join(@root_dir,dest) if @root_dir
-  sh "rm -f #{File.join(dest,file.to_s)}"
+  sh "rm -f #{File.join(dest,file.to_s)}*"
 end
 
 def deb_versions()
@@ -349,7 +354,7 @@ task :install_client, [:root_dir,:distrib] => [:prepare, :man_client, :install_c
   installf(:man8,File.join(D[:man],'karights3.8'))
 
   create_dir(:conf)
-  installf(:conf,:'client_conf.yml')
+  installf(:conf,:'client_conf.yml',nil,false)
 
   create_dir(:bin)
   Dir[File.join(D[:bin],'*')].each do |f|
@@ -405,11 +410,11 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:man8,File.join(D[:man],'kadeploy3d.8'))
 
   create_dir(:conf)
-  installf(:conf,:'server_conf.yml')
-  installf(:conf,:'clusters.yml')
-  installf(:conf,:'cmd.yml')
+  installf(:conf,:'server_conf.yml',nil,false)
+  installf(:conf,:'clusters.yml',nil,false)
+  installf(:conf,:'cmd.yml',nil,false)
   Dir[File.join(D[:conf],'cluster-*.yml')].each do |f|
-    installf(:conf,File.basename(f).to_sym)
+    installf(:conf,File.basename(f).to_sym,nil,false)
   end
   Tempfile.open('kadeploy_version',File.dirname(__FILE__)) do |f|
     f.puts VERSION
