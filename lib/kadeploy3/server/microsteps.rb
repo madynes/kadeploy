@@ -501,10 +501,6 @@ class Microstep < Automata::QueueTask
             cmd = context[:cluster].instance_variable_get("@cmd_#{kind}_#{level}") unless cmd
             cmd = Nodes::NodeCmd.generate(cmd,node)
             cmd = replace_groups_in_command(cmd, entry) if entry.is_a?(Array)
-            #We directly transmit the --no-wait parameter to the power_on/power_off commands
-            if (kind == "power_on") || (kind == "power_off") then
-              cmd += " --no-wait" if (not context[:execution].wait)
-            end
             pr.add(cmd, node)
           end
           pr.run
