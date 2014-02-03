@@ -894,7 +894,7 @@ class FirstFountain<AbstractFountain
         end
       rescue Exception => ex
         $log.error ex unless @shunting_down
-        $log.info 'master server was shunted down'
+        $log.info 'master server was shut down'
       end
     end
   end
