@@ -414,11 +414,6 @@ class FileOutput < Output
     reader
   end
 
-  def close
-    @stream.close
-    0
-  end
-
   def quit
     close
     #rm file ?
