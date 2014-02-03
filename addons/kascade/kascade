@@ -138,7 +138,7 @@ def detect_who_i_am
 end
 
 def connect_try(line)
-  $config[:retries].downto(0) do |i|
+  1.upto($config[:retries]) do |i|
     begin
       return connect(line)
     rescue Errno::EHOSTUNREACH, Timeout::Error => ex
@@ -148,7 +148,7 @@ def connect_try(line)
     rescue Exception => e
       $log.debug e
       raise e if 0==i
-      $log.warn("retry  #{i} on node #{line}: #{e.to_s}")
+      $log.warn("Connection failed on #{line}, retrying (#{i}/#{$config[:retries]}): #{e.to_s}")
       sleep 1
     end
   end
