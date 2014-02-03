@@ -1111,7 +1111,7 @@ $config = {
     :deploy => Ssh.new,
     :retries => 10,
     :retries2 => [10, 0],
-    :output => FileOutput.new($stdout),
+    :output => nil,
     :who_i_am => -1,
     :buffer_in_memory => 1600,
     :chunk_size => 160,
@@ -1214,6 +1214,9 @@ if $config[:nodeList].nil?
   fatal_error("No nodes list specified. See kascade -?")
 end
 
+if $config[:output].nil?
+  fatal_error("No output mode specified. Use '-o FILE' or '-O COMMAND'. See kascade -?")
+end
 if $config[:sort]
   $config[:modified_node_list]=true
   $config[:nodeList].uniq!
