@@ -748,7 +748,8 @@ end
 class FirstFountain<AbstractFountain
   def initialize
     super
-    if $config[:input]==nil # from standard input
+    # both cases are needed: on the master, '-'. on other nodes, nil.
+    if $config[:input]=='-' or $config[:input]==nil # from standard input
       $stdin.binmode
       $log.info 'using standard input'
       @input=nil
@@ -800,7 +801,7 @@ class FirstFountain<AbstractFountain
   end
 
   def send_data(output_stream, byte_from)
-    if $config[:input].nil? # input stream
+    if $config[:input].nil? or $config[:input] == '-' # input stream
       if @cyclic_buffer.min_byte>byte_from
         send_cmd(KEYWORDS[:FORGET], min)
       else
@@ -841,7 +842,7 @@ class FirstFountain<AbstractFountain
   end
 
   def send_data_master(output_stream, byte_from, byte_to)
-    if $config[:input]
+    if $config[:input] != nil and $config[:input] != '-'
       input=File.open($config[:input])
       input.seek(byte_from, IO::SEEK_SET)
       data_size=[byte_to-byte_from, input.size-byte_from].min
@@ -1132,13 +1133,12 @@ OptionParser.new do |opts|
   opts.separator ' * Copy a tar archive and decompress on-the-fly:'
   opts.separator '   kascade -N n2,n3,n4 -i myfile.tgz -O \'tar -xzC /opt/\''
   opts.separator ' * Cloning a disk partition using dd, streaming Kascade\'s standard input:'
-  opts.separator '   dd if=/dev/sda2 | gzip | kascade -N n2,n3,n4 -O \'gunzip | dd of=/dev/sda2\''
+  opts.separator '   dd if=/dev/sda2 | gzip | kascade -i - -N n2,n3,n4 -O \'gunzip | dd of=/dev/sda2\''
   opts.separator ''
   opts.separator 'Main options:'
-  opts.on('-i', '--input FILE', 'input file') do |v|
+  opts.on('-i', '--input FILE', 'input file (- for stdin)') do |v|
     $config[:input] = v
-    fatal_error "file #{v} does not exist" unless File.exist?(v)
-    $config[:filesize]=File.size(v)
+    fatal_error "file #{v} does not exist" unless File.exist?(v) or v == '-'
   end
   opts.on('-k', '--ok FILE', 'list of successful nodes') { |v| $config[:ok_file] = v }
   opts.on('-K', '--ko FILE', 'list of failed nodes') { |v| $config[:ko_file] = v }
@@ -1261,6 +1261,11 @@ time_before_fountain = Time.now
 
 
 if $config[:who_i_am]==-1 # master
+  if $config[:input].nil?
+    fatal_error("No input specified. Use '-i -' for stdin")
+  end
+  $config[:filesize]=File.size($config[:input]) if $config[:input] != '-'
+
   $log.info 'I am the master'
   Signal.trap('INT') do
     case $config[:QUIT]
