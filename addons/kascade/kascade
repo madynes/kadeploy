@@ -56,7 +56,7 @@ KEYWORDS = {
 }
 
 $log= Logger.new(STDERR)
-$log.level=Logger::ERROR
+$log.level=Logger::WARN
 beginning_time = Time.now
 
 
