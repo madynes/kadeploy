@@ -1135,11 +1135,11 @@ OptionParser.new do |opts|
   opts.separator '   dd if=/dev/sda2 | gzip | kascade -N n2,n3,n4 -O \'gunzip | dd of=/dev/sda2\''
   opts.separator ''
   opts.separator 'Options: '
-  opts.on('-A', '--[no-]aggressive', 'kill process which use the listen port') { |v| $config[:aggressive] = v }
-  opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default: #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
+  opts.on('-A', '--[no-]aggressive', 'kill the process using the listening port') { |v| $config[:aggressive] = v }
+  opts.on('-b', '--buffer-size SIZE', "read buffer size, in bytes (default: #{$config[:buffer_size]})") { |v| $config[:buffer_size] = v.to_i }
   opts.on('-c', '--disable-check-master', 'disable check master in node list') { |v| $config[:check_master] = false }
-  opts.on('-C', '--chunk-size SIZE', "how much buffer readed before read next header (default: #{$config[:chunk_size]})")
-  opts.on('-D', '--deploy [ssh,taktuk,clush]', [:ssh, :taktuk, :clush, :none], 'Choose deploy method. Ssh is default value') do |v|
+  opts.on('-C', '--chunk-size SIZE', "size of chunks (amount of data between headers). unit: buffer size (default: #{$config[:chunk_size]})")
+  opts.on('-D', '--deploy [ssh,taktuk,clush]', [:ssh, :taktuk, :clush, :none], "Choose deployment method (default: #{$config[:deploy].class.to_s.downcase})") do |v|
     case v
       when :ssh
         $config[:deploy]=Ssh.new
@@ -1159,8 +1159,8 @@ OptionParser.new do |opts|
     fatal_error "file #{v} does not exist" unless File.exist?(v)
     $config[:filesize]=File.size(v)
   end
-  opts.on('-k', '--ok FILE', 'list of node correctly deployed') { |v| $config[:ok_file] = v }
-  opts.on('-K', '--ko FILE', 'list of node with error') { |v| $config[:ko_file] = v }
+  opts.on('-k', '--ok FILE', 'list of successful nodes') { |v| $config[:ok_file] = v }
+  opts.on('-K', '--ko FILE', 'list of failed nodes') { |v| $config[:ko_file] = v }
   opts.on('-m', '--master HOST', 'Specify the master hostname') { |v| $config[:master] = v }
   opts.on('-M', '--[no-]mr-proper', 'delete the script and node list') { |v| $config[:mr_proper] = v }
   opts.on('-n', '--node-file FILE', 'node file') do |v|
@@ -1179,8 +1179,8 @@ OptionParser.new do |opts|
   opts.on('-r', '--retry NUM', "Set number retry attempts, by default this value is #{$config[:retries]} and each retry is performed after 1s") { |v| $config[:retries] = v.to_i }
   opts.on('-R', '--retry2 TIME,retries', Array, "Set new retries number after time second default is #{$config[:retries2][0]},#{$config[:retries2][1]} ") { |v| $config[:retries2] = v }
   opts.on('-s', '--[no-]sort', 'sort the node file') { |v| $config[:sort] = v }
-  opts.on('-S', '--ssh-command SSH', 'parse ssh command') { |v| $config[:ssh_command] = v }
-  opts.on('-t', '--timeout NUM', "Timeout to connect or send/receive a buffer (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
+  opts.on('-S', '--ssh-command SSH', 'custom ssh command (experimental)') { |v| $config[:ssh_command] = v }
+  opts.on('-t', '--timeout NUM', "Timeout for connection and buffer send/receive (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
   opts.on('-u', '--number-of-buffer NB', "Number of max buffer stored (default: #{$config[:buffer_in_memory]})") { |v| $config[:buffer_in_memory]=v.to_i }
   opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
     case v
@@ -1196,9 +1196,8 @@ OptionParser.new do |opts|
         $log.level=v.to_i
     end
   end
-  opts.on('-w', '--[no-}wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
-  opts.on('-W', '--who-i-am NUM', 'number of node it is non number parameter activate the auto-detection') { |v| $config[:who_i_am] = Integer(v) rescue nil }
-  opts.separator ''
+  opts.on('-w', '--[no-]wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
+  opts.on('-W', '--who-i-am NUM', 'master node\'s index in the node list') { |v| $config[:who_i_am] = Integer(v) rescue nil }
   opts.on_tail('-?', '--help', 'show this message') do
     puts opts
     exit
@@ -1223,7 +1222,7 @@ end
 
 unless $config[:who_i_am]
   $config[:who_i_am]=detect_who_i_am
-  fatal_error('I don\'t know who i am !') unless $config[:who_i_am]
+  fatal_error('I don\'t know who I am!') unless $config[:who_i_am]
 end
 
 unless $config[:master]
