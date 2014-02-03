@@ -1202,7 +1202,7 @@ OptionParser.new do |opts|
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
   opts.on('-r', '--retry NUM', "Set number retry attempts, by default this value is #{$config[:retries]} and each retry is performed after 1s") { |v| $config[:retries] = v.to_i }
   opts.on('-R', '--retry2 TIME,retries', Array, "Set new retries number after time second default is #{$config[:retries2][0]},#{$config[:retries2][1]} ") { |v| $config[:retries2] = v }
-  opts.on('-s', '--[no-]sort', 'sort the node file') { |v| $config[:sort] = v }
+  opts.on('-s', '--[no-]sort', 'sort and unify the nodes list') { |v| $config[:sort] = v }
   opts.on('-S', '--ssh-command SSH', 'custom ssh command (experimental)') { |v| $config[:ssh_command] = v }
   opts.on('-t', '--timeout NUM', "Timeout for connection and buffer send/receive (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
   opts.on('-u', '--number-of-buffer NB', "Number of max buffer stored (default: #{$config[:buffer_in_memory]})") { |v| $config[:buffer_in_memory]=v.to_i }
