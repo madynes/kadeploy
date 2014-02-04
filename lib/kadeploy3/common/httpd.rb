@@ -70,6 +70,11 @@ module HTTPd
       super(415,'Unsupported Media Type',msg,headers)
     end
   end
+  class UnavailableError < HTTPError
+    def initialize(msg=nil,headers)
+      super(503,'Service Unavailable',msg,headers)
+    end
+  end
 
   class ContentBinding < Hash
   end
