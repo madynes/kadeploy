@@ -1118,6 +1118,14 @@ $config = {
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby #{__FILE__} [options]"
   opts.separator ''
+  opts.separator 'Example usage:'
+  opts.separator ' * Simple file broadcast to three hosts:'
+  opts.separator '   kascade -N n2,n3,n4 -i myfile.tgz -o /home/login/myfile.tgz'
+  opts.separator ' * Copy a tar archive and decompress on-the-fly:'
+  opts.separator '   kascade -N n2,n3,n4 -i myfile.tgz -O \'tar -xzC /opt/\''
+  opts.separator ' * Cloning a disk partition using dd, streaming Kascade\'s standard input:'
+  opts.separator '   dd if=/dev/sda2 | gzip | kascade -N n2,n3,n4 -O \'gunzip | dd of=/dev/sda2\''
+  opts.separator ''
   opts.separator 'Options: '
   opts.on('-A', '--[no-]aggressive', 'kill process which use the listen port') { |v| $config[:aggressive] = v }
   opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default: #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
