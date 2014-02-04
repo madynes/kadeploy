@@ -18,19 +18,22 @@ $version = nil
 $autoclean = nil
 $kadeploy = nil
 $httpd = nil
+$mainthread = nil
 
 Signal::trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
   $autoclean.kill() if $autoclean
   $kadeploy.kill() if $kadeploy
+  $mainthread.kill if $mainthread
   $httpd.kill() if $httpd
   clean()
   exit!(1)
 end
 
 Signal::trap("TERM") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  puts "\nSIGTERM trapped, let's clean everything ..."
   $autoclean.kill() if $autoclean
+  $mainthread.kill if $mainthread
   $kadeploy.kill() if $kadeploy
   $httpd.kill() if $httpd
   clean()
@@ -306,6 +309,6 @@ end
 GC.start
 
 # Launch HTTPd
-$httpd.run()
+$mainthread = Thread.new{$httpd.run()}
+$mainthread.join
 clean()
-
