@@ -147,7 +147,8 @@ def detect_who_i_am
 end
 
 def connect_try(line)
-  1.upto($config[:retries]) do |i|
+  retries=$config[:retries] # it can change with time
+  1.upto(retries) do |i|
     begin
       return connect(line)
     rescue Errno::EHOSTUNREACH, Timeout::Error => ex
@@ -156,8 +157,8 @@ def connect_try(line)
       raise ex
     rescue Exception => e
       $log.debug e
-      raise e if 0==i
-      $log.warn("Connection failed on #{line}, retrying (#{i}/#{$config[:retries]}): #{e.to_s}")
+      raise e if retries==i
+      $log.warn("Connection failed on #{line}, retrying (#{i}/#{retries}): #{e.to_s}")
       sleep 1
     end
   end
