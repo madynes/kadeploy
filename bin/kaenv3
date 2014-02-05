@@ -241,12 +241,18 @@ class KaenvsClient < Client
   def run(options,params)
     # set path
     path = api_path()
-    if ![:add, :list, :'move-files'].include?(options[:operation])
-      path = File.join(path,"/#{options[:env_user]||''}/")
-      path = File.join(path,options[:env_name]) if options[:env_name]
-      path = File.join(path,options[:env_version].to_s) if options[:env_version]
-    elsif options[:operation] != :add
-      path = File.join(path,options[:env_user]) if options[:env_user]
+
+    if ![:add, :'move-files'].include?(options[:operation])
+      if [:print,:list].include?(options[:operation])
+        path = File.join(path,"/#{options[:env_user]||''}/")
+      else
+        path = File.join(path,options[:env_user]||USER)
+      end
+
+      if options[:operation] != :list
+        path = File.join(path,options[:env_name]) if options[:env_name]
+        path = File.join(path,options[:env_version].to_s) if options[:env_version]
+      end
     end
 
     method = nil
