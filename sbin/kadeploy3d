@@ -221,6 +221,19 @@ if (!File.writable?(File.join($kadeploy_logdir,LOGFILE_DEBUG)) \
   error("Log directory '#{$kadeploy_logdir}' not writable")
 end
 
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket::do_not_reverse_lookup = true
+
+$stdout.puts ''
+# Load the configuration
+begin
+  $kadeploy = Kadeploy::KadeployServer.new()
+rescue Kadeploy::KadeployError => ke
+  error("#{Kadeploy::KadeployError.to_msg(ke.errno)}"\
+    "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
+end
+$stdout.puts 'Configuration files loaded'
+
 # Loading SSH agent
 if $ssh_key
   error("Unable to read the SSH key file '#{$ssh_key}'") unless File.readable?($ssh_key)
@@ -239,19 +252,6 @@ if $ssh_key
   error('Unable to add the key to the ssh-agent') unless $?.success?
   $stdout.puts "SSH-agent #{$ssh_agent_pid} loaded"
 end
-
-
-# Disable reverse lookup to prevent lag in case of DNS failure
-Socket::do_not_reverse_lookup = true
-
-# Load the configuration
-begin
-  $kadeploy = Kadeploy::KadeployServer.new()
-rescue Kadeploy::KadeployError => ke
-  error("#{Kadeploy::KadeployError.to_msg(ke.errno)}"\
-    "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
-end
-$stdout.puts 'Configuration files loaded'
 
 dh_seeds = nil
 if $kadeploy.secure and $generate_dh_seeds
