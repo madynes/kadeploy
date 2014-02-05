@@ -6,6 +6,8 @@ require 'digest/md5'
 require 'uri'
 require 'yaml'
 
+YAML::ENGINE.yamler = 'syck'
+
 module Kadeploy
 
 class CacheIndexPVHash
