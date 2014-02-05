@@ -56,6 +56,7 @@ class KadeployServer
   end
 
   def kill
+    workflows_kill(get_nodes())
   end
 
   def load_config(caches=nil)
