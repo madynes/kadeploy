@@ -1067,7 +1067,7 @@ class Microstep < Automata::QueueTask
     kofile = Tempfile.new("kascade-kofile")
     kofile.close
 
-    cmd = "#{context[:common].kascade} -i #{file} -n #{nodefile.path} -O '#{decompress}' -S '#{context[:common].taktuk_connector}' --ok #{okfile.path} --ko #{kofile.path} #{context[:common].kascade_options}" # -m Socket.gethostname()
+    cmd = "#{context[:common].kascade} -i #{file} -n #{nodefile.path} -O '#{decompress}' -S '#{context[:common].taktuk_connector}' --ok #{okfile.path} --ko #{kofile.path} #{context[:common].kascade_options} #{(context[:cluster].use_ip_to_deploy)?'-I':''}" # -m Socket.gethostname()
 
     @nodes_ok.clean()
     status,out,err = nil
