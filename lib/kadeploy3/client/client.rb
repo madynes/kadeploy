@@ -947,6 +947,8 @@ class ClientWorkflow < Client
       else
         return false
       end
+    when 'server'
+      file
     when 'http','https'
       file
     else

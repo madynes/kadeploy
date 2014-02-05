@@ -6,6 +6,8 @@ require 'digest/md5'
 module Kadeploy
 
 class FetchFile
+  attr_reader :path
+
   def initialize(path,client=nil)
     @path = path
     @client = client

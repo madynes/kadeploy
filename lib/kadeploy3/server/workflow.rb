@@ -60,12 +60,11 @@ module Workflow
       if path and !path.empty?
         kind = nil
         begin
-          kind = URI.parse(path).scheme || 'local'
+          kind = URI.parse(path).scheme
         rescue URI::InvalidURIError
-          kind = 'local'
         end
 
-        if kind == 'local'
+        if kind.nil?
           unless File.readable?(path)
             error(APIError::INVALID_FILE,"The file '#{path}' is not readable on the server")
           end

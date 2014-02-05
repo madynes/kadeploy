@@ -44,7 +44,7 @@ class KadeployError < Exception
     when APIError::DATABASE_ERROR
       "Database issue"
     when APIError::CACHE_ERROR
-      "Something went wront with the cache system"
+      "Something went wrong with the cache system"
     when APIError::CACHE_FULL
       "The cache is full"
     when APIError::DESTRUCTIVE_ENVIRONMENT
