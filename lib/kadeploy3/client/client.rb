@@ -932,7 +932,10 @@ class ClientWorkflow < Client
 
   def kill
     super()
-    delete(api_path()) if @wid
+    begin
+      delete(api_path()) if @wid
+    rescue Exception
+    end
   end
 
   def self.load_file(file)
