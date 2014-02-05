@@ -470,6 +470,7 @@ class Report
     rescue => e
       $log.error "error during open file #{file_name} #{e.to_s}"
     end
+    $log.info("The report #{file_name} is written") 
   end
 
   def log_report(head, table, error_show=false)
@@ -900,9 +901,9 @@ class FirstFountain<AbstractFountain
   end
 
   def shutdown_master_server
+    report.make_report_files
     @shunting_down=true
     @master_server.shutdown
-    report.make_report_files
   end
 
   def stop
