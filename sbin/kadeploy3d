@@ -27,8 +27,7 @@ Signal::trap("INT") do
   $kadeploy.kill() if $kadeploy
   $mainthread.kill if $mainthread
   $httpd.kill() if $httpd
-  clean()
-  exit!(1)
+  exit 1
 end
 
 Signal::trap("TERM") do
@@ -38,8 +37,7 @@ Signal::trap("TERM") do
   $mainthread.kill if $mainthread
   $kadeploy.kill() if $kadeploy
   $httpd.kill() if $httpd
-  clean()
-  exit!(1)
+  exit 1
 end
 
 #require 'stringio'
@@ -115,12 +113,19 @@ require 'optparse'
 
 
 def clean()
+  begin
+    File.delete($pidfile) if $pidfile
+    $pidfile = nil
+  rescue Exception
+  end
+
   if $ssh_key
     ENV['SSH_AGENT_PID'] = $ssh_agent_pid
     ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
     `ssh-agent -k`
+    $ssh_key = nil
   end
-  `rm -f #{$pidfile}` if $pidfile
+
   $kadeploy_logfiles.each_value do |io|
     io.close if io and !io.closed?
   end
@@ -128,6 +133,8 @@ def clean()
   STDOUT::reopen('/dev/null')
   STDERR::reopen('/dev/null')
 end
+
+at_exit{ clean() }
 
 def error(msg='',abrt = true)
   $stderr.puts msg if msg and !msg.empty?
@@ -300,21 +307,25 @@ if $redirect_stderr
 end
 $stderr = STDERR
 
-File.open($pidfile,'w'){|f| f.puts Process::pid} if $pidfile
+begin
+  File.open($pidfile,'w'){|f| f.puts Process::pid} if $pidfile
 
-$stdout.puts "[#{Time.now.to_s}] Launching service"
+  $stdout.puts "[#{Time.now.to_s}] Launching service"
 
-# Launch autoclean thread
-$autoclean = Thread.new do
-  begin
-    sleep AUTOCLEAN_PITCH
-    $kadeploy.workflows_clean()
-  end while true
+  # Launch autoclean thread
+  $autoclean = Thread.new do
+    begin
+      sleep AUTOCLEAN_PITCH
+      $kadeploy.workflows_clean()
+    end while true
+  end
+
+  GC.start
+
+  # Launch HTTPd
+  $mainthread = Thread.new{$httpd.run()}
+  $mainthread.join
+  clean()
+ensure
+  File.delete($pidfile) if $pidfile
 end
-
-GC.start
-
-# Launch HTTPd
-$mainthread = Thread.new{$httpd.run()}
-$mainthread.join
-clean()

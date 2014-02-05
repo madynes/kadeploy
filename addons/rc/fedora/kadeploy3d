@@ -45,7 +45,8 @@ stop() {
         killproc -p ${pidfile} -d 3 $kadeploy3d
         RETVAL=$?
         echo
-	[ $RETVAL = 0 ] && rm -f ${lockfile}
+        # Remove the PID file if the process was killed using SIGKILL
+	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
 }
 
 reload() {
