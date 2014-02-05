@@ -93,7 +93,7 @@ class HTTPBasicAuthentication < Authentication
 
   def ==(auth)
     if auth.is_a?(self.class)
-      (@dbfile == auth.instance_variable_get(:@dbfile) and (@realm == auth.realm) and @whitelist == auth.whitelist)
+      (@dbfile.instance_variable_get(:@path) == auth.instance_variable_get(:@dbfile).instance_variable_get(:@path) and @realm == auth.realm and @whitelist == auth.whitelist)
     else
       false
     end
