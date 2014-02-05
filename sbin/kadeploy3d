@@ -113,14 +113,18 @@ require 'optparse'
 
 
 def clean()
-  $kadeploy_logfiles.each_value do |io|
-    io.close if io and !io.closed?
-  end
   if $ssh_key
     ENV['SSH_AGENT_PID'] = $ssh_agent_pid
     ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
     `ssh-agent -k`
   end
+  `rm -f #{$pidfile}` if $pidfile
+  $kadeploy_logfiles.each_value do |io|
+    io.close if io and !io.closed?
+  end
+  STDIN::reopen('/dev/null')
+  STDOUT::reopen('/dev/null')
+  STDERR::reopen('/dev/null')
 end
 
 def error(msg='',abrt = true)
