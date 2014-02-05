@@ -71,6 +71,15 @@ class String
     Integer(self) rescue self
   end
 end
+def local_ip(destination)
+   orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true
+   UDPSocket.open do |s|
+     s.connect destination, 1
+     s.addr.last
+   end
+   ensure
+     Socket.do_not_reverse_lookup = orig
+end 
 
 def read_cmd(stream)
   line = stream.read(100)
@@ -1091,26 +1100,27 @@ end
 
 # CONFIGURATION
 $config = {
-    :port => 10000,
+    :buffer_in_memory => 1600,
     :buffer_size => 1024*64, #1460*64
+    :check_master => true,
+    :chunk_size => 160,
+    :dec_ping_port => 1000,
+    :deploy => Ssh.new,
     :input => nil,
-    :ok_file => nil,
     :ko_file => nil,
     :master => nil,
-    :ssh_command => nil,
-    :deploy => Ssh.new,
+    :modified_node_list => false,
+    :mr_proper => false,
+    :ok_file => nil,
+    :output => nil,
+    :port => 10000,
     :retries => 10,
     :retries2 => [10, 0],
-    :output => nil,
-    :who_i_am => -1,
-    :buffer_in_memory => 1600,
-    :chunk_size => 160,
+    :ssh_command => nil,
     :timeout => 3,
-    :dec_ping_port => 1000,
+    :use_ip => false,
     :wait_deploy => false,
-    :mr_proper => false,
-    :modified_node_list => false,
-    :check_master => true
+    :who_i_am => -1,
 }
 
 
@@ -1188,6 +1198,7 @@ OptionParser.new do |opts|
     end
   end
   opts.on('-H', '--[no-]disable-handshake', 'disable the handshake') { |v| $config[:handshake]=!v }
+  opts.on('-I', '--[no-]use-ip', 'Use ip instead hostname when -m is not set') { |v| $config[:use_ip]=v }
   opts.on('-m', '--master HOST', 'Specify the master hostname') { |v| $config[:master] = v }
   opts.on('-M', '--[no-]mr-proper', 'delete the script and node list') { |v| $config[:mr_proper] = v }
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
@@ -1229,7 +1240,11 @@ end
 
 unless $config[:master]
   if $config[:who_i_am]==-1
-    $config[:master]=`hostname`.strip
+    if $config[:use_ip]
+      $config[:master]=local_ip($config[:nodeList][0])
+    else
+      $config[:master]=`hostname`.strip
+    end
   else
     fatal_error('I don\t know who are the master !')
   end
