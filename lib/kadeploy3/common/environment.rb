@@ -163,6 +163,10 @@ class Environment
     @recorded
   end
 
+  def cache_version
+    "#{@name}/#{@version}"
+  end
+
   # Load an environment file
   #
   # Arguments

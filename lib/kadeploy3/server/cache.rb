@@ -403,6 +403,26 @@ class Cache
     ret
   end
 
+  # Manually remove a file from the cache
+  def remove(path,version,user,priority,tag='')
+    if ret = read({
+      :path => path,
+      :version => version,
+      :user => user,
+      :priority => priority,
+      :tag => tag,
+    }) then
+      if ret.used?
+        false
+      else
+        delete(ret)
+        true
+      end
+    else
+      false
+    end
+  end
+
   # Free (at least) a specific amout of memory in the cache
   def free(amount=0)
     @lock.synchronize{ free!(amount) }
