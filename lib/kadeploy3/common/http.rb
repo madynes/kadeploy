@@ -139,7 +139,13 @@ module HTTP
         if response.is_a?(Net::HTTPOK)
 
           if parse
-            case response['Content-Type'].split(';').first.downcase
+            begin
+              tmp = response['Content-Type'].split(';').first.downcase
+            rescue Exception
+              tmp = ''
+            end
+
+            case tmp
             when 'application/json'
               res = JSON::load(body)
             when 'application/x-yaml'
@@ -149,7 +155,7 @@ module HTTP
             when 'text/plain'
               res = body
             else
-              error("Invalid server response (Content-Type: '#{response['Content-Type']}')")
+              error("Invalid server response (Content-Type: '#{response['Content-Type']}')\n#{body if body}")
             end
           else
             res = body
