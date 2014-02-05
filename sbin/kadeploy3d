@@ -22,6 +22,7 @@ $mainthread = nil
 
 Signal::trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
+  $kadeploy.shutdown = true if $kadeploy
   $autoclean.kill() if $autoclean
   $kadeploy.kill() if $kadeploy
   $mainthread.kill if $mainthread
@@ -32,6 +33,7 @@ end
 
 Signal::trap("TERM") do
   puts "\nSIGTERM trapped, let's clean everything ..."
+  $kadeploy.shutdown = true if $kadeploy
   $autoclean.kill() if $autoclean
   $mainthread.kill if $mainthread
   $kadeploy.kill() if $kadeploy

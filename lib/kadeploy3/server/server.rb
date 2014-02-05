@@ -18,6 +18,7 @@ class KadeployServer
   include Kaconsole
 
   attr_reader :host, :port, :secure, :local, :cert, :private_key, :logfile, :window_managers, :httpd
+  attr_writer :shutdown
 
   def initialize()
     @config = load_config()
@@ -53,6 +54,7 @@ class KadeployServer
       :console => {},
     }
     @httpd = nil
+    @shutdown = false
   end
 
   def kill
@@ -145,6 +147,10 @@ class KadeployServer
 
   def error_invalid!(msg=nil)
     raise HTTPd::InvalidError.new(msg)
+  end
+
+  def error_unavailable!(msg=nil)
+    raise HTTPd::UnavailableError.new(msg)
   end
 
   def uuid(prefix='')
@@ -423,6 +429,10 @@ class KadeployServer
       query = :delete
     else
       raise
+    end
+
+    if @shutdown
+      error_unavailable!("The service is being shutdown, please try again later")
     end
 
     # Authenticate the user
