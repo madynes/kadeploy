@@ -431,9 +431,10 @@ class KadeployServer
     options = init_exec_context(user)
     parse_params_default(params[:params],options)
 
-    # Prepare the treatment (parse arguments, ...)
-    options = run_method(kind,:prepare,params[:params],query,options)
     begin
+      # Prepare the treatment (parse arguments, ...)
+      options = run_method(kind,:prepare,params[:params],query,options)
+
       # Check rights
       # (only check rights if the method 'kind'_rights? is defined)
       check_rights = nil
