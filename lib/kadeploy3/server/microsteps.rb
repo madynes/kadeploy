@@ -1095,6 +1095,7 @@ class Microstep < Automata::QueueTask
         okfile.unlink
         konodes = YAML.load_file(kofile.path)
         kofile.unlink
+        raise if !oknodes.is_a?(Array) or !konodes.is_a?(Hash)
       rescue
         oknodes = []
         tmp = node_set.make_sorted_array_of_nodes.collect{|n| get_nodeid(n)}
