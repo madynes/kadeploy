@@ -346,7 +346,6 @@ class Output
 
   def close
     @queue.push(nil)
-    #try
     @threads.each do |th|
       th.join
     end
@@ -412,7 +411,7 @@ class FileOutput < Output
 
   def quit
     close
-    #rm file ?
+    # TODO should we remove the file when interrupted during the transfer?
   end
 
   def arg
@@ -441,7 +440,7 @@ class Report
   end
 
   def send_report_master
-    $log.info 'I am the last and i send report to master'
+    $log.info 'I am the last and I send report to master'
     client = connect($config[:master])
     send_reporting(client)
     client.close
