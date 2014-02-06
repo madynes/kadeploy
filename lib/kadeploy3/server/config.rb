@@ -166,7 +166,12 @@ module Configuration
     include ConfigFile
 
     def self.file()
-      File.join($kadeploy_confdir, "server_conf.yml")
+      file = File.join($kadeploy_confdir, "server.conf")
+      unless File.readable?(file)
+        file = File.join($kadeploy_confdir, "server_conf.yml")
+        $stderr.puts "Warning using a deprecated configuration file, consider to rename it to 'server.conf'"
+      end
+      file
     end
 
     attr_reader :cache
@@ -692,7 +697,12 @@ module Configuration
     include ConfigFile
 
     def self.file()
-      File.join($kadeploy_confdir, "clusters.yml")
+      file = File.join($kadeploy_confdir, "clusters.conf")
+      unless File.readable?(file)
+        file = File.join($kadeploy_confdir, "clusters.yml")
+        $stderr.puts "Warning using a deprecated configuration file, consider to rename it to 'clusters.conf'"
+      end
+      file
     end
 
     def load(commonconfig)
@@ -1298,7 +1308,12 @@ module Configuration
     include ConfigFile
 
     def self.file()
-      File.join($kadeploy_confdir, "cmd.yml")
+      file = File.join($kadeploy_confdir, "command.conf")
+      unless File.readable?(file)
+        file = File.join($kadeploy_confdir, "cmd.yml")
+        $stderr.puts "Warning using a deprecated configuration file, consider to rename it to 'command.conf'"
+      end
+      file
     end
 
     def load(common)

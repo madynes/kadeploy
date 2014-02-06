@@ -433,7 +433,7 @@ Example of field description:
 \end{itemize}
 
 \section{General configuration file}\label{sec:general_config}
-The general configuration file is named \texttt{server\_conf.yml} and is located in the Kadeploy configuration directory.
+The general configuration file is named \texttt{server.conf} and is located in the Kadeploy configuration directory.
 
 \subsection{Example of a general configuration file}
 \begin{small}
@@ -836,7 +836,7 @@ Some scripts are provided in the distribution to help to generate a GRUB NBP tha
 
 
 \section{Clusters file\label{sec:clusters_conf}}
-This file describes the list of all the clusters, the location of their specific setting files and their nodes. All the nodes of the clusters that aim to be deployed must be declared in this file. It must be defined in the  \texttt{/etc/kadeploy3/clusters.yml} file.
+This file describes the list of all the clusters, the location of their specific setting files and their nodes. All the nodes of the clusters that aim to be deployed must be declared in this file. It must be defined in the  \texttt{/etc/kadeploy3/clusters.conf} file.
 
 Warning, a cluster-specific configuration file and some partitioning/bootloader\_install scripts must be defined for each cluster define in this file.
 
@@ -847,7 +847,7 @@ Warning, a cluster-specific configuration file and some partitioning/bootloader\
 clusters:
 - name: graphene
   prefix: gra
-  conf_file: cluster_conf-graphene.yml
+  conf_file: graphene-cluster.conf
   nodes:
     - name: graphene-1.nancy.grid5000.fr # Full version
       address: 10.0.66.1
@@ -858,7 +858,7 @@ clusters:
     - name: graphene-4.nancy.grid5000.fr
       address: 10.0.66.4
 - name: griffon
-  conf_file: cluster_conf-griffon.yml
+  conf_file: griffon-cluster.conf
   nodes:
     - name: griffon-[1-92].nancy.grid5000.fr # Digest version
       address: 10.0.65.[1-92]
@@ -1396,7 +1396,7 @@ You should also use the \emph{/sbin/partprobe} at the end of your script to info
 Examples of scripts are provided in the distribution (in the directory \texttt{scripts/partitioning/}).
 
 \section{Specific commands configuration files}
-In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{cmd.yml} in the configuration directory.
+In the part~\ref{sec:specific_config} we saw that generic commands can be given to all the nodes that belong to a cluster. It is also possible to override these generic values for some specific nodes. To do this, you must fill the file named \texttt{command.conf} in the configuration directory.
 
 Note: it is not mandatory to override all the commands for a given node.
 
@@ -1502,7 +1502,7 @@ It is possible to make the Kadeploy server load an SSH-agent at launch time. Thi
 To enable this functionnality, the SSH private key to be used with the SSH-agent must be present as \texttt{keys/id\_deploy} of the server configuration directory (see section \ref{sec:confpath}). By default (if the file \texttt{/etc/kadeploy3/keys/id\_deploy} does not exist), no agent is loaded at launch time.
 
 \chapter{Client side configuration}\label{chap:Client_side_conf}
-On the client side, you only have to configure the file named \texttt{client\_conf.yml}. This file defines Kadeploy servers and a default server.
+On the client side, you only have to configure the file named \texttt{client.conf}. This file defines Kadeploy servers and a default server.
 
 \paragraph{Example of a client configuration file}
 \begin{verbatim}

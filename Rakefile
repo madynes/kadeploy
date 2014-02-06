@@ -354,7 +354,7 @@ task :install_client, [:root_dir,:distrib] => [:prepare, :man_client, :install_c
   installf(:man8,File.join(D[:man],'karights3.8'))
 
   create_dir(:conf)
-  installf(:conf,:'client_conf.yml',nil,false)
+  installf(:conf,:'client.conf',nil,false)
 
   create_dir(:bin)
   Dir[File.join(D[:bin],'*')].each do |f|
@@ -388,7 +388,7 @@ task :uninstall_client, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:sbin,:'karights3')
   delete_dir(:sbin)
 
-  uninstallf(:conf,:'client_conf.yml')
+  uninstallf(:conf,:'client.conf')
   delete_dir(:conf)
 
   Dir[File.join(D[:lib],'kadeploy3','client','*.rb')].each do |f|
@@ -410,10 +410,10 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:man8,File.join(D[:man],'kadeploy3d.8'))
 
   create_dir(:conf)
-  installf(:conf,:'server_conf.yml',nil,false)
-  installf(:conf,:'clusters.yml',nil,false)
-  installf(:conf,:'cmd.yml',nil,false)
-  Dir[File.join(D[:conf],'cluster-*.yml')].each do |f|
+  installf(:conf,:'server.conf',nil,false)
+  installf(:conf,:'clusters.conf',nil,false)
+  installf(:conf,:'command.conf',nil,false)
+  Dir[File.join(D[:conf],'cluster-*.conf')].each do |f|
     installf(:conf,File.basename(f).to_sym,nil,false)
   end
   Tempfile.open('kadeploy_version',File.dirname(__FILE__)) do |f|
@@ -461,10 +461,10 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:lib,:'server.rb')
   delete_dir(:lib)
 
-  uninstallf(:conf,:'server_conf.yml')
-  uninstallf(:conf,:'clusters.yml')
-  uninstallf(:conf,:'cmd.yml')
-  Dir[File.join(D[:conf],'cluster-*.yml')].each do |f|
+  uninstallf(:conf,:'server.conf')
+  uninstallf(:conf,:'clusters.conf')
+  uninstallf(:conf,:'command.conf')
+  Dir[File.join(D[:conf],'cluster-*.conf')].each do |f|
     uninstallf(:conf,File.basename(f).to_sym)
   end
   uninstallf(:conf,:version)

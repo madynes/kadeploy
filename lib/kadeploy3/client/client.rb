@@ -108,7 +108,8 @@ class Client
   end
 
   def self.load_configfile()
-    configfile = File.join($kadeploy_confdir,'client_conf.yml')
+    configfile = File.join($kadeploy_confdir, "client.conf")
+    configfile = File.join($kadeploy_confdir, "client_conf.yml") unless File.readable?(configfile)
     begin
       begin
         config = YAML.load_file(configfile)
