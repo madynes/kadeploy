@@ -208,11 +208,7 @@ def send_with_timeout(stream, msg)
   while 0 < msg.size
     begin
       written = stream.write_nonblock(msg)
-    rescue IO::WaitReadable
-      $log.warn ('never here -------------------')
-      IO.select([stream], nil, nil, $config[:timeout])
-      retry
-    rescue IO::WaitWritable #place a heart beat to be in better world than ping pong
+    rescue IO::WaitWritable
       if IO.select(nil, [stream], nil, $config[:timeout])
         retry
       else
