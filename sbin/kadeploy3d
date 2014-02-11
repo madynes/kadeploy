@@ -120,8 +120,7 @@ def clean()
   end
 
   if $ssh_key
-    ENV['SSH_AGENT_PID'] = $ssh_agent_pid
-    ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
+    $stdout.puts("Killing ssh-agent")
     `ssh-agent -k`
     $ssh_key = nil
   end
@@ -285,7 +284,8 @@ $kadeploy.config_httpd_bindings($httpd)
 
 # Demonize the process
 if $detach
-  exit 0 if fork
+  #exit! avoids call at_exit which kills the ssh-agent and another stuff.
+  exit! 0 if fork
   Process::setsid
 end
 
