@@ -71,7 +71,7 @@ module HTTPd
     end
   end
   class UnavailableError < HTTPError
-    def initialize(msg=nil,headers)
+    def initialize(msg=nil,headers=nil)
       super(503,'Service Unavailable',msg,headers)
     end
   end
