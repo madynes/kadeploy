@@ -18,7 +18,7 @@ override_dh_auto_install:
 
 override_dh_fixperms:
 	dh_fixperms
-	chmod 640 debian/kadeploy/etc/kadeploy3/*.yml
+	chmod 640 debian/kadeploy/etc/kadeploy3/*.conf
 
 # generation of custom packages with a suffix
 # use with DEB_BUILD_OPTIONS=devpkg=dev

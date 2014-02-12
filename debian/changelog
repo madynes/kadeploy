@@ -11,6 +11,7 @@ kadeploy (3.2.0~rc4-1) UNRELEASED; urgency=low
   * New Git snapshot based on v3.2.0_rc4.
   * Add the Kascade binary in the server package
   * Create the /etc/kadeploy3/keys directory in the server package
+  * Renamed .yml configuration files to .conf
 
  -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Wed, 27 Nov 2013 10:37:29 +0100
 

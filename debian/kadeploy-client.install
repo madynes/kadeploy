@@ -1,2 +1,2 @@
 sbin/karights3 /usr/sbin
-conf/client_conf.yml /etc/kadeploy3
+conf/client.conf /etc/kadeploy3
