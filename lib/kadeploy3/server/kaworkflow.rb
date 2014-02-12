@@ -18,6 +18,7 @@ module Kaworkflow
     ret.outputfile = nil
     ret.logger = nil
     ret.loggerfile = nil
+    ret.hook = false
     if [:deploy,:reboot].include?(kind)
       ret.pxe = nil
       ret.client = nil
@@ -51,6 +52,7 @@ module Kaworkflow
     context.outputfile = nil
     context.logger = nil
     context.loggerfile = nil
+    context.hook = nil
     if [:deploy,:reboot].include?(kind)
       context.pxe = nil
       context.client = nil
@@ -151,6 +153,9 @@ module Kaworkflow
 
         # Check debug
         context.debug = p.parse('debug',nil,:toggle=>true)
+
+        # Check hook
+        context.hook = p.parse('hook',nil,:toggle=>true)
 
         # Loading OutputControl
         if context.config.common.dbg_to_file and !context.config.common.dbg_to_file.empty?
@@ -428,7 +433,7 @@ module Kaworkflow
 
         info[:done] = true
       ensure
-        run_wmethod(kind,:end_hook,info)
+        run_wmethod(kind,:end_hook,info) if context[:execution].hook
       end
 
       yield(info) if block_given?
