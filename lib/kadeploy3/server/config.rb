@@ -271,7 +271,11 @@ module Configuration
         cp.parse('network',true) do
           cp.parse('vlan',true) do
             @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
-            @set_vlan_cmd = cp.value('set_cmd',String,'')
+            @set_vlan_cmd = cp.value('set_cmd',String,'',{
+              :type => 'file', :command => true,
+              :readable => true, :executable => true
+            })
+            @set_vlan_cmd = nil if @set_vlan_cmd.empty?
           end
 
           cp.parse('ports') do
@@ -628,13 +632,20 @@ module Configuration
         end
 
         cp.parse('hooks') do
-          @end_of_deploy_hook = cp.value(
-            'end_of_deployment',String,''
-          )
+          @end_of_deploy_hook = cp.value('end_of_deployment',String,'',{
+            :type => 'file', :command => true,
+            :readable => true, :executable => true
+          })
           @end_of_deploy_hook = nil if @end_of_deploy_hook.empty?
-          @end_of_reboot_hook = cp.value('end_of_reboot',String,'')
+          @end_of_reboot_hook = cp.value('end_of_reboot',String,'',{
+            :type => 'file', :command => true,
+            :readable => true, :executable => true
+          })
           @end_of_reboot_hook = nil if @end_of_reboot_hook.empty?
-          @end_of_power_hook = cp.value('end_of_power',String,'')
+          @end_of_power_hook = cp.value('end_of_power',String,'',{
+            :type => 'file', :command => true,
+            :readable => true, :executable => true
+          })
           @end_of_power_hook = nil if @end_of_power_hook.empty?
         end
 
@@ -946,7 +957,11 @@ module Configuration
             unless info[:empty]
               #ugly temporary hack
               name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String)
+              cmd = cp.value('cmd',String,'',{
+                :type => 'file', :command => true,
+                :readable => true, :executable => true
+              })
+              cmd = nil if cmd.empty?
               group = cp.value('group',String,false)
 
               addgroup.call
@@ -966,7 +981,11 @@ module Configuration
             unless info[:empty]
               #ugly temporary hack
               name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String)
+              cmd = cp.value('cmd',String,'',{
+                :type => 'file', :command => true,
+                :readable => true, :executable => true
+              })
+              cmd = nil if cmd.empty?
               group = cp.value('group',String,false)
 
               addgroup.call
@@ -986,7 +1005,11 @@ module Configuration
             unless info[:empty]
               #ugly temporary hack
               name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String)
+              cmd = cp.value('cmd',String,'',{
+                :type => 'file', :command => true,
+                :readable => true, :executable => true
+              })
+              cmd = nil if cmd.empty?
               group = cp.value('group',String,false)
 
               addgroup.call
@@ -1012,7 +1035,12 @@ module Configuration
                 )
               end
               _ = cp.value('name',String)
-              cmd = cp.value('cmd',String)
+              cmd = cp.value('cmd',String,'',{
+                :type => 'file', :command => true,
+                :readable => true, :executable => true
+              })
+              cmd = nil if cmd.empty?
+
               @cmd_power_status = cmd
             end
           end
@@ -1026,7 +1054,11 @@ module Configuration
               )
             end
             _ = cp.value('name',String)
-            cmd = cp.value('cmd',String)
+            cmd = cp.value('cmd',String,'',{
+              :type => 'file', :command => true,
+              :readable => true, :executable => true
+            })
+            cmd = nil if cmd.empty?
             @cmd_console = cmd
           end
         end
@@ -1034,7 +1066,11 @@ module Configuration
         cp.parse('localops') do |info|
           cp.parse('broadcastenv') do
             unless info[:empty]
-              @cmd_sendenv = cp.value('cmd',String)
+              @cmd_sendenv = cp.value('cmd',String,'',{
+                :type => 'file', :command => true,
+                :readable => true, :executable => true
+              })
+              @cmd_sendenv = nil if @cmd_sendenv.empty?
               @decompress_environment = !(cp.value('decompress',[TrueClass,FalseClass],true))
             end
           end

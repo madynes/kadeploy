@@ -1,5 +1,6 @@
 require 'pathname'
 require 'fileutils'
+require 'open3'
 
 module Kadeploy
 
@@ -243,6 +244,19 @@ module Configuration
 
     def customcheck_file(val, fieldname, args)
       return if args[:disable]
+
+      if args[:command]
+        val = val.split(/\s+/).first||''
+        if !val.empty? and !Pathname.new(val).absolute?
+          Open3.popen3('which',val) do |inp,out,err,stat|
+            # Since the command is launched in a shell and can be a script,
+            # if the command cannot be found, skip further checkings
+            return unless stat.value.success?
+            val = out.read.strip
+          end
+        end
+      end
+
       if args[:prefix]
         tmp = Pathname.new(val)
         val.gsub!(val,File.join(args[:prefix],val)) if !tmp.absolute? and !val.empty?
@@ -259,6 +273,12 @@ module Configuration
           if args[:readable]
             unless File.stat(val).readable?
               raise ParserError.new("The file '#{val}' is not readable")
+            end
+          end
+
+          if args[:executable]
+            unless File.stat(val).executable?
+              raise ParserError.new("The file '#{val}' is not executable")
             end
           end
         else
