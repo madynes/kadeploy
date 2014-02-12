@@ -398,7 +398,7 @@ class PipeOutput < Output
   end
 
   def arg
-    "-O #{Shellwords.escape(@cmd)}"
+    "-O '#{@cmd}'"
   end
 end
 
@@ -532,7 +532,7 @@ class Deploy
     @nodes_ports = Shellwords.escape($config[:nodeList]*"\n")
 
     #Prepare commands : Behaviour intermediate node have retries 1 and 2 or only 2 ?
-    @common_options="-D none -M -b #{$config[:buffer_size]} -n #{@nodes_path} -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
+    @common_options="-D none -M -b #{$config[:buffer_size]} -n '#{@nodes_path}' -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
     @command_fountain="ruby #{@fountain_path} #{@common_options} #{$config[:output].arg}"
   end
 
@@ -622,7 +622,7 @@ class Taktuk < Deploy
     cmd="#{taktuk_common} broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
     $log.debug 'launching: '+cmd
     system(cmd)
-    cmd="#{taktuk_common} broadcast exec [ #{@command_fountain} ]"
+    cmd="#{taktuk_common} broadcast exec [ #{Shellwords.escape(@command_fountain)} ]"
     $log.debug 'launching: '+cmd
     thread_catch_errors do
       system(cmd)
