@@ -9,6 +9,15 @@ module Kaenvs
     ret
   end
 
+  def envs_free_exec_context(context)
+    context = free_exec_context(context)
+    if context.config
+      context.config.free
+      context.config = nil
+    end
+    context
+  end
+
   def envs_prepare(params,operation,context)
     context = envs_init_exec_context(context)
 
@@ -44,6 +53,7 @@ module Kaenvs
         context.last = p.parse('last',nil,:toggle=>true)
       end
     when :modify
+      context.config = duplicate_config()
       context.environment = {}
       env = context.environment
       parse_params(params) do |p|
@@ -145,8 +155,8 @@ module Kaenvs
           name,
           version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           cexec.user,
-          (cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
-          false
+          true,
+          true
         )
       else
         error_not_found!
@@ -165,12 +175,15 @@ module Kaenvs
       envs.collect do |env|
         env.to_hash.merge!({'user'=>env.user})
       end
-    else
+    elsif name or version
       error_not_found!
+    else
+      []
     end
   end
 
   def envs_modify(cexec,user=nil,name=nil,version=nil)
+    cache = cexec.config.caches[:global]
     fileupdate = Proc.new do |env,kind,upfile|
       file = env.send(kind.to_sym)
       next unless file
@@ -194,6 +207,8 @@ module Kaenvs
             FetchFile[f['file'],cexec.client].size
           else
             md5 = FetchFile[f['file'],cexec.client].checksum
+            # Remove the file from the cache if it was modified
+            cache.remove(f['file'],env.cache_version,env.user,:db,kind) if cache
             kaerror(APIError::INVALID_FILE,"#{kind} md5") if !md5 or md5.empty?
             kaerror(APIError::NOTHING_MODIFIED) if f['md5'] and f['md5'] == md5
             f['md5'] = md5

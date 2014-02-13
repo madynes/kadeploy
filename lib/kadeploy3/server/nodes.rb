@@ -1076,6 +1076,12 @@ module Nodes
       @states[hostname][:error] = error if error and !error.empty?
     end
 
+    def unset(hostname, *fields)
+      fields.each do |field|
+        @states[hostname][field] = nil if @states[hostname] and @states[hostname][field]
+      end
+    end
+
     def get(hostname)
       @states[hostname]
     end

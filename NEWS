@@ -23,6 +23,7 @@
 
 !! Changes in configuration files !!
 * General configuration (doc sec/2.1)
+  - The general configuration file is now named server.conf
   - An authentication method for administrators has to be providden
   - The server can be launched in secure mode using a custom certificate/key
   - Clients can be forced to export files in secure mode
@@ -30,9 +31,14 @@
   - It's now possible to specify options for tarballs manipulations
   - End of deployment/reboot/power hooks are now specified in the field 'hooks'
   - It's now possible to specify a threshold for the autoclean loop
+* Clusters configuration (doc sec/2.3)
+  - The clusters configuration file is now named clusters.conf
+* Command configuration (doc sec/2.7)
+  - The command configuration file is now named command.conf
 * Cluster specific configuration (doc sec/2.4)
   - It's now possible to specify Kascade as BroadcastEnv method
 * Client configuration file (doc sec/3)
+  - The client configuration file is now named client.conf
   - The connection to a specific server can be secure or not
 
 !! Database update !!

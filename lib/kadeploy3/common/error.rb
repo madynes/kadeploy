@@ -41,10 +41,12 @@ class KadeployError < Exception
       "Some options are missing"
     when APIError::NOTHING_MODIFIED
       "No element has been modified"
+    when APIError::EXECUTE_ERROR
+      "The execution of a command failed"
     when APIError::DATABASE_ERROR
       "Database issue"
     when APIError::CACHE_ERROR
-      "Something went wront with the cache system"
+      "Something went wrong with the cache system"
     when APIError::CACHE_FULL
       "The cache is full"
     when APIError::DESTRUCTIVE_ENVIRONMENT
@@ -63,7 +65,7 @@ end
 
 class KadeployExecuteError < KadeployError
   def initialize(msg)
-    super(KadeployError::EXECUTE_ERROR,nil,msg)
+    super(APIError::EXECUTE_ERROR,nil,msg)
   end
 end
 
@@ -83,6 +85,7 @@ class APIError
   MISSING_OPTION = 12
   CONFLICTING_OPTIONS = 13
   NOTHING_MODIFIED = 14
+  EXECUTE_ERROR = 15
   DATABASE_ERROR = 20
   CACHE_ERROR = 21
   CACHE_FULL = 22

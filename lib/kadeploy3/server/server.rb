@@ -18,6 +18,7 @@ class KadeployServer
   include Kaconsole
 
   attr_reader :host, :port, :secure, :local, :cert, :private_key, :logfile, :window_managers, :httpd
+  attr_writer :shutdown
 
   def initialize()
     @config = load_config()
@@ -53,9 +54,11 @@ class KadeployServer
       :console => {},
     }
     @httpd = nil
+    @shutdown = false
   end
 
   def kill
+    workflows_kill(get_nodes())
   end
 
   def load_config(caches=nil)
@@ -144,6 +147,10 @@ class KadeployServer
 
   def error_invalid!(msg=nil)
     raise HTTPd::InvalidError.new(msg)
+  end
+
+  def error_unavailable!(msg=nil)
+    raise HTTPd::UnavailableError.new(msg)
   end
 
   def uuid(prefix='')
@@ -266,7 +273,7 @@ class KadeployServer
       # Authentication with certificate
       if cfg.static[:auth][:cert] and cert
         ok,msg = cfg.static[:auth][:cert].auth!(
-          HTTPd.get_sockaddr(request), :cert=>Base64.strict_decode64(cert))
+          HTTPd.get_sockaddr(request), :user=>user, :cert=>Base64.strict_decode64(cert))
         error_unauthorized!("Authentication failed: #{msg}") unless ok
       # Authentication with Ident
       elsif cfg.static[:auth][:ident]
@@ -278,6 +285,17 @@ class KadeployServer
           "#{cfg.static[:auth].keys.collect{|k| k.to_s}.join(', ')}")
       end
     else
+      # Authentication with Ident
+      if cfg.static[:auth][:ident]
+        user,_ = cfg.static[:auth][:ident].auth!(
+          HTTPd.get_sockaddr(request), :port=>@httpd.port)
+        return user if user and user.is_a?(String) and !user.empty?
+      # Authentication with certificate
+      elsif cfg.static[:auth][:cert] and cert
+        user,_ = cfg.static[:auth][:cert].auth!(
+          HTTPd.get_sockaddr(request), :cert=>Base64.strict_decode64(cert))
+        return user if user and user.is_a?(String) and !user.empty?
+      end
       error = "Authentication failed: no user specified "\
         "in the #{cfg.static[:auth_headers_prefix]}User HTTP header"
       error << " or using the HTTP Basic Authentication method" if cfg.static[:auth][:http_basic]
@@ -413,15 +431,20 @@ class KadeployServer
       raise
     end
 
+    if @shutdown
+      error_unavailable!("The service is being shutdown, please try again later")
+    end
+
     # Authenticate the user
     user = authenticate!(params[:request])
 
     options = init_exec_context(user)
     parse_params_default(params[:params],options)
 
-    # Prepare the treatment (parse arguments, ...)
-    options = run_method(kind,:prepare,params[:params],query,options)
     begin
+      # Prepare the treatment (parse arguments, ...)
+      options = run_method(kind,:prepare,params[:params],query,options)
+
       # Check rights
       # (only check rights if the method 'kind'_rights? is defined)
       check_rights = nil

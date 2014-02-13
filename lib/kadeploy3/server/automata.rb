@@ -539,9 +539,9 @@ module Automata
       @cleaner = Thread.new do
         while !done? and @runthread.alive?
           sleep(CLEAN_THREADS_PITCH)
-          @threads_lock.synchronize { clean_threads() }
+          @threads_lock.synchronize { clean_threads() } if @threads_lock
         end
-        @runthread.join unless @runthread.alive?
+        @runthread.join if @runthread and !@runthread.alive?
       end
       start!
       curtask = nil

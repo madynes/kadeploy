@@ -208,7 +208,11 @@ end
 
 def cfg_kadeploy_client_filename()
   if $version >= 5
-    File.join(CFG_KADEPLOY_CONF_PATH,'client_conf.yml')
+    if $version >= 8
+      File.join(CFG_KADEPLOY_CONF_PATH,'client.conf')
+    else
+      File.join(CFG_KADEPLOY_CONF_PATH,'client_conf.yml')
+    end
   else
     File.join(CFG_KADEPLOY_CONF_PATH,'client_conf')
   end
@@ -272,7 +276,11 @@ end
 
 def cfg_kadeploy_conf_filename()
   if $version >= 5
-    File.join(CFG_KADEPLOY_CONF_PATH,'server_conf.yml')
+    if $version >= 8
+      File.join(CFG_KADEPLOY_CONF_PATH,'server.conf')
+    else
+      File.join(CFG_KADEPLOY_CONF_PATH,'server_conf.yml')
+    end
   else
     File.join(CFG_KADEPLOY_CONF_PATH,'conf')
   end
@@ -515,7 +523,11 @@ end
 
 def cfg_kadeploy_cmd_filename()
   if $version >= 5
-    File.join(CFG_KADEPLOY_CONF_PATH,'cmd.yml')
+    if $version >= 8
+      File.join(CFG_KADEPLOY_CONF_PATH,'command.conf')
+    else
+      File.join(CFG_KADEPLOY_CONF_PATH,'cmd.yml')
+    end
   else
     File.join(CFG_KADEPLOY_CONF_PATH,'cmd')
   end
@@ -527,7 +539,11 @@ end
 
 def cfg_kadeploy_clusters_filename()
   if $version >= 5
-    File.join(CFG_KADEPLOY_CONF_PATH,'clusters.yml')
+    if $version >= 8
+      File.join(CFG_KADEPLOY_CONF_PATH,'clusters.conf')
+    else
+      File.join(CFG_KADEPLOY_CONF_PATH,'clusters.yml')
+    end
   else
     File.join(CFG_KADEPLOY_CONF_PATH,'clusters')
   end
@@ -3632,7 +3648,7 @@ sshgw.ssh(servername,'root') do |session|
       msg('Installing identd',MSG_INFO)
       apt_install(session,'oidentd',server)
 
-      msg('Creating htpasswd user db',server)
+      msg('Creating htpasswd user db',MSG_INFO)
       apt_install(session,'apache2-utils',server)
       sexec(session,"htpasswd -bcd #{CFG_KADEPLOY_DBFILE} #{CFG_KADEPLOY_USER} KADEPLOY")
       sexec(session,"htpasswd -bd #{CFG_KADEPLOY_DBFILE} #{CFG_FRONTEND_USER} KADEPLOY")
@@ -3659,7 +3675,7 @@ sshgw.ssh(servername,'root') do |session|
 
       msg('Creating x509 certificate and private key for admins and sign it with CA',MSG_INFO)
       reqfile = "#{CFG_KADEPLOY_ADMIN_CERT}.csr"
-      sexec(session,"openssl req -new -nodes -subj /CN=#{$services[:frontend][:fqdn]} -out #{reqfile} -keyform RSA -keyout #{CFG_KADEPLOY_ADMIN_PRIVATE_KEY}")
+      sexec(session,"openssl req -new -nodes -subj /CN=#{CFG_FRONTEND_USER} -out #{reqfile} -keyform RSA -keyout #{CFG_KADEPLOY_ADMIN_PRIVATE_KEY}")
       sexec(session,"openssl x509 -req -in #{reqfile} -CA #{CFG_CA_CERT} -CAkey #{CFG_CA_PRIVATE_KEY} -CAcreateserial -out #{CFG_KADEPLOY_ADMIN_CERT}")
       sexec(session,"rm -f #{reqfile}")
       sexec(session,"chown 755 #{CFG_KADEPLOY_ADMIN_CERT}")

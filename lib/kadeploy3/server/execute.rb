@@ -78,7 +78,13 @@ class Execute
           rescue IOError
           end
         end
-        exec(*@command)
+
+        begin
+          exec(*@command)
+        rescue SystemCallError => sce
+          STDERR.puts "#{sce.message} (#{sce.class.name})"
+        end
+        exit! 1
       }
 
       @child_io.each do |io|
@@ -179,6 +185,8 @@ class Execute
 
   def self.kill_recursive(pid)
     begin
+      # Check that the process still exists
+      Process.kill(0,pid)
       # SIGSTOPs the process to avoid it creating new children
       Process.kill('STOP',pid)
       # Gather the list of children before killing the parent in order to

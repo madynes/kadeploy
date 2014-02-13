@@ -17,7 +17,7 @@ operation 'Reboot operations' do
       parameter :deploy_partition, :Integer, 'The partition the environment has been installed on', false
       parameter :environment, :Hash, 'The environment that has been deployed. This field is mandatory when using the kind "recorded_env".',false do
         parameter :name, :String, 'The name of the environment'
-        parameter :version, :String, 'The version of the environment'
+        parameter :version, :String, 'The version of the environment', false
         parameter :user, :String, 'The owner of the environment', false
       end
       parameter :timeout_reboot_classical, :Integer, 'Overwrite the default value for the reboot timeout', false

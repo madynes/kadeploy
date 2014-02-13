@@ -28,14 +28,15 @@ RETVAL=0
 
 start() {
 	      echo -n "Starting $prog: "
-	      [ -e $pidfile ] && [ -e /proc/`cat $pidfile` ] && echo "Daemon already running" && return 1
+        [ -d $rundir ] || (mkdir $rundir && chown $user $rundir)
+	[ -e $pidfile ] && [ -e /proc/`cat $pidfile` ] && echo "Daemon already running" && return 1
         [ -e $pidfile ] || ( touch $pidfile && chown $user:$user $pidfile )
         daemon --pidfile=${pidfile} --user=$user "$kadeploy3d $args"
-	      RETVAL=$?
-	      PID=`cat $pidfile`
+	RETVAL=$?
+	PID=`cat $pidfile`
         echo
-	      ( [ -n "$PID" ] && [ -x /proc/${PID} ] ) || (rm ${pidfile} ; return 1)
-	      [ $RETVAL = 0 ] && touch ${lockfile}
+	( [ -n "$PID" ] && [ -x /proc/${PID} ] ) || return 1
+	[ $RETVAL = 0 ] && touch ${lockfile}
         return $RETVAL
 }
 
@@ -44,7 +45,8 @@ stop() {
         killproc -p ${pidfile} -d 3 $kadeploy3d
         RETVAL=$?
         echo
-	      [ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
+        # Remove the PID file if the process was killed using SIGKILL
+	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
 }
 
 reload() {
@@ -53,7 +55,7 @@ reload() {
         killproc -p "$pidfile" "$kadeploy3d" -HUP
         while [ ! -s $reloadfile ]
         do
-          sleep 1
+                sleep 1
         done
         sed '1d' $reloadfile >&2
         [ "$(sed '1q' $reloadfile)" = "0" ]
@@ -68,7 +70,7 @@ case "$1" in
         stop
 	;;
   status)
-	      status -p ${pidfile} $kadeploy3d
+	status -p ${pidfile} $kadeploy3d
         RETVAL=$?
   ;;
   reload|force-reload)
@@ -76,9 +78,9 @@ case "$1" in
         [ $RETVAL != "0" ] && [ "$1" = "force-reload" ] && stop && start
   ;;
   restart)
-	      stop
-	      start
-	;;
+	stop
+	start
+  ;;
   *)
     	  echo $"Usage: $prog {start|stop|restart|reload|force-reload|status}"
         RETVAL=3
