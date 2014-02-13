@@ -1,7 +1,6 @@
 require 'ipaddr'
 require 'resolv'
 require 'timeout'
-require 'socket'
 require 'openssl'
 require 'webrick'
 
@@ -94,7 +93,7 @@ class HTTPBasicAuthentication < Authentication
 
   def ==(auth)
     if auth.is_a?(self.class)
-      (@dbfile == auth.instance_variable_get(:@dbfile) and (@realm == auth.realm) and @whitelist == auth.whitelist)
+      (@dbfile.instance_variable_get(:@path) == auth.instance_variable_get(:@dbfile).instance_variable_get(:@path) and @realm == auth.realm and @whitelist == auth.whitelist)
     else
       false
     end
@@ -117,7 +116,18 @@ class CertificateAuthentication < Authentication
       return [false,"Invalid x509 certificate (#{e.message})"]
     end
 
-    [cert.verify(@public_key),INVALID_PARAMS]
+    cns = nil
+    if cert.verify(@public_key)
+      cns = cert.subject.to_a.select{|v| v[0] == 'CN'}.collect{|v| v[1]}
+    else
+      return [false,"The certificate was not signed by the trusted CA"]
+    end
+
+    if params[:user]
+      [cns.include?(params[:user]),'Specified user does not match with the certificate\'s CN']
+    else
+      [cns.first,nil]
+    end
   end
 
   def ==(auth)
@@ -133,42 +143,18 @@ class IdentAuthentication < Authentication
   def auth!(source_sock,params={})
     return [false,UNTRUSTED_SOURCE] unless check_host?(source_sock)
 
-    source = { :ip => source_sock[3], :port => source_sock[1] }
-    ident = nil
-    begin
-      Timeout::timeout(10) do
-        sock = TCPSocket.new(source[:ip],113)
-        sock.puts("#{source[:port]}, #{params[:port]}")
-        ident = sock.gets.strip
-        sock.close
-      end
-    rescue Timeout::Error
-      return [false, 'Connection to ident service timed out']
-    rescue Errno::ECONNREFUSED
-      return [false, 'Connection to ident service was refused']
-    rescue Exception
-      return [false, 'Connection to ident service failed']
-    end
-
     user = nil
-    # 12345, 443 : USERID : UNIX : username
-    # or
-    # 12345, 443 : ERROR : NO-USER
-    # ...
-    if /^\s*\d+\s*,\s*\d+\s*:\s*(\S+)\s*:\s*(\S+)\s*(?::\s*(\S+)\s*)$/ =~ ident
-      res = Regexp.last_match(1)
-      dom = Regexp.last_match(2)
-      usr = Regexp.last_match(3)
-      if res.upcase == 'USERID'
-        user = usr
-      else
-        return [false,"Ident authentication failed: #{dom||res}"]
-      end
-    else
-      return [false,'Ident authentication failed, invalid answer from service']
+    begin
+      user = Ident.userid(source_sock,params[:port])
+    rescue IdentError => ie
+      return [false, ie.message]
     end
 
-    [user == params[:user],'Specified user does not match with the one given by the ident service']
+    if params[:user]
+      [user == params[:user],'Specified user does not match with the one given by the ident service']
+    else
+      [user,nil]
+    end
   end
 
   def ==(auth)

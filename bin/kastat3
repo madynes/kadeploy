@@ -88,8 +88,8 @@ class KastatClient < Client
     true
   end
 
-  def run(options)
-    params = init_params(options)
+  def self.prepare(options)
+    params = super(options)
     params[:kind] = options[:kind] if options[:kind]
     params[:nodes] = options[:nodes] if options[:nodes]
     params[:fields] = options[:fields] if options[:fields]
@@ -101,7 +101,10 @@ class KastatClient < Client
     params[:min_failure_rate] = options[:min_failure_rate] if options[:min_failure_rate]
     params[:min_retries] = options[:min_retries] if options[:min_retries]
     params[:step_retries] = options[:step_retries] if options[:step_retries]
+    params
+  end
 
+  def run(options,params)
     path = api_path()
     path = File.join(path,options[:operation]) if options[:operation]
 

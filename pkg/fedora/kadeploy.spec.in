@@ -68,10 +68,10 @@ KADEPLOY3_LIBS/*
 #%attr(0740,deploy,deploy) /var/run/kadeploy3
 %defattr(-,deploy,deploy,-)
 /etc/init.d/kadeploy3d
-%config(noreplace) /etc/kadeploy3/clusters.yml
-%config(noreplace) /etc/kadeploy3/cluster-sample.yml
-%config(noreplace) /etc/kadeploy3/cmd.yml
-%config(noreplace) /etc/kadeploy3/server_conf.yml
+%config(noreplace) /etc/kadeploy3/clusters.conf
+%config(noreplace) /etc/kadeploy3/sample-cluster.conf
+%config(noreplace) /etc/kadeploy3/command.conf
+%config(noreplace) /etc/kadeploy3/server.conf
 /etc/kadeploy3/version
 /usr/bin/kastafior
 /usr/sbin/kadeploy3d
@@ -79,7 +79,7 @@ KADEPLOY3_LIBS/*
 
 %files client
 %defattr(-,deploy,deploy,-)
-%config(noreplace) /etc/kadeploy3/client_conf.yml
+%config(noreplace) /etc/kadeploy3/client.conf
 /usr/bin/kaconsole3
 /usr/bin/kanodes3
 /usr/bin/kastat3

@@ -38,7 +38,7 @@ class TestNodes < Test::Unit::TestCase
     ret = run_kanodes('-p')
     begin
       desc = YAML.load(ret)
-      assert(!desc.select{|v| v[:id] == wid}.empty?,ret)
+      assert(!desc.select{|v| v[:wid] == wid}.empty?,ret)
     rescue ArgumentError => ae
       assert(false,ae.message)
     ensure

@@ -112,8 +112,8 @@ class KarebootClient < ClientWorkflow
     true
   end
 
-  def run(options)
-    params = init_params(options)
+  def self.prepare(options)
+    params = super(options)
 
     params[:kind] = options[:operation]
     params[:level] = options[:level] if options[:level]
@@ -131,22 +131,16 @@ class KarebootClient < ClientWorkflow
     params[:check_destructive] = options[:check_demolishing] if options[:check_demolishing]
 
     if options[:env_name]
+      username = options[:env_user] || ''
       envname = options[:env_name]
-      username = nil
-      username = options[:env_user] if options[:env_user]
+      envversion = options[:env_version] || ''
 
-      envs = get(api_path(username,:envs))
-      envs.select!{|en| en['name'] == envname}
+      tmp = {}
+      tmp[:last] = true unless options[:env_version]
+      envs = get2(options,api_path("/#{username}/#{envname}/#{envversion}",:envs),tmp)
       error("The environment '#{envname}' does not exist") if envs.size <= 0
-      envs.sort_by!{|en| en['version']}
+      env = envs.first
 
-      if options[:env_version]
-        envs.select!{|en| en['version'] == options[:env_version]}
-        error("The environment '#{envname}' does not exist in version #{options[:env_version]}") if envs.size <= 0
-        env = envs.first
-      else
-        env = envs.last
-      end
       params[:environment] = {
         :user => env['user'],
         :name => env['name'],
@@ -165,7 +159,7 @@ class KarebootClient < ClientWorkflow
     # Add the PXE files
     add_localfiles(options[:pxe_files]) unless options[:pxe_files].empty?
 
-    run_workflow(options,params)
+    params
   end
 end
 

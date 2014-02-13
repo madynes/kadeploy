@@ -18,23 +18,26 @@ $version = nil
 $autoclean = nil
 $kadeploy = nil
 $httpd = nil
+$mainthread = nil
 
 Signal::trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
+  $kadeploy.shutdown = true if $kadeploy
   $autoclean.kill() if $autoclean
   $kadeploy.kill() if $kadeploy
+  $mainthread.kill if $mainthread
   $httpd.kill() if $httpd
-  clean()
-  exit!(1)
+  exit 1
 end
 
 Signal::trap("TERM") do
-  puts "\nSIGINT trapped, let's clean everything ..."
+  puts "\nSIGTERM trapped, let's clean everything ..."
+  $kadeploy.shutdown = true if $kadeploy
   $autoclean.kill() if $autoclean
+  $mainthread.kill if $mainthread
   $kadeploy.kill() if $kadeploy
   $httpd.kill() if $httpd
-  clean()
-  exit!(1)
+  exit 1
 end
 
 #require 'stringio'
@@ -110,15 +113,27 @@ require 'optparse'
 
 
 def clean()
+  begin
+    File.delete($pidfile) if $pidfile
+    $pidfile = nil
+  rescue Exception
+  end
+
+  if $ssh_key
+    $stdout.puts("Killing ssh-agent")
+    `ssh-agent -k`
+    $ssh_key = nil
+  end
+
   $kadeploy_logfiles.each_value do |io|
     io.close if io and !io.closed?
   end
-  if $ssh_key
-    ENV['SSH_AGENT_PID'] = $ssh_agent_pid
-    ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
-    `ssh-agent -k`
-  end
+  STDIN::reopen('/dev/null')
+  STDOUT::reopen('/dev/null')
+  STDERR::reopen('/dev/null')
 end
+
+at_exit{ clean() }
 
 def error(msg='',abrt = true)
   $stderr.puts msg if msg and !msg.empty?
@@ -205,6 +220,19 @@ if (!File.writable?(File.join($kadeploy_logdir,LOGFILE_DEBUG)) \
   error("Log directory '#{$kadeploy_logdir}' not writable")
 end
 
+# Disable reverse lookup to prevent lag in case of DNS failure
+Socket::do_not_reverse_lookup = true
+
+$stdout.puts ''
+# Load the configuration
+begin
+  $kadeploy = Kadeploy::KadeployServer.new()
+rescue Kadeploy::KadeployError => ke
+  error("#{Kadeploy::KadeployError.to_msg(ke.errno)}"\
+    "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
+end
+$stdout.puts 'Configuration files loaded'
+
 # Loading SSH agent
 if $ssh_key
   error("Unable to read the SSH key file '#{$ssh_key}'") unless File.readable?($ssh_key)
@@ -223,19 +251,6 @@ if $ssh_key
   error('Unable to add the key to the ssh-agent') unless $?.success?
   $stdout.puts "SSH-agent #{$ssh_agent_pid} loaded"
 end
-
-
-# Disable reverse lookup to prevent lag in case of DNS failure
-Socket::do_not_reverse_lookup = true
-
-# Load the configuration
-begin
-  $kadeploy = Kadeploy::KadeployServer.new()
-rescue Kadeploy::KadeployError => ke
-  error("#{Kadeploy::KadeployError.to_msg(ke.errno)}"\
-    "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
-end
-$stdout.puts 'Configuration files loaded'
 
 dh_seeds = nil
 if $kadeploy.secure and $generate_dh_seeds
@@ -269,7 +284,8 @@ $kadeploy.config_httpd_bindings($httpd)
 
 # Demonize the process
 if $detach
-  exit 0 if fork
+  #exit! avoids call at_exit which kills the ssh-agent and another stuff.
+  exit! 0 if fork
   Process::setsid
 end
 
@@ -291,21 +307,25 @@ if $redirect_stderr
 end
 $stderr = STDERR
 
-File.open($pidfile,'w'){|f| f.puts Process::pid} if $pidfile
+begin
+  File.open($pidfile,'w'){|f| f.puts Process::pid} if $pidfile
 
-$stdout.puts "[#{Time.now.to_s}] Launching service"
+  $stdout.puts "[#{Time.now.to_s}] Launching service"
 
-# Launch autoclean thread
-$autoclean = Thread.new do
-  begin
-    sleep AUTOCLEAN_PITCH
-    $kadeploy.workflows_clean()
-  end while true
+  # Launch autoclean thread
+  $autoclean = Thread.new do
+    begin
+      sleep AUTOCLEAN_PITCH
+      $kadeploy.workflows_clean()
+    end while true
+  end
+
+  GC.start
+
+  # Launch HTTPd
+  $mainthread = Thread.new{$httpd.run()}
+  $mainthread.join
+  clean()
+ensure
+  File.delete($pidfile) if $pidfile
 end
-
-GC.start
-
-# Launch HTTPd
-$httpd.run()
-clean()
-

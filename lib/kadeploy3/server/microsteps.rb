@@ -501,10 +501,6 @@ class Microstep < Automata::QueueTask
             cmd = context[:cluster].instance_variable_get("@cmd_#{kind}_#{level}") unless cmd
             cmd = Nodes::NodeCmd.generate(cmd,node)
             cmd = replace_groups_in_command(cmd, entry) if entry.is_a?(Array)
-            #We directly transmit the --no-wait parameter to the power_on/power_off commands
-            if (kind == "power_on") || (kind == "power_off") then
-              cmd += " --no-wait" if (not context[:execution].wait)
-            end
             pr.add(cmd, node)
           end
           pr.run
@@ -1071,8 +1067,7 @@ class Microstep < Automata::QueueTask
     kofile = Tempfile.new("kascade-kofile")
     kofile.close
 
-    cmd = "#{context[:common].kascade} -i #{file} -n #{nodefile.path} -O '#{decompress}' -S '#{context[:common].taktuk_connector}' --ok #{okfile.path} --ko #{kofile.path} #{context[:common].kascade_options}" # -m Socket.gethostname()
-
+    cmd = "#{context[:common].kascade} -i #{file} -n #{nodefile.path} -O '#{decompress}' -S '#{context[:common].taktuk_connector}' --ok #{okfile.path} --ko #{kofile.path} #{context[:common].kascade_options} #{(context[:cluster].use_ip_to_deploy)?'-I ':''} -D taktuk" 
     @nodes_ok.clean()
     status,out,err = nil
     command(cmd,
@@ -1094,10 +1089,18 @@ class Microstep < Automata::QueueTask
 
       return true
     else
-      oknodes = YAML.load_file(okfile.path)
-      okfile.unlink
-      konodes = YAML.load_file(kofile.path)
-      kofile.unlink
+      begin
+        oknodes = YAML.load_file(okfile.path)
+        okfile.unlink
+        konodes = YAML.load_file(kofile.path)
+        kofile.unlink
+        raise if !oknodes.is_a?(Array) or !konodes.is_a?(Hash)
+      rescue
+        oknodes = []
+        tmp = node_set.make_sorted_array_of_nodes.collect{|n| get_nodeid(n)}
+        konodes = Hash[tmp.zip [err]*tmp.size]
+        tmp = nil
+      end
 
       node_set.set.each do |node|
         id = get_nodeid(node)

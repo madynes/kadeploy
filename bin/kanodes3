@@ -76,15 +76,16 @@ class KanodesClient < Client
     true
   end
 
-  def run(options)
-    params = init_params(options)
+  #def self.prepare(options)
+  #end
 
+  def run(options,params)
+    params[:nodes] = nodes() if nodes()
     path = nil
 
     case options[:operation]
     when :get_state
       path = api_path()
-      params[:nodes] = nodes() if nodes()
     when :get_status_deploy
       path = api_path(options[:wid],:deploy)
     when :get_status_reboot

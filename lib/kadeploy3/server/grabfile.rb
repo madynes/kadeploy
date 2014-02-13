@@ -30,7 +30,7 @@ class GrabFile
     @files.each do |file|
       file.release
     end
-    @cache.clean()
+    @cache.clean() if @cache
   end
 
   def grab(path,version,user,priority,tag,checksum=nil,opts={})
@@ -38,6 +38,15 @@ class GrabFile
     cf = nil
     begin
       fetcher = FetchFile[path,@client]
+      if fetcher.is_a?(ServerFetchFile)
+        unless File.readable?(fetcher.path)
+          error(APIError::CACHE_ERROR,"Unable to read the file '#{fetcher.path}'")
+        end
+        return fetcher.path
+      elsif !@cache
+        error(APIError::CACHE_ERROR,
+          "Impossible to cache the file '#{path}', the cache is disabled")
+      end
 
       if fetcher.size > @cache.maxsize
         error(APIError::CACHE_ERROR,
@@ -93,7 +102,7 @@ class GrabFile
       return if !path or path.empty?
       version,user = nil
       if opts[:env] and opts[:env].recorded?
-        version = "#{opts[:env].name}/#{opts[:env].version}"
+        version = opts[:env].cache_version
         user = opts[:env].user
       elsif prio != :anon
         version = 'file'
@@ -114,7 +123,11 @@ class GrabFile
         opts
       )
 
-      path.gsub!(path,file.file)
+      if file.is_a?(String)
+        path.gsub!(path,file)
+      else
+        path.gsub!(path,file.file)
+      end
     rescue KadeployError => ke
       ke.context = context
       raise ke

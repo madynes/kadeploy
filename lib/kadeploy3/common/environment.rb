@@ -163,6 +163,10 @@ class Environment
     @recorded
   end
 
+  def cache_version
+    "#{@name}/#{@version}"
+  end
+
   # Load an environment file
   #
   # Arguments
@@ -341,7 +345,7 @@ class Environment
       args = []
       query = "SELECT * FROM environments WHERE name=?"
       args << name
-      if userq and !userq.empty?
+      if userq and !userq.empty? and user and !user.empty?
         query += " AND #{userq}"
         args << user
       end
@@ -355,7 +359,7 @@ class Environment
       else
         subquery = "SELECT MAX(version) FROM environments WHERE name = ?"
         args << name
-        if userq and !userq.empty?
+        if userq and !userq.empty? and user and !user.empty?
           subquery += " AND #{userq}"
           args << user
         end

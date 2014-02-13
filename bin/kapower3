@@ -62,13 +62,24 @@ class KapowerClient < ClientWorkflow
     true
   end
 
-  def run(options)
-    params = init_params(options)
+  def self.prepare(options)
+    params = super(options)
 
     case options[:operation]
     when :on, :off
       params[:status] = options[:operation]
       params[:level] = options[:level] if options[:level]
+    when :status
+    else
+      raise
+    end
+
+    params
+  end
+
+  def run(options,params)
+    case options[:operation]
+    when :on, :off
       run_workflow(options,params,:put)
     when :status
       run_workflow(options,params,:get)

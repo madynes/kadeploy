@@ -60,12 +60,11 @@ module Workflow
       if path and !path.empty?
         kind = nil
         begin
-          kind = URI.parse(path).scheme || 'local'
+          kind = URI.parse(path).scheme
         rescue URI::InvalidURIError
-          kind = 'local'
         end
 
-        if kind == 'local'
+        if kind.nil?
           unless File.readable?(path)
             error(APIError::INVALID_FILE,"The file '#{path}' is not readable on the server")
           end
@@ -228,6 +227,10 @@ module Workflow
     def break!(task,nodeset)
       @nodes_brk.set_state(self.class.operation('ed'),nil,
         context[:database],context[:user])
+      @nodes_brk.set.each do |node|
+        context[:states].set(node.hostname,nil,nil,'brk')
+        context[:states].unset(node.hostname,:macro,:micro,:error)
+      end
       log('success', true, nodeset)
       debug(1,"Breakpoint reached for #{nodeset.to_s_fold}",task.nsid)
     end
@@ -235,6 +238,10 @@ module Workflow
     def success!(task,nodeset)
       @nodes_ok.set_state(self.class.operation('ed'),nil,
         context[:database],context[:user])
+      @nodes_ok.set.each do |node|
+        context[:states].set(node.hostname,nil,nil,'ok')
+        context[:states].unset(node.hostname,:macro,:micro,:error)
+      end
       log('success', true, nodeset)
       debug(1,
         "End of #{self.class.opname()} for #{nodeset.to_s_fold} "\
@@ -246,6 +253,9 @@ module Workflow
     def fail!(task,nodeset)
       @nodes_ko.set_state(self.class.operation('_failed'),nil,
         context[:database],context[:user])
+      @nodes_ko.set.each do |node|
+        context[:states].set(node.hostname,nil,nil,'ko')
+      end
       log('success', false, nodeset)
       @logger.error(nodeset,context[:states])
       debug(1,
@@ -262,10 +272,6 @@ module Workflow
       )
 
       @logger.dump
-
-      if hook = context[:common].send(:"end_of_#{self.class.operation}_hook")
-        Execute[hook.dup.gsub('WORKFLOW_ID',context[:wid])].run!.wait
-      end
 
       nodes_ok = Nodes::NodeSet.new
       @nodes_ok.linked_copy(nodes_ok)
@@ -461,7 +467,7 @@ module Workflow
         elsif !context[:cluster].deploy_supported_fs.include?(context[:execution].environment.filesystem)
           setclassical.call(
             instance,
-            "Using classical reboot instead of kexec since the filesystem of the boot partition is not supported (#{macrosteps[2].name})"
+            "Using classical reboot instead of kexec since the filesystem is not supported by the deployment environment (#{macrosteps[2].name})"
           )
         elsif context[:execution].disable_kexec
           setclassical.call(
@@ -475,6 +481,17 @@ module Workflow
 
       @tasks.each do |macro|
         macro = macro[0] if macro.size == 1
+      end
+
+      # Some extra debugs
+      cexec = context[:execution]
+      unless context[:cluster].deploy_supported_fs.include?(cexec.environment.filesystem)
+        debug(0,"Disable some micro-steps since the filesystem is not supported by the deployment environment")
+      end
+
+      if cexec.block_device and !cexec.block_device.empty? \
+        and (!cexec.deploy_part or cexec.deploy_part.empty?)
+        debug(0,"Deploying on block device, disable format micro-steps")
       end
     end
 

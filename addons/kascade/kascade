@@ -29,14 +29,13 @@
 require 'rubygems'
 require 'optparse'
 require 'shellwords'
-require 'net/ssh'
-require 'net/ssh/multi'
+require 'timeout'
+require 'logger'
 require 'socket'
 require 'tempfile'
 require 'securerandom'
 require 'yaml'
 require 'open3'
-require 'pp'
 
 # set old yameler
 YAML::ENGINE.yamler = 'syck'
@@ -57,14 +56,14 @@ KEYWORDS = {
 }
 
 $log= Logger.new(STDERR)
-$log.level=Logger::ERROR
+$log.level=Logger::WARN
 beginning_time = Time.now
 
 
 # Tools box
 def fatal_error(message)
   $log.fatal message
-  exit -1
+  exit(1)
 end
 
 class String
@@ -72,6 +71,15 @@ class String
     Integer(self) rescue self
   end
 end
+def local_ip(destination)
+   orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true
+   UDPSocket.open do |s|
+     s.connect destination, 1
+     s.addr.last
+   end
+   ensure
+     Socket.do_not_reverse_lookup = orig
+end 
 
 def read_cmd(stream)
   line = stream.read(100)
@@ -86,7 +94,7 @@ def version_check(client)
   send_cmd(client, KEYWORDS[:HELLO])
   version=read_cmd(client)[0]
   return true if version == KEYWORDS[:HELLO]
-  $log.error ("Bad protocol version : #{version}")
+  $log.error ("Bad protocol version: #{version}")
   false
 end
 
@@ -139,7 +147,8 @@ def detect_who_i_am
 end
 
 def connect_try(line)
-  $config[:retries].downto(0) do |i|
+  retries=$config[:retries] # it can change with time
+  1.upto(retries) do |i|
     begin
       return connect(line)
     rescue Errno::EHOSTUNREACH, Timeout::Error => ex
@@ -148,8 +157,8 @@ def connect_try(line)
       raise ex
     rescue Exception => e
       $log.debug e
-      raise e if 0==i
-      $log.warn("retry  #{i} on node #{line} : #{e.to_s}")
+      raise e if retries==i
+      $log.warn("Connection failed on #{line}, retrying (#{i}/#{retries}): #{e.to_s}")
       sleep 1
     end
   end
@@ -209,11 +218,7 @@ def send_with_timeout(stream, msg)
   while 0 < msg.size
     begin
       written = stream.write_nonblock(msg)
-    rescue IO::WaitReadable
-      $log.warn ('never here -------------------')
-      IO.select([stream], nil, nil, $config[:timeout])
-      retry
-    rescue IO::WaitWritable #place a heart beat to be in better world than ping pong
+    rescue IO::WaitWritable
       if IO.select(nil, [stream], nil, $config[:timeout])
         retry
       else
@@ -254,7 +259,7 @@ class CyclicBuffer
   def push(new_obj)
     @max_obj+=1
     @max_byte+=new_obj.size
-    i=@max_obj%@buffer.size
+    i=@max_obj % @buffer.size
     if @buffer[i]!=nil
       @min_obj+=1
       @min_byte+=new_obj.size
@@ -264,7 +269,7 @@ class CyclicBuffer
 
   def get(i)
     return nil if i>@max_obj || i<@min_obj
-    @buffer[i%@buffer.size]
+    @buffer[i % @buffer.size]
   end
 
   def get_from_to(i, j)
@@ -295,7 +300,7 @@ class CyclicBuffer
     byte=@max_byte-i+1
     j=@max_obj
     while byte>0 do
-      byte-=@buffer[j%@buffer.size].size
+      byte-=@buffer[j % @buffer.size].size
       j-=1
     end
     j+=1
@@ -305,7 +310,7 @@ class CyclicBuffer
   def get_all_byte(i)
     raise 'Nothing in stack' if i>@max_byte || i<@min_byte
     j, offset=index(i)
-    yield(@buffer[j%@buffer.size][offset..-1])
+    yield(@buffer[j % @buffer.size][offset..-1])
     if j<@max_obj
       get_all(j+1) do |b|
         yield(b)
@@ -317,7 +322,7 @@ class CyclicBuffer
   def get_all(i)
     raise 'Nothing in stack' if i>@max_obj || i<@min_obj
     while i<=@max_obj
-      yield(@buffer[i%@buffer.size])
+      yield(@buffer[i % @buffer.size])
       i+=1
     end
   end
@@ -351,7 +356,6 @@ class Output
 
   def close
     @queue.push(nil)
-    #try
     @threads.each do |th|
       th.join
     end
@@ -394,7 +398,7 @@ class PipeOutput < Output
   end
 
   def arg
-    "-O #{Shellwords.escape(@cmd)}"
+    "-O '#{@cmd}'"
   end
 end
 
@@ -415,14 +419,9 @@ class FileOutput < Output
     reader
   end
 
-  def close
-    @stream.close
-    0
-  end
-
   def quit
     close
-    #rm file ?
+    # TODO should we remove the file when interrupted during the transfer?
   end
 
   def arg
@@ -451,7 +450,7 @@ class Report
   end
 
   def send_report_master
-    $log.info 'I am the last and i send report to master'
+    $log.info 'I am the last and I send report to master'
     client = connect($config[:master])
     send_reporting(client)
     client.close
@@ -472,6 +471,7 @@ class Report
     rescue => e
       $log.error "error during open file #{file_name} #{e.to_s}"
     end
+    $log.info("The report #{file_name} is written") 
   end
 
   def log_report(head, table, error_show=false)
@@ -532,7 +532,7 @@ class Deploy
     @nodes_ports = Shellwords.escape($config[:nodeList]*"\n")
 
     #Prepare commands : Behaviour intermediate node have retries 1 and 2 or only 2 ?
-    @common_options="-D none -M -b #{$config[:buffer_size]} -n #{@nodes_path} -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
+    @common_options="-D none -M -b #{$config[:buffer_size]} -n '#{@nodes_path}' -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
     @command_fountain="ruby #{@fountain_path} #{@common_options} #{$config[:output].arg}"
   end
 
@@ -545,8 +545,13 @@ end
 class Ssh < Deploy
   def deploy
     $log.info 'Using ssh'
+    require 'net/ssh'
+    require 'net/ssh/multi'
     ssh_options={:timeout=>1}
     if $config[:ssh_command]!=nil
+      # FIXME that code is super-ugly. instead we should provide several options for SSH things
+      #       we want to support changing. But, well, there's .ssh/config, too...
+      # FIXME we don't support running kascade with oarsh
       flip=true
       #Split the ssh command string to obtain an array of argument. This split is double quote compliant
       ssh_args=$config[:ssh_command].split(/"/).collect { |t| flip=!flip; flip ? t : t.split(' ') }.flatten
@@ -617,7 +622,7 @@ class Taktuk < Deploy
     cmd="#{taktuk_common} broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
     $log.debug 'launching: '+cmd
     system(cmd)
-    cmd="#{taktuk_common} broadcast exec [ #{@command_fountain} ]"
+    cmd="#{taktuk_common} broadcast exec [ #{Shellwords.escape(@command_fountain)} ]"
     $log.debug 'launching: '+cmd
     thread_catch_errors do
       system(cmd)
@@ -744,7 +749,8 @@ end
 class FirstFountain<AbstractFountain
   def initialize
     super
-    if $config[:input]==nil # from standard input
+    # both cases are needed: on the master, '-'. on other nodes, nil.
+    if $config[:input]=='-' or $config[:input]==nil # from standard input
       $stdin.binmode
       $log.info 'using standard input'
       @input=nil
@@ -796,7 +802,7 @@ class FirstFountain<AbstractFountain
   end
 
   def send_data(output_stream, byte_from)
-    if $config[:input].nil? # input stream
+    if $config[:input].nil? or $config[:input] == '-' # input stream
       if @cyclic_buffer.min_byte>byte_from
         send_cmd(KEYWORDS[:FORGET], min)
       else
@@ -837,7 +843,7 @@ class FirstFountain<AbstractFountain
   end
 
   def send_data_master(output_stream, byte_from, byte_to)
-    if $config[:input]
+    if $config[:input] != nil and $config[:input] != '-'
       input=File.open($config[:input])
       input.seek(byte_from, IO::SEEK_SET)
       data_size=[byte_to-byte_from, input.size-byte_from].min
@@ -890,15 +896,15 @@ class FirstFountain<AbstractFountain
         end
       rescue Exception => ex
         $log.error ex unless @shunting_down
-        $log.info 'master server was shunted down'
+        $log.info 'master server was shut down'
       end
     end
   end
 
   def shutdown_master_server
+    report.make_report_files
     @shunting_down=true
     @master_server.shutdown
-    report.make_report_files
   end
 
   def stop
@@ -1039,7 +1045,7 @@ class Fountain < AbstractFountain
         raise ForgetException.new(from_byte, cyclic_buffer.min_byte)
       end
       while output_stream && cyclic_buffer.max_byte > @byte_need_to_send
-        send_size=[cyclic_buffer.max_byte-@byte_need_to_send+1, @chunk_size-@byte_need_to_send%@chunk_size].min
+        send_size=[cyclic_buffer.max_byte-@byte_need_to_send+1, @chunk_size-@byte_need_to_send % @chunk_size].min
         to_size=@byte_need_to_send+send_size-1
         if @before_next_sender_header==0
           send_cmd(output_stream, KEYWORDS[:DATA], send_size)
@@ -1096,38 +1102,90 @@ end
 
 # CONFIGURATION
 $config = {
-    :port => 10000,
+    :buffer_in_memory => 1600,
     :buffer_size => 1024*64, #1460*64
+    :check_master => true,
+    :chunk_size => 160,
+    :dec_ping_port => 1000,
+    :deploy => Ssh.new,
     :input => nil,
-    :ok_file => nil,
     :ko_file => nil,
     :master => nil,
-    :ssh_command => nil,
-    :deploy => Taktuk.new,
+    :modified_node_list => false,
+    :mr_proper => false,
+    :ok_file => nil,
+    :output => nil,
+    :port => 10000,
     :retries => 10,
     :retries2 => [10, 0],
-    :output => FileOutput.new($stdout),
-    :who_i_am => -1,
-    :buffer_in_memory => 1600,
-    :chunk_size => 160,
+    :ssh_command => nil,
     :timeout => 3,
-    :dec_ping_port => 1000,
+    :use_ip => false,
     :wait_deploy => false,
-    :mr_proper => false,
-    :modified_node_list => false,
-    :check_master => true
+    :who_i_am => -1,
 }
 
 
 OptionParser.new do |opts|
   opts.banner = "Usage: ruby #{__FILE__} [options]"
   opts.separator ''
-  opts.separator 'Specific options : '
-  opts.on('-A', '--[no-]aggressive', 'kill process which use the listen port') { |v| $config[:aggressive] = v }
-  opts.on('-b', '--buffer-size SIZE', "the number of byte which read and passed (default : #{$config[:buffer_size]}") { |v| $config[:buffer_size] = v.to_i }
+  opts.separator 'Example usage:'
+  opts.separator ' * Simple file broadcast to three hosts:'
+  opts.separator '   kascade -N n2,n3,n4 -i myfile.tgz -o /home/login/myfile.tgz'
+  opts.separator ' * Copy a tar archive and decompress on-the-fly:'
+  opts.separator '   kascade -N n2,n3,n4 -i myfile.tgz -O \'tar -xzC /opt/\''
+  opts.separator ' * Cloning a disk partition using dd, streaming Kascade\'s standard input:'
+  opts.separator '   dd if=/dev/sda2 | gzip | kascade -i - -N n2,n3,n4 -O \'gunzip | dd of=/dev/sda2\''
+  opts.separator ''
+  opts.separator 'Main options:'
+  opts.on('-i', '--input FILE', 'input file (- for stdin)') do |v|
+    $config[:input] = v
+    fatal_error "file #{v} does not exist" unless File.exist?(v) or v == '-'
+  end
+  opts.on('-k', '--ok FILE', 'list of successful nodes') { |v| $config[:ok_file] = v }
+  opts.on('-K', '--ko FILE', 'list of failed nodes') { |v| $config[:ko_file] = v }
+  opts.on('-n', '--node-file FILE', 'node file') do |v|
+    $config[:nodeFile]=v
+    begin
+      $config[:nodeList] = File.readlines(v).map { |l| l.strip }
+    rescue Exception => ex
+      fatal_error "Error: could not open #{v} file: #{ex.to_s}"
+    end
+  end
+  opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
+  opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
+  opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = PipeOutput.new(v) }
+  opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
+    case v
+      when 'warn'
+        $log.level=Logger::WARN
+      when 'debug'
+        $log.level=Logger::DEBUG
+      when 'info'
+        $log.level=Logger::INFO
+      when 'fatal'
+        $log.level=Logger::FATAL
+      when (Logger::DEBUG.to_s)..(Logger::FATAL.to_s)
+        $log.level=v.to_i
+      when nil
+        $log.level=Logger::INFO
+      else
+        $log.level=Logger::INFO
+        $log.info("Invalid log level '#{v}'. Using 'info'.")
+    end
+  end
+  opts.on('-s', '--[no-]sort', 'sort and unify the nodes list') { |v| $config[:sort] = v }
+  opts.on('-?', '--help', 'show this message') do
+    puts opts
+    exit
+  end
+  opts.separator ''
+  opts.separator 'Performance & tuning options:'
+  opts.on('-A', '--[no-]aggressive', 'kill the process using the listening port') { |v| $config[:aggressive] = v }
+  opts.on('-b', '--buffer-size SIZE', "read buffer size, in bytes (default: #{$config[:buffer_size]})") { |v| $config[:buffer_size] = v.to_i }
   opts.on('-c', '--disable-check-master', 'disable check master in node list') { |v| $config[:check_master] = false }
-  opts.on('-C', '--chunk-size SIZE', "how much buffer readed before read next header (default : #{$config[:chunk_size]})")
-  opts.on('-D', '--deploy [ssh,taktuk,clush]', [:ssh, :taktuk, :clush, :none], 'Choose deploy method. Ssh is default value') do |v|
+  opts.on('-C', '--chunk-size SIZE', "size of chunks (amount of data between headers). unit: buffer size (default: #{$config[:chunk_size]})")
+  opts.on('-D', '--deploy [ssh,taktuk,clush]', [:ssh, :taktuk, :clush, :none], "Choose deployment method (default: #{$config[:deploy].class.to_s.downcase})") do |v|
     case v
       when :ssh
         $config[:deploy]=Ssh.new
@@ -1142,59 +1200,26 @@ OptionParser.new do |opts|
     end
   end
   opts.on('-H', '--[no-]disable-handshake', 'disable the handshake') { |v| $config[:handshake]=!v }
-  opts.on('-i', '--input FILE', 'input file') do |v|
-    $config[:input] = v
-    fatal_error "file #{v} does not exist" unless File.exist?(v)
-    $config[:filesize]=File.size(v)
-  end
-  opts.on('-k', '--ok FILE', 'list of node correctly deployed') { |v| $config[:ok_file] = v }
-  opts.on('-K', '--ko FILE', 'list of node with error') { |v| $config[:ko_file] = v }
+  opts.on('-I', '--[no-]use-ip', 'Use ip instead hostname when -m is not set') { |v| $config[:use_ip]=v }
   opts.on('-m', '--master HOST', 'Specify the master hostname') { |v| $config[:master] = v }
   opts.on('-M', '--[no-]mr-proper', 'delete the script and node list') { |v| $config[:mr_proper] = v }
-  opts.on('-n', '--node-file FILE', 'node file') do |v|
-    # READS NODE FILE
-    $config[:nodeFile]=v
-    begin
-      $config[:nodeList] = File.readlines(v).map { |l| l.strip }
-    rescue Exception => ex
-      fatal_error "Error : could not open #{v} file: #{ex.to_s}"
-    end
-  end
-  opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
-  opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
-  opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = PipeOutput.new(v) }
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
   opts.on('-r', '--retry NUM', "Set number retry attempts, by default this value is #{$config[:retries]} and each retry is performed after 1s") { |v| $config[:retries] = v.to_i }
   opts.on('-R', '--retry2 TIME,retries', Array, "Set new retries number after time second default is #{$config[:retries2][0]},#{$config[:retries2][1]} ") { |v| $config[:retries2] = v }
-  opts.on('-s', '--[no-]sort', 'sort the node file') { |v| $config[:sort] = v }
-  opts.on('-S', '--ssh-command SSH', 'parse ssh command') { |v| $config[:ssh_command] = v }
-  opts.on('-t', '--timeout NUM', "Timeout to connect or send/receive a buffer (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
+  opts.on('-S', '--ssh-command SSH', 'custom ssh command (experimental)') { |v| $config[:ssh_command] = v }
+  opts.on('-t', '--timeout NUM', "Timeout for connection and buffer send/receive (default: #{$config[:timeout]})") { |v| $config[:timeout] = v.to_i }
   opts.on('-u', '--number-of-buffer NB', "Number of max buffer stored (default: #{$config[:buffer_in_memory]})") { |v| $config[:buffer_in_memory]=v.to_i }
-  opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
-    case v
-      when 'warn'
-        $log.level=Logger::WARN
-      when 'debug'
-        $log.level=Logger::DEBUG
-      when 'info'
-        $log.level=Logger::INFO
-      when 'fatal'
-        $log.level=Logger::FATAL
-      else
-        $log.level=v.to_i
-    end
-  end
-  opts.on('-w', '--[no-}wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
-  opts.on('-W', '--who-i-am NUM', 'number of node it is non number parameter activate the auto-detection') { |v| $config[:who_i_am] = Integer(v) rescue nil }
-  opts.separator ''
-  opts.separator 'Common options :'
-  opts.on_tail('-?', '--help', 'show this message') do
-    puts opts
-    exit
-  end
+  opts.on('-w', '--[no-]wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
+  opts.on('-W', '--who-i-am NUM', 'master node\'s index in the node list') { |v| $config[:who_i_am] = Integer(v) rescue nil }
 end.parse!
 
+if $config[:nodeList].nil?
+  fatal_error("No nodes list specified. See kascade -?")
+end
 
+if $config[:output].nil?
+  fatal_error("No output mode specified. Use '-o FILE' or '-O COMMAND'. See kascade -?")
+end
 if $config[:sort]
   $config[:modified_node_list]=true
   $config[:nodeList].uniq!
@@ -1205,19 +1230,23 @@ if $config[:who_i_am]==-1 && $config[:check_master]
   index=detect_who_i_am
   if index
     $config[:nodeList].delete_at(index)
-    $log.warn 'master is in nodes list, remove it'
+    $log.warn 'master node is in the nodes list, removing it'
     $config[:modified_node_list]=true
   end
 end
 
 unless $config[:who_i_am]
   $config[:who_i_am]=detect_who_i_am
-  fatal_error('I don\'t know who i am !') unless $config[:who_i_am]
+  fatal_error('I don\'t know who I am!') unless $config[:who_i_am]
 end
 
 unless $config[:master]
   if $config[:who_i_am]==-1
-    $config[:master]=`hostname`.strip
+    if $config[:use_ip]
+      $config[:master]=local_ip($config[:nodeList][0])
+    else
+      $config[:master]=`hostname`.strip
+    end
   else
     fatal_error('I don\t know who are the master !')
   end
@@ -1242,6 +1271,11 @@ time_before_fountain = Time.now
 
 
 if $config[:who_i_am]==-1 # master
+  if $config[:input].nil?
+    fatal_error("No input specified. Use '-i -' for stdin")
+  end
+  $config[:filesize]=File.size($config[:input]) if $config[:input] != '-'
+
   $log.info 'I am the master'
   Signal.trap('INT') do
     case $config[:QUIT]
@@ -1260,7 +1294,7 @@ if $config[:who_i_am]==-1 # master
   ping=PingServer.new($config[:master])
   fountain=FirstFountain.new
 else
-  Signal.trap('INT') { exit! -1 }
+  Signal.trap('INT') { exit! 1 }
   ping=PingServer.new
   $log.info "I am number #{$config[:who_i_am]}"
   fountain=Fountain.new

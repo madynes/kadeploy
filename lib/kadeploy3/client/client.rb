@@ -50,6 +50,14 @@ class Client
     debug "Error encountered, let's clean everything ..."
   end
 
+  def self.api_path(path=nil,kind=nil,*args)
+    API.ppath(
+      kind||service_name.downcase.gsub(/^ka/,'').to_sym,'',
+      path||'',
+      *args
+    )
+  end
+
   def api_path(path=nil,kind=nil,*args)
     API.ppath(
       kind||self.class.service_name.downcase.gsub(/^ka/,'').to_sym,
@@ -100,7 +108,8 @@ class Client
   end
 
   def self.load_configfile()
-    configfile = File.join($kadeploy_confdir,'client_conf.yml')
+    configfile = File.join($kadeploy_confdir, "client.conf")
+    configfile = File.join($kadeploy_confdir, "client_conf.yml") unless File.readable?(configfile)
     begin
       begin
         config = YAML.load_file(configfile)
@@ -399,7 +408,7 @@ class Client
     end
   end
 
-  def add_localfiles(env)
+  def self.add_localfiles(env)
     localfiles = []
     if env.is_a?(Array)
       env.each do |file|
@@ -436,7 +445,7 @@ class Client
   end
 
   # returns absolute path if local, nil if not
-  def localfile?(filename)
+  def self.localfile?(filename)
     uri = URI.parse(filename)
     if !uri.scheme or uri.scheme.empty? or uri.scheme.downcase == 'local'
       filename.replace(File.absolute_path(uri.path))
@@ -444,11 +453,11 @@ class Client
   end
 
   # Serve files throught HTTP(s)
-  def http_export_files(secure=false)
+  def self.http_export_files(secure=false)
     return if !$files or $files.empty?
-    self.class.httpd_init(secure)
-    self.class.httpd_bind_files()
-    httpd = self.class.httpd_run()
+    httpd_init(secure)
+    httpd_bind_files()
+    httpd = httpd_run()
     httpd.url()
   end
 
@@ -456,9 +465,13 @@ class Client
     name.split('::').last.gsub(/Client$/,'')
   end
 
-  def parse_uri(uri)
+  def self.parse_uri(uri)
     uri = URI.parse(uri)
     [uri.host,uri.port,uri.path,uri.query]
+  end
+
+  def parse_uri(uri)
+    self.class.parse_uri(uri)
   end
 
   def self.get(host,port,path,secure,headers=nil)
@@ -475,6 +488,23 @@ class Client
       error(e.message)
     end
     ret
+  end
+
+  def self.get2(options,path,params=nil)
+    host,port,path,query = parse_uri(path)
+    if query
+      path = "#{path}?#{query}"
+    elsif params
+      path = HTTP::Client.path_params(path,params)
+    end
+    host = options[:server_host]  unless host
+    port = options[:server_port]  unless port
+    headers = {"#{options[:server_auth_http_prefix]}User" => USER}
+    begin
+      HTTP::Client::get(host,port,path,options[:server_secure],nil,nil,nil,headers)
+    rescue HTTP::ClientError => e
+      error(e.message,e.code)
+    end
   end
 
   def get(uri,params=nil,accept_type=nil,parse=nil)
@@ -632,6 +662,8 @@ class Client
       :chosen_server => nil,
       :server_host => nil,
       :server_port => nil,
+      :server_secure => nil,
+      :server_auth_http_prefix => nil,
     }
   end
 
@@ -710,13 +742,19 @@ class Client
     end
     options[:server_host] = options[:servers][options[:chosen_server]][0]
     options[:server_port] = options[:servers][options[:chosen_server]][1]
+    options[:server_secure] = options[:servers][options[:chosen_server]][2]
+    options[:server_auth_http_prefix] = options[:servers][options[:chosen_server]][3]
     true
   end
 
-  def init_params(options)
+  def self.init_params(options)
     ret = { }
     ret[:dry_run] = options[:dry_run] if options[:dry_run]
     ret
+  end
+
+  def self.prepare(options)
+    init_params(options)
   end
 
   def self.launch()
@@ -780,15 +818,20 @@ class Client
       end
       $clients << self.new(nil,info[0],info[1],info[2],info[3],nodes)
     end
+    options[:server_auth_http_prefix] = options[:servers][options[:chosen_server]][3]
 
     # Check that every nodes was treated
     error("The nodes #{(options[:nodes] - treated).join(", ")} does not belongs to any server") if options[:nodes] and treated.sort != options[:nodes].sort
+
+    # Prepare parameters
+    params = self.prepare(options)
+    params = self.check_params(options,params)
 
     # Launch the deployment
     $clients.each do |client|
       $threads << Thread.new do
         Thread.current[:client] = client
-        ret = client.run(options)
+        ret = client.run(options,params)
         client.result(options,ret) if ret and !options[:dry_run]
       end
     end
@@ -846,7 +889,11 @@ class Client
   def self.check_options(options)
   end
 
-  def run(options)
+  def self.check_params(options,params)
+    params
+  end
+
+  def run(options,params)
     raise
   end
 
@@ -886,7 +933,10 @@ class ClientWorkflow < Client
 
   def kill
     super()
-    delete(api_path()) if @wid
+    begin
+      delete(api_path()) if @wid
+    rescue Exception
+    end
   end
 
   def self.load_file(file)
@@ -898,8 +948,10 @@ class ClientWorkflow < Client
       else
         return false
       end
+    when 'server'
+      file
     when 'http','https'
-      options[:key] = file
+      file
     else
       error("Invalid protocol '#{kind}'")
       return false
@@ -1132,10 +1184,9 @@ class ClientWorkflow < Client
     true
   end
 
-  def init_params(options)
+  def self.init_params(options)
     ret = super(options)
 
-    ret[:nodes] = nodes()
     ret[:debug] = options[:debug] if options[:debug]
     ret[:verbose_level] = options[:verbose_level] if options[:verbose_level]
     ret[:force] = options[:force] if options[:force]
@@ -1145,7 +1196,8 @@ class ClientWorkflow < Client
     ret
   end
 
-  def run_workflow(options,params,submit_method=:post)
+  def self.prepare(options)
+    params = super(options)
     if options[:custom_operations]
       options[:custom_operations].each_pair do |macro,micros|
         micros.each_pair do |micro,ops|
@@ -1158,6 +1210,12 @@ class ClientWorkflow < Client
       end
     end
 
+    params
+  end
+
+  def self.check_params(options,params)
+    params = super(options,params)
+
     # Serve local files throught HTTP(s)
     params[:client] = http_export_files(options[:secure]) unless $files.empty?
 
@@ -1165,6 +1223,17 @@ class ClientWorkflow < Client
     if !options[:wait] and !$files.empty?
       error("Cannot use --no-wait since some files have to be exported to the server:\n  #{$files.collect{|f|f.path}.join("\n  ")}")
     end
+
+    params
+  end
+
+  def run(options,params)
+    # Launch the workflow
+    run_workflow(options,params)
+  end
+
+  def run_workflow(options,params,submit_method=:post)
+    params[:nodes] = nodes()
 
     # Launch the operation
     ret = send(submit_method,api_path(),params)

@@ -6,6 +6,8 @@ require 'digest/md5'
 require 'uri'
 require 'yaml'
 
+YAML::ENGINE.yamler = 'syck' if RUBY_VERSION >= '1.9'
+
 module Kadeploy
 
 class CacheIndexPVHash
@@ -264,7 +266,7 @@ class Cache
   def initialize(directory, maxsize, idxmeth, tagfiles, prefix_base=PREFIX_BASE)
     directory = CacheFile.absolute_path(directory)
     raise KadeployError.new(APIError::CACHE_ERROR,nil,"#{directory} is not a directory") unless File.directory?(directory)
-    raise KadeployError.new(APIError::CACHE_ERROR,nil,"Invalid cache size '#{maxsize}'") unless maxsize.is_a?(Fixnum) and maxsize > 0
+    raise KadeployError.new(APIError::CACHE_ERROR,nil,"Invalid cache size '#{maxsize}'") if !(maxsize.is_a?(Fixnum) or maxsize.is_a?(Bignum))  or maxsize <= 0
 
     @directory = directory
     @cursize = 0 # Bytes
@@ -401,6 +403,26 @@ class Cache
     ret
   end
 
+  # Manually remove a file from the cache
+  def remove(path,version,user,priority,tag='')
+    if ret = read({
+      :path => path,
+      :version => version,
+      :user => user,
+      :priority => priority,
+      :tag => tag,
+    }) then
+      if ret.used?
+        false
+      else
+        delete(ret)
+        true
+      end
+    else
+      false
+    end
+  end
+
   # Free (at least) a specific amout of memory in the cache
   def free(amount=0)
     @lock.synchronize{ free!(amount) }
@@ -473,7 +495,7 @@ class Cache
             meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
             if File.file?(meta)
               files << CacheFile.load(rfile,meta,@prefix_base)
-              debug("Delete old meta file #{File.basename(meta)} from cache")
+              #debug("Delete old meta file #{File.basename(meta)} from cache")
               #FileUtils.rm_f(rfile)
               Execute["rm -f #{meta}"].run!.wait
             else

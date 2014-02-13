@@ -4,6 +4,7 @@ operation 'Workflow-based operations' do
     field :user, :String, 'The user that initiated the operation'
     field :done, :Boolean, 'Set to true if the operation is done. Once an operation is done it\'s information should be removed from the API using the DELETE method.'
     field :error, :Boolean, 'Set to true if an error was encountered. The error message can be obtained by getting /%OPERATION/:id/error.'
+    field :start_time, :Integer, 'The start time (POSIX time) of the operation'
     field :logs, :Boolean, 'New logs available for polling (see /%OPERATION/:id/logs). Only available to the users that have the rights to consult the information about this operation.'
     field :debugs, :Boolean, 'New debugs available for polling (see /%OPERATION/:id/debugs). Only available to the users that have the rights to consult the information about this operation.'
     field :time, :Float, 'The time elapsed since the start of the operation. Only available to the users that have the rights to consult the information about this operation.'
@@ -100,6 +101,7 @@ operation 'Workflow-based operations' do
       parameter :force, :Set, 'Force the operation, even if the nodes seems to be already involved in another one', false
       parameter :verbose_level, :Integer, 'The verbose level of the logs', false, :expected => [1,2,3,4,5]
       parameter :debug, :Set, 'Enable the command\'s debugging', false
+      parameter :hook, :Set, 'Enable the server-side hook at the end of the operation', false
       parameter :custom_operations, :Hash, 'Add some custom steps to the operation\'s workflow', false do
         parameter 'macrostepname', :Hash, 'The macro-step the custom-step has to be added to' do
           parameter 'microstepname', :Hash, 'The micro-step the custom-step has to be added to' do

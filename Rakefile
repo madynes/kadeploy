@@ -87,6 +87,12 @@ INSTALL = {
     :group => DEPLOY_USER,
     :mode => '770',
   },
+  :run => {
+    :dir => '/var/log/kadeploy3d',
+    :user => DEPLOY_USER,
+    :group => 'root',
+    :mode => '755',
+  },
   :conf => {
     :dir => '/etc/kadeploy3',
     :user => 'root',
@@ -183,16 +189,21 @@ end
 def delete_dir(dir)
   dir = INSTALL[dir][:dir] if dir.is_a?(Symbol)
   dir = File.join(@root_dir,dir) if @root_dir
-  system("rmdir #{dir.to_s}")
+  system("rmdir -p #{dir.to_s}")
 end
 
-def installf(kind,file,filename=nil)
+def installf(kind,file,filename=nil,override=true)
   file = File.join(D[kind],file.to_s) if file.is_a?(Symbol)
   inst = INSTALL[kind]
   raise file if !inst or !File.exist?(file)
   dest = inst[:dir]
-  dest = File.join(dest,filename) if filename
+  if filename
+    dest = File.join(dest,filename) 
+  else
+    dest = File.join(dest,File.basename(file))
+  end
   dest = File.join(@root_dir,dest) if @root_dir
+  dest +='.dist' if !override && File.exist?(dest)
   sh "install -o #{inst[:user]} -g #{inst[:group]} -m #{inst[:mode]} #{file} #{dest}"
 end
 
@@ -201,7 +212,7 @@ def uninstallf(kind,file,filename=nil)
   dest = INSTALL[kind][:dir]
   dest = File.join(dest,filename) if filename
   dest = File.join(@root_dir,dest) if @root_dir
-  sh "rm -f #{File.join(dest,file.to_s)}"
+  sh "rm -f #{File.join(dest,file.to_s)}*"
 end
 
 def deb_versions()
@@ -343,7 +354,7 @@ task :install_client, [:root_dir,:distrib] => [:prepare, :man_client, :install_c
   installf(:man8,File.join(D[:man],'karights3.8'))
 
   create_dir(:conf)
-  installf(:conf,:'client_conf.yml')
+  installf(:conf,:'client.conf',nil,false)
 
   create_dir(:bin)
   Dir[File.join(D[:bin],'*')].each do |f|
@@ -377,7 +388,7 @@ task :uninstall_client, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:sbin,:'karights3')
   delete_dir(:sbin)
 
-  uninstallf(:conf,:'client_conf.yml')
+  uninstallf(:conf,:'client.conf')
   delete_dir(:conf)
 
   Dir[File.join(D[:lib],'kadeploy3','client','*.rb')].each do |f|
@@ -399,11 +410,11 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:man8,File.join(D[:man],'kadeploy3d.8'))
 
   create_dir(:conf)
-  installf(:conf,:'server_conf.yml')
-  installf(:conf,:'clusters.yml')
-  installf(:conf,:'cmd.yml')
-  Dir[File.join(D[:conf],'cluster-*.yml')].each do |f|
-    installf(:conf,File.basename(f).to_sym)
+  installf(:conf,:'server.conf',nil,false)
+  installf(:conf,:'clusters.conf',nil,false)
+  installf(:conf,:'command.conf',nil,false)
+  Dir[File.join(D[:conf],'*-cluster.conf')].each do |f|
+    installf(:conf,File.basename(f).to_sym,nil,false)
   end
   Tempfile.open('kadeploy_version',File.dirname(__FILE__)) do |f|
     f.puts VERSION
@@ -424,6 +435,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy3d'))
 
   create_dir(:log)
+  create_dir(:run)
 
   create_dir(:lib)
   installf(:lib,:'kadeploy3/server.rb')
@@ -449,10 +461,10 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:lib,:'server.rb')
   delete_dir(:lib)
 
-  uninstallf(:conf,:'server_conf.yml')
-  uninstallf(:conf,:'clusters.yml')
-  uninstallf(:conf,:'cmd.yml')
-  Dir[File.join(D[:conf],'cluster-*.yml')].each do |f|
+  uninstallf(:conf,:'server.conf')
+  uninstallf(:conf,:'clusters.conf')
+  uninstallf(:conf,:'command.conf')
+  Dir[File.join(D[:conf],'*-cluster.conf')].each do |f|
     uninstallf(:conf,File.basename(f).to_sym)
   end
   uninstallf(:conf,:version)
@@ -471,12 +483,23 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   logs = File.join(@root_dir,logs) if @root_dir
   sh "rm -f #{logs}"
   delete_dir(:log)
+
+  runs = File.join(INSTALL[:run][:dir],'*')
+  runs = File.join(@root_dir,runs) if @root_dir
+  sh "rm -f #{runs}"
+  delete_dir(:run)
 end
 
 desc "Install kastafior"
 task :install_kastafior, [:root_dir,:distrib] => [:prepare] do
   create_dir(:bin)
   installf(:bin,File.join(D[:addons],'kastafior','kastafior'))
+end
+
+desc "Install kascade"
+task :install_kascade, [:root_dir,:distrib] => [:prepare] do
+  create_dir(:bin)
+  installf(:bin,File.join(D[:addons],'kascade','kascade'))
 end
 
 desc "Clean the build directory"

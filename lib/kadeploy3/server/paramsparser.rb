@@ -118,6 +118,8 @@ class ParamsParser
       error(APIError::INVALID_NODELIST,"Must be a single node") if Nodes::REGEXP_NODELIST =~ param
 
       # Get the node
+      param = param.strip
+      error(APIError::INVALID_NODELIST,"Empty node name") if param.empty?
       unless param = @nodes.get_node(param)
         error(APIError::INVALID_NODELIST,"The node #{param} does not exist")
       end
@@ -125,8 +127,8 @@ class ParamsParser
       # Get hostlist
       hosts = []
       param.each do |host|
-        if Nodes::REGEXP_NODELIST =~ host
-          hosts += Nodes::NodeSet::nodes_list_expand(host)
+        if Nodes::REGEXP_NODELIST =~ host.strip
+          hosts += Nodes::NodeSet::nodes_list_expand(host.strip)
         else
           hosts << host.strip
         end
@@ -135,6 +137,8 @@ class ParamsParser
       # Create a nodeset
       param = Nodes::NodeSet.new(0)
       hosts.each do |host|
+        host = host.strip
+        error(APIError::INVALID_NODELIST,"Empty node name") if host.empty?
         node = @nodes.get_node(host)
         if node
           if node.is_a?(Array)
