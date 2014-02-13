@@ -18,7 +18,6 @@ module Kaworkflow
     ret.outputfile = nil
     ret.logger = nil
     ret.loggerfile = nil
-    ret.hook = false
     if [:deploy,:reboot].include?(kind)
       ret.pxe = nil
       ret.client = nil
@@ -52,7 +51,6 @@ module Kaworkflow
     context.outputfile = nil
     context.logger = nil
     context.loggerfile = nil
-    context.hook = nil
     if [:deploy,:reboot].include?(kind)
       context.pxe = nil
       context.client = nil
@@ -71,14 +69,17 @@ module Kaworkflow
   end
 
   def work_init_info(kind,cexec)
+    hook = nil
     nodes = Nodes::NodeSet.new(0)
     cexec.nodes.duplicate(nodes)
+    hook = cexec.config.common.send(:"end_of_#{kind.to_s}_hook") if cexec.hook
     {
       :wid => uuid(API.wid_prefix(kind)),
       :user => cexec.user,
       :start_time => Time.now,
       :end_time => nil,
       :done => false,
+      :error => false,
       :thread => nil,
       :config => cexec.config,
       :nodelist => cexec.nodelist,
@@ -90,6 +91,7 @@ module Kaworkflow
       :threads => {},
       :outputfile => cexec.outputfile,
       :loggerfile => cexec.loggerfile,
+      :hook => hook.dup,
       :output => Debug::OutputControl.new(
         cexec.verbose_level || cexec.config.common.verbose_level,
         cexec.outputfile,
@@ -296,30 +298,30 @@ module Kaworkflow
     cexecdup.nodes = nil
 
     info[:thread] = Thread.new do
-      context = {
-        :wid => info[:wid].dup,
-        :user => info[:user],
-        #:nodelist => cexec.nodelist,
-        #:nodes => cexec.nodes,
-        :states => info[:state],
-        :nodesets_id => 0,
-
-        :execution => cexecdup,
-        :common => info[:config].common,
-        :caches => info[:config].caches,
-        :cluster => nil,
-        :cluster_prefix => nil,
-
-        :database => info[:database],
-
-        :windows => @window_managers,
-        :output => info[:output],
-        :debugger => info[:debugger],
-      }
-
-      workflows = info[:workflows]
-
       begin
+        context = {
+          :wid => info[:wid].dup,
+          :user => info[:user],
+          #:nodelist => cexec.nodelist,
+          #:nodes => cexec.nodes,
+          :states => info[:state],
+          :nodesets_id => 0,
+
+          :execution => cexecdup,
+          :common => info[:config].common,
+          :caches => info[:config].caches,
+          :cluster => nil,
+          :cluster_prefix => nil,
+
+          :database => info[:database],
+
+          :windows => @window_managers,
+          :output => info[:output],
+          :debugger => info[:debugger],
+        }
+
+        workflows = info[:workflows]
+
         # Cache the files
         begin
           info[:cached_files] = GrabFile.grab_user_files(context)
@@ -403,7 +405,6 @@ module Kaworkflow
           end
           sleep(WORKFLOW_STATUS_CHECK_PITCH)
         end
-
         info[:end_time] = Time.now
 
         # Print debug
@@ -432,16 +433,22 @@ module Kaworkflow
         end
 
         info[:done] = true
+
+        yield(info) if block_given?
+
+        # Clean everything
+        free_exec_context(context[:execution])
+        #wipe_exec_context(context[:execution]) # Bug -> clear strings,arrays,..., to be re-enabled if there is some memory leak issues
+        run_wmethod(kind,:free,info)
+
+      rescue Exception => e
+        info[:error] = true
+        run_wmethod(kind,:kill,info)
+        run_wmethod(kind,:free,info)
+        raise e
       ensure
-        run_wmethod(kind,:end_hook,info) if context[:execution].hook
+        run_wmethod(kind,:end_hook,info)
       end
-
-      yield(info) if block_given?
-
-      # Clean everything
-      free_exec_context(context[:execution])
-      #wipe_exec_context(context[:execution]) # Bug -> clear strings,arrays,..., to be re-enabled if there is some memory leak issues
-      run_wmethod(kind,:free,info)
     end
 
     { :wid => info[:wid], :resources => info[:resources] }
@@ -459,14 +466,12 @@ module Kaworkflow
       if info[:done]
         done = true
       else
-        if !info[:thread].alive?
-          done = true
-          error = true
-          run_wmethod(kind,:kill,info)
-          run_wmethod(kind,:free,info)
-        else
-          done = false
-        end
+        done = false
+      end
+
+      if info[:error]
+        error = true
+        done = true
       end
 
       ret = {
@@ -575,7 +580,7 @@ module Kaworkflow
 
   def work_kill(kind,info)
     unless info[:freed]
-      info[:thread].kill if info[:thread] and info[:thread].alive?
+      info[:thread].kill if info[:thread] and info[:thread].alive? and info[:thread] != Thread.current
       info[:threads].each_value{|thread| thread.kill} if info[:threads]
       if info[:workflows] and !info[:done]
         info[:workflows].each_value do |workflow|
@@ -638,7 +643,7 @@ module Kaworkflow
   def work_get_logs(kind,cexec,wid,cluster=nil)
     workflow_get(kind,wid) do |info|
       # check if already done
-      break if !info[:done] and !info[:thread].alive? # error
+      break if info[:error]
       error_not_found! if info[:workflows] and cluster and !info[:workflows][cluster]
 
       if info[:workflows] and info[:workflows][cluster]
@@ -658,7 +663,7 @@ module Kaworkflow
 
   def work_get_debugs(kind,cexec,wid,node=nil)
     workflow_get(kind,wid) do |info|
-      break if !info[:done] and !info[:thread].alive? # error
+      break if info[:error]
       error_not_found! if (node and !info[:nodelist].include?(node)) or !info[:debugger]
 
       info[:debugger].pop(node)
@@ -667,14 +672,14 @@ module Kaworkflow
 
   def work_get_state(kind,cexec,wid)
     workflow_get(kind,wid) do |info|
-      break if !info[:done] and !info[:thread].alive? # error
+      break if info[:error]
       info[:state].states
     end
   end
 
   def work_get_status(kind,cexec,wid)
     workflow_get(kind,wid) do |info|
-      break if !info[:done] and !info[:thread].alive? # error
+      break if info[:error]
       ret = {}
       if info[:thread] and info[:thread].alive?
         info[:workflows].each_pair do |cluster,workflow|
@@ -687,7 +692,7 @@ module Kaworkflow
 
   def work_get_error(kind,cexec,wid)
     workflow_get(kind,wid) do |info|
-      break if info[:done] or info[:thread].alive?
+      break if !info[:error]
       begin
         info[:thread].join
         info[:threads].each_value{|thr| thr.join unless thr.alive?} if info[:threads]
@@ -700,8 +705,9 @@ module Kaworkflow
   end
 
   def work_end_hook(kind,info)
-    if hook = info[:config].common.send(:"end_of_#{kind.to_s}_hook")
-      Execute[hook.dup.gsub('WORKFLOW_ID',info[:wid])].run!.wait(:checkstatus=>false)
+    if info[:hook]
+      info[:hook].gsub!('WORKFLOW_ID',info[:wid])
+      Execute[info[:hook]].run!.wait(:checkstatus=>false)
     end
   end
 end
