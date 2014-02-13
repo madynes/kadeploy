@@ -59,6 +59,7 @@ module HTTP
     resp = nil
     http = Net::HTTP.new(url.host, url.port)
     http.use_ssl = url.is_a?(URI::HTTPS)
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
     http.start
     opts = {}
     opts['If-None-Match'] = expected_etag if expected_etag
