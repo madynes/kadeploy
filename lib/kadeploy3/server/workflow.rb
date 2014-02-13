@@ -273,10 +273,6 @@ module Workflow
 
       @logger.dump
 
-      if hook = context[:common].send(:"end_of_#{self.class.operation}_hook")
-        Execute[hook.dup.gsub('WORKFLOW_ID',context[:wid])].run!.wait
-      end
-
       nodes_ok = Nodes::NodeSet.new
       @nodes_ok.linked_copy(nodes_ok)
       @nodes_brk.linked_copy(nodes_ok)
