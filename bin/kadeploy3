@@ -157,6 +157,22 @@ class KadeployClient < ClientWorkflow
       params[:environment][:user] = env['user']
       params[:environment][:name] = env['name']
       params[:environment][:version] = env['version']
+      if options[:multi_server]
+        warn = false
+        warn = true if localfile?(env['image']['file'])
+
+        warn = true if !warn and env['preinstall'] and localfile?(env['preinstall']['archive'])
+
+        if !warn and env['postinstalls'] and !env['postinstalls'].empty?
+          env['postinstalls'].each do |postinstall|
+            if localfile?(postinstall['archive'])
+              warn = true
+              break
+            end
+          end
+        end
+        debug("Warning: deploying a recorded environment that depends on locally stored files using the muli-server option") if warn
+      end
     when :anonymous
       params[:environment].merge!(options[:env_desc])
       env = options[:env_desc]
