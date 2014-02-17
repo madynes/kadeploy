@@ -216,10 +216,8 @@ module HTTPd
         type,content = [ TYPES[:json], JSON.pretty_generate(obj) ]
       end
 
-      # Force encoding to UTF-8
-      content.encode!('UTF-8', {:invalid => :replace, :undef => :replace})
       type = type.dup
-      type << '; charset=utf-8'
+      type << "; charset=\"#{content.encoding.to_s.strip}\""
 
       if @encoding and @encoding.include?('gzip')
         sio = StringIO.new('w')
@@ -370,9 +368,7 @@ module HTTPd
       end
       if response['Content-Type'] == 'text/plain'
         res += "\n"
-        # Force encoding to UTF-8
-        response['Content-Type'] << '; charset=utf-8'
-        res.encode!('UTF-8', {:invalid => :replace, :undef => :replace})
+        response['Content-Type'] << "; charset=\"#{res.encoding.to_s.strip}\""
       end
       response['Content-Length'] = res.size
       response.body = res unless get_method(request) == :HEAD
