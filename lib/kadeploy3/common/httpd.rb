@@ -370,7 +370,11 @@ module HTTPd
         res += "\n"
         response['Content-Type'] << "; charset=\"#{res.encoding.to_s.strip}\""
       end
-      response['Content-Length'] = res.size
+      if res.is_a?(String)
+        response['Content-Length'] = res.bytesize
+      else
+        response['Content-Length'] = res.size
+      end
       response.body = res unless get_method(request) == :HEAD
       res = nil
     end
