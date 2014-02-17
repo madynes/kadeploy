@@ -456,7 +456,8 @@ class KadeployServer
       end
       if check_rights
         ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
-        error_unauthorized!(msg) unless ok
+        msg = "You do not the rights to perform this operation" if msg.nil? or msg.empty?
+        error_forbidden!(msg) unless ok
       end
 
       # Run the treatment
