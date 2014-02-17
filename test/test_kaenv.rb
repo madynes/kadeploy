@@ -1,3 +1,4 @@
+# encoding: utf-8
 $:.unshift File.dirname(__FILE__)
 require 'ka_test_case'
 require 'test/unit'
@@ -201,6 +202,29 @@ class TestKadeploy < Test::Unit::TestCase
     run_kaenv('--update-postinstall-checksum',@tmp[:envname])
     check_env(@tmp[:envname])
     run_kaenv('-d', @tmp[:envname])
+    envfile.unlink
+  end
+
+  def test_charset
+    envfile = Tempfile.new('env')
+    str = "ĶåđėƥŁŏŷ"
+    name = "#{@tmp[:envname]}-#{str}"
+    desc = {
+      'name' => name,
+      'description' => "description-" + str,
+      'author' => "author-" + str,
+      'os' => 'linux',
+      'image' => {
+        'file' => @tgzfile,
+        'kind' => 'dd',
+        'compression' => 'gzip',
+      },
+    }
+    envfile.write(desc.to_yaml)
+    envfile.close
+    run_kaenv('-a', envfile.path)
+    check_env(name)
+    run_kaenv('-d', name)
     envfile.unlink
   end
 end
