@@ -72,7 +72,7 @@ module Kaworkflow
     hook = nil
     nodes = Nodes::NodeSet.new(0)
     cexec.nodes.duplicate(nodes)
-    hook = cexec.config.common.send(:"end_of_#{kind.to_s}_hook") if cexec.hook
+    hook = cexec.config.common.send(:"end_of_#{kind.to_s}_hook").dup if cexec.hook
     {
       :wid => uuid(API.wid_prefix(kind)),
       :user => cexec.user,
@@ -91,7 +91,7 @@ module Kaworkflow
       :threads => {},
       :outputfile => cexec.outputfile,
       :loggerfile => cexec.loggerfile,
-      :hook => hook.dup,
+      :hook => hook,
       :output => Debug::OutputControl.new(
         cexec.verbose_level || cexec.config.common.verbose_level,
         cexec.outputfile,
