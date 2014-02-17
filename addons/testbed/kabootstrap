@@ -155,7 +155,7 @@ CFG_KADEPLOY_PARTITIONING_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'parted-samp
 CFG_KADEPLOY_BOOTLOADER_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'install_grub2')
 CFG_KADEPLOY_TEST_PATH='/tmp/test'
 CFG_KADEPLOY_TEST_VLAN_PATH="#{CFG_KADEPLOY_TEST_PATH}-vlan"
-
+CFG_KADEPLOY_TEST_HOOK_PATH="#{CFG_KADEPLOY_TEST_PATH}-hook"
 
 
 def cfg_environment_desc(env,http=false)
@@ -421,6 +421,11 @@ def cfg_kadeploy_conf()
         },
       },
       'pxe' => pxe,
+      'hooks' => {
+        'end_of_deployment' => "curl -k #{File.join('https://'+$services[:kadeploy][:fqdn]+':'+CFG_KADEPLOY_PORT.to_s,'deployment','WORKFLOW_ID')} > #{CFG_KADEPLOY_TEST_HOOK_PATH}-end_of_deployment",
+        'end_of_reboot' => "curl -k #{File.join('https://'+$services[:kadeploy][:fqdn]+':'+CFG_KADEPLOY_PORT.to_s,'reboot','WORKFLOW_ID')} > #{CFG_KADEPLOY_TEST_HOOK_PATH}-end_of_reboot",
+        'end_of_power' => "curl -k #{File.join('https://'+$services[:kadeploy][:fqdn]+':'+CFG_KADEPLOY_PORT.to_s,'power','WORKFLOW_ID')} > #{CFG_KADEPLOY_TEST_HOOK_PATH}-end_of_power",
+      },
       'external' => {
         'mkfs' => [
           {
@@ -518,7 +523,9 @@ def cfg_kadeploy_conf()
     "max_postinstall_size = 10\n"\
     "vlan_hostname_suffix = -kavlan-VLAN_ID\n"
     "set_vlan_cmd = echo 'test VLAN_ID USER' > #{CFG_KADEPLOY_TEST_VLAN_PATH}\n"
-    #"async_end_of_deployment_hook = \n"\
+    "async_end_of_deployment_hook = echo WORKFLOW_ID > #{CFG_KADEPLOY_TEST_HOOK_PATH}-end_of_deployment\n"\
+    "async_end_of_reboot_hook = echo WORKFLOW_ID > #{CFG_KADEPLOY_TEST_HOOK_PATH}-end_of_reboot\n"\
+    "async_end_of_power_hook = echo WORKFLOW_ID > #{CFG_KADEPLOY_TEST_HOOK_PATH}-end_of_power\n"\
     # >>> TODO: add Bitorrent support in bootstrap
     #"bt_tracker_ip = \n"\
   end

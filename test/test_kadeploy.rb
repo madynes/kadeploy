@@ -4,6 +4,7 @@ require 'test/unit'
 require 'tempfile'
 require 'tmpdir'
 require 'yaml'
+require 'json'
 require 'rubygems'
 require 'net/ssh'
 
@@ -394,6 +395,24 @@ class TestKadeploy < Test::Unit::TestCase
       `rm #{@tmp[:localfile]}`
       scriptfile.unlink
       opsfile.unlink
+    end
+  end
+
+  def test_end_hook
+    widfile = Tempfile.new('wid')
+    run_kadeploy('--hook','--write-workflow-id',widfile.path)
+    assert(File.exist?(widfile.path),"WID file not found")
+    wid = File.read(widfile.path).strip
+    file = '/tmp/test-hook-end_of_deployment'
+    assert(File.exist?(file),"#{file} file not found")
+    begin
+      status = JSON.parse(File.read(file))
+      assert(status['wid'] == wid,"Invalid WID")
+      assert(status['done'],"Operation not done when executing the hook")
+    rescue JSON::ParserError
+      assert(false,"#{file} invalid file, JSON error")
+    ensure
+      widfile.unlink
     end
   end
 end
