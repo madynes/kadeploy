@@ -687,7 +687,7 @@ module Configuration
             end
           end
 
-          @tar_options = cp.value('tar',String,'')
+          @tar_options = cp.value('tar_opts',String,'')
         end
 
       rescue ArgumentError => ae
