@@ -96,14 +96,14 @@ INSTALL = {
   :conf => {
     :dir => '/etc/kadeploy3',
     :user => 'root',
-    :group => 'root',
-    :mode => '644',
+    :group => 'deploy',
+    :mode => '640',
   },
   :script => {
     :dir => '/usr/share/doc/kadeploy3/scripts',
     :user => 'root',
     :group => 'root',
-    :mode => '640',
+    :mode => '644',
   },
   :bin => {
     :dir => '/usr/bin',
