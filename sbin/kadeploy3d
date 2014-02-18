@@ -1,4 +1,8 @@
 #!/usr/bin/ruby -w
+
+# Necessary to force the Debian's ruby-mysql library to return UTF-8 encoded strings
+Encoding.default_external = Encoding::UTF_8 if RUBY_VERSION >= '1.9'
+
 $:.unshift(ENV['KADEPLOY3_LIBS']) if ENV['KADEPLOY3_LIBS']
 $kadeploy_logdir=ENV['KADEPLOY3_LOG_DIR']||'/var/log/kadeploy3'
 $kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3d'
