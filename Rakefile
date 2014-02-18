@@ -260,7 +260,10 @@ end
 desc "Generate server manpages"
 task :man_server => :man_server_clean do
   raise "help2man is missing !" unless system('which help2man')
-  gen_man(File.join(D[:sbin],'kadeploy3d'),8)
+
+  Dir[File.join(D[:sbin],'kadeploy3d'),File.join(D[:sbin],'kaimagehelper3')].each  do |bin|
+    gen_man(bin,8)
+  end
 end
 
 desc "Clean manpages files"
