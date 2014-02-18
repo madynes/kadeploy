@@ -8,6 +8,7 @@ Signal.trap("INT") do
 end
 
 require 'kadeploy3/client'
+require 'uri'
 
 module Kadeploy
 
@@ -244,13 +245,13 @@ class KaenvsClient < Client
 
     if ![:add, :'move-files'].include?(options[:operation])
       if [:print,:list].include?(options[:operation])
-        path = File.join(path,"/#{options[:env_user]||''}/")
+        path = File.join(path,"/#{URI.encode_www_form_component(options[:env_user]||'')}/")
       else
-        path = File.join(path,options[:env_user]||USER)
+        path = File.join(path,URI.encode_www_form_component(options[:env_user]||USER))
       end
 
       if options[:operation] != :list
-        path = File.join(path,options[:env_name]) if options[:env_name]
+        path = File.join(path,URI.encode_www_form_component(options[:env_name])) if options[:env_name]
         path = File.join(path,options[:env_version].to_s) if options[:env_version]
       end
     end

@@ -1,0 +1,24 @@
+#!/bin/bash -e
+
+PARTED_OPTS="--script -a optimal"
+UNIT="GB"
+# Set the filesystem type of the deployment partition
+# (in order for parted to write the corresponding MSDOS partition type
+# in the partition table)
+FSTYPE[$KADEPLOY_DEPLOY_PART_NUM]=$KADEPLOY_FS_TYPE
+
+function do_parted()
+{
+  /sbin/parted $PARTED_OPTS $KADEPLOY_BLOCK_DEVICE unit $UNIT $@
+}
+
+# Execution of several parted commands for debug purpose
+# (identification of the line which is failing)
+do_parted "mklabel msdos"
+do_parted "mkpart primary linux-swap 0% 4"
+do_parted "mkpart primary ${FSTYPE[2]} 4 100%"
+do_parted "toggle $KADEPLOY_DEPLOY_PART_NUM boot"
+do_parted "align-check optimal 1"
+do_parted "align-check optimal 2"
+
+/sbin/partprobe $KADEPLOY_BLOCK_DEVICE
