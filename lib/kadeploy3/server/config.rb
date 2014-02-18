@@ -268,8 +268,8 @@ module Configuration
           )
         end
 
-        cp.parse('network',true) do
-          cp.parse('vlan',true) do
+        cp.parse('network',false) do
+          cp.parse('vlan') do
             @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
             @set_vlan_cmd = cp.value('set_cmd',String,'',{
               :type => 'file', :command => true,
@@ -291,7 +291,7 @@ module Configuration
           @kadeploy_tcp_buffer_size = cp.value(
             'tcp_buffer_size',Fixnum,8192
           )
-          static[:host] = cp.value('server_hostname',String)
+          static[:host] = cp.value('server_hostname',String,`hostname`.strip)
         end
 
         cp.parse('security') do |info|
@@ -556,7 +556,7 @@ module Configuration
           pxemethod = Proc.new do |name,info|
             unless info[:empty]
               args = []
-              args << cp.value('method',String,nil,
+              args << cp.value('method',String,'PXElinux',
                 ['PXElinux','GPXElinux','IPXE','GrubPXE']
               )
               repo = cp.value('repository',String,nil,Dir)
@@ -569,9 +569,9 @@ module Configuration
                 )
               end
 
-              cp.parse('export',true) do
-                args << cp.value('kind',String,nil,['http','ftp','tftp']).to_sym
-                args << cp.value('server',String)
+              cp.parse('export') do
+                args << cp.value('kind',String,'tftp',['http','ftp','tftp']).to_sym
+                args << cp.value('server',String,'LOCAL_IP')
               end
 
               args << repo
@@ -590,8 +590,9 @@ module Configuration
                 args << 'PXE_CUSTOM'
               end
 
-              cp.parse('profiles',true) do
-                profiles_dir = cp.value('directory',String,'')
+              cp.parse('profiles') do
+                #TODO : check profile config for example : pxelinuix => pxelinux.cfg,ip_hex another=> another
+                profiles_dir = cp.value('directory',String,'pxelinux.cfg')
                 args << profiles_dir
                 if profiles_dir.empty?
                   profiles_dir = repo
@@ -601,7 +602,7 @@ module Configuration
                 if !File.exist?(profiles_dir) or !File.directory?(profiles_dir)
                   raise ArgumentError.new(Parser.errmsg(info[:path],"The directory '#{profiles_dir}' does not exist"))
                 end
-                args << cp.value('filename',String,nil,
+                args << cp.value('filename',String,'ip_hex',
                   ['ip','ip_hex','hostname','hostname_short']
                 )
               end
@@ -891,15 +892,14 @@ module Configuration
 
         cp.parse('partitioning',true) do
           @block_device = cp.value('block_device',String,nil,Pathname)
+
+          @swap_part = cp.value('disable_swap',[TrueClass,FalseClass],false)? 'none':nil
           cp.parse('partitions',true) do
-            @swap_part = cp.value('swap',Fixnum,1).to_s
-            @prod_part = cp.value('prod',Fixnum).to_s
+            @swap_part = cp.value('swap',Fixnum,nil).to_s unless @swap_part
+            @prod_part = cp.value('prod',Fixnum,-1).to_s
             @deploy_part = cp.value('deploy',Fixnum).to_s
-            @tmp_part = cp.value('tmp',Fixnum).to_s
+            @tmp_part = cp.value('tmp',Fixnum,-1).to_s
           end
-          @swap_part = 'none' if cp.value(
-            'disable_swap',[TrueClass,FalseClass],false
-          )
           @partitioning_script = cp.value('script',String,nil,
             { :type => 'file', :readable => true, :prefix => Config.dir() })
         end
@@ -920,7 +920,7 @@ module Configuration
                 'drivers',String,''
               ).split(',').collect{ |v| v.strip }
               @deploy_supported_fs = cp.value(
-                'supported_fs',String
+                'supported_fs',String,'ext2, ext3, ext4, vfat'
               ).split(',').collect{ |v| v.strip }
             end
 
@@ -1208,8 +1208,8 @@ module Configuration
           end
         end
 
-        cp.parse('timeouts',true) do |info|
-          code = cp.value('reboot',Object,nil,
+        cp.parse('timeouts') do |info|
+          code = cp.value('reboot',Object,120,
             { :type => 'code', :prefix => 'n=1;' }
           ).to_s
           begin
