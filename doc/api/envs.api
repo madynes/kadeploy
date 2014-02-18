@@ -409,7 +409,7 @@ operation 'Environments management' do
       EOS
   end
 
-  resource :GET, '/environments/:username?/:name?/:version?', 'Gather the description of environments. If no user is given, the public environment will be displayed, otherwise a list of all environments that are public or owned by the user will be returned' do
+  resource :GET, '/environments/:username?/:name?/:version?', 'Gather the description of environments. If no user is given, the public environment will be displayed, otherwise a list of all environments that are public or owned by the user will be returned. The :username or the :name fields have to be encoded following the RFC 3986 specifications (non-ASCII characters are encoded with a percent notation)' do
     request do
       parameter ':username', :String, 'The owner of the environment', false
       parameter ':name', :String, 'The name of the environment', false
@@ -713,7 +713,7 @@ operation 'Environments management' do
       EOS
   end
 
-  resource :PUT, '/environments/:username/:name/:version?', 'Modify some environment(s) properties, returns the modified environment. If no version is specified, modify the last version' do
+  resource :PUT, '/environments/:username/:name/:version?', 'Modify some environment(s) properties, returns the modified environment. If no version is specified, modify the last version. The :username or the :name fields have to be encoded following the RFC 3986 specifications (non-ASCII characters are encoded with a percent notation)' do
     request do
       parameter ':username', :String, 'The owner of the environment, mandatory if the operation is not update_file', false
       parameter ':name', :String, 'The name of the environment, mandatory if the operation is not update_file', false
@@ -802,7 +802,7 @@ operation 'Environments management' do
       EOS
   end
 
-  resource :PUT, '/environments/:username?/:name?/:version?', 'Modify some environment(s) properties, returns the modified environment. If no version is specified, modify the last version' do
+  resource :PUT, '/environments/:username?/:name?/:version?', 'Modify some environment(s) properties, returns the modified environment. If no version is specified, modify the last version. The :username or the :name fields have to be encoded following the RFC 3986 specifications (non-ASCII characters are encoded with a percent notation)' do
     request do
       parameter ':username', :String, 'The owner of the environment, mandatory if the operation is not update_file', false
       parameter ':name', :String, 'The name of the environment, mandatory if the operation is not update_file', false
@@ -882,7 +882,7 @@ operation 'Environments management' do
   end
 
 
-  resource :DELETE, '/environments/:username/:name/:version?', 'Delete a specific environment, returns the resources that was deleted' do
+  resource :DELETE, '/environments/:username/:name/:version?', 'Delete a specific environment, returns the resources that was deleted. The :username or the :name fields have to be encoded following the RFC 3986 specifications (non-ASCII characters are encoded with a percent notation)' do
     request do
       parameter ':username', :String, 'The owner of the environment', false
       parameter ':name', :String, 'The name of the environment', false

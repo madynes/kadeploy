@@ -96,14 +96,14 @@ INSTALL = {
   :conf => {
     :dir => '/etc/kadeploy3',
     :user => 'root',
-    :group => 'root',
-    :mode => '644',
+    :group => 'deploy',
+    :mode => '640',
   },
   :script => {
     :dir => '/usr/share/doc/kadeploy3/scripts',
     :user => 'root',
     :group => 'root',
-    :mode => '640',
+    :mode => '644',
   },
   :bin => {
     :dir => '/usr/bin',
@@ -426,6 +426,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:script,File.join(D[:scripts],'bootloader','install_grub'))
   installf(:script,File.join(D[:scripts],'bootloader','install_grub2'))
   installf(:script,File.join(D[:scripts],'partitioning','parted-sample'))
+  installf(:script,File.join(D[:scripts],'partitioning','parted-sample-simple'))
   installf(:script,File.join(D[:scripts],'partitioning','fdisk-sample'))
 
   create_dir(:sbin)
@@ -473,6 +474,7 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:script,'install_grub')
   uninstallf(:script,'install_grub2')
   uninstallf(:script,'parted-sample')
+  uninstallf(:script,'parted-sample-simple')
   uninstallf(:script,'fdisk-sample')
   delete_dir(:script)
 

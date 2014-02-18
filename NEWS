@@ -10,6 +10,10 @@
 == REST API ==
 * It's now possible to interact with the server using a REST API (see the Network API documentation)
 
+== Deployement environment generation scripts ==
+* The ssh key addons/ssh/id_deploy is not copied on deployment kernel anymore,
+  it's recommanded to use the ssh agent for ssh communications
+
 == Internals ==
 * Client/Server interactions are now performed using a REST API instead of DRb
   (see doc sec/5)

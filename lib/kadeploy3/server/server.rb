@@ -597,9 +597,7 @@ class KadeployServer
               if (Time.now - info[:start_time]) > clean_threshold
                 to_clean << wid
               end
-            elsif !info[:thread].alive? # Dead workflow
-              run_wmethod(kind,:kill,info)
-              run_wmethod(kind,:free,info)
+            elsif info[:error] # Dead workflow
               if (Time.now - info[:start_time]) > clean_threshold
                 to_clean << wid
               end

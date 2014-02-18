@@ -40,8 +40,18 @@ class TestKadeploy < Test::Unit::TestCase
   end
 
   def test_vlan
-    @connect = false
-    run_kadeploy('--vlan',@vlan) if @vlan
+    if @vlan
+      @connect = false
+      run_kadeploy('--vlan',@vlan)
+    else # in kaboostrap
+      run_kadeploy('--vlan','1')
+      begin
+        str = File.read('/tmp/test-vlan').strip
+        assert(str == "test 1 #{USER}","Invalid VLAN test file")
+      rescue
+        assert(false,"VLAN test file not found")
+      end
+    end
   end
 
   def test_breakpoint
