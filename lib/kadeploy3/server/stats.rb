@@ -101,6 +101,12 @@ module Stats
       ret << db_field(table,'wid',"like '#{API.wid_prefix(operation)}%'")
     end
 
+    if filters[:nodes]
+      ret << ' AND ' unless ret.empty?
+      args += filters[:nodes]
+      ret << db_field(table,'hostname',"IN (#{(['?']*filters[:nodes].size).join(',')})")
+    end
+
     if filters[:date_min]
       ret << ' AND ' unless ret.empty?
       args << filters[:date_min].to_i
