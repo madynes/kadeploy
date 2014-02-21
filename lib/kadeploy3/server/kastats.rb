@@ -16,12 +16,13 @@ module Kastats
 
     parse_params(params) do |p|
       # Check nodelist
-      context.nodes = p.parse('nodes',Array,:type=>:nodeset,
+      nodes = p.parse('nodes',Array,:type=>:nodeset,
         :errno=>APIError::INVALID_NODELIST)
-      if context.nodes
-        tmp = context.nodes.make_array_of_hostname
-        context.nodes.free
-        context.nodes = tmp
+      if nodes
+        tmp = nodes.make_array_of_hostname
+        nodes.free
+        nodes = nil
+        context.filters[:nodes] = tmp
       end
 
       context.kind = p.parse('kind',String,:values=>['all','failure_rates'],:default=>'all')

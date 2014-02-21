@@ -1852,9 +1852,10 @@ class Microstep < Automata::QueueTask
   # Output
   # * return true if the keys have been successfully copied, false otherwise
   def ms_send_key(scattering_kind)
+    dir = File.join(context[:common].environment_extraction_dir,'root','.ssh')
     return parallel_exec(
-      "cat - >>#{context[:common].environment_extraction_dir}/root/"\
-      ".ssh/authorized_keys",
+      "mkdir -p #{dir}; cat - >> #{File.join(dir,'authorized_keys')}"\
+      "",
       {:input_file => context[:execution].key, :scattering => scattering_kind }
     )
   end

@@ -137,7 +137,7 @@ module Configuration
             end
 
             if typeok
-              yield(@val[fieldname])
+              yield(@val[fieldname],true)
             else
               $,=','
               typename = type.to_s
@@ -149,7 +149,7 @@ module Configuration
           elsif mandatory
             raise ParserError.new("The field is mandatory")
           else
-            yield(nil)
+            yield(nil,@val.has_key?(fieldname))
           end
         elsif mandatory
           if @val.nil?
@@ -158,7 +158,7 @@ module Configuration
             raise ParserError.new("The field has to be a Hash")
           end
         else
-          yield(nil)
+          yield(nil,false)
         end
       rescue ParserError => pe
         raise ArgumentError.new(
@@ -337,8 +337,8 @@ module Configuration
     end
 
 
-    def parse(fieldname, mandatory=false, type=Hash)
-      check_field(fieldname,mandatory,type) do |curval|
+    def parse(fieldname, mandatory=false, type=Hash,warns_if_empty=true)
+      check_field(fieldname,mandatory,type) do |curval,provided|
         oldval = @val
         push(fieldname, curval)
 
@@ -350,6 +350,7 @@ module Configuration
               :empty => curval.nil?,
               :path => path,
               :iter => i,
+              :provided => provided,
             })
             pop()
           end
@@ -360,10 +361,10 @@ module Configuration
             :empty => curval.nil?,
             :path => path,
             :iter => 0,
+            :provided => provided,
           })
         end
-
-        oldval.delete(fieldname) if curval and curval.empty?
+        oldval.delete(fieldname) if (curval and curval.empty?) or (!warns_if_empty and provided)
 
         pop(oldval)
       end
