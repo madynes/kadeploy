@@ -40,5 +40,9 @@ class TestKapower < Test::Unit::TestCase
     ret = run_kapower('--off','--no-wait')
     assert(ret.split(' ')[0] =~ R_WID,ret)
   end
+
+  def test_server
+    run_kapower('--on','--server','kadeploy')
+  end
 end
 
