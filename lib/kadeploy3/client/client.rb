@@ -1120,6 +1120,12 @@ class ClientWorkflow < Client
     }
   end
 
+  def self.parse_hook(opt,options)
+    add_opt(opt,"--[no-]hook", "Launch server's hook at the end of operation, disabled by default") { |h|
+      options[:hook] = h
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -1153,6 +1159,7 @@ class ClientWorkflow < Client
       parse_force(opt,options)
       parse_breakpoint(opt,options)
       parse_custom_ops(opt,options)
+      parse_hook(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -1192,6 +1199,7 @@ class ClientWorkflow < Client
     ret[:force] = options[:force] if options[:force]
     ret[:breakpoint] = options[:breakpoint] if options[:breakpoint]
     ret[:custom_operations] = options[:custom_operations] if options[:custom_operations]
+    ret[:hook] = options[:hook] if options[:hook]
 
     ret
   end

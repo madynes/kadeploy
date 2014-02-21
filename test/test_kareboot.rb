@@ -3,6 +3,7 @@ require 'ka_test_case'
 require 'test/unit'
 require 'tempfile'
 require 'socket'
+require 'json'
 
 class TestKareboot  < Test::Unit::TestCase
   include KaTestCase
@@ -102,6 +103,24 @@ class TestKareboot  < Test::Unit::TestCase
   end
 
   def test_check_destructive
+  end
+
+  def test_end_hook
+    widfile = Tempfile.new('wid')
+    run_kareboot('--hook','--write-workflow-id',widfile.path)
+    assert(File.exist?(widfile.path),"WID file not found")
+    wid = File.read(widfile.path).strip
+    file = '/tmp/test-hook-end_of_reboot'
+    assert(File.exist?(file),"#{file} file not found")
+    begin
+      status = JSON.parse(File.read(file))
+      assert(status['wid'] == wid,"Invalid WID")
+      assert(status['done'],"Operation not done when executing the hook")
+    rescue JSON::ParserError
+      assert(false,"#{file} invalid file, JSON error")
+    ensure
+      widfile.unlink
+    end
   end
 end
 

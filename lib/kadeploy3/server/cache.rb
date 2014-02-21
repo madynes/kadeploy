@@ -263,7 +263,8 @@ class Cache
 
   # Tagfiles: rename cached files and move them to the cache directory in order to be able to reload on relaunch, when files are not tagged, the directory is fully cleaned on loading
   # !!! maxsize in Bytes
-  def initialize(directory, maxsize, idxmeth, tagfiles, prefix_base=PREFIX_BASE)
+  def initialize(directory, maxsize, idxmeth, tagfiles, prefix_base=PREFIX_BASE, emptycache=true)
+    prefix_base=PREFIX_BASE if prefix_base.nil?
     directory = CacheFile.absolute_path(directory)
     raise KadeployError.new(APIError::CACHE_ERROR,nil,"#{directory} is not a directory") unless File.directory?(directory)
     raise KadeployError.new(APIError::CACHE_ERROR,nil,"Invalid cache size '#{maxsize}'") if !(maxsize.is_a?(Fixnum) or maxsize.is_a?(Bignum))  or maxsize <= 0
@@ -276,7 +277,7 @@ class Cache
     @files = {}
     @idxc = idxmeth #TODO: check that class exists
     @lock = Mutex.new
-    load()
+    load(emptycache)
   end
 
   def debug(msg)
@@ -481,62 +482,86 @@ class Cache
     end
   end
 
-  def load()
-    debug("Loading cache #{@directory} ...")
-    exclude = [ '.', '..' ]
-    files = []
-    Dir.entries(@directory).sort.each do |file|
-      rfile = File.join(@directory,file)
-      if !exclude.include?(file)
-        if @tagfiles
-          if File.file?(rfile) \
-            and file =~ CacheFile.regexp_filename(@prefix_base,CacheFile::EXT_FILE) \
-          then
-            meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
-            if File.file?(meta)
-              files << CacheFile.load(rfile,meta,@prefix_base)
-              #debug("Delete old meta file #{File.basename(meta)} from cache")
-              #FileUtils.rm_f(rfile)
-              Execute["rm -f #{meta}"].run!.wait
-            else
-              debug("Delete file #{rfile} from cache (no meta)")
-              #FileUtils.rm_f(rfile)
-              Execute["rm -f #{rfile}"].run!.wait
+  def load(emptycache = true)
+    if emptycache
+      debug("Cleaning cache #{@directory} ...")
+      exclude = [ '.', '..' ]
+      files = []
+      Dir.entries(@directory).sort.each do |file|
+        rfile = File.join(@directory,file)
+        if !exclude.include?(file)
+          if @tagfiles
+            if File.file?(rfile) \
+              and file =~ CacheFile.regexp_filename(@prefix_base,CacheFile::EXT_FILE) \
+            then
+              meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
+              if File.file?(meta)
+                Execute["rm -f #{meta}"].run!.wait
+              end
+              debug("Delete file #{File.basename(file)} from cache")
+              Execute["rm -f #{file}"].run!.wait
             end
+          else
+            # Remove every files from directory if file not tagged
+            debug("Delete file #{rfile} from cache")
+            Execute["rm -f #{rfile}"].run!.wait
           end
-        else
-          # Remove every files from directory if file not tagged
-          debug("Delete file #{rfile} from cache")
-          #FileUtils.rm_f(rfile)
-          Execute["rm -f #{rfile}"].run!.wait
         end
       end
-    end
+      debug("Cache #{@directory} cleaned")
+    else
+      debug("Loading cache #{@directory} ...")
+      exclude = [ '.', '..' ]
+      files = []
+      Dir.entries(@directory).sort.each do |file|
+        rfile = File.join(@directory,file)
+        if !exclude.include?(file)
+          if @tagfiles
+            if File.file?(rfile) \
+              and file =~ CacheFile.regexp_filename(@prefix_base,CacheFile::EXT_FILE) \
+            then
+              meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
+              if File.file?(meta)
+                files << CacheFile.load(rfile,meta,@prefix_base)
+                Execute["rm -f #{meta}"].run!.wait
+              else
+                debug("Delete file #{rfile} from cache (no meta)")
+                Execute["rm -f #{rfile}"].run!.wait
+              end
+            end
+          else
+            # Remove every files from directory if file not tagged
+            debug("Delete file #{rfile} from cache")
+            Execute["rm -f #{rfile}"].run!.wait
+          end
+        end
+      end
 
-    # Only keep the most recently used files with the greater priority
-    @lock.synchronize do
-      if @tagfiles
-        files.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.reverse!.each do |file|
-          if file.priority != 0 and file.size <= freesize!()
-            if cfile = add!(file)
-              debug("Load cached file #{file.path} (#{cfile.size/(1024*1024)}MB)")
-              cfile.save(@directory)
+      # Only keep the most recently used files with the greater priority
+      @lock.synchronize do
+        if @tagfiles
+          files.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.reverse!.each do |file|
+            if file.priority != 0 and file.size <= freesize!()
+              if cfile = add!(file)
+                debug("Load cached file #{file.path} (#{cfile.size/(1024*1024)}MB)")
+                cfile.save(@directory)
+              else
+                debug("Delete cached file #{file.path} from cache "\
+                  "(#{file.size/(1024*1024)}MB)")
+                #FileUtils.rm_f(rfile)
+                Execute["rm -f #{file.file}"].run!.wait
+              end
             else
               debug("Delete cached file #{file.path} from cache "\
                 "(#{file.size/(1024*1024)}MB)")
               #FileUtils.rm_f(rfile)
               Execute["rm -f #{file.file}"].run!.wait
             end
-          else
-            debug("Delete cached file #{file.path} from cache "\
-              "(#{file.size/(1024*1024)}MB)")
-            #FileUtils.rm_f(rfile)
-            Execute["rm -f #{file.file}"].run!.wait
           end
         end
-      end
-    end # synchronize
-    debug("Cache #{@directory} loaded (#{@cursize/(1024*1024)}MB)")
+      end # synchronize
+      debug("Cache #{@directory} loaded (#{@cursize/(1024*1024)}MB)")
+    end
   end
 
   protected
