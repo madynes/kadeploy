@@ -137,6 +137,27 @@ class TestKadeploy < Test::Unit::TestCase
     end
   end
 
+  def test_env_anon_server
+    desc = env_desc(@env)
+    desc['name'] = @tmp[:envname]
+    desc['visibility'] = 'shared'
+    desc['image']['file'] = 'server://' + desc['image']['file']
+    desc['postinstalls'].each do |post|
+      post['archive'] = 'server://' + post['archive']
+    end
+
+    envfile = Tempfile.new('env')
+    envfile.write(desc.to_yaml)
+    envfile.close
+
+    begin
+      @env = nil
+      run_kadeploy('-a',envfile.path)
+    ensure
+      envfile.unlink
+    end
+  end
+
   def test_env_rec_http
     @env = @envs[:http]
     run_kadeploy()
@@ -145,6 +166,29 @@ class TestKadeploy < Test::Unit::TestCase
   def test_env_rec_nfs
     @env = @envs[:nfs]
     run_kadeploy()
+  end
+
+  def test_env_rec_server
+    desc = env_desc(@env)
+    desc['name'] = @tmp[:envname]
+    desc['visibility'] = 'shared'
+    desc['image']['file'] = 'server://' + desc['image']['file']
+    desc['postinstalls'].each do |post|
+      post['archive'] = 'server://' + post['archive']
+    end
+
+    envfile = Tempfile.new('env')
+    envfile.write(desc.to_yaml)
+    envfile.close
+
+    begin
+      run_ka(@binaries[:kaenv],'-a',envfile.path){}
+      @env = @tmp[:envname]
+      run_kadeploy()
+    ensure
+      run_ka(@binaries[:kaenv],'-d',@tmp[:envname]){}
+      envfile.unlink
+    end
   end
 
   def test_env_xen
