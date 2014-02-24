@@ -371,7 +371,7 @@ module Configuration
     # if no defaultvalue defined, field is mandatory
     def value(fieldname,type,defaultvalue=nil,expected=nil)
       ret = nil
-      check_field(fieldname,defaultvalue.nil?,type) do |val|
+      check_field(fieldname,defaultvalue.nil?,type) do |val,provided|
         if val.nil?
           ret = defaultvalue
         else
