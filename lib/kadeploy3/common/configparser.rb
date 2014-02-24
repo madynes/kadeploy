@@ -248,12 +248,10 @@ module Configuration
       if args[:command]
         val = val.split(/\s+/).first||''
         if !val.empty? and !Pathname.new(val).absolute?
-          Open3.popen3('which',val) do |inp,out,err,stat|
             # Since the command is launched in a shell and can be a script,
             # if the command cannot be found, skip further checkings
-            return unless stat.value.success?
-            val = out.read.strip
-          end
+           val = `which '#{val}'`.strip
+           return unless $?.success?
         end
       end
 
