@@ -28,6 +28,7 @@
 
 require 'rubygems'
 require 'optparse'
+require 'thread'
 require 'shellwords'
 require 'timeout'
 require 'logger'
@@ -38,7 +39,7 @@ require 'yaml'
 require 'open3'
 
 # set old yameler
-YAML::ENGINE.yamler = 'syck'
+YAML::ENGINE.yamler = 'syck' if RUBY_VERSION >= '1.9'
 Thread.abort_on_exception=true
 
 
@@ -61,6 +62,19 @@ beginning_time = Time.now
 
 
 # Tools box
+
+if RUBY_VERSION < '1.9' #backward compatiblity
+  class File
+    def self.absolute_path(path)
+      Pathname.new(path).realpath
+    end
+
+    def size()
+      File.size(self.path())
+    end
+  end
+end
+
 def fatal_error(message)
   $log.fatal message
   exit(1)
@@ -79,7 +93,7 @@ def local_ip(destination)
    end
    ensure
      Socket.do_not_reverse_lookup = orig
-end 
+end
 
 def read_cmd(stream)
   line = stream.read(100)
@@ -94,7 +108,7 @@ def version_check(client)
   send_cmd(client, KEYWORDS[:HELLO])
   version=read_cmd(client)[0]
   return true if version == KEYWORDS[:HELLO]
-  $log.error ("Bad protocol version: #{version}")
+  $log.error("Bad protocol version: #{version}")
   false
 end
 
@@ -140,8 +154,7 @@ def detect_who_i_am
     who = my_list.index(host) if host
   end
   unless who
-    ips=Socket.ip_address_list
-    who=my_list.index { |ip| ips.index { |ip2| ip2.ip_address==ip } }
+    who = my_list.index(local_ip($config[:master]))
   end
   who
 end
@@ -218,7 +231,7 @@ def send_with_timeout(stream, msg)
   while 0 < msg.size
     begin
       written = stream.write_nonblock(msg)
-    rescue IO::WaitWritable
+    rescue Errno::EWOULDBLOCK
       if IO.select(nil, [stream], nil, $config[:timeout])
         retry
       else
@@ -381,7 +394,7 @@ class PipeOutput < Output
 
   def init
     @stream, @out_stream, @err_stream, @wait_thr=Open3.popen3(@cmd)
-    @threads<<@wait_thr
+    @threads<<@wait_thr if @wait_thr #1.8 compatibility
     redirect(@out_stream, $stdout)
     redirect(@err_stream, $stderr)
     reader
@@ -394,7 +407,7 @@ class PipeOutput < Output
 
   def close
     super
-    @wait_thr.value.exitstatus
+    @wait_thr ? @wait_thr.value.exitstatus : 0 #1.8 compatibility
   end
 
   def arg
@@ -733,7 +746,7 @@ class AbstractFountain
           raise ex_read
         rescue Exception => e
           host=$config[:nodeList][@index]
-          $log.debug (e)
+          $log.debug(e)
           $log.error("#{e.to_s} with #{host}")
           @report.add_error(host, e)
           @index+=1
@@ -945,7 +958,7 @@ class Fountain < AbstractFountain
 
   def loose
     @report.add_error($config[:nodeList][$config[:who_i_am]], 'Forget Part')
-    connexion_next do |output_stream|
+    connexion_next do |output_stream,_|
       if output_stream
         send_cmd(output_stream, KEYWORDS[:QUIT])
         @report.send_reporting(output_stream)
@@ -994,21 +1007,21 @@ class Fountain < AbstractFountain
             $log.info('quitting...')
             @report.add_error($config[:nodeList][$config[:who_i_am]], 'QUIT')
             $config[:QUIT]=1
-            connexion_next do |output_stream|
+            connexion_next do |output_stream,_|
               send_cmd(output_stream, KEYWORDS[:QUIT]) if output_stream
             end
             $config[:retries]=1
           #$config[:output].quit if $config[:output]
           when KEYWORDS[:END]
             $log.info('Ending ...')
-            connexion_next do |output_stream|
+            connexion_next do |output_stream,_|
               send_cmd(output_stream, KEYWORDS[:END]) if output_stream
             end
             ret=$config[:output].close
             @report.add_error($config[:nodeList][$config[:who_i_am]], "children process return non zero value: '#{ret}'") if ret!=0
           when KEYWORDS[:REPORTING]
             report.receive_report(input_stream.read cmd[1].to_i)
-            connexion_next do |output_stream|
+            connexion_next do |output_stream,_|
               if output_stream
                 @report.send_reporting(output_stream)
                 wait_passed(output_stream)
@@ -1280,7 +1293,7 @@ if $config[:who_i_am]==-1 # master
   Signal.trap('INT') do
     case $config[:QUIT]
       when nil
-        $stdout.write ('ctrl+c caught')
+        $stdout.write('ctrl+c caught')
         $stdout.flush
         $config[:retries]=1
         $config[:QUIT]=1
