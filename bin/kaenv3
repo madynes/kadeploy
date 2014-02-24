@@ -202,8 +202,8 @@ class KaenvsClient < Client
       when :'move-files'
         desc = options[:files_to_move].values
       else
-        username = options[:env_user] || ''
-        envname = options[:env_name]
+        username = URI.encode_www_form_component(options[:env_user]) || ''
+        envname = URI.encode_www_form_component(options[:env_name])
         envversion = options[:env_version] || ''
         tmp = params.dup
         tmp[:last] = true unless options[:env_version]
