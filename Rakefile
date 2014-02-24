@@ -215,6 +215,12 @@ def uninstallf(kind,file,filename=nil)
   sh "rm -f #{File.join(dest,file.to_s)}*"
 end
 
+def gen_man(file,level)
+  filename = File.basename(file)
+  %x{#{file} --help}
+  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s #{level} -o #{D[:man]}/#{filename}.#{level} #{file}"
+end
+
 def deb_versions()
   if RELEASE_VERSION =~ /git|alpha|rc/
     [
@@ -241,10 +247,9 @@ task :man_client => :man_client_clean do
   raise "help2man is missing !" unless system('which help2man')
 
   Dir[File.join(D[:bin],'/*')].each do |bin|
-    filename = File.basename(bin)
-	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 1 -o #{D[:man]}/#{filename}.1 #{bin}"
+    gen_man(bin,1)
   end
+  gen_man(File.join(D[:sbin],'karights3'),8)
 end
 
 desc "Clean manpages files"
@@ -255,12 +260,7 @@ end
 desc "Generate server manpages"
 task :man_server => :man_server_clean do
   raise "help2man is missing !" unless system('which help2man')
-
-  Dir[File.join(D[:sbin],'*')].each do |bin|
-    filename = File.basename(bin)
-	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 8 -o #{D[:man]}/#{filename}.8 #{bin}"
-  end
+  gen_man(File.join(D[:sbin],'kadeploy3d'),8)
 end
 
 desc "Clean manpages files"
