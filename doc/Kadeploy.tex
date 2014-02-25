@@ -641,13 +641,12 @@ external:
   \item \ypath{/cache}
   \begin{itemize}
     \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment.
-    \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
-    \item \yfieldd{disable}{boolean}{false} disable the use of a cache. Be careful, if you disable the cache, it will not be possible to use HTTP hosted files in environments.
+    \item \yfieldd{size}{Integer}{8000} size (MB) of the Kadeploy cache.
   \end{itemize}
 
   \item \ypath{/network}
   \begin{itemize}
-    \item \yfield{server\_hostname}{String} hostname of the Kadeploy server
+    \item \yfieldd{server\_hostname}{String}{result of hostname command} hostname of the Kadeploy server
     \item \yfieldd{tcp\_buffer\_size}{Integer}{8192} TCP buffer size (Bytes) for the Kadeploy file server
   \end{itemize}
 
@@ -690,13 +689,13 @@ external:
 
   \item \ypath{/pxe/dhcp} the default method used to PXE boot. Further information are available in the paragraph \texttt{Booting over the network}.
   \begin{itemize}
-    \item \yfield{method}{String} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
+    \item \yfieldd{method}{String}{PXElinux} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
     \item \yfield{repository}{String} absolute path of the repository where PXE files are accessibles (TFTP, HTTP, ...). Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
   \end{itemize}
   \item \ypath{/pxe/dhcp/export}
   \begin{itemize}
-    \item \yfield{kind}{String} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
-    \item \yfield{server}{String} The server where PXE files are stored. To be complicant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
+    \item \yfieldd{kind}{String}{tftp} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
+    \item \yfieldd{server}{String}{hostname} The server where PXE files are stored. To be complicant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
   \end{itemize}
   \item \ypath{/pxe/dhcp/profiles}
   \begin{itemize}
@@ -766,7 +765,7 @@ The information used to generate this filenames are the one specified for each n
 
   \item \ypath{/external/taktuk}
   \begin{itemize}
-    \item \yfield{connector}{String} connector used by Taktuk
+    \item \yfieldd{connector}{String}{SSH_COMMAND} connector used by Taktuk
     \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
     \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
     \item \yfieldd{outputs\_size}{Integer}{20000} to avoid big taktuk outputs to be loaded in the server's memory, it's possible to setup a limit of the per-node output size. If TakTuk returns an output bigger than \texttt{(NODES\_NUMBER * outputs\_size)} an error will be returned. This limit can be disabled by setting the \texttt{0} value.
@@ -1039,9 +1038,9 @@ automata:
   \item \ypath{/partitioning/partitions}
   \begin{itemize}
     \item \yfieldd{swap}{Integer}{1} number of the swap partition on the disk
-    \item \yfield{prod}{Integer} number of the production partition on the disk
-    \item \yfield{deploy}{Integer} number of the deployment partition on the disk
-    \item \yfield{tmp}{Integer} number of the tmp partition on the disk
+    \item \yfieldd{prod}{Integer}{-1} number of the production partition on the disk
+    \item \yfieldd{deploy}{Integer}{2} number of the deployment partition on the disk
+    \item \yfieldd{tmp}{Integer}{-1} number of the tmp partition on the disk
   \end{itemize}
 
   \item \ypath{/boot}
@@ -1060,7 +1059,7 @@ automata:
     \item \yfield{vmlinuz}{String} name of the kernel file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfield{initrd}{String} name of the initrd file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfieldd{params}{String}{""} boot parameters of the deployment environment kernel
-    \item \yfield{supported\_fs}{String} list of file systems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
+    \item \yfieldd{supported\_fs}{String}{ext2,ext3,ext4,vfat} list of file systems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
     \item \yfieldd{drivers}{String}{""} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
   \end{itemize}
 
@@ -1073,7 +1072,7 @@ automata:
 
   \item \ypath{/timeouts}
   \begin{itemize}
-    \item \yfield{reboot}{Integer/String} classical reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
+    \item \yfieldd{reboot}{Integer/String}{120} classical reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
     \item \yfieldd{kexec}{Integer/String}{60} kexec reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
   \end{itemize}
   \item \ypath{/localops/broadcastenv} A custom command that will be used when sending an environment in a \texttt{BroadcastEnv} macro-step of kind \texttt{Custom}. Be careful, this command will be launched from the Kadeploy3 server.
