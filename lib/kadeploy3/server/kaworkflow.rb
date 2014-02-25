@@ -546,36 +546,40 @@ module Kaworkflow
       ret
     end
 
-    workflow_get(kind,wid) do |infos|
-      if infos.is_a?(Array)
-        ret = []
-        infos.each do |info|
-          ret << get_status.call(info)
-        end
-        ret
-      else
-        get_status.call(infos)
+    if wid
+      workflow_get(kind,wid) do |info|
+        get_status.call(info)
       end
+    else
+      ret = []
+      workflow_list(kind) do |info|
+        ret << get_status.call(info)
+      end
+      ret
     end
   end
 
   def work_delete(kind,cexec,wid)
     workflow_delete(kind,wid) do |info|
-      run_wmethod(kind,:kill,info)
-      run_wmethod(kind,:free,info)
-      info[:output].free if info[:output]
-      info.delete(:output)
-      info[:debugger].free if info[:debugger]
-      info.delete(:debugger)
-      info[:state].free if info[:state]
-      info.delete(:state)
-      info.delete(:environment)
-      info.delete(:thread)
-      # ...
-
-      GC.start
-      { :wid => info[:wid] }
+      run_wmethod(kind,:delete!,cexec,info)
     end
+  end
+
+  def work_delete!(kind,cexec,info)
+    run_wmethod(kind,:kill,info)
+    run_wmethod(kind,:free,info)
+    info[:output].free if info[:output]
+    info.delete(:output)
+    info[:debugger].free if info[:debugger]
+    info.delete(:debugger)
+    info[:state].free if info[:state]
+    info.delete(:state)
+    info.delete(:environment)
+    info.delete(:thread)
+    # ...
+
+    GC.start
+    { :wid => info[:wid] }
   end
 
   def work_kill(kind,info)
