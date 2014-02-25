@@ -14,7 +14,7 @@ unless ARGV.size >= 2
 end
 _,$commit,$repo_kind = get_repo_commit(ARGV[0])
 $version=ARGV[1]
-if ARGV[3]
+if ARGV[3] and !ARGV[3].empty?
   unless File.directory?(ARGV[3])
     error("file not found #{ARGV[3]}")
   end
@@ -30,7 +30,7 @@ $nodefile=ENV['OAR_NODE_FILE']
 $nodes=get_nodes($nodefile)
 unless ENV['NO_KADEPLOY']
   puts 'Running Kadeploy'
-  kadeploy($nodefile,ENVIRONMENT,$vlan)
+  kadeploy($nodefile,KADEPLOY_ENV,$vlan)
   puts '... done'
 end
 puts 'Running kabootstrap'

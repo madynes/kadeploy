@@ -1,7 +1,5 @@
 ---
 - name: Kastafior_exp
-  git: 3.1.7
-  version: 7
   times: 5
   environments:
     - debian-min
@@ -21,8 +19,6 @@
 
 - name: Chain_exp
   times: 5
-  git: 3.1.7
-  version: 7
   environments:
     - debian-min
   macrosteps:
@@ -41,8 +37,6 @@
 
 - name: Tree_exp
   times: 5
-  git: 3.1.7
-  version: 7
   environments:
     - debian-min
   macrosteps:
