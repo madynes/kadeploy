@@ -886,7 +886,33 @@ module Configuration
         unless config.is_a?(Hash)
           raise ArgumentError.new("Invalid file format'#{configfile}'")
         end
-
+        
+        #The method to add default automata is ugly, but it is readable.
+        unless config['automata']
+          add={'automata'=>{
+                'macrosteps'=>{
+                    'BootNewEnv'=> [{
+                        'timeout'=> 150,
+                        'type'=>'Classical',
+                        'retries'=> 1,
+                    }],
+                    'BroadcastEnv'=> [{
+                        'timeout'=> 300,
+                        'type'=>'Kascade',
+                        'retries'=> 2,
+                    }],
+                    'SetDeploymentEnv'=> [{
+                        'timeout'=> 200,
+                        'type'=>'Untrusted',
+                        'retries'=> 2,
+                    }],
+                  }
+                }
+              }
+          config.merge!(add)
+        end
+        #end of ugly
+         
         @name = cluster
         cp = Parser.new(config)
 
