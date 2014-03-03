@@ -1,0 +1,5 @@
+include 'misc'
+include 'dhcp'
+include 'mysql'
+include 'tftp'
+include 'kadeploy'
