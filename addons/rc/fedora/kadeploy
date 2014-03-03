@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# kadeploy3d        Startup script for the Kadeploy 3 server
+# kadeploy        Startup script for the Kadeploy 3 server
 #
 # processname: kadeploy3d
 #
 ### BEGIN INIT INFO
-# Provides: kadeploy3d
+# Provides: kadeploy
 # Should-Start: distcache
 # Short-Description: start and stop Kadeploy 3 Server
 # Description: Kadeploy 3 server.
