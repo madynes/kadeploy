@@ -1094,6 +1094,7 @@ automata:
     \item \yfield{cmd}{String} The command that will send the environment file. You can use the \texttt{ENVFILE}, \texttt{NODEFILE}, \texttt{TAKTUK\_CONNECTOR} and \texttt{DECOMPRESS} patterns in the command-line. The pattern \texttt{DECOMPRESS} will replaced by a command that can be used to decompress the file while receiving it (if not specify, the \texttt{decompress} parameter should be set to false). The pattern \texttt{TAKTUK\_CONNECTOR} will be replaced by the TakTuk connector (see section \ref{sec:general_config}).
     \item \yfieldd{decompress}{Boolean}{true} If the script decompress the file while receiving it, it should be set to \emph{true}. If the script don't, an extra micro-step will be add to the deployment process in order to decompress the file after it has been sent.
   \end{itemize}
+  \item \yfieldd{level\_name}{String Array}{\["soft","hard","very hard"\]} defines level name by priority order.
   \item \ypath{/remoteops/[reboot]} The reboot commands, an escalation of them will be performed in the order of the List. Warning: at the moment, only the names \emph{soft}, \emph{hard} and \emph{very\_hard} can be used.
   \begin{itemize}
     \item \yfield{name}{String} the name of the command (used in the display)

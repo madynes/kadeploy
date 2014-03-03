@@ -862,18 +862,40 @@ module Configuration
       @pxe_header = {}
       @use_ip_to_deploy = false
 
-      @cmd_reboot_soft = nil
-      @cmd_reboot_hard = nil
-      @cmd_reboot_very_hard = nil
-      @cmd_console = nil
-      @cmd_power_on_soft = nil
-      @cmd_power_on_hard = nil
-      @cmd_power_on_very_hard = nil
-      @cmd_power_off_soft = nil
-      @cmd_power_off_hard = nil
-      @cmd_power_off_very_hard = nil
-      @cmd_power_status = nil
+      @cmd_ext = {}
     end
+
+    def handle_cmd_priority(obj,conf_path,cp,cluster=null,limit=3)
+      begin
+        raise "This is not an array, please check the documentation." unless obj.is_a? Array
+        raise "This version accepts only #{limit} commands." if obj.size > limit
+        if (not obj.empty?) and (obj[0].is_a? Hash)
+          output = []
+          obj.each do |element|
+              idx = @level_name.index(element['name'])
+              raise "the '#{element['name']}' is not a valid name." if idx<0
+              output[idx] = element['cmd']
+              group = element['group']
+              add_group_of_nodes("#{name}_reboot", group, cluster) unless group.nil? || cluster.nil?
+          end
+          obj = output
+        end
+        obj.each_index do |idx|
+          cmd = obj[idx]
+          if cmd
+            raise "The provided command is not a string." unless cmd.is_a? String
+            cp.customcheck_file(cmd,nil,{
+                  :type => 'file', :command => true,
+                  :readable => true, :executable => true
+                })
+          end
+        end
+        obj
+      rescue Exception => ex
+        raise ArgumentError.new("error in #{conf_path}, #{ex}")
+      end
+    end
+
 
     def load(cluster, configfile)
       begin
@@ -890,7 +912,7 @@ module Configuration
         unless config.is_a?(Hash)
           raise ArgumentError.new("Invalid file format'#{configfile}'")
         end
-        
+
         #The method to add default automata is ugly, but it is readable.
         unless config['automata']
           add={'automata'=>{
@@ -916,7 +938,7 @@ module Configuration
           config.merge!(add)
         end
         #end of ugly
-         
+
         @name = cluster
         cp = Parser.new(config)
 
@@ -961,136 +983,22 @@ module Configuration
           end
         end
 
-        cp.parse('remoteops',true) do
-          #ugly temporary hack
-          group = nil
-          addgroup = Proc.new do
-            if group
-              unless add_group_of_nodes("#{name}_reboot", group, cluster)
-                raise ArgumentError.new(Parser.errmsg(
-                    info[:path],"Unable to create group of node '#{group}' "
-                  )
-                )
-              end
+        cp.parse('remoteops',true) do  |remoteops_info|
+          @level_name = cp.value('level_name',Array,['soft','hard','very_hard'])
+          level_symbols = [:soft,:hard,:very_hard]
+
+          [:power_off,:power_on,:reboot].each do |symb|
+            @cmd_ext[symb]=handle_cmd_priority(cp.value(symb.to_s,Array,[]),remoteops_info[:path],cp,cluster)
+            0.upto(level_symbols.length-1)  do |idx|
+              self.instance_variable_set("@cmd_#{symb.to_s}_#{level_symbols[idx].to_s}".to_sym,@cmd_ext[symb][idx])
             end
           end
 
-          cp.parse('reboot',false,Array) do |info|
-=begin
-            if info[:empty]
-              raise ArgumentError.new(Parser.errmsg(
-                  info[:path],'You need to specify at least one value'
-                )
-              )
-            else
-=end
-            unless info[:empty]
-              #ugly temporary hack
-              name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-              group = cp.value('group',String,false)
+          @cmd_ext[:power_status] = handle_cmd_priority(cp.value('power_status',Array,[]),remoteops_info[:path],cp,nil,1)
+          @cmd_power_status = @cmd_ext[:power_status][0]
+          @cmd_ext[:console] = handle_cmd_priority(cp.value('console',Array,[]),remoteops_info[:path],cp,nil,1)
+          @cmd_console = @cmd_ext[:console][0]
 
-              addgroup.call
-
-              case name
-                when 'soft'
-                  @cmd_reboot_soft = cmd
-                when 'hard'
-                  @cmd_reboot_hard = cmd
-                when 'very_hard'
-                  @cmd_reboot_very_hard = cmd
-              end
-            end
-          end
-
-          cp.parse('power_on',false,Array) do |info|
-            unless info[:empty]
-              #ugly temporary hack
-              name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-              group = cp.value('group',String,false)
-
-              addgroup.call
-
-              case name
-                when 'soft'
-                  @cmd_power_on_soft = cmd
-                when 'hard'
-                  @cmd_power_on_hard = cmd
-                when 'very_hard'
-                  @cmd_power_on_very_hard = cmd
-              end
-            end
-          end
-
-          cp.parse('power_off',false,Array) do |info|
-            unless info[:empty]
-              #ugly temporary hack
-              name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-              group = cp.value('group',String,false)
-
-              addgroup.call
-
-              case name
-                when 'soft'
-                  @cmd_power_off_soft = cmd
-                when 'hard'
-                  @cmd_power_off_hard = cmd
-                when 'very_hard'
-                  @cmd_power_off_very_hard = cmd
-              end
-            end
-          end
-
-          cp.parse('power_status',false,Array) do |info|
-            unless info[:empty]
-              #ugly temporary hack
-              if info[:iter] > 0
-                raise ArgumentError.new(Parser.errmsg(
-                    info[:path],"At the moment you can only set one single value "
-                  )
-                )
-              end
-              _ = cp.value('name',String)
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-
-              @cmd_power_status = cmd
-            end
-          end
-
-          cp.parse('console',true,Array) do |info|
-            #ugly temporary hack
-            if info[:iter] > 0
-              raise ArgumentError.new(Parser.errmsg(
-                  info[:path],"At the moment you can only set one single value "
-                )
-              )
-            end
-            _ = cp.value('name',String)
-            cmd = cp.value('cmd',String,'',{
-              :type => 'file', :command => true,
-              :readable => true, :executable => true
-            })
-            cmd = nil if cmd.empty?
-            @cmd_console = cmd
-          end
         end
 
         cp.parse('localops') do |info|
@@ -1360,12 +1268,11 @@ module Configuration
     def add_group_of_nodes(command, file, cluster)
       if File.readable?(file) then
         @group_of_nodes[command] = Array.new
-        IO.readlines(file).each { |line|
+        IO.readlines(file).each do |line|
           @group_of_nodes[command].push(line.strip.split(","))
-        }
-        return true
+        end
       else
-        return false
+         raise ArgumentError.new(Parser.errmsg(info[:path],"Unable to read group of node '#{file}'"))
       end
     end
   end
