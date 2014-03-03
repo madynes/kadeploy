@@ -67,7 +67,7 @@ KADEPLOY3_LIBS/*
 #%dir /var/run/kadeploy3
 #%attr(0740,deploy,deploy) /var/run/kadeploy3
 %defattr(-,deploy,deploy,-)
-/etc/init.d/kadeploy3d
+/etc/init.d/kadeploy
 %config(noreplace) /etc/kadeploy3/clusters.conf
 %config(noreplace) /etc/kadeploy3/sample-cluster.conf
 %config(noreplace) /etc/kadeploy3/command.conf
@@ -95,7 +95,7 @@ if ! getent passwd deploy >/dev/null 2>&1 ; then
 fi
 
 %post server
-chkconfig --add kadeploy3d
+chkconfig --add kadeploy
 
 %preun server
-chkconfig --del kadeploy3d
+chkconfig --del kadeploy

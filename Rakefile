@@ -433,7 +433,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:sbin,:kadeploy3d)
 
   create_dir(:rc)
-  installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy3d'))
+  installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy'))
 
   create_dir(:log)
   create_dir(:run)
@@ -478,7 +478,7 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:script,'fdisk-sample')
   delete_dir(:script)
 
-  uninstallf(:rc,'kadeploy3d')
+  uninstallf(:rc,'kadeploy')
   delete_dir(:rc)
 
   logs = File.join(INSTALL[:log][:dir],'*')
