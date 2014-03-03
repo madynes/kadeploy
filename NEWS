@@ -35,6 +35,7 @@
   - It's now possible to specify options for tarballs manipulations
   - End of deployment/reboot/power hooks are now specified in the field 'hooks'
   - It's now possible to specify a threshold for the autoclean loop
+  - It's now possible to specify a ssh private key path to load in ssh-agent
 * Clusters configuration (doc sec/2.3)
   - The clusters configuration file is now named clusters.conf
 * Command configuration (doc sec/2.7)
