@@ -6,7 +6,7 @@
 
 override_dh_installinit:
 	# copy the upstream init script to debian/
-	cp addons/rc/debian/kadeploy3d debian/kadeploy.init
+	cp addons/rc/debian/kadeploy debian/kadeploy.init
 	dh_installinit
 
 override_dh_auto_install:
