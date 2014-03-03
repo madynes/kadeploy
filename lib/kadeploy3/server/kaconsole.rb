@@ -66,6 +66,7 @@ module Kaconsole
     end
 
     context.info = console_init_info(context)
+    error_forbidden!("This feature is disabled: no console command is given in configuration file.") unless context.config.clusters[context.info[:node].cluster].cmd_console
 
     context
   end
