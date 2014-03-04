@@ -1,3 +1,11 @@
+## New in 3.2.1 ##
+== Internals ==
+!! Changes in configuration files !!
+  - It's now possible to define new alias DEFAULT_CONNECTOR in external section
+    with default_connector item.
+    It can be used  with the following fields: taktuk connector and all remotes operations.
+
+
 ## New in 3.2 ##
 == User interface ==
 * Environments files in old description format are no longer supported

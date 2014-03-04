@@ -777,9 +777,10 @@ The information used to generate this filenames are the one specified for each n
 
   \item \yfieldd{autoclean\_threshold}{Fixnum}{360} at the end of an operation (deploy/reboot/power) it's status kept until the user explicitly deletes them. This value fix the maximal time (in minutes) this information will be kept in memory by the server until the autoclean loop delete them.
 
+  \item \yfieldd{/external/default\_connector}{String}{ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes} define alias for DEFAULT\_CONNECTOR in taktuk connector and remoteops for cluster specific file.
   \item \ypath{/external/taktuk}
   \begin{itemize}
-    \item \yfield{connector}{String} connector used by Taktuk
+    \item \yfieldd{connector}{String}{DEFAULT\_CONNECTOR} connector used by Taktuk
     \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
     \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
     \item \yfieldd{outputs\_size}{Integer}{20000} to avoid big taktuk outputs to be loaded in the server's memory, it's possible to setup a limit of the per-node output size. If TakTuk returns an output bigger than \texttt{(NODES\_NUMBER * outputs\_size)} an error will be returned. This limit can be disabled by setting the \texttt{0} value.
