@@ -499,7 +499,7 @@ class Cache
                 Execute["rm -f #{meta}"].run!.wait
               end
               debug("Delete file #{File.basename(file)} from cache")
-              Execute["rm -f #{file}"].run!.wait
+              Execute["rm -f #{rfile}"].run!.wait
             end
           else
             # Remove every files from directory if file not tagged
