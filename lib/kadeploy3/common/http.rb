@@ -23,35 +23,9 @@ module HTTP
   # * etag: ETag of the file (http_response is -1 if Tempfiles cannot be created)
   # Output
   # * return http_response and ETag
-  def self.fetch_file(uri, output, cache_dir, expected_etag)
-    http_response = String.new
-    etag = String.new
-    begin
-      if cache_dir
-        wget_output = Tempfile.new("wget_output", cache_dir)
-        wget_download = Tempfile.new("wget_download", cache_dir)
-      else
-        wget_output = Tempfile.new("wget_output")
-        wget_download = Tempfile.new("wget_download")
-      end
-    rescue StandardError
-      return -1,0
-    end
-    if (expected_etag == nil) then
-      cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} 2> #{wget_output.path}"
-    else
-      cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} --header='If-None-Match: \"#{expected_etag}\"' 2> #{wget_output.path}"
-    end
-    system(cmd)
-    http_response = `grep "^HTTP/1\.." #{wget_output.path}|tail -1|cut -f 2 -d' '`.chomp
-    if (http_response == "200") then
-      if not system("mv #{wget_download.path} #{output}") then
-        return -2,0
-      end
-    end
-    etag = `grep "ETag" #{wget_output.path}|cut -f 2 -d' '`.chomp
-    wget_output.unlink
-    return http_response.to_i, etag
+  def self.fetch_file(uri,destfile)
+    out = `LANG=C wget --server-response --no-verbose --no-check-certificate #{uri} --output-document=#{destfile} 2>&1`
+    return out[/^\s*HTTP\/[0-9\.]+\s+(\d+)/,1].to_i rescue nil
   end
 
   def self.check_file(uri, expected_etag=nil)
