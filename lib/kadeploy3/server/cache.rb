@@ -49,15 +49,15 @@ class CacheFile
   end
 
   def used?
-    (@refs > 0)
+    @lock.synchronize{ (@refs > 0) }
   end
 
   def acquire
-    @refs += 1
+    @lock.synchronize{ @refs += 1 }
   end
 
   def release
-    @refs -= 1 if @refs > 0
+    @lock.synchronize{ @refs -= 1 if @refs > 0 }
   end
 
   def idx(idxc)
