@@ -5,6 +5,7 @@ require 'resolv'
 require 'ipaddr'
 require 'yaml'
 require 'webrick'
+require 'socket'
 
 module Kadeploy
 
@@ -291,7 +292,7 @@ module Configuration
           @kadeploy_tcp_buffer_size = cp.value(
             'tcp_buffer_size',Fixnum,8192
           )
-          static[:host] = cp.value('server_hostname',String,`hostname`.strip)
+          static[:host] = cp.value('server_hostname',String,Socket.gethostname)
         end
 
         cp.parse('security') do |info|
