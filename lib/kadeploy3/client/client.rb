@@ -584,8 +584,8 @@ class Client
       elsif !STDIN.tty? or STDIN.closed?
         @@terminal_width = 80
       else
-        if !(size = `stty size`.strip).empty?
-          @@terminal_width = size.split(' ')[1].to_i
+        if !(sizes = STDIN.winsize).empty?
+          @@terminal_width = sizes[1]
         else
           @@terminal_width = 80
         end
