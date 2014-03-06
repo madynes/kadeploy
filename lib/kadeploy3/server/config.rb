@@ -485,7 +485,7 @@ module Configuration
           end
         end
 
-        static[:ssh_private_key] = cp.value('ssh_private_key',String, File.join($kadeploy_confdir,'keys','id_deploy')
+        static[:ssh_private_key] = cp.value('ssh_private_key',String, File.join($kadeploy_confdir,'keys','id_deploy'),
             { :type => 'file', :readable => true, :prefix => Config.dir()})
 
         cp.parse('logs') do
