@@ -22,12 +22,13 @@ require 'timeout'
 require 'tempfile'
 require 'json'
 require 'yaml'
+require 'etc'
 require 'io/console' if RUBY_VERSION >= '1.9'
 
 
 module Kadeploy
 CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
-USER = `id -nu`.strip
+USER = Etc.getlogin
 STATUS_UPDATE_DELAY = 1
 SLEEP_PITCH = 1
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
