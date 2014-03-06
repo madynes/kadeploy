@@ -24,8 +24,25 @@ module HTTP
   # Output
   # * return http_response and ETag
   def self.fetch_file(uri,destfile)
-    out = `LANG=C wget --server-response --no-verbose --no-check-certificate #{uri} --output-document=#{destfile} 2>&1`
-    return out[/^\s*HTTP\/[0-9\.]+\s+(\d+)/,1].to_i rescue nil
+    ret = nil
+    url = URI.parse(uri)
+    http = Net::HTTP.new(url.host, url.port)
+    http.use_ssl = url.is_a?(URI::HTTPS)
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    http.start
+    http.request_get(url.path,{}) do |resp|
+      raise KadeployHTTPError.new(resp.code) if !resp.is_a?(Net::HTTPSuccess) and !resp.is_a?(Net::HTTPNotModified)
+
+      ret = resp.to_hash
+      File.open(destfile,'w+') do |f|
+        resp.read_body do |chunk|
+          f.write chunk
+          nil
+        end
+      end
+    end
+
+    return ret
   end
 
   def self.check_file(uri, expected_etag=nil)
