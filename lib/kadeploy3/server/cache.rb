@@ -390,6 +390,10 @@ class Cache
   end
 
   # Manually remove a file from the cache
+  # returns:
+  #   true: the element was removed
+  #   false: the element was used so it was not possible to remove it
+  #   nil: the element was not in the cache
   def remove(path,version,user,priority,tag='')
     fid = id({
       :path => path,
@@ -417,13 +421,13 @@ class Cache
               ret = true
             end
           else
-            ret = false
+            ret = nil
           end
         ensure
           flock.unlock
         end
       else
-        ret = false
+        ret = nil
       end
     end
 
