@@ -104,7 +104,7 @@ module Kaworkflow
       :bindings => [],
       :freed => false,
 ###
-      :cached_files => nil,
+      :cached_files => {:global=>[],:netboot=>[]},
       :environment => cexec.environment,
     }
   end
@@ -324,7 +324,7 @@ module Kaworkflow
 
         # Cache the files
         begin
-          info[:cached_files] = GrabFile.grab_user_files(context)
+          GrabFile.grab_user_files(context,info[:cached_files],workflow_lock(kind,info[:wid]))
         rescue KadeployError => ke
           info[:nodes].set_state('aborted',nil,context[:database],context[:user])
           raise ke
@@ -595,8 +595,15 @@ module Kaworkflow
         end
       end
       info[:database].disconnect if info[:database]
-      info[:cached_files].each{|file| file.release} if info[:cached_files]
-      info.delete(:cached_files)
+      if info[:cached_files]
+        info[:cached_files][:global].each do |file|
+          info[:config].caches[:global].release(file)
+        end if info[:config].caches[:global]
+        info[:cached_files][:netboot].each do |file|
+          info[:config].caches[:netboot].release(file)
+        end if info[:config].caches[:netboot]
+        info.delete(:cached_files)
+      end
     end
   end
 
@@ -629,11 +636,18 @@ module Kaworkflow
       info[:database].free if info[:database]
       info.delete(:database)
 
-      info[:cached_files].each{|file| file.release } if info[:cached_files]
-      info.delete(:cached_files)
+      if info[:cached_files]
+        info[:cached_files][:global].each do |file|
+          info[:config].caches[:global].release(file)
+        end if info[:config].caches[:global]
+        info[:cached_files][:netboot].each do |file|
+          info[:config].caches[:netboot].release(file)
+        end if info[:config].caches[:netboot]
+        info.delete(:cached_files)
+      end
 
       info[:config].caches[:global].clean if info[:config].caches[:global]
-      info[:config].caches[:netboot].clean
+      info[:config].caches[:netboot].clean if info[:config].caches[:netboot]
 
       info[:config].free
       info.delete(:config)
