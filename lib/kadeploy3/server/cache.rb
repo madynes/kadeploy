@@ -341,15 +341,15 @@ class Cache
 
         if create
           # If a size was given, clean the cache before grabbing the new file
-          freesize = freesize!()
+          freesize = freesize()
           if size > freesize
-            if size > (freeable!() + freesize)
+            if size > (freeable() + freesize)
               raise KadeployError.new(
                 APIError::CACHE_FULL,nil,
                 "Impossible to cache the file '#{path}', the cache is full"
               )
             else
-              unless free!(size)
+              unless free(size)
                 raise KadeployError.new(
                   APIError::CACHE_FULL,nil,
                   "Impossible to cache the file '#{path}', the cache is full"
@@ -434,76 +434,9 @@ class Cache
     ret
   end
 
-  # Free (at least) a specific amout of memory in the cache
-  def free(amount=0)
-    @lock.synchronize{ free!(amount) }
-  end
-
-  # !!! Be careful, use lock
-  def free!(amount=0)
-    amount = @maxsize if amount == 0
-    #return true if amount < freesize!()
-
-    # Delete all elements with prio 0 (elements in cache for a single usage)
-    clean!(0)
-
-    return true if amount < freesize!()
-
-    # Delete elements depending on their priority and last access time
-    # (Do not use cleanables() since there is too much race conditions)
-    @files.values.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.each do |file|
-      return true if amount < freesize!()
-      unless file.used?
-        flock = @locks[file.idx(@idxc)]
-        flock.synchronize do
-          release(file.size)
-          delete(file)
-          @locks.delete(file.idx(@idxc))
-        end
-      end
-    end
-
-    return amount < freesize!()
-  end
-
-  def freeable()
-    @lock.synchronize{ freeable!() }
-  end
-
-  def freeable!()
-    size = 0
-    @files.each_value do |file|
-      size += file.size unless file.used?
-    end
-    size
-  end
-
-  def freesize()
-    @lock.synchronize{ freesize!() }
-  end
-
-  # !!! Be careful, use lock
-  def freesize!()
-    @maxsize - @cursize
-  end
-
   # Clean every cache values that are freeable and have a priority lesser or equal to max_priority
   def clean(max_priority=0)
     @lock.synchronize{ clean!(max_priority) }
-  end
-
-  # !!! Be careful, use lock
-  def clean!(max_priority=0)
-    @files.values.each do |file|
-      if file.priority <= max_priority and !file.used?
-        flock = @locks[file.idx(@idxc)]
-        flock.synchronize do
-          release(file.size)
-          delete(file)
-          @locks.delete(file.idx(@idxc))
-        end
-      end
-    end
   end
 
   def load(emptycache = true)
@@ -565,7 +498,7 @@ class Cache
       @lock.synchronize do
         if @tagfiles
           files.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.reverse!.each do |file|
-            if file.priority != 0 and file.size <= freesize!()
+            if file.priority != 0 and file.size <= freesize()
               if cfile = add(file)
                 debug("Load cached file #{file.path} (#{cfile.size/(1024*1024)}MB)")
                 cfile.save(@directory)
@@ -589,6 +522,7 @@ class Cache
   end
 
   protected
+  # Every protected method has to be called with @lock taken
 
   def fetch(path,version,user,priority,tag='',size=nil,fpath=nil)
     # If new version have a greater priority (less chances to be deleted), change it: f.save if f.update(:priority => priority) if priority > f.priority
@@ -667,6 +601,57 @@ class Cache
     fid = file.idx(@idxc)
     @files[fid].remove()
     @files.delete(fid)
+  end
+
+  def freeable()
+    size = 0
+    @files.each_value do |file|
+      size += file.size unless file.used?
+    end
+    size
+  end
+
+  def freesize()
+    @maxsize - @cursize
+  end
+
+  def free(amount=0)
+    amount = @maxsize if amount == 0
+    #return true if amount < freesize()
+
+    # Delete all elements with prio 0 (elements in cache for a single usage)
+    clean!(0)
+
+    return true if amount < freesize()
+
+    # Delete elements depending on their priority and last access time
+    # (Do not use cleanables() since there is too much race conditions)
+    @files.values.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.each do |file|
+      return true if amount < freesize()
+      unless file.used?
+        flock = @locks[file.idx(@idxc)]
+        flock.synchronize do
+          release(file.size)
+          delete(file)
+          @locks.delete(file.idx(@idxc))
+        end
+      end
+    end
+
+    return amount < freesize()
+  end
+
+  def clean!(max_priority=0)
+    @files.values.each do |file|
+      if file.priority <= max_priority and !file.used?
+        flock = @locks[file.idx(@idxc)]
+        flock.synchronize do
+          release(file.size)
+          delete(file)
+          @locks.delete(file.idx(@idxc))
+        end
+      end
+    end
   end
 end
 
