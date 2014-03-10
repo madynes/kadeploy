@@ -467,16 +467,16 @@ module Configuration
             end
           end
 
-          cp.parse('ident',false) do |inf|
-            next if inf[:empty]
+          cp.parse('ident',false,Hash,false) do |info_ident|
+            next unless info_ident[:provided]
             static[:auth] = {} unless static[:auth]
             static[:auth][:ident] = IdentAuthentication.new
             if static[:local]
-              static[:auth][:ident].whitelist << parse_hostname.call('localhost',inf[:path])
+              static[:auth][:ident].whitelist << parse_hostname.call('localhost',info_ident[:path])
             else
-              cp.parse('whitelist',true,Array) do |info|
-                next if info[:empty]
-                static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              cp.parse('whitelist',true,Array) do |info_white|
+                next if info_white[:empty]
+                static[:auth][:ident].whitelist << parse_hostname.call(info_white[:val][info_white[:iter]],info_white[:path])
               end
             end
           end
