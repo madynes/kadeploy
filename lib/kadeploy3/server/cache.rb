@@ -26,12 +26,12 @@ class CacheFile
   EXT_FILE = '.file'
 
   attr_reader :file, :user, :priority, :path , :version, :tag, :md5, :size, :atime, :mtime, :lock, :refs, :filename
+  attr_accessor :fetched, :fetch_error
 
-  def initialize(file,path,version,prefix,user,priority,tag='')
+  def initialize(lock,file,path,version,prefix,user,priority,tag='')
     file = self.class.absolute_path(file)
 
-    self.class.readable?(file)
-
+    @lock = lock
     @uuid = self.class.gen_uuid()
     @file = file.clone # The file in the filesystem
     @meta = nil
@@ -42,22 +42,40 @@ class CacheFile
     @md5 = '' if @priority == 0 # No md5 checking for single usage files
     @user = user.clone
     @tag = tag.clone
-    @lock = Mutex.new
     @refs = 0
-
-    refresh()
+    @valid = false
+    @fetched = false
+    @fetch_error = nil
   end
 
-  def used?
-    @lock.synchronize{ (@refs > 0) }
+  def used?()
+    if @lock.try_lock
+      ret = used!()
+      @lock.unlock
+      ret
+    else
+      true
+    end
+  end
+
+  def used!()
+    (@refs > 0)
   end
 
   def acquire
-    @lock.synchronize{ @refs += 1 }
+    @lock.synchronize{ acquire! }
+  end
+
+  def acquire!
+    @refs += 1
   end
 
   def release
-    @lock.synchronize{ @refs -= 1 if @refs > 0 }
+    @lock.synchronize{ release! }
+  end
+
+  def release!
+    @refs -= 1 if @refs > 0
   end
 
   def idx(idxc)
@@ -78,11 +96,6 @@ class CacheFile
       ret[instvar[1..-1].to_sym] = instance_variable_get(instvar)
     end
     ret
-  end
-
-  # The file descirbed in @path is a local file (in the filesystem)
-  def local?()
-    self.class.local_path(@path)
   end
 
   def update(changes)
@@ -126,7 +139,7 @@ class CacheFile
       end
     end
 
-    update_mtime() if @mtime.nil? #and local_path?()
+    update_mtime() if @mtime.nil?
     update_atime() if @atime.nil?
 
     @meta = File.join(directory,File.basename(@file,EXT_FILE)) + EXT_META unless @meta
@@ -146,7 +159,6 @@ class CacheFile
 
   # !!! Be careful, use lock
   def remove!()
-    #FileUtils.rm_f(@file)
     Execute["rm -f #{@file}"].run!.wait
     Execute["rm -f #{@meta}"].run!.wait if @meta
     @mtime = nil
@@ -160,11 +172,6 @@ class CacheFile
   def self.gen_uuid()
     @@id += 1
     Digest::SHA1.hexdigest("#{Time.now.to_i}-#{@@id}")
-  end
-
-  # The file is accessible in the filesystem
-  def self.local_path?(pathname)
-    URI.parse(pathname).scheme.nil?
   end
 
   def self.absolute_path(file)
@@ -226,7 +233,7 @@ class CacheFile
 
   # !!! Be careful, use lock
   def refresh!()
-    @mtime = File.mtime(@file) #if local_path?()
+    @mtime = File.mtime(@file)
     @atime = Time.now
     @md5 = Digest::MD5.file(@file).hexdigest! if @priority != 0
     @size = File.size(@file)
@@ -259,7 +266,7 @@ class Cache
     :db => 1,
   }
 
-  attr_reader :files, :directory, :maxsize, :tagfiles
+  attr_reader :directory, :maxsize, :tagfiles
 
   # Tagfiles: rename cached files and move them to the cache directory in order to be able to reload on relaunch, when files are not tagged, the directory is fully cleaned on loading
   # !!! maxsize in Bytes
@@ -307,26 +314,33 @@ class Cache
     create = false
     hit = nil
     ret = nil
+    tmp = nil
+
     # Get a lock on the file fid
     @lock.synchronize do
       @locks[fid] = Mutex.new unless @locks[fid]
       flock = @locks[fid]
       flock.lock # Keep the global lock for the code to stay simple
 
-      begin
-        if ret = get(fid)
+      if ret = get(fid)
+        begin
+          if !ret.fetched or ret.fetch_error
+            raise KadeployError.new(APIError::CACHE_ERROR,nil,ret.fetch_error||"File fetch error")
+          end
+
           ret.update_atime
           mtime = mtime.call.to_i if mtime
           if ((mtime and mtime > ret.mtime.to_i) or !mtime) \
             and (md5 and md5.call != ret.md5)
           then
-            if ret.used?
+            if ret.used!
               raise KadeployError.new(APIError::CACHE_ERROR,nil,
                 "The checksum of the (used) file '#{path}' does not match"
               )
             else
-              release(ret.size)
               delete(ret)
+              ret.remove!
+              @files.delete(fid)
               create = true
               hit = false
             end
@@ -334,55 +348,106 @@ class Cache
             # Hack not for the checksum to be performed in vain the next time
             ret.update_mtime if mtime and mtime > ret.mtime.to_i
           end
-        else
-          create = true
-          hit = false
+        rescue Exception => e
+          flock.unlock
+          raise e
         end
+      else
+        create = true
+        hit = false
+      end
 
-        if create
+      if create
+        begin
           # If a size was given, clean the cache before grabbing the new file
           freesize = freesize()
           if size > freesize
             if size > (freeable() + freesize)
               raise KadeployError.new(
                 APIError::CACHE_FULL,nil,
-                "Impossible to cache the file '#{path}', the cache is full"
+                "Impossible to cache the file '#{path}'"
               )
             else
-              unless free(size)
+              unless free_space(size)
                 raise KadeployError.new(
                   APIError::CACHE_FULL,nil,
-                  "Impossible to cache the file '#{path}', the cache is full"
+                  "Impossible to cache the file '#{path}'"
                 )
               end
             end
           end
-          acquire(size)
+
+          if file
+            if !@tagfiles and File.exists?(file)
+              raise KadeployError.new(
+                APIError::CACHE_ERROR,nil,
+                "Duplicate cache entries with the name '#{File.basename(path)}'"
+              )
+            end
+          else
+            begin
+              tmp = Tempfile.new('FETCH',@directory)
+              file = tmp.path
+            rescue
+              raise KadeployError.new(
+                APIError::CACHE_ERROR,nil,"Tempfiles cannot be created"
+              )
+            end
+          end
+
+          add(size)
+          @files[fid] = CacheFile.new(flock,file,path,version,@prefix_base,user,priority,tag)
+          ret = @files[fid]
+        rescue Exception => e
+          @locks.delete(fid)
+          flock.unlock
+          raise e
         end
-      rescue Exception => e
-        flock.unlock
-        @locks.delete(fid)
-        raise e
       end
     end # synchronize
 
-    begin
-      if create
-        ret = fetch(path,version,user,priority,tag,size,file) do |f,o|
-          yield(f,o,hit)
-        end
+    ret.acquire!
+
+    if create
+      begin
+        # The file don't exists, lets download and write it
+        opts = {}
+        yield(file,opts,hit)
+        ret.fetched = true
+        ret.refresh!
+        tmp.close if tmp
+        opts[:norename] = true if !@tagfiles
+
         if ret.size != size
-          delete(ret)
           raise KadeployError.new(APIError::CACHE_ERROR,nil,
-            "The size of the file '#{path}' differs from the size announced before the download"
-          )
+            "The size of the file '#{path}' differs from the size "\
+            "announced before the download"
+          ) # The element will be deleted in the rescue
         end
+
+        ret.save!(@directory,opts)
+
+        raise unless ret.idx!(@idxc) == fid
+      rescue Exception => e
+        ret.fetched = false
+        ret.fetch_error = e.message
+        raise e
+      ensure
+        unless ret.fetched
+          ret.remove!
+          ret.release!
+        end
+        flock.unlock
+        unless ret.fetched
+          @lock.synchronize do
+            delete(ret,size)
+            @files.delete(fid)
+            @locks.delete(fid)
+          end
+        end
+        tmp.unlink if tmp
       end
-    rescue Exception => e
-      release(size)
-      @locks.delete(fid)
-      raise e
-    ensure
+    else
       flock.unlock
     end
 
@@ -412,11 +477,12 @@ class Cache
 
         begin
           if ret = get(fid)
-            if ret.used?
+            if ret.used!
               ret = false
             else
-              release(ret.size)
               delete(ret)
+              ret.remove!
+              @files.delete(fid)
               @locks.delete(fid)
               ret = true
             end
@@ -432,6 +498,26 @@ class Cache
     end
 
     ret
+  end
+
+  # The file is not being used anymore
+  # returns:
+  #   true: operation successfull
+  #   false: the file is not in the cache
+  def release(file)
+    raise unless file.fetched
+
+    # Get a lock on the file fid
+    @lock.synchronize do
+      fid = file.idx(@idxc)
+      if cached_file = get(fid)
+        raise KadeployError.new(APIError::CACHE_ERROR,nil,"collision") if file != cached_file
+        file.release
+        true
+      else
+        false
+      end
+    end
   end
 
   # Clean every cache values that are freeable and have a priority lesser or equal to max_priority
@@ -505,13 +591,11 @@ class Cache
               else
                 debug("Delete cached file #{file.path} from cache "\
                   "(#{file.size/(1024*1024)}MB)")
-                #FileUtils.rm_f(rfile)
                 Execute["rm -f #{file.file}"].run!.wait
               end
             else
               debug("Delete cached file #{file.path} from cache "\
                 "(#{file.size/(1024*1024)}MB)")
-              #FileUtils.rm_f(rfile)
               Execute["rm -f #{file.file}"].run!.wait
             end
           end
@@ -521,53 +605,8 @@ class Cache
     end
   end
 
-  protected
+  private
   # Every protected method has to be called with @lock taken
-
-  def fetch(path,version,user,priority,tag='',size=nil,fpath=nil)
-    # If new version have a greater priority (less chances to be deleted), change it: f.save if f.update(:priority => priority) if priority > f.priority
-    ret = nil
-    tmp = nil
-    begin
-      # The file don't exists, lets download and write it
-      if fpath
-        if !@tagfiles and File.exists?(fpath)
-          raise KadeployError.new(
-            APIError::CACHE_ERROR,nil,
-            "Duplicate cache entries with the name '#{File.basename(path)}'"
-          )
-        end
-        file = fpath
-      else
-        begin
-          tmp = Tempfile.new('FETCH',@directory)
-          file = tmp.path
-        rescue
-          raise KadeployError.new(
-            APIError::CACHE_ERROR,nil,"Tempfiles cannot be created"
-          )
-        end
-      end
-
-      opts = {}
-      yield(file,opts)
-      tmp.close if tmp
-      opts[:norename] = true if !@tagfiles
-
-      if ret = add(CacheFile.new(file,path,version,@prefix_base,user,priority,tag))
-        ret.save(@directory,opts)
-      else
-        raise KadeployError.new(
-          APIError::CACHE_FULL,nil,
-          "Impossible to cache the file '#{path}', the cache is full"
-        )
-      end
-    ensure
-      tmp.unlink if tmp
-    end
-
-    ret
-  end
 
   def id(params={})
     @idxc.idx(params)
@@ -577,36 +616,24 @@ class Cache
     @files[fid]
   end
 
-  def acquire(size)
+  def add(size)
     @cursize += size
   end
 
-  def release(size)
-    @cursize -= size
-  end
-
-  def add(file)
-    idx = file.idx(@idxc)
-
-    if @files[idx]
-      @files[idx].replace(file,@idxc)
-    else
-      @files[idx] = file
-    end
-
-    @files[idx]
-  end
-
-  def delete(file)
-    fid = file.idx(@idxc)
-    @files[fid].remove()
-    @files.delete(fid)
+  def delete(file,size=nil)
+    @cursize -= (size||file.size)
   end
 
   def freeable()
     size = 0
     @files.each_value do |file|
-      size += file.size unless file.used?
+      if file.lock.try_lock
+        begin
+          size += file.size if !file.used!
+        ensure
+          file.lock.unlock
+        end
+      end
     end
     size
   end
@@ -615,7 +642,7 @@ class Cache
     @maxsize - @cursize
   end
 
-  def free(amount=0)
+  def free_space(amount=0)
     amount = @maxsize if amount == 0
     #return true if amount < freesize()
 
@@ -626,31 +653,53 @@ class Cache
 
     # Delete elements depending on their priority and last access time
     # (Do not use cleanables() since there is too much race conditions)
-    @files.values.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.each do |file|
-      return true if amount < freesize()
-      unless file.used?
-        flock = @locks[file.idx(@idxc)]
-        flock.synchronize do
-          release(file.size)
-          delete(file)
-          @locks.delete(file.idx(@idxc))
+    to_delete = []
+    begin
+      @files.values.sort_by{|v| "#{v.priority}#{v.atime.to_i}".to_i}.each do |file|
+        return true if amount < freesize()
+        if file.lock.try_lock
+          if !file.used!
+            to_delete << file
+            delete(file)
+            file.remove!
+          else
+            file.lock.unlock
+          end
         end
       end
+    ensure
+      to_delete.each do |file|
+        @files.delete(file.idx!(@idxc))
+        @locks.delete(file.idx!(@idxc))
+        file.lock.unlock
+      end
+      to_delete.clear
     end
 
     return amount < freesize()
   end
 
   def clean!(max_priority=0)
-    @files.values.each do |file|
-      if file.priority <= max_priority and !file.used?
-        flock = @locks[file.idx(@idxc)]
-        flock.synchronize do
-          release(file.size)
-          delete(file)
-          @locks.delete(file.idx(@idxc))
+    to_delete = []
+    begin
+      @files.values.each do |file|
+        if file.priority <= max_priority and file.lock.try_lock
+          if !file.used!
+            to_delete << file
+            delete(file)
+            file.remove!
+          else
+            file.lock.unlock
+          end
         end
       end
+    ensure
+      to_delete.each do |file|
+        @files.delete(file.idx!(@idxc))
+        @locks.delete(file.idx!(@idxc))
+        file.lock.unlock
+      end
+      to_delete.clear
     end
   end
 end

@@ -220,12 +220,12 @@ class KadeployServer
   end
 
   def wipe_exec_context(context)
-    context.marshal_dump.keys.each do |name|
-      obj = context.send(name.to_sym)
-      obj.free if obj.respond_to?(:free)
-      obj.clear if obj.respond_to?(:clear)
-      context.delete_field(name)
-    end
+    #context.marshal_dump.keys.each do |name|
+    #  obj = context.send(name.to_sym)
+    #  obj.free if obj.respond_to?(:free)
+    #  obj.clear if obj.respond_to?(:clear)
+    #  context.delete_field(name)
+    #end
   end
 
   def parse_params_default(params,context)
@@ -509,6 +509,13 @@ class KadeployServer
           :args=>[1,3,5,7],:static=>[static],:name=>[2,4,6]
         )
       end
+    end
+  end
+
+  def workflow_lock(kind,wid)
+    @workflows_locks[kind].synchronize do
+      kaerror(APIError::INVALID_WORKFLOW_ID) unless @workflows_info[kind][wid]
+      @workflows_info[kind][wid][:lock]
     end
   end
 
