@@ -28,7 +28,7 @@ require 'io/console' if RUBY_VERSION >= '1.9'
 
 module Kadeploy
 CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
-USER = Etc.getlogin
+USER = ENV['USER'] || ENV['USERNAME'] || Etc.getlogin
 STATUS_UPDATE_DELAY = 1
 SLEEP_PITCH = 1
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
