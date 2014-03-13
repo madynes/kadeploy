@@ -578,7 +578,6 @@ module Kaworkflow
     info.delete(:thread)
     # ...
 
-    GC.start
     { :wid => info[:wid] }
   end
 

@@ -651,6 +651,8 @@ class KadeployServer
         to_clean = nil
       end
     end
+    GC.start
+    nil
   end
 
   def get_nodes(*args)

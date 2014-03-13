@@ -421,10 +421,6 @@ module Automata
       end
       to_delete.each{|task| @threads.delete(task)}
       to_delete.clear
-      begin
-        GC.start
-      rescue TypeError
-      end
     end
 
     def join_threads # To be called with the threads lock
