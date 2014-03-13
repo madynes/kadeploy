@@ -108,7 +108,7 @@ class CacheFile
   end
 
   def update_mtime()
-    Execute["touch -m #{@file}"].run!.wait
+    Execute['touch','-m',@file].run!.wait
     @mtime = File.mtime(@file)
     self
   end
@@ -126,14 +126,14 @@ class CacheFile
 
       newfile = File.join(directory,@filename) + EXT_FILE
       if @file != newfile
-        Execute["mv #{@file} #{newfile}"].run!.wait
+        Execute['mv',@file,newfile].run!.wait
         @file = newfile
       end
 
       if @meta
         newmeta = File.join(directory,@filename) + EXT_META
         if @meta != newmeta
-          Execute["mv #{@meta} #{newmeta}"].run!.wait
+          Execute['mv',@meta,newmeta].run!.wait
           @meta = newmeta
         end
       end
@@ -149,7 +149,7 @@ class CacheFile
       f.write(content.to_yaml)
     end
 
-    Execute["chmod #{opts[:mode]} #{@file}"].run!.wait if opts[:mode]
+    Execute['chmod',opts[:mode].to_s,@file].run!.wait if opts[:mode]
     self
   end
 
@@ -159,8 +159,8 @@ class CacheFile
 
   # !!! Be careful, use lock
   def remove!()
-    Execute["rm -f #{@file}"].run!.wait
-    Execute["rm -f #{@meta}"].run!.wait if @meta
+    Execute['rm','-f',@file].run!.wait
+    Execute['rm','-f',@meta].run!.wait if @meta
     @mtime = nil
     @atime = nil
     @md5 = nil
@@ -539,15 +539,15 @@ class Cache
             then
               meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
               if File.file?(meta)
-                Execute["rm -f #{meta}"].run!.wait
+                Execute['rm','-f',meta].run!.wait
               end
               debug("Delete file #{File.basename(file)} from cache")
-              Execute["rm -f #{rfile}"].run!.wait
+              Execute['rm','-f',rfile].run!.wait
             end
           else
             # Remove every files from directory if file not tagged
             debug("Delete file #{rfile} from cache")
-            Execute["rm -f #{rfile}"].run!.wait
+            Execute['rm','-f',rfile].run!.wait
           end
         end
       end
@@ -566,16 +566,16 @@ class Cache
               meta = File.join(@directory,File.basename(file,CacheFile::EXT_FILE) + CacheFile::EXT_META)
               if File.file?(meta)
                 files << CacheFile.load(rfile,meta,@prefix_base)
-                Execute["rm -f #{meta}"].run!.wait
+                Execute['rm','-f',meta].run!.wait
               else
                 debug("Delete file #{rfile} from cache (no meta)")
-                Execute["rm -f #{rfile}"].run!.wait
+                Execute['rm','-f',rfile].run!.wait
               end
             end
           else
             # Remove every files from directory if file not tagged
             debug("Delete file #{rfile} from cache")
-            Execute["rm -f #{rfile}"].run!.wait
+            Execute['rm','-f',rfile].run!.wait
           end
         end
       end
@@ -591,12 +591,12 @@ class Cache
               else
                 debug("Delete cached file #{file.path} from cache "\
                   "(#{file.size/(1024*1024)}MB)")
-                Execute["rm -f #{file.file}"].run!.wait
+                Execute['rm','-f',file.file].run!.wait
               end
             else
               debug("Delete cached file #{file.path} from cache "\
                 "(#{file.size/(1024*1024)}MB)")
-              Execute["rm -f #{file.file}"].run!.wait
+              Execute['rm','-f',file.file].run!.wait
             end
           end
         end
