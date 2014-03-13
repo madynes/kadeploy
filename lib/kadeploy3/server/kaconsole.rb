@@ -179,7 +179,6 @@ module Kaconsole
     console_kill(info)
     console_free(info)
 
-    GC.start
     { :wid => info[:wid] }
   end
 
