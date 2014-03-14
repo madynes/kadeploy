@@ -1,0 +1,21 @@
+# Launching some experimentations and generate statistics
+rake launch NODEFILE=~/nodes
+rake launch[experiences/dummy_exp.yml] NODEFILE=~/nodes DIRECTORY=output-dir/
+rake launch NODEFILE=~/nodes EXPNAME=mytest KEYFILE=/root/.ssh/authorized_keys
+rake launch NODEFILE=~/nodes EXPNUM=42 KASTAT=1 VERBOSE=1 # See kanalyze options
+
+# Run experimentations (only)
+rake run NODEFILE=~/nodes
+rake run[experiences/dummy_exp.yml] NODEFILE=~/nodes DIRECTORY=output-dir/
+KADEPLOY_BIN=kadeploy3-dev rake run
+
+# Generate statistics (only)
+rake stats DIRECTORY=kanalyze-2014-01-01-10-00-00
+rake stats DIRECTORY=kanalyze-2014-01-01-10-00-00 MICROSTEPS=1
+rake stats FILES=kanalyze-*/stats/*.csv DIRECTORY=output-dir/ MICROSTEPS=1
+
+# Search for a pattern in console log files
+rake search['^[0-9]\+ Kernel'] DIRECTORY=kanalyze-2014-01-01-10-00-00
+
+# Install dependencies that are needed to generate statistics (debian)
+rake stats_install_deps

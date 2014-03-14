@@ -456,7 +456,8 @@ class KadeployServer
       end
       if check_rights
         ok,msg = run_method(kind,:'rights?',options,query,params[:names],*args)
-        error_unauthorized!(msg) unless ok
+        msg = "You do not the rights to perform this operation" if msg.nil? or msg.empty?
+        error_forbidden!(msg) unless ok
       end
 
       # Run the treatment
@@ -484,51 +485,60 @@ class KadeployServer
     raise unless @workflows_info[kind]
     raise unless @httpd
 
-    error = nil
     @workflows_locks[kind].synchronize do
-      if @workflows_info[kind][wid]
-        error = true
-      else
+      raise if @workflows_info[kind][wid]
+      info[:lock] = Mutex.new
+      info[:lock].lock
+      @workflows_info[kind][wid] = info
+      begin
         yield if block_given?
-        @workflows_info[kind][wid] = info
-
-        static = nil
-        if workkind
-          static = workkind
-        else
-          static = [kind,:work]
-        end
-
-        bind(kind,info,'resource') do |httpd,path|
-          httpd.bind([:GET,:DELETE],path,:filter,:object=>self,:method =>:launch,
-            :args=>[1,3,5,7],:static=>[static],:name=>[2,4,6]
-          )
-        end
+      ensure
+        info[:lock].unlock
       end
-    end
-    if error
-      raise if error == true
-      kaerror(error)
+
+      static = nil
+      if workkind
+        static = workkind
+      else
+        static = [kind,:work]
+      end
+
+      bind(kind,info,'resource') do |httpd,path|
+        httpd.bind([:GET,:DELETE],path,:filter,:object=>self,:method =>:launch,
+          :args=>[1,3,5,7],:static=>[static],:name=>[2,4,6]
+        )
+      end
     end
   end
 
-  def workflow_get(kind,wid=nil)
-    raise unless @workflows_locks[kind]
-    raise unless @workflows_info[kind]
-    error = nil
-    ret = nil
+  def workflow_list(kind)
+    # Take the global lock to iterate on the list but ensure an accurate view
     @workflows_locks[kind].synchronize do
-      if wid
-        if @workflows_info[kind][wid]
-          ret = yield(@workflows_info[kind][wid])
-        else
-          error = APIError::INVALID_WORKFLOW_ID
+      @workflows_info[kind].each_value do |info|
+        info[:lock].synchronize do
+          yield(info)
+          nil
         end
-      else
-        ret = yield(@workflows_info[kind].values)
       end
     end
-    kaerror(error) if error
+  end
+
+  def workflow_get(kind,wid)
+    raise unless @workflows_locks[kind]
+    raise unless @workflows_info[kind]
+
+    ret = nil
+    @workflows_locks[kind].synchronize do
+      kaerror(APIError::INVALID_WORKFLOW_ID) unless @workflows_info[kind][wid]
+      @workflows_info[kind][wid][:lock].lock
+    end
+
+    begin
+      ret = yield(@workflows_info[kind][wid])
+    ensure
+      @workflows_info[kind][wid][:lock].unlock
+    end
+
     ret
   end
 
@@ -537,18 +547,23 @@ class KadeployServer
     raise unless @workflows_info[kind]
     raise unless @httpd
 
-    error = nil
+    info = nil
     ret = {}
     @workflows_locks[kind].synchronize do
-      if @workflows_info[kind][wid]
-        ret = yield(@workflows_info[kind][wid]) if block_given?
-        unbind(@workflows_info[kind][wid])
-      else
-        error = APIError::INVALID_WORKFLOW_ID
-      end
+      kaerror(APIError::INVALID_WORKFLOW_ID) unless @workflows_info[kind][wid]
+      info = @workflows_info[kind][wid]
+      info[:lock].lock
+      unbind(info)
       @workflows_info[kind].delete(wid)
     end
-    kaerror(error) if error
+
+    begin
+      ret = yield(info) if block_given?
+    ensure
+      info[:lock].unlock
+    end
+    info.clear
+
     ret
   end
 
@@ -557,30 +572,31 @@ class KadeployServer
     nodes.each do |node|
       [:deploy,:reboot,:power,:console].each do |kind|
         if @workflows_locks[kind] and @workflows_info[kind]
-          to_clean = []
+          to_kill = []
           @workflows_locks[kind].synchronize do
             @workflows_info[kind].each_pair do |wid,info|
               if info[:nodelist].include?(node)
-                to_clean << wid
-                if kind == :console
-                  console_kill(info)
-                  console_free(info)
-                else
-                  run_wmethod(kind,:kill,info)
-                  run_wmethod(kind,:free,info)
-                end
+                to_kill << info
+                info[:lock].lock
+                @workflows_info[kind].delete(wid)
+                unbind(info)
               end
             end
           end
-          to_clean.each do |wid|
-            if kind == :console
-              console_delete(nil,wid)
-            else
-              run_wmethod(kind,:delete,nil,wid)
+          to_kill.each do |info|
+            begin
+              if kind == :console
+                console_delete!(nil,info)
+              else
+                run_wmethod(kind,:delete!,nil,info)
+              end
+            ensure
+              info[:lock].unlock
             end
+            info.clear
           end
-          to_clean.clear
-          to_clean = nil
+          to_kill.clear
+          to_kill = nil
         end
       end
     end
@@ -593,19 +609,35 @@ class KadeployServer
         to_clean = []
         @workflows_locks[kind].synchronize do
           @workflows_info[kind].each_pair do |wid,info|
+            info[:lock].lock
             if info[:done] # Done workflow
               if (Time.now - info[:start_time]) > clean_threshold
-                to_clean << wid
+                to_clean << info
+                @workflows_info[kind].delete(wid)
+                unbind(info)
+              else
+                info[:lock].unlock
               end
             elsif info[:error] # Dead workflow
               if (Time.now - info[:start_time]) > clean_threshold
-                to_clean << wid
+                to_clean << info
+                @workflows_info[kind].delete(wid)
+                unbind(info)
+              else
+                info[:lock].unlock
               end
+            else
+              info[:lock].unlock
             end
           end
         end
-        to_clean.each do |wid|
-          run_wmethod(kind,:delete,nil,wid)
+        to_clean.each do |info|
+          begin
+            run_wmethod(kind,:delete!,nil,info)
+          ensure
+            info[:lock].unlock
+          end
+          info.clear
         end
         to_clean.clear
         to_clean = nil

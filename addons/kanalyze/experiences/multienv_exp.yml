@@ -1,8 +1,6 @@
 ---
 - name: Kadeploy316
   times: 30
-  git: 3.1.6
-  version: 6
   environments:
     - debian-min
   macrosteps:
@@ -21,8 +19,6 @@
 
 - name: Kadeploy317
   times: 30
-  git: 3.1.7
-  version: 7
   environments:
     - debian-min
   macrosteps:

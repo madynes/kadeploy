@@ -30,7 +30,6 @@ class GrabFile
     @files.each do |file|
       file.release
     end
-    @cache.clean() if @cache
   end
 
   def grab(path,version,user,priority,tag,checksum=nil,opts={})
