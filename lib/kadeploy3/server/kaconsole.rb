@@ -67,6 +67,10 @@ module Kaconsole
 
     context.info = console_init_info(context)
 
+    if operation == :create
+      error_forbidden!("This feature is disabled: no console command is given in configuration file.") unless context.config.clusters[context.info[:node].cluster].cmd_console
+    end
+
     context
   end
 
@@ -152,27 +156,31 @@ module Kaconsole
       ret
     end
 
-    workflow_get(:console,wid) do |infos|
-      if infos.is_a?(Array)
-        ret = []
-        infos.each do |info|
-          ret << get_status.call(info)
-        end
-        ret
-      else
-        get_status.call(infos)
+    if wid
+      workflow_get(:console,wid) do |info|
+        get_status.call(info)
       end
+    else
+      ret = []
+      workflow_list(:console) do |info|
+        ret << get_status.call(info)
+      end
+      ret
     end
   end
 
   def console_delete(cexec,wid)
     workflow_delete(:console,wid) do |info|
-      console_kill(info)
-      console_free(info)
-
-      GC.start
-      { :wid => info[:wid] }
+      console_delete!(cexec,info)
     end
+  end
+
+  def console_delete!(cexec,info)
+    console_kill(info)
+    console_free(info)
+
+    GC.start
+    { :wid => info[:wid] }
   end
 
   def console_kill(info)

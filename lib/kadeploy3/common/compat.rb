@@ -1,5 +1,11 @@
 # Ugly hacks for ruby 1.8 backwards compatibility
 if RUBY_VERSION < '1.9'
+  class String
+    def encoding
+      'US-ASCII'
+    end
+  end
+
   class Array
     def select!(*args,&block)
       replace(select(*args,&block))

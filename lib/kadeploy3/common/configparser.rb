@@ -248,12 +248,10 @@ module Configuration
       if args[:command]
         val = val.split(/\s+/).first||''
         if !val.empty? and !Pathname.new(val).absolute?
-          Open3.popen3('which',val) do |inp,out,err,stat|
             # Since the command is launched in a shell and can be a script,
             # if the command cannot be found, skip further checkings
-            return unless stat.value.success?
-            val = out.read.strip
-          end
+           val = `which '#{val}'`.strip
+           return unless $?.success?
         end
       end
 
@@ -373,7 +371,7 @@ module Configuration
     # if no defaultvalue defined, field is mandatory
     def value(fieldname,type,defaultvalue=nil,expected=nil)
       ret = nil
-      check_field(fieldname,defaultvalue.nil?,type) do |val|
+      check_field(fieldname,defaultvalue.nil?,type) do |val,provided|
         if val.nil?
           ret = defaultvalue
         else
