@@ -230,7 +230,7 @@ def deb_versions()
   else
     [
       "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
-      "v#{deb_version}",
+      "v#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
     ]
   end
 end
