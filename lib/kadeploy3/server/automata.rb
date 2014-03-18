@@ -171,14 +171,15 @@ module Automata
       @static_context = nil
       @queue = nil
       if @threads
-        #@threads_lock.lock if @threads_lock
-        @threads.each_key do |task|
-          task.free
-          task = nil
+        @threads_lock.synchronize do
+          @threads.each_key do |task|
+            task.free
+            task = nil
+          end
+          @threads.clear
+          @threads = nil
         end
-        #@threads_lock.unlock if @threads_lock
       end
-      @threads = nil
       @threads_lock = nil
       @nodes = nil
       #@nodes_done.free(false) if @nodes_done
@@ -308,6 +309,7 @@ module Automata
     def status()
       ret = {}
       @threads_lock.synchronize do
+        clean_threads()
         @threads.each_key do |task|
           ret[task.name] = task.status
         end
@@ -393,15 +395,19 @@ module Automata
       @nodes.empty? or @nodes_done.equal?(@nodes)
     end
 
-    def clean_threads
+    def clean_threads # To be called with the threads lock
       return unless @threads
+      to_delete = []
       @threads.each_pair do |task,threads|
+        to_delete2 = []
         threads.each_pair do |key,thread|
           unless thread.alive?
             thread.join
-            threads.delete(key)
+            to_delete2 << key
           end
         end
+        to_delete2.each{|key| threads.delete(key)}
+        to_delete2.clear
 
         # Treatment of this task is done, cleaning everything
         if @threads[task] and @threads[task].empty? and task.nodes.empty?
@@ -410,24 +416,27 @@ module Automata
             task.cleaner.join
           end
           task.free
-          @threads.delete(task)
-
-          begin
-            GC.start
-          rescue TypeError
-          end
+          to_delete << task
         end
       end
+      to_delete.each{|task| @threads.delete(task)}
+      to_delete.clear
     end
 
-    def join_threads
+    def join_threads # To be called with the threads lock
+      to_delete = []
       @threads.each_pair do |task,threads|
+        to_delete2 = []
         threads.each_pair do |key,thread|
           thread.join
-          threads.delete(key)
+          to_delete2 << key
         end
-        @threads.delete(task) if @threads[task] and @threads[task].empty?
+        to_delete2.each{|key| threads.delete(key)}
+        to_delete2.clear
+        to_delete << task if @threads[task] and @threads[task].empty?
       end
+      to_delete.each{|task| @threads.delete(task)}
+      to_delete.clear
     end
 
     def run_task(task)
@@ -444,8 +453,10 @@ module Automata
 
       timestart = Time.now
       thr = Thread.new { task.run }
-      @threads[task] = {} unless @threads[task]
-      @threads[task][:run] = thr
+      @threads_lock.synchronize do
+        @threads[task] = {} unless @threads[task]
+        @threads[task][:run] = thr
+      end
 
       success = true
 
@@ -465,8 +476,6 @@ module Automata
       task.context[:local][:duration] = Time.now - timestart
 
       success = success && thr.value
-      @threads[task].delete(:run)
-      @threads.delete(task) if @threads[task].empty?
 
       task.mutex.synchronize do
         clean_nodeset(task.nodes)
@@ -653,7 +662,7 @@ module Automata
     end
 
     def kill(dofree=true)
-      clean_threads()
+      @threads_lock.synchronize{ clean_threads() } if @threads
       @queue.clear()
 
       unless @runthread.nil?
@@ -668,13 +677,17 @@ module Automata
         @cleaner = nil
       end
 
-      @threads.each_pair do |task,threads|
-        task.kill(false)
-        threads.each_pair do |key,thread|
-          thread.kill
-          thread.join
+      if @threads
+        @threads_lock.synchronize do
+          @threads.each_pair do |task,threads|
+            task.kill(false)
+            threads.each_pair do |key,thread|
+              thread.kill
+              thread.join
+            end
+            task.free
+          end
         end
-        task.free
       end
 
       @threads = {}
