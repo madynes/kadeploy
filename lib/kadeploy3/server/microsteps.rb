@@ -334,8 +334,10 @@ class Microstep < Automata::QueueTask
     res = nil
     parallel_run(node_set.id) do |pr|
       node_set.set.each do |node|
-        if (node.cmd.power_status != nil) then
-          pr.add(node.cmd.power_status, node)
+        if node.cmd.power_status
+          pr.add(Nodes::NodeCmd.generate(node.cmd.power_status,node),node)
+        elsif context[:cluster].cmd_power_status
+          pr.add(Nodes::NodeCmd.generate(context[:cluster].cmd_power_status,node),node)
         else
           set_node(node, :stderr => 'power_status command is not provided')
           @nodes_ko.push(node)
