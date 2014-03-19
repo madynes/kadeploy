@@ -550,18 +550,14 @@ class Client
     end
   end
 
-  def delete(uri,params=nil,accept_type=nil,parse=nil)
+  def delete(uri,data={},content_type=nil,accept_type=nil,parse=nil)
     host,port,path,query = parse_uri(uri)
-    if query
-      path = "#{path}?#{query}"
-    elsif params
-      path = HTTP::Client.path_params(path,params)
-    end
+    path = "#{path}?#{query}" if query
     host = @server unless host
     port = @port unless port
     headers = {"#{@auth_headers_prefix}User" => USER}
     begin
-      HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse,headers)
+      HTTP::Client::delete(host,port,path,data,@secure,content_type,accept_type,parse,headers)
     rescue HTTP::ClientError => e
       error(e.message,e.code)
     end
