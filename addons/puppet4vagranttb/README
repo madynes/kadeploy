@@ -1,0 +1,13 @@
+HOWTO
+
+1/ Update addons/puppet4vagranttb/modules/kadeploy/files/sample-cluster.conf
+You have to update the hard reboot command in order to use the correct user. Indeed kadeploy_master VM will have connect to the host in order to perform the reboot command via vboxmanage. Furthermore, on the host side, you have to add addons/ssh/id_deploy.pub to your authorized_keys (another key can be used but you will have to update also addons/puppet4vagranttb/modules/kadeploy/files/reboot.sh)
+
+2/ Connect into the kadeploy_master VM
+$> cd $KADEPLOY_ROOT_DIR
+$> vagrant up
+$> vagrant ssh kadeploy_master
+
+3/ Become root and try to deploy
+$> sudo su -
+$> kadeploy3 -e wheezy-min -m node-1
