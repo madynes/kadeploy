@@ -388,7 +388,7 @@ class Environment
 
     # if no envs were found and allowed to check publics envs,
     # we check publics envs with a different user than the one specified
-    if !ret and public_envs
+    if (!ret or ret.size > 1) and public_envs
       ret = dbproc.call('user<>?',"visibility = 'public'")
     end
 
