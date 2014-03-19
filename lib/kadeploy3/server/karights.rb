@@ -167,7 +167,7 @@ module Karights
         end
       end
 
-      workflows_kill(nodes)
+      workflows_kill(nodes,user)
 
       ret
     else

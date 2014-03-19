@@ -575,14 +575,14 @@ class KadeployServer
   end
 
   # Kill workflows involving nodes
-  def workflows_kill(nodes)
+  def workflows_kill(nodes,user=nil)
     nodes.each do |node|
       [:deploy,:reboot,:power,:console].each do |kind|
         if @workflows_locks[kind] and @workflows_info[kind]
           to_kill = []
           @workflows_locks[kind].synchronize do
             @workflows_info[kind].each_pair do |wid,info|
-              if info[:nodelist].include?(node)
+              if info[:nodelist].include?(node) and (!user or info[:user] == user)
                 to_kill << info
                 info[:lock].lock
                 @workflows_info[kind].delete(wid)

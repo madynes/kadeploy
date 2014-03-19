@@ -1068,12 +1068,13 @@ module Nodes
       @states = nil
     end
 
-    def set(hostname, macro='', micro='', state='', error='')
+    def set(hostname, macro='', micro='', state='', error='', out='')
       @states[hostname] = {} unless @states[hostname]
       @states[hostname][:macro] = macro if macro and !macro.empty?
       @states[hostname][:micro] = micro if micro and !micro.empty?
       @states[hostname][:state] = state if state and !state.empty?
       @states[hostname][:error] = error if error and !error.empty?
+      @states[hostname][:out] = out if out and !out.empty?
     end
 
     def unset(hostname, *fields)
