@@ -85,7 +85,7 @@ class ServerFetchFile < FetchFile
   def grab(dest,dir=nil)
     if File.readable?(@path)
       begin
-        FileUtils.cp(@path,dest)
+        Execute['cp',@path,dest].run!.wait
       rescue Exception => e
         error("Unable to grab the file #{@path} (#{e.message})")
       end

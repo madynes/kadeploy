@@ -6,7 +6,7 @@ KADEPLOY_AUTH_HEADER=ENV['KADEPLOY3_AUTH_HEADER']||'X-Kadeploy-'
 USER=ENV['USER']
 
 $:.unshift KADEPLOY_LIBS
-require 'kadeploy3/server/execute'
+require 'kadeploy3/common/execute'
 require 'yaml'
 require 'test/unit'
 require 'rubygems'

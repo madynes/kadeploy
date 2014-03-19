@@ -18,6 +18,8 @@ class Execute
 
     @child_io = nil
     @parent_io = nil
+
+    @kill_lock = Mutex.new
   end
 
   def free
@@ -164,13 +166,18 @@ class Execute
         @exec_pid = nil
       rescue Errno::ECHILD
         @status = nil
+        @exec_pid = nil
       ensure
-        @parent_io.each do |io|
-          begin
-            io.close if io and !io.closed?
-          rescue IOError
-          end
-        end if @parent_io
+        if @exec_pid # Process.wait2 did not finish, the current thread was probably killed
+          kill()
+        else
+          @parent_io.each do |io|
+            begin
+              io.close if io and !io.closed?
+            rescue IOError
+            end
+          end if @parent_io
+        end
         @parent_io = nil
         @child_io = nil
       end
@@ -202,29 +209,33 @@ class Execute
   end
 
   def kill()
-    @parent_io.each do |io|
-      begin
-        io.close if io and !io.closed?
-      rescue IOError
-      end
-    end if @parent_io
+    @kill_lock.synchronize do
+      @parent_io.each do |io|
+        begin
+          io.close if io and !io.closed?
+        rescue IOError
+        end
+      end if @parent_io
+      @parent_io = nil
 
-    @child_io.each do |io|
-      begin
-        io.close if io and !io.closed?
-      rescue IOError
-      end
-    end if @child_io
+      @child_io.each do |io|
+        begin
+          io.close if io and !io.closed?
+        rescue IOError
+        end
+      end if @child_io
+      @child_io = nil
 
-    unless @exec_pid.nil?
-      begin
-        Execute.kill_recursive(@exec_pid)
-        Process.wait(@exec_pid)
-      rescue Errno::ESRCH
+      unless @exec_pid.nil?
+        begin
+          Execute.kill_recursive(@exec_pid)
+          Process.wait(@exec_pid)
+        rescue Errno::ESRCH
+        end
+        @exec_pid = nil
       end
-      @exec_pid = nil
+      free()
     end
-    free()
   end
 
   def self.do(*cmd,&block)

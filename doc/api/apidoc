@@ -647,7 +647,7 @@ end
 out = $cgi.html do
   $cgi.head do
     $cgi.title{ARGV[0]} +
-    $cgi.link(:rel=>'stylesheet', :type=>'text/css', :href=>ARGV[1])
+    $cgi.link(:rel=>'stylesheet', :type=>'text/css', :href=>File.basename(ARGV[1]))
   end +
   $cgi.body do
     $current.to_html($cgi)
