@@ -229,8 +229,8 @@ module HTTP
       request(server,port,secure,gen_request(:PUT,path,data,content_type,accept_type,headers),parse)
     end
 
-    def self.delete(server,port,path,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
-      request(server,port,secure,gen_request(:DELETE,path,nil,nil,accept_type,headers),parse)
+    def self.delete(server,port,path,data,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
+      request(server,port,secure,gen_request(:DELETE,path,data,content_type,accept_type,headers),parse)
     end
   end
 end
