@@ -1,4 +1,4 @@
-kadeploy (3.2.0~rc4-1) UNRELEASED; urgency=low
+kadeploy (3.2.0.2-1) UNRELEASED; urgency=low
 
   * Move karights3 binaries in the client package
   * Add the Kastafior binary in the server package
@@ -12,8 +12,9 @@ kadeploy (3.2.0~rc4-1) UNRELEASED; urgency=low
   * Add the Kascade binary in the server package
   * Create the /etc/kadeploy3/keys directory in the server package
   * Renamed .yml configuration files to .conf
+  * New Git snapshot based on v3.2.0.2.
 
- -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Wed, 27 Nov 2013 10:37:29 +0100
+ -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Wed, 19 Mar 2014 23:55:16 +0100
 
 kadeploy (3.2.0~alpha1) unstable; urgency=low
 
