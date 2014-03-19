@@ -348,6 +348,9 @@ class Microstep < Automata::QueueTask
       res = pr.get_results
     end
     classify_nodes(res)
+    @nodes_ok.set.each do |node|
+      context[:states].set(node.hostname,nil,nil,nil,nil,node.last_cmd_stdout)
+    end
     return (not @nodes_ok.empty?)
   end
 
