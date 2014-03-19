@@ -1,9 +1,9 @@
 body {
   font-family: sans-serif;
-  background-color: #FFBB50;
+  background-color: #FFE89D;
 }
 div.apidoc_frame {
-  background-color: #FFBB50;
+  background-color: #FFE89D;
 }
 div {
   background-color: white;
@@ -57,7 +57,7 @@ div.apidoc_index_frame, div.intro_frame, div.operation_frame {
   margin-left: 8px;
   margin-right: 8px;
   margin-bottom: 16px;
-  background-color: #FFBB50;
+  background-color: #FFE89D;
 }
 div.apidoc_index_frame {
   margin-top: 10px;
@@ -178,7 +178,7 @@ h2.resource_title, h2.operation_index_title {
   border-width: 1px;
   border-color: #282828;
   border-radius: 4px;
-  background-color: #FFBB50;
+  background-color: #FFE89D;
   border-style: solid;
   border-color: #888888;
 }

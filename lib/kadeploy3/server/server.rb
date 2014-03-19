@@ -219,12 +219,12 @@ class KadeployServer
   end
 
   def wipe_exec_context(context)
-    context.marshal_dump.keys.each do |name|
-      obj = context.send(name.to_sym)
-      obj.free if obj.respond_to?(:free)
-      obj.clear if obj.respond_to?(:clear)
-      context.delete_field(name)
-    end
+    #context.marshal_dump.keys.each do |name|
+    #  obj = context.send(name.to_sym)
+    #  obj.free if obj.respond_to?(:free)
+    #  obj.clear if obj.respond_to?(:clear)
+    #  context.delete_field(name)
+    #end
   end
 
   def parse_params_default(params,context)
@@ -511,6 +511,13 @@ class KadeployServer
     end
   end
 
+  def workflow_lock(kind,wid)
+    @workflows_locks[kind].synchronize do
+      kaerror(APIError::INVALID_WORKFLOW_ID) unless @workflows_info[kind][wid]
+      @workflows_info[kind][wid][:lock]
+    end
+  end
+
   def workflow_list(kind)
     # Take the global lock to iterate on the list but ensure an accurate view
     @workflows_locks[kind].synchronize do
@@ -643,6 +650,8 @@ class KadeployServer
         to_clean = nil
       end
     end
+    GC.start
+    nil
   end
 
   def get_nodes(*args)
