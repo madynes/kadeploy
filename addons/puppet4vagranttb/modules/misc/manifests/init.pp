@@ -39,6 +39,10 @@ class misc {
     'rubygems':
       ensure => installed;
   }
+  package {
+    'netcat-openbsd':
+      ensure => installed;
+  }
   Group['deploy'] -> User['deploy'] -> Exec['apt-get-update'] -> Package['taktuk'] -> Package['libtaktuk-perl'] -> Package['oidentd'] -> Package['rake'] -> Package['help2man'] -> Package['rubygems']
   exec {
     'host-node1':
