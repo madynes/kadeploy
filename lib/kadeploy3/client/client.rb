@@ -164,18 +164,17 @@ class Client
   def self.load_envfile(envfile,srcfile)
     tmpfile = Tempfile.new("env_file")
     begin
-      uri = URI(File.absolute_path(srcfile))
-      uri.scheme = 'server'
-      uri.send(:set_host, '')
-      FetchFile[uri.to_s].grab(tmpfile.path)
+      uri = URI(srcfile)
+      if uri.scheme.nil? or uri.scheme.empty?
+        uri.send(:set_scheme,'server')
+        uri.send(:set_path,File.absolute_path(srcfile))
+      end
+      FetchFile[uri.to_s,true].grab(tmpfile.path)
       tmpfile.close
       uri = nil
     rescue KadeployError => ke
-      msg = KadeployError.to_msg(ke.errno) || ''
-      msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
-      msg += ke.message if ke.message and !ke.message.empty?
       tmpfile.unlink
-      error(msg)
+      error(ke.message)
     end
 
     unless `file --mime-type --brief #{tmpfile.path}`.chomp == "text/plain"
