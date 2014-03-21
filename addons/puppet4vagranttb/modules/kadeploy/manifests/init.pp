@@ -9,7 +9,7 @@ class kadeploy {
   service {
     'kadeploy':
       ensure => running,
-      require => [File['/etc/kadeploy3/server.conf'], File['/etc/kadeploy3/client.conf'], File['/etc/kadeploy3/sample-cluster.conf'], File['/etc/kadeploy3/clusters.conf'], File['/srv/tftp/userfiles'], File['/srv/tftp/kernels'], File['/srv/tftp/pxelinux.cfg'], File['/etc/kadeploy3/keys/id_deploy'], Exec['/srv/tftp/kernels/vmlinuz-3.2.0-4-amd64'], Exec['/srv/tftp/kernels/initrd-3.2.0-4-amd64']];
+      require => [File['/etc/kadeploy3/server.conf'], File['/etc/kadeploy3/client.conf'], File['/etc/kadeploy3/sample-cluster.conf'], File['/etc/kadeploy3/clusters.conf'], File['/etc/kadeploy3/command.conf'], File['/srv/tftp/userfiles'], File['/srv/tftp/kernels'], File['/srv/tftp/pxelinux.cfg'], File['/etc/kadeploy3/keys/id_deploy'], Exec['/srv/tftp/kernels/vmlinuz-3.2.0-4-amd64'], Exec['/srv/tftp/kernels/initrd-3.2.0-4-amd64']];
   }
   exec {
     'karights':
@@ -44,6 +44,12 @@ class kadeploy {
     '/etc/kadeploy3/clusters.conf':
       ensure => file,
       source => 'puppet:///modules/kadeploy/clusters.conf',
+      require => Exec['kadeploy_install'],
+  }
+  file {
+    '/etc/kadeploy3/command.conf':
+      ensure => file,
+      source => 'puppet:///modules/kadeploy/command.conf',
       require => Exec['kadeploy_install'],
   }
   file {

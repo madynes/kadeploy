@@ -4,9 +4,9 @@ HOWTO
 
 2/ Connect into the kadeploy_master VM
 $> cd $KADEPLOY_ROOT_DIR
-$> vagrant up
+$> CLUSTER_SIZE=2 vagrant up
 $> vagrant ssh kadeploy_master
 
 3/ Become root and try to deploy
 $> sudo su -
-$> kadeploy3 -e wheezy-min -m node-1
+$> kadeploy3 -e wheezy-min -m node-[1,2]

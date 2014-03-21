@@ -27,7 +27,7 @@ class tftp {
       owner => deploy,
   }
   file {
-    '/srv/tftp/pxelinux.cfg/0A000A0B':
+    "/srv/tftp/pxelinux.cfg/default":
       ensure => file,
       source => 'puppet:///modules/tftp/default_profile',
       require => File['/srv/tftp/pxelinux.cfg'],
