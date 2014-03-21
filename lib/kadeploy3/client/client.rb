@@ -48,7 +48,6 @@ class Client
   end
 
   def kill
-    debug "Error encountered, let's clean everything ..."
   end
 
   def self.api_path(path=nil,kind=nil,*args)
