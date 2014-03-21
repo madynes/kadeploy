@@ -113,10 +113,12 @@ class Client
     begin
       begin
         config = YAML.load_file(configfile)
-      rescue ArgumentError
-        raise ArgumentError.new("Invalid YAML file '#{configfile}'")
+      rescue Psych::SyntaxError => se
+        error("Invalid YAML file '#{configfile}'\n#{se.message}")
+      rescue ArgumentError => ae
+        error("Invalid YAML file '#{configfile}' (#{ae.message})")
       rescue Errno::ENOENT
-        raise ArgumentError.new("File not found '#{configfile}'")
+        error("File not found '#{configfile}'")
       end
 
       servers = {}
@@ -183,9 +185,12 @@ class Client
 
     begin
       ret = YAML.load_file(tmpfile.path)
-    rescue ArgumentError
+    rescue Psych::SyntaxError => se
+      error("Invalid YAML file '#{srcfile}'\n#{se.message.gsub(tmpfile.path,srcfile)}")
       tmpfile.unlink
-      error("Invalid YAML file '#{srcfile}'")
+    rescue ArgumentError => ae
+      error("Invalid YAML file '#{srcfile}' (#{ae.message.gsub(tmpfile.path,srcfile)})")
+      tmpfile.unlink
     rescue Errno::ENOENT
       tmpfile.unlink
       error("File not found '#{srcfile}'")
@@ -238,9 +243,10 @@ class Client
 
     begin
       config = YAML.load_file(file)
-    rescue ArgumentError
-      $stderr.puts "Invalid YAML file '#{file}'"
-      return false
+    rescue Psych::SyntaxError => se
+      error("Invalid YAML file '#{file}'\n#{se.message}")
+    rescue ArgumentError => ae
+      error("Invalid YAML file '#{file}' (#{ae.message})")
     rescue Errno::ENOENT
       return true
     end
