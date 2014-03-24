@@ -56,6 +56,8 @@ Vagrant.configure("2") do |config|
         vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
         vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
         vb.customize ["modifyvm", :id, "--nic2", "none"]
+        # Disable USB since it's not necessary and depends on extra modules
+        vb.customize ["modifyvm", :id, "--usb", "off"]
       end
       slave.ssh.host = ip
     end
