@@ -39,6 +39,7 @@ Vagrant.configure("2") do |config|
         vb.customize ["modifyvm", :id, "--boot1", "net"]
         vb.customize ["modifyvm", :id, "--macaddress1", mac]
         vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
+        vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
         vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
         vb.customize ["modifyvm", :id, "--nic2", "none"]
       end
