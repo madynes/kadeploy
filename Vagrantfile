@@ -18,6 +18,15 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--hostonlyadapter2", "vboxnet0"]
     end
 
+    if ENV['http_proxy']
+      master.vm.provision :shell, inline:
+        "echo 'export http_proxy=#{ENV['http_proxy'].strip}' >> /etc/profile"
+    end
+    if ENV['https_proxy']
+      master.vm.provision :shell, inline:
+        "echo 'export https_proxy=#{ENV['https_proxy'].strip}' >> /etc/profile"
+    end
+
     master.vm.provision :shell, path: 'addons/puppet4vagranttb/install_puppet.sh'
 
     master.vm.provision :puppet do |puppet|
