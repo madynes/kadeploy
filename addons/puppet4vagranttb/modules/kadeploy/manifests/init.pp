@@ -77,7 +77,7 @@ class kadeploy {
   }
   exec {
     '/etc/kadeploy3/envs/wheezy-x64-min-1.4.tgz':
-      command => "wget -q http://www.loria.fr/~ejeanvoi/kadeploy/wheezy-x64-min-1.4.tgz",
+      command => "wget -q http://kadeploy3.gforge.inria.fr/files/wheezy-x64-min-1.4.tgz",
       cwd => '/etc/kadeploy3/envs',
       path => '/usr/bin',
       require => File['/etc/kadeploy3/envs'],

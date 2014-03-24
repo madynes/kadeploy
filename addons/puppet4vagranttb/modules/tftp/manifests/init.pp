@@ -53,14 +53,14 @@ class tftp {
   }
   exec {
     '/srv/tftp/kernels/vmlinuz-3.2.0-4-amd64':
-      command => "wget -q http://www.loria.fr/~ejeanvoi/kadeploy/vmlinuz-3.2.0-4-amd64",
+      command => "wget -q http://kadeploy3.gforge.inria.fr/files/vmlinuz-3.2.0-4-amd64",
       cwd => '/srv/tftp/kernels',
       path => '/usr/bin',
       require => File['/srv/tftp/kernels'],
   }
   exec {
     '/srv/tftp/kernels/initrd-3.2.0-4-amd64':
-      command => "wget -q http://www.loria.fr/~ejeanvoi/kadeploy/initrd-3.2.0-4-amd64",
+      command => "wget -q http://kadeploy3.gforge.inria.fr/files/initrd-3.2.0-4-amd64",
       cwd => '/srv/tftp/kernels',
       path => '/usr/bin',
       require => File['/srv/tftp/kernels'],
