@@ -2,11 +2,13 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 50
 
   config.vm.define :kadeploy do |master|
-    # Could be replaced by standard images (ie. chef/debian-7.4)
-    #   https://github.com/opscode/bento
-    #   https://vagrantcloud.com/discover/featured
-    master.vm.box = 'irisa_debian-7.3.0_puppet'
-    master.vm.box_url = 'https://vagrant.irisa.fr/boxes/irisa_debian-7.3.0_puppet-3.4.2.box'
+    if Vagrant::VERSION >= "1.5.0"
+      master.vm.box = 'chef/debian-7.4'
+    else
+      master.vm.box = 'debian-7.4'
+      master.vm.box_url =
+        "https://vagrantcloud.com/chef/debian-7.4/version/1/provider/virtualbox.box"
+    end
 
     master.vm.network :private_network, ip: '10.0.10.10'
     config.vm.provider :virtualbox do |vb|
@@ -15,6 +17,9 @@ Vagrant.configure("2") do |config|
       vb.customize ["modifyvm", :id, "--nic2", "hostonly"]
       vb.customize ["modifyvm", :id, "--hostonlyadapter2", "vboxnet0"]
     end
+
+    master.vm.provision :shell, path: 'addons/puppet4vagranttb/install_puppet.sh'
+
     master.vm.provision :puppet do |puppet|
       puppet.manifests_path = 'addons/puppet4vagranttb/manifests'
       puppet.manifest_file = 'init.pp'
