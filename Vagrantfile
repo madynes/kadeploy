@@ -32,8 +32,8 @@ Vagrant.configure("2") do |config|
     name = "kadeploy_slave#{id}"
     ip = "10.0.10.#{10 + id}"
     config.vm.define name do |slave|
-      slave.vm.box = 'irisa_debian-7.3.0_puppet'
-      slave.vm.box_url = 'https://vagrant.irisa.fr/boxes/irisa_debian-7.3.0_puppet-3.4.2.box'
+      slave.vm.box = 'empty'
+      slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/empty.box'
       config.vm.provider :virtualbox do |vb|
         vb.customize ["modifyvm", :id, "--memory", "384"]
         vb.customize ["modifyvm", :id, "--boot1", "net"]
