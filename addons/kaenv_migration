@@ -475,14 +475,14 @@ def migrate_content(content, conftree = nil, options = {:wrap=>true,:custom=>fal
     content.each do |line|
       key,val = parse_key_val(line)
       next if key.nil?
-      puts "migration of '#{key}' -> '#{val}':" if $debug
+      $stderr.puts "migration of '#{key}' -> '#{val}':" if $debug
       key,val = yield(key,val) if options[:custom]
       if key and options[:wrap]
         tmp = cw.migrate(key,val)
       else
         tmp = { key => val }
       end
-      puts "  #{tmp.pretty_inspect}" if $debug
+      $stderr.puts "  #{tmp.pretty_inspect}" if $debug
       config.merge!(tmp) unless key.nil?
     end
 
@@ -531,7 +531,7 @@ end
 
 ARGV.each do |curfile|
   migrate_file(curfile) do |content|
-    puts "=== DEBUG ===" if $debug
+    $stderr.puts "=== DEBUG ===" if $debug
     env = migrate_content(
       content,
       ENV_DESC,
@@ -541,7 +541,7 @@ ARGV.each do |curfile|
       val = val.to_s.to_i(16) if key == 'fdisktype'
       [key,val]
     end
-    puts "=============" if $debug
+    $stderr.puts "=============" if $debug
     print_file(env,:sort=>ENV_SORT)
   end
 end
