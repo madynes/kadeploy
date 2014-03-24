@@ -142,6 +142,8 @@ class HTTPFetchFile < FetchFile
         error("Unable to grab the file #{@path} (http error ##{code})")
       end
       nil
+    rescue KadeployError => ke
+      raise ke
     rescue Exception => e
       error("Unable to grab the file #{@path} (#{e.message})")
     end

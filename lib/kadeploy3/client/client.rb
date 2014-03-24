@@ -47,7 +47,6 @@ class Client
   end
 
   def kill
-    debug "Error encountered, let's clean everything ..."
   end
 
   def self.api_path(path=nil,kind=nil,*args)
@@ -113,10 +112,12 @@ class Client
     begin
       begin
         config = YAML.load_file(configfile)
-      rescue ArgumentError
-        raise ArgumentError.new("Invalid YAML file '#{configfile}'")
+      rescue Psych::SyntaxError => se
+        error("Invalid YAML file '#{configfile}'\n#{se.message}")
+      rescue ArgumentError => ae
+        error("Invalid YAML file '#{configfile}' (#{ae.message})")
       rescue Errno::ENOENT
-        raise ArgumentError.new("File not found '#{configfile}'")
+        error("File not found '#{configfile}'")
       end
 
       servers = {}
@@ -163,18 +164,17 @@ class Client
   def self.load_envfile(envfile,srcfile)
     tmpfile = Tempfile.new("env_file")
     begin
-      uri = URI(File.absolute_path(srcfile))
-      uri.scheme = 'server'
-      uri.send(:set_host, '')
-      FetchFile[uri.to_s].grab(tmpfile.path)
+      uri = URI(srcfile)
+      if uri.scheme.nil? or uri.scheme.empty?
+        uri.send(:set_scheme,'server')
+        uri.send(:set_path,File.absolute_path(srcfile))
+      end
+      FetchFile[uri.to_s,true].grab(tmpfile.path)
       tmpfile.close
       uri = nil
     rescue KadeployError => ke
-      msg = KadeployError.to_msg(ke.errno) || ''
-      msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
-      msg += ke.message if ke.message and !ke.message.empty?
       tmpfile.unlink
-      error(msg)
+      error(ke.message)
     end
 
     unless `file --mime-type --brief #{tmpfile.path}`.chomp == "text/plain"
@@ -184,9 +184,12 @@ class Client
 
     begin
       ret = YAML.load_file(tmpfile.path)
-    rescue ArgumentError
+    rescue Psych::SyntaxError => se
+      error("Invalid YAML file '#{srcfile}'\n#{se.message.gsub(tmpfile.path,srcfile)}")
       tmpfile.unlink
-      error("Invalid YAML file '#{srcfile}'")
+    rescue ArgumentError => ae
+      error("Invalid YAML file '#{srcfile}' (#{ae.message.gsub(tmpfile.path,srcfile)})")
+      tmpfile.unlink
     rescue Errno::ENOENT
       tmpfile.unlink
       error("File not found '#{srcfile}'")
@@ -239,9 +242,10 @@ class Client
 
     begin
       config = YAML.load_file(file)
-    rescue ArgumentError
-      $stderr.puts "Invalid YAML file '#{file}'"
-      return false
+    rescue Psych::SyntaxError => se
+      error("Invalid YAML file '#{file}'\n#{se.message}")
+    rescue ArgumentError => ae
+      error("Invalid YAML file '#{file}' (#{ae.message})")
     rescue Errno::ENOENT
       return true
     end

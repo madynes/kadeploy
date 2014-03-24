@@ -116,4 +116,9 @@ if RUBY_VERSION < '1.9'
       system('stty -raw echo')
     end
   end
+
+  module Psych
+    class SyntaxError < Exception
+    end
+  end
 end
