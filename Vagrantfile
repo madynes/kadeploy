@@ -1,4 +1,6 @@
 Vagrant.configure("2") do |config|
+  config.vm.boot_timeout = 50
+
   config.vm.define :kadeploy_master do |master|
     master.vm.box = 'irisa_debian-7.3.0_puppet'
     master.vm.box_url = 'https://vagrant.irisa.fr/boxes/irisa_debian-7.3.0_puppet-3.4.2.box'
