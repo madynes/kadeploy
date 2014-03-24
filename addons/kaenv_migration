@@ -1,4 +1,4 @@
-#!/usr/bin/ruby
+#!/usr/bin/ruby1.8
 
 require 'yaml'
 require 'fileutils'
@@ -6,6 +6,8 @@ require 'optparse'
 require 'pp'
 
 # Default values and constants
+$debug = ENV['DEBUG']
+
 
 USER=`id -u -n`.strip
 GROUP=`id -g -n`.strip
@@ -297,12 +299,12 @@ class ConfigWrapper
         #puts "#{oldname}: #{path.pretty_inspect}"
         ret = path2hash(path,ret) if !ret.nil? and ret.size > 0
       rescue ArgumentError => ae
-        raise ae if $error
+        raise ae
       end
     else
       raise ArgumentError.new(
         "No rules to migrate the '#{oldname}' field"
-      ) if $error
+      )
     end
     ret
   end
@@ -406,79 +408,11 @@ ENV_SORT = [
   'partition_type',
 ]
 
-# Options parsing
-
-$backuppath   = nil
-$user         = USER
-$group        = GROUP
-$setrights      = false
-
-$backupfiles = []
-$backup = false
-$confirm = true
-$save = true
-$debug = false
-$error = true
-
-USAGE = "Usage: #{$0} [options]"
-
-optparse = OptionParser.new(USAGE) do |opts|
-	opts.on( '-h', '--help', 'Display this screen' ) do
-  		puts opts
-  		exit
-	end
-
-	opts.on( '-b', '--backup', "Move current configuration files into the backup directory [default: disabled]") do
-  	$backup = false
-	end
-
-	opts.on( '-B', '--backup-dir <PATH>', "Specify the path to the directory where kadeploy current environment files should be saved [default: '#{ENVS_PATH}/#{BACKUP_DIR}']") do |b|
-  	$backuppath = b
-	end
-
-	opts.on( '-u', '--user <USERNAME>', "Specify the user that owns the configuration files [default: '#{USER}]'") do |u|
-  	$user = u
-	end
-
-	opts.on( '-g', '--group <GROUPNAME>', "Specify the group of the configuration files [default: '#{GROUP}']") do |g|
-  	$group = g
-	end
-
-	opts.on( '-d', '--dry-run', "Do not write or modify any files [default: disabled]") do
-  	$save = false
-	end
-
-	opts.on( '-r', '--rights', "Set the USER/GROUP rights on generated files [default: disabled]") do
-  	$setrights = true
-	end
-
-	opts.on( '-y', '--no-confirmation-dialog', "Disable the confirmation dialog [default: enabled]") do
-  	$confirm = false
-	end
-
-	opts.on( '-E', '--no-errors', "Do not display errors [default: disabled]") do
-  	$error = false
-	end
-
-	opts.on( '', '--debug', "Print debug of the migration [default: disabled]") do
-  	$debug = true
-	end
-end
-
-begin
-  optparse.parse!
-rescue OptionParser::InvalidOption => e
-  $stderr.puts e.to_s
-  exit 1
-end
-
-
 
 # Signal handler
 trap('INT') do
   abort_migration()
 end
-
 
 
 # Script methods
@@ -487,7 +421,7 @@ def abort_migration()
   exit 1
 end
 
-def save_config_file(file, content_hash, options = {:sort=>false})
+def print_file(content_hash, options = {:sort=>false})
   unless content_hash.empty?
     if options[:sort]
       # Ugly hack to enable yaml output sorting since the :SortKeys option do
@@ -508,14 +442,7 @@ def save_config_file(file, content_hash, options = {:sort=>false})
     else
       yaml = content_hash.to_yaml
     end
-    if $save
-      File.open(file,'w+') { |f| f.puts(yaml) }
-      FileUtils.chown($user,$group,file) if $setrights
-    else
-      puts "\n=== #{file} ==="
-      puts yaml
-      puts '==='
-    end
+    $stdout.puts yaml
   end
 end
 
@@ -528,9 +455,8 @@ def migrate_file(file, options = {:content=>true,:errmsg=>true})
       content = nil
     end
 
+    content.delete_at(0) if content.first == '---' or content.first == '###'
     yield(content)
-
-    $backupfiles << file if $backup
   else
     $stderr.puts "### file not found '#{file}', ignored" if options[:errmsg]
   end
@@ -549,14 +475,14 @@ def migrate_content(content, conftree = nil, options = {:wrap=>true,:custom=>fal
     content.each do |line|
       key,val = parse_key_val(line)
       next if key.nil?
-      puts "\tmigration of '#{key}' -> '#{val}':" if $debug
+      puts "migration of '#{key}' -> '#{val}':" if $debug
       key,val = yield(key,val) if options[:custom]
       if key and options[:wrap]
         tmp = cw.migrate(key,val)
       else
         tmp = { key => val }
       end
-      puts "\t#{tmp.pretty_inspect}" if $debug
+      puts "  #{tmp.pretty_inspect}" if $debug
       config.merge!(tmp) unless key.nil?
     end
 
@@ -598,41 +524,14 @@ def parse_key_val(line)
   [key,val]
 end
 
-
-# Treatment
-if ARGV.empty?
-  $stderr.puts 'No files given'
-  abort_migration()
+if ARGV.size < 1
+  $stderr.puts "Usage: #{$0} <envfile1> <envfile2> ... <envfileN>"
+  exit 1
 end
-
-$backuppath = File.join(ENVS_PATH,BACKUP_DIR) unless $backuppath
-
-# Confirmation dialog
-if $confirm
-  puts "\nMigration settings"
-  puts "  Environments files      : #{ARGV.join(', ')}"
-  puts "  Backup directory        : #{$backuppath}"
-  puts "  Dry run                 : #{!$save}"
-  puts "  Debug mode              : #{$debug}"
-  puts "  Enable errors           : #{$error}"
-  puts "  Set rights to files     : #{$setrights}"
-  puts "  Move files to backup dir: #{$backup}"
-  puts "  User                    : #{$user}"
-  puts "  Group                   : #{$group}"
-  print "\nAre this settings ok [y/N]? "
-
-  abort_migration() unless $stdin.gets.chomp.downcase == 'y'
-end
-
-# Migration
-puts "\nStarting migration"
-
-FileUtils.mkdir_p($backuppath) if $backup
-
-begin
 
 ARGV.each do |curfile|
   migrate_file(curfile) do |content|
+    puts "=== DEBUG ===" if $debug
     env = migrate_content(
       content,
       ENV_DESC,
@@ -642,33 +541,7 @@ ARGV.each do |curfile|
       val = val.to_s.to_i(16) if key == 'fdisktype'
       [key,val]
     end
-    basename = nil
-    if File.basename(curfile).include?('.')
-      basename = File.basename(curfile,".#{curfile.split('.').last}")
-    else
-      basename = File.basename(curfile)
-    end
-    save_config_file(
-      File.join(File.dirname(curfile),"#{basename}.yml"),
-      env,
-      :sort=>ENV_SORT
-    )
-    puts "  migration of '#{curfile}' ok"
+    puts "=============" if $debug
+    print_file(env,:sort=>ENV_SORT)
   end
-end
-
-# Backup of old files
-if $save and $backup and !$backupfiles.empty?
-  puts "  Moving old files to backup directory"
-  $backupfiles.each do |file|
-    FileUtils.mv(file,$backuppath)
-    puts "  #{file} ok"
-  end
-end
-
-puts "Migration done."
-
-rescue ArgumentError => ae
-  $stderr.puts "Error: #{ae.message}"
-  exit 1
 end
