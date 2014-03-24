@@ -139,24 +139,20 @@ module HTTP
           case response.code.to_i
           when 400
             if response['X-Application-Error-Code']
-              error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{body}",(response['X-Application-Error-Code'].to_i rescue 1))
+              error("#{body.strip}\n"\
+                "[Kadeploy Error ##{response['X-Application-Error-Code']}]",
+                (response['X-Application-Error-Code'].to_i rescue 1))
             else
-              error(
-                "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
-                "-----------------\n"\
-                "#{body}\n"\
-                "-----------------"
-              )
+              error("#{body.strip}\n"\
+                "[HTTP Error ##{response.code} on #{request.method} #{request.path}]",2)
             end
+          when 404
+            error("Resource not found #{request.path.split('?').first}")
           when 500
-            error("[Internal Server Error]\n#{body}")
+            error("[Internal Server Error]\n#{body.strip}",3)
           else
-            error(
-              "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
-              "-----------------\n"\
-              "#{body}\n"\
-              "-----------------"
-            )
+            error("#{body.strip}\n"\
+              "[HTTP Error ##{response.code} on #{request.method} #{request.path}]",2)
           end
         end
       end
