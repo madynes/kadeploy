@@ -1,7 +1,10 @@
 Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 50
 
-  config.vm.define :kadeploy_master do |master|
+  config.vm.define :kadeploy do |master|
+    # Could be replaced by standard images (ie. chef/debian-7.4)
+    #   https://github.com/opscode/bento
+    #   https://vagrantcloud.com/discover/featured
     master.vm.box = 'irisa_debian-7.3.0_puppet'
     master.vm.box_url = 'https://vagrant.irisa.fr/boxes/irisa_debian-7.3.0_puppet-3.4.2.box'
     master.vm.network :private_network, ip: '10.0.10.10'
