@@ -57,7 +57,7 @@ Vagrant.configure("2") do |config|
   cluster_size.to_i.times do |i|
     id = i + 1
     mac = "00093d0011" + "%02x" % id
-    name = "node#{id}"
+    name = "node-#{id}"
     ip = "10.0.10.#{10 + id}"
     config.vm.define name do |slave|
       slave.vm.box = 'empty'
