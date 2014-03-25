@@ -74,10 +74,9 @@ Vagrant.configure("2") do |config|
         vb.customize ["modifyvm", :id, "--usbehci", "off"]
         vb.customize ["modifyvm", :id, "--usb", "off"]
       end
-
       slave.ssh.host = ip
-      slave.ssh.username = 'root'
-      slave.ssh.password= 'root'
+
+      slave.vm.synced_folder ".", "/vagrant", disabled: true
     end
   end
 end
