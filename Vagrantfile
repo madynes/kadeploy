@@ -33,7 +33,21 @@ Vagrant.configure("2") do |config|
       puppet.manifests_path = 'addons/puppet4vagranttb/manifests'
       puppet.manifest_file = 'init.pp'
       puppet.module_path = 'addons/puppet4vagranttb/modules'
-#      puppet.options = "--verbose --debug"
+      puppet.options = "--verbose --debug" if ENV['DEBUG']
+    end
+
+    if ENV['DEV'] # for development purpose
+      # synced_folder are conflicting with /vagrant during the installation process
+      master.vm.provision :shell, inline:
+        'rm -Rf /usr/lib/ruby/vendor_ruby/kadeploy3'
+      master.vm.provision :shell, inline:
+        'ln -sf /vagrant/lib/kadeploy3 /usr/lib/ruby/vendor_ruby/kadeploy3'
+      master.vm.provision :shell, inline:
+        'for bin in /vagrant/bin/*; do ln -sf $bin /usr/bin/; done'
+      master.vm.provision :shell, inline:
+        'for bin in /vagrant/sbin/*; do ln -sf $bin /usr/sbin/; done'
+      master.vm.provision :shell, inline:
+        'ln -sf /vagrant/addons/rc/debian/kadeploy /etc/init.d/'
     end
   end
 
@@ -43,7 +57,7 @@ Vagrant.configure("2") do |config|
   cluster_size.to_i.times do |i|
     id = i + 1
     mac = "00093d0011" + "%02x" % id
-    name = "kadeploy_slave#{id}"
+    name = "node#{id}"
     ip = "10.0.10.#{10 + id}"
     config.vm.define name do |slave|
       slave.vm.box = 'empty'
