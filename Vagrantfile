@@ -60,8 +60,9 @@ Vagrant.configure("2") do |config|
     name = "node-#{id}"
     ip = "10.0.10.#{10 + id}"
     config.vm.define name do |slave|
-      slave.vm.box = 'empty'
-      slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/empty.box'
+      slave.vm.box = 'tcl'
+      slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
+
       slave.vm.provider :virtualbox do |vb|
         vb.customize ["modifyvm", :id, "--memory", "384"]
         vb.customize ["modifyvm", :id, "--boot1", "net"]
@@ -70,9 +71,13 @@ Vagrant.configure("2") do |config|
         vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
         vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
         # Disable USB since it's not necessary and depends on extra modules
+        vb.customize ["modifyvm", :id, "--usbehci", "off"]
         vb.customize ["modifyvm", :id, "--usb", "off"]
       end
+
       slave.ssh.host = ip
+      slave.ssh.username = 'root'
+      slave.ssh.password= 'root'
     end
   end
 end
