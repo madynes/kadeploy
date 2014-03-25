@@ -11,6 +11,7 @@ while true
     else # In case the VM is not running
       echo "--- start $node"
       vmid=$(vboxmanage list vms|grep ${node}_|cut -f2 -d" "|tr -d "{}")
+      [ -z "$vmid" ] && echo "$node not found" && exit 1
       vboxmanage startvm $vmid --type headless
     fi
   done
