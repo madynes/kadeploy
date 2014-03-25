@@ -11,7 +11,7 @@ Vagrant.configure("2") do |config|
     end
 
     master.vm.network :private_network, ip: '10.0.10.10'
-    config.vm.provider :virtualbox do |vb|
+    master.vm.provider :virtualbox do |vb|
       vb.customize ["modifyvm", :id, "--memory", "1024"]
       vb.customize ["modifyvm", :id, "--nic1", "nat"]
       vb.customize ["modifyvm", :id, "--nic2", "hostonly"]
@@ -48,14 +48,13 @@ Vagrant.configure("2") do |config|
     config.vm.define name do |slave|
       slave.vm.box = 'empty'
       slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/empty.box'
-      config.vm.provider :virtualbox do |vb|
+      slave.vm.provider :virtualbox do |vb|
         vb.customize ["modifyvm", :id, "--memory", "384"]
         vb.customize ["modifyvm", :id, "--boot1", "net"]
         vb.customize ["modifyvm", :id, "--macaddress1", mac]
         vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
         vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
         vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
-        vb.customize ["modifyvm", :id, "--nic2", "none"]
         # Disable USB since it's not necessary and depends on extra modules
         vb.customize ["modifyvm", :id, "--usb", "off"]
       end
