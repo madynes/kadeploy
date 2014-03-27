@@ -1169,7 +1169,7 @@ OptionParser.new do |opts|
   opts.on('-N', '--node n1[:p1],n2[:p2],...', Array, 'list of node') { |v| $config[:nodeList]=v }
   opts.on('-o', '--output [FILE]', 'output file') { |v| $config[:output] = FileOutput.new(v) }
   opts.on('-O', '--output-cmd [CMD]', 'output command') { |v| $config[:output] = PipeOutput.new(v) }
-  opts.on('-v', '--verbose [warn,info,debug,fatal]', 'run verbosely') do |v|
+  opts.on('-v', '--verbose [fatal,error,warn,info,debug]', 'run verbosely') do |v|
     case v
       when 'warn'
         $log.level=Logger::WARN
@@ -1177,6 +1177,8 @@ OptionParser.new do |opts|
         $log.level=Logger::DEBUG
       when 'info'
         $log.level=Logger::INFO
+      when 'error'
+        $log.level=Logger::ERROR
       when 'fatal'
         $log.level=Logger::FATAL
       when (Logger::DEBUG.to_s)..(Logger::FATAL.to_s)
