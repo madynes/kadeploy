@@ -1,5 +1,12 @@
+# Samples:
+#   DEV=1 INSTALL=build vagrant up
+#
+# Configure/Tune the kabootstrap receipe: puppet/modules/kabootstrap/README
+
 Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 50
+  install = (ENV['INSTALL'] || 'init').downcase
+  install = 'init' unless install =~ /(packages|build|sources|repository)/
 
   config.vm.define :kadeploy do |master|
     if Vagrant::VERSION >= "1.5.0"
@@ -10,7 +17,7 @@ Vagrant.configure("2") do |config|
         "https://vagrantcloud.com/chef/debian-7.4/version/1/provider/virtualbox.box"
     end
 
-    master.vm.network :private_network, ip: '10.0.10.10'
+    master.vm.network :private_network, ip: '10.0.10.253'
     master.vm.provider :virtualbox do |vb|
       vb.customize ["modifyvm", :id, "--memory", "1024"]
       vb.customize ["modifyvm", :id, "--nic1", "nat"]
@@ -30,9 +37,9 @@ Vagrant.configure("2") do |config|
     master.vm.provision :shell, path: 'addons/puppet4vagranttb/install_puppet.sh'
 
     master.vm.provision :puppet do |puppet|
-      puppet.manifests_path = 'addons/puppet4vagranttb/manifests'
-      puppet.manifest_file = 'init.pp'
-      puppet.module_path = 'addons/puppet4vagranttb/modules'
+      puppet.manifests_path = 'puppet/manifests'
+      puppet.manifest_file = "#{install}.pp"
+      puppet.module_path = 'puppet/modules'
       puppet.options = "--verbose --debug" if ENV['DEBUG']
     end
 
@@ -56,9 +63,9 @@ Vagrant.configure("2") do |config|
 
   cluster_size.to_i.times do |i|
     id = i + 1
-    mac = "00093d0011" + "%02x" % id
+    mac = "0200020002" + "%02x" % id
     name = "node-#{id}"
-    ip = "10.0.10.#{10 + id}"
+    ip = "10.0.10.#{id + 1}"
     config.vm.define name do |slave|
       slave.vm.box = 'tcl'
       slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
