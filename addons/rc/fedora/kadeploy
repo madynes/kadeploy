@@ -19,11 +19,11 @@
 
 prog="Kadeploy 3"
 kadeploy3d=/usr/sbin/kadeploy3d
-pidfile=/var/run/kadeploy3d.pid
+rundir=/var/run/kadeploy3d
+pidfile=${rundir}/kadeploy3d.pid
 args="--pidfile $pidfile"
 lockfile=/var/lock/subsys/kadeploy3d
 user=deploy
-rundir=/var/run/kadeploy3
 RETVAL=0
 
 start() {
