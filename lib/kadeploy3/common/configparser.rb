@@ -250,7 +250,7 @@ module Configuration
         if !val.empty? and !Pathname.new(val).absolute?
             # Since the command is launched in a shell and can be a script,
             # if the command cannot be found, skip further checkings
-           val = `which '#{val}'`.strip
+           val = `which '#{val}' 2>/dev/null`.strip
            return unless $?.success?
         end
       end
