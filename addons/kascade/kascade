@@ -161,7 +161,7 @@ end
 
 def connect_try(line)
   retries=$config[:retries] # it can change with time
-  1.upto(retries) do |i|
+  0.upto(retries) do |i|
     begin
       return connect(line)
     rescue Errno::EHOSTUNREACH, Timeout::Error => ex
@@ -171,10 +171,11 @@ def connect_try(line)
     rescue Exception => e
       $log.debug e
       raise e if retries==i
-      $log.warn("Connection failed on #{line}, retrying (#{i}/#{retries}): #{e.to_s}")
+      $log.warn("Connection failed on #{line}, retrying (#{i+1}/#{retries}): #{e.to_s}")
       sleep 1
     end
   end
+  raise "Retry limit is reached for #{line}. It's possible that is never tried !"
 end
 
 def get_port(line, add=0)
@@ -1229,6 +1230,8 @@ end.parse!
 if $config[:nodeList].nil?
   fatal_error("No nodes list specified. See kascade -?")
 end
+
+fatal_error("Retries value must be > 0") unless $config[:retries] > 0
 
 if $config[:output].nil?
   fatal_error("No output mode specified. Use '-o FILE' or '-O COMMAND'. See kascade -?")
