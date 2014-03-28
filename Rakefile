@@ -95,7 +95,7 @@ INSTALL = {
     :mode => '770',
   },
   :run => {
-    :dir => '/var/log/kadeploy3d',
+    :dir => '/var/run/kadeploy3d',
     :user => DEPLOY_USER,
     :group => 'root',
     :mode => '755',
