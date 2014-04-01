@@ -43,7 +43,7 @@ class misc {
     'netcat-openbsd':
       ensure => installed;
   }
-  Group['deploy'] -> User['deploy'] -> Exec['apt-get-update'] -> Package['taktuk'] -> Package['libtaktuk-perl'] -> Package['oidentd'] -> Package['rake'] -> Package['help2man'] -> Package['rubygems']
+  Group['deploy'] -> User['deploy'] -> Exec['apt-get-update'] -> Package['taktuk'] -> Package['libtaktuk-perl'] -> Package['oidentd'] -> Package['rake'] -> Package['help2man'] -> Package['rubygems'] -> Package['netcat-openbsd']
   $hostscript = '/tmp/set_hosts.sh'
   file {
     $hostscript:
