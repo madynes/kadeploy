@@ -199,7 +199,7 @@ class Client
     tmpfile.unlink
 
     begin
-      Environment.new.load_from_desc(Marshal.load(Marshal.dump(ret)),[],USER,nil,false)
+      Environment.new.load_from_desc(Marshal.load(Marshal.dump(ret)),[],USER,nil,false,$stdout)
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno) || ''
       msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
