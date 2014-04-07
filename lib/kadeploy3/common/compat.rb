@@ -117,6 +117,10 @@ if RUBY_VERSION < '1.9'
     end
   end
 
+  def STDIN.cooked!()
+    system('stty cooked')
+  end
+
   def STDIN.winsize()
     ret = `stty size`.strip
     if ret.empty?
