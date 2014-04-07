@@ -175,7 +175,7 @@ class Environment
   # * user: true user
   # Output
   # * returns true if the environment can be loaded correctly, false otherwise
-  def load_from_desc(description, almighty_env_users, user, client=nil, get_checksum=true)
+  def load_from_desc(description, almighty_env_users, user, client=nil, get_checksum=true,output=nil)
     @recorded = false
     @user = user
     @preinstall = nil
@@ -330,7 +330,7 @@ class Environment
     end
 
     cp.unused().each do |path|
-      debug("Warning[environment description]: Unused field '#{path}'")
+      output.puts "Warning[env_desc]: Unused field '#{path}'" if output
     end
 
     ret = check_os_values()
