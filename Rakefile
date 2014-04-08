@@ -23,6 +23,13 @@ VERSION="#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
 
 DEPLOY_USER='deploy'
 
+def vendordir(*args)
+  if RUBY_VERSION >= "1.9.0"
+    File.join(RbConfig::CONFIG["vendordir"],*args)
+  else
+    File.join(RbConfig::CONFIG["vendorlibdir"],*args)
+  end
+end
 # Directories
 D = {
   :base => File.dirname(__FILE__),
@@ -58,25 +65,25 @@ INSTALL = {
     :mode => '644',
   },
   :lib => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3'),
+    :dir => vendordir('kadeploy3'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_client => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','client'),
+    :dir => vendordir('kadeploy3','client'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_server => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','server'),
+    :dir => vendordir('kadeploy3','server'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_common => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','common'),
+    :dir => vendordir('kadeploy3','common'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
@@ -88,7 +95,7 @@ INSTALL = {
     :mode => '770',
   },
   :run => {
-    :dir => '/var/log/kadeploy3d',
+    :dir => '/var/run/kadeploy3d',
     :user => DEPLOY_USER,
     :group => 'root',
     :mode => '755',

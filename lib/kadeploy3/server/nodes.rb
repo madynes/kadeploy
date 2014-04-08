@@ -10,7 +10,7 @@ module Nodes
   def self.sort_list(nodes)
     nodes.sort_by! do |h|
       h.to_s.split('.').reverse.collect do |v|
-        v.scan(/\d+|\p{Alpha}+/).map!{|n| Integer(n) rescue n}
+        v.scan(/\d+|[a-zA-Z]+/).map!{|n| Integer(n) rescue n}
       end.flatten
     end
   end

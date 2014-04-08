@@ -64,8 +64,8 @@ KADEPLOY3_LIBS/*
 %files server
 %dir /var/log/kadeploy3
 %attr(0770,root,deploy) /var/log/kadeploy3
-#%dir /var/run/kadeploy3
-#%attr(0740,deploy,deploy) /var/run/kadeploy3
+%dir /var/run/kadeploy3d
+%attr(0740,deploy,deploy) /var/run/kadeploy3d
 %defattr(-,deploy,deploy,-)
 /etc/init.d/kadeploy
 %config(noreplace) /etc/kadeploy3/clusters.conf

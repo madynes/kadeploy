@@ -252,7 +252,7 @@ module Kaconsole
               begin
                 sock.sysread(1,c)
                 w.syswrite(c)
-              rescue EOFError
+              rescue EOFError, Errno::ECONNRESET
                 sock.close_read
                 done = true
               end
