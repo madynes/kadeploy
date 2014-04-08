@@ -117,6 +117,10 @@ if RUBY_VERSION < '1.9'
     end
   end
 
+  def STDIN.cooked!()
+    system('stty cooked')
+  end
+
   module Psych
     class SyntaxError < Exception
     end
