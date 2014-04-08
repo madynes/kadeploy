@@ -321,7 +321,7 @@ task :apidoc_clean do
 end
 
 task :prepare, [:root_dir] do |f,args|
-  @root_dir = args.root_dir
+  @root_dir = args.root_dir if args.root_dir and !args.root_dir.empty?
 end
 
 desc "Install the client and the server"
@@ -413,7 +413,7 @@ end
 desc "Install the server"
 task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_common] do |f,args|
   args.with_defaults(:distrib => 'debian')
-  raise "unknown distrib '#{args.distrib}'" unless %w{debian fedora}.include?(args.distrib)
+  raise "unknown distrib '#{args.distrib}'" unless %w{debian redhat}.include?(args.distrib)
   raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
 
   create_dir(:man8)
@@ -602,7 +602,7 @@ desc "Generate rpm package"
 task :rpm, [:dir] => :build do
   sh "mkdir -p #{File.join(D[:build],'SOURCES')}"
   sh "mv #{File.join(D[:build],'*')} #{File.join(D[:build],'SOURCES')} || true"
-  specs = File.read(File.join(D[:pkg],'fedora','kadeploy.spec.in'))
+  specs = File.read(File.join(D[:pkg],'redhat','kadeploy.spec.in'))
   specs.gsub!(/KADEPLOY3_LIBS/,INSTALL[:lib][:dir])
   specs.gsub!(/MAJOR_VERSION/,MAJOR_VERSION)
   specs.gsub!(/MINOR_VERSION/,MINOR_VERSION)
