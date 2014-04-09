@@ -612,45 +612,34 @@ class KadeployServer
   def workflows_clean()
     clean_threshold = cfg().common.autoclean_threshold
     [:deploy,:reboot,:power].each do |kind|
-      if @workflows_locks[kind] and @workflows_info[kind]
-        to_clean = []
-        @workflows_locks[kind].synchronize do
-          @workflows_info[kind].each_pair do |wid,info|
-            info[:lock].lock
-            if info[:done] # Done workflow
-              if (Time.now - info[:start_time]) > clean_threshold
-                to_clean << info
-                @workflows_info[kind].delete(wid)
-                unbind(info)
-              else
-                info[:lock].unlock
-              end
-            elsif info[:error] # Dead workflow
-              if (Time.now - info[:start_time]) > clean_threshold
-                to_clean << info
-                @workflows_info[kind].delete(wid)
-                unbind(info)
-              else
-                info[:lock].unlock
-              end
+      to_clean = []
+      @workflows_locks[kind].synchronize do
+        @workflows_info[kind].each_pair do |wid,info|
+          info[:lock].lock
+          if info[:done] or info[:error] # Done or Error workflow
+            if (Time.now - info[:start_time]) > clean_threshold
+              to_clean << info
+              @workflows_info[kind].delete(wid)
+              unbind(info)
             else
               info[:lock].unlock
             end
-          end
-        end
-        to_clean.each do |info|
-          begin
-            run_wmethod(kind,:delete!,nil,info)
-          ensure
+          else
             info[:lock].unlock
           end
-          info.clear
         end
-        to_clean.clear
-        to_clean = nil
       end
+      to_clean.each do |info|
+        begin
+          run_wmethod(kind,:delete!,nil,info)
+        ensure
+          info[:lock].unlock
+        end
+        info.clear
+      end
+      to_clean.clear
+      to_clean = nil
     end
-    GC.start
     nil
   end
 
