@@ -326,68 +326,73 @@ module Kaworkflow
         begin
           GrabFile.grab_user_files(context,info[:cached_files],workflow_lock(kind,info[:wid]))
         rescue KadeployError => ke
-          info[:nodes].set_state('aborted',nil,context[:database],context[:user])
+          info[:lock].synchronize do
+            info[:nodes].set_state('aborted',nil,context[:database],context[:user])
+          end
           raise ke
         end
 
-        # Set clusters IDs
-        clusters = info[:nodes].group_by_cluster
-        if clusters.size > 1
-          clid = 1
-        else
-          clid = 0
-        end
-
-        # Run a Workflow by cluster
-        clusters.each_pair do |cluster,nodeset|
-          context[:cluster] = info[:config].clusters[cluster]
+        output = nil
+        info[:lock].synchronize do
+          # Set clusters IDs
+          clusters = info[:nodes].group_by_cluster
           if clusters.size > 1
-            if context[:cluster].prefix.empty?
-              context[:cluster_prefix] = "c#{clid}"
-              clid += 1
-            else
-              context[:cluster_prefix] = context[:cluster].prefix.dup
-            end
+            clid = 1
           else
-            context[:cluster_prefix] = ''
+            clid = 0
           end
 
-          info[:outputfile].prefix = "#{context[:wid]}|#{info[:user]} -> " if info[:outputfile]
-          context[:output] = Debug::OutputControl.new(
-            context[:execution].verbose_level || info[:config].common.verbose_level,
-            info[:outputfile],
-            context[:cluster_prefix]
-          )
-          context[:logger] = Debug::Logger.new(
-            nodeset.make_array_of_hostname,
-            info[:user],
-            context[:wid],
-            Time.now,
-            (info[:environment] ? "#{info[:environment].name}:#{info[:environment].version.to_s}" : nil),
-            (info[:environment] and info[:environment].id < 0),
-            info[:loggerfile],
-            (info[:config].common.log_to_db ? context[:database] : nil)
-          )
+          # Run a Workflow by cluster
+          clusters.each_pair do |cluster,nodeset|
+            context[:cluster] = info[:config].clusters[cluster]
+            if clusters.size > 1
+              if context[:cluster].prefix.empty?
+                context[:cluster_prefix] = "c#{clid}"
+                clid += 1
+              else
+                context[:cluster_prefix] = context[:cluster].prefix.dup
+              end
+            else
+              context[:cluster_prefix] = ''
+            end
 
-          workflow = Workflow.const_get("#{kind.to_s.capitalize}").new(nodeset,context.dup)
+            info[:outputfile].prefix = "#{context[:wid]}|#{info[:user]} -> " if info[:outputfile]
+            context[:output] = Debug::OutputControl.new(
+              context[:execution].verbose_level || info[:config].common.verbose_level,
+              info[:outputfile],
+              context[:cluster_prefix]
+            )
+            context[:logger] = Debug::Logger.new(
+              nodeset.make_array_of_hostname,
+              info[:user],
+              context[:wid],
+              Time.now,
+              (info[:environment] ? "#{info[:environment].name}:#{info[:environment].version.to_s}" : nil),
+              (info[:environment] and info[:environment].id < 0),
+              info[:loggerfile],
+              (info[:config].common.log_to_db ? context[:database] : nil)
+            )
 
-          workflows[cluster] = workflow
-        end
+            workflow = Workflow.const_get("#{kind.to_s.capitalize}").new(nodeset,context.dup)
 
-        output = info[:output]
-
-        # Print debug
-        if clusters.size > 1 and output
-          output.push(0,"---")
-          output.push(0,"Clusters involved in the operation:")
-          workflows.each_value do |workflow|
-            output.push(0,"  #{Debug.prefix(workflow.context[:cluster_prefix])}: #{workflow.context[:cluster].name}")
+            workflows[cluster] = workflow
           end
-          output.push(0,"---")
-        end
 
-        # Run every workflows
-        workflows.each_value{ |wf| info[:threads][wf] = wf.run! }
+          output = info[:output]
+
+          # Print debug
+          if clusters.size > 1 and output
+            output.push(0,"---")
+            output.push(0,"Clusters involved in the operation:")
+            workflows.each_value do |workflow|
+              output.push(0,"  #{Debug.prefix(workflow.context[:cluster_prefix])}: #{workflow.context[:cluster].name}")
+            end
+            output.push(0,"---")
+          end
+
+          # Run every workflows
+          workflows.each_value{ |wf| info[:threads][wf] = wf.run! }
+        end # synchronize
 
         # Wait for cleaners to be started
         workflows.each_value{ |wf| sleep(0.2) until (wf.cleaner or wf.done?) }
@@ -405,46 +410,52 @@ module Kaworkflow
           end
           sleep(WORKFLOW_STATUS_CHECK_PITCH)
         end
-        info[:end_time] = Time.now
 
-        # Print debug
-        workflows.each_value do |workflow|
-        #  clname = workflow.context[:cluster].name
-        #  output.push(0,"")
-          unless workflow.nodes_brk.empty?
-            info[:nodes_ok] += workflow.nodes_brk.make_array_of_hostname
+        info[:lock].synchronize do
+          info[:end_time] = Time.now
+
+          # Print debug
+          workflows.each_value do |workflow|
+          #  clname = workflow.context[:cluster].name
+          #  output.push(0,"")
+            unless workflow.nodes_brk.empty?
+              info[:nodes_ok] += workflow.nodes_brk.make_array_of_hostname
+            end
+
+            unless workflow.nodes_ok.empty?
+              info[:nodes_ok] += workflow.nodes_ok.make_array_of_hostname
+            end
+
+            unless workflow.nodes_ko.empty?
+              info[:nodes_ko] += workflow.nodes_ko.make_array_of_hostname
+            end
+          end
+          Nodes::sort_list(info[:nodes_ok])
+          Nodes::sort_list(info[:nodes_ko])
+
+          if output
+            info[:workflows].each_value do |workflow|
+              output.write(workflow.output.pop) unless workflow.output.empty?
+            end
           end
 
-          unless workflow.nodes_ok.empty?
-            info[:nodes_ok] += workflow.nodes_ok.make_array_of_hostname
-          end
-
-          unless workflow.nodes_ko.empty?
-            info[:nodes_ko] += workflow.nodes_ko.make_array_of_hostname
-          end
-        end
-        Nodes::sort_list(info[:nodes_ok])
-        Nodes::sort_list(info[:nodes_ko])
-
-        if output
-          info[:workflows].each_value do |workflow|
-            output.write(workflow.output.pop) unless workflow.output.empty?
-          end
-        end
-
-        info[:done] = true
+          info[:done] = true
+        end # synchronize
 
         yield(info) if block_given?
 
         # Clean everything
-        free_exec_context(context[:execution])
-        #wipe_exec_context(context[:execution]) # Bug -> clear strings,arrays,..., to be re-enabled if there is some memory leak issues
-        run_wmethod(kind,:free,info)
+        info[:lock].synchronize do
+          free_exec_context(context[:execution])
+          run_wmethod(kind,:free,info)
+        end
 
       rescue Exception => e
-        info[:error] = true
-        run_wmethod(kind,:kill,info)
-        run_wmethod(kind,:free,info)
+        info[:lock].synchronize do
+          info[:error] = true
+          run_wmethod(kind,:kill,info)
+          run_wmethod(kind,:free,info)
+        end
         raise e
       ensure
         run_wmethod(kind,:end_hook,info)
