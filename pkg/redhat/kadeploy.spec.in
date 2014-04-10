@@ -23,7 +23,7 @@ This package provide the common part of the Kadeploy deployment tool.
 
 %package server
 Summary:        Server part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}, taktuk >= 3.6
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}
 Group:          System/Cluster
 %description server
 This package provide the server part of the Kadeploy deployment tool.

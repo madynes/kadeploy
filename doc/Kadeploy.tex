@@ -174,10 +174,23 @@ mysql> GRANT select, insert, update, delete, create, drop, alter, \
 
 Once the database is created and the user granted, you can use the SQL script provided in the distribution (\texttt{db/db\_creation.sql}) to create the tables in the database.
 
+\subsection{TakTuk}
+Kadeploy3 have a strong dependence on the TakTuk software, this software should be installed on the machine that hosts the Kadeploy3 service in order for it to work properly.
+
+\noindent \textbf{Note for Debian users}
+
+\noindent The TakTuk software is available in the official repositories.
+
+\noindent \textbf{Note for RedHat users}
+
+\noindent The TakTuk software is not packaged in RedHat-based distributions for the moment. Some RPM packages are available on the Kadeploy3 website: \url{http://kadeploy3.gforge.inria.fr/files/taktuk/}. It's also possible to install the TakTuk software from the sources, more information on the project's website: \url{http://taktuk.gforge.inria.fr/}.
+
+
+
 \section{Kadeploy installation}
 Since Kadeploy is based on a client/server architecture, you must perform the install on both the server and the client if it is not the same machine.
 
-Two ways are provided to install Kadeploy, a basic installer and packages (for Debian and Fedora). In both cases, you had to ensure that a user \texttt{deploy} is existing on your system. This user is used to execute the Kadeploy server. Furthermore, all the installation operations must be performed with root rights.
+Two ways are provided to install Kadeploy, a basic installer and packages (for Debian and RedHat). In both cases, you had to ensure that a user \texttt{deploy} is existing on your system. This user is used to execute the Kadeploy server. Furthermore, all the installation operations must be performed with root rights.
 
 \subsection{Basic installation}
 First of all , you have to uncompress the Kadeploy tarball.
@@ -210,7 +223,7 @@ First of all , you have to uncompress the Kadeploy tarball.
 
 \paragraph{remark:} If there are already configuration files, the new example of configuration files will be installed with \texttt{.dist} extension.
 
-\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and Fedora (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
+\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and RedHat (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
 \begin{small}
 \begin{verbatim}
 > rake install[root_dir,redhat]
@@ -280,8 +293,8 @@ This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, 
 \paragraph{Warning}
 In order to preserve your configuration files, the removal of a Kadeploy package will preserve the configuration files (unless you specify the \texttt{-{}-purge} tag).
 
-\subsection{Fedora packages}
-The following installation method works only an Fedora based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
+\subsection{RedHat packages}
+The following installation method works only an RedHat based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
 \subsubsection{Build}
 \noindent First, you have to uncompress the Kadeploy tarball.
 \begin{small}
@@ -323,7 +336,6 @@ This will generate three rpm package in the RPMS package of your build environme
 \end{Verbatim}
 \end{small}
 
-
 \section{Launching the Kadeploy server}
 After being installed and configured, the Kadeploy server can be run either interactively:
 \begin{small}
@@ -338,7 +350,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \end{verbatim}
 \end{small}
 
-\subsection{Automatic launch on a Debian and a Fedora based distribution}
+\subsection{Automatic launch on a Debian and a RedHat based distribution}
 \noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
 \chapter{Server side configuration}\label{chap:Server_side_conf}
