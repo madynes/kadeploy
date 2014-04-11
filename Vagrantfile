@@ -1,6 +1,7 @@
 # Samples:
 #   DEV=1 INSTALL=build vagrant up
 #   DISTRIB=redhat INSTALL=package vagrant up
+#   PKG=1 vagrant up # sources files are copied in vagrant's homedir kadeploy3/
 #
 # Configure/Tune the kabootstrap receipe: puppet/modules/kabootstrap/README
 
@@ -59,12 +60,38 @@ Vagrant.configure("2") do |config|
 
     master.vm.provision :puppet do |puppet|
       puppet.manifests_path = 'puppet/manifests'
-      puppet.manifest_file = "#{install}.pp"
       puppet.module_path = 'puppet/modules'
+      if ENV['PKG'] # Only install dependencies to build Kadeploy packages
+        puppet.manifest_file = 'deps.pp'
+      else # Install the service
+        puppet.manifest_file = "#{install}.pp"
+      end
+      puppet.facter = {'facter_http_proxy' => ENV['http_proxy']} if ENV['http_proxy']
       puppet.options = "--verbose --debug" if ENV['DEBUG']
     end
 
-    if ENV['DEV'] # for development purpose
+    if ENV['PKG']
+      gerrit='https://helpdesk.grid5000.fr/gerrit/kadeploy3'
+      repodir='/home/vagrant/kadeploy3'
+      gitopts="--git-dir=#{repodir}/.git --work-tree=#{repodir}"
+      # Create a copy of the sources directory
+      master.vm.provision :shell, inline:
+        "rm -Rf #{repodir}; cp -R /vagrant #{repodir}"
+      # Clean the git directory
+      master.vm.provision :shell, inline:
+        "git #{gitopts} clean -ffd"
+      # Configure the repository for gerrit (use https not to copy SSH keys)
+      master.vm.provision :shell, inline:
+        "git #{gitopts} remote set-url origin #{gerrit}"
+      master.vm.provision :shell, inline:
+        "git #{gitopts} config user.name '#{`git config user.name`.strip}'"
+      master.vm.provision :shell, inline:
+        "git #{gitopts} config user.email '#{`git config user.email`.strip}'"
+      master.vm.provision :shell, inline:
+        "git #{gitopts} config credential.helper cache"
+      master.vm.provision :shell, inline:
+        "chown -R vagrant:vagrant #{repodir}"
+    elsif ENV['DEV'] # For development purpose
       # synced_folder are conflicting with /vagrant during the installation process
       master.vm.provision :shell, inline:
         'rm -Rf /usr/lib/ruby/vendor_ruby/kadeploy3'
@@ -80,31 +107,33 @@ Vagrant.configure("2") do |config|
   end
 
 
-  cluster_size = ENV['CLUSTER_SIZE'] || 1
+  unless ENV['PKG']
+    cluster_size = ENV['CLUSTER_SIZE'] || 1
 
-  cluster_size.to_i.times do |i|
-    id = i + 1
-    mac = "0200020002" + "%02x" % id
-    name = "node-#{id}"
-    ip = "10.0.10.#{id + 1}"
-    config.vm.define name do |slave|
-      slave.vm.box = 'tcl'
-      slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
+    cluster_size.to_i.times do |i|
+      id = i + 1
+      mac = "0200020002" + "%02x" % id
+      name = "node-#{id}"
+      ip = "10.0.10.#{id + 1}"
+      config.vm.define name do |slave|
+        slave.vm.box = 'tcl'
+        slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
 
-      slave.vm.provider :virtualbox do |vb|
-        vb.memory = 384
-        vb.customize ["modifyvm", :id, "--boot1", "net"]
-        vb.customize ["modifyvm", :id, "--macaddress1", mac]
-        vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
-        vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
-        vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
-        # Disable USB since it's not necessary and depends on extra modules
-        vb.customize ["modifyvm", :id, "--usbehci", "off"]
-        vb.customize ["modifyvm", :id, "--usb", "off"]
+        slave.vm.provider :virtualbox do |vb|
+          vb.memory = 384
+          vb.customize ["modifyvm", :id, "--boot1", "net"]
+          vb.customize ["modifyvm", :id, "--macaddress1", mac]
+          vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
+          vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
+          vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
+          # Disable USB since it's not necessary and depends on extra modules
+          vb.customize ["modifyvm", :id, "--usbehci", "off"]
+          vb.customize ["modifyvm", :id, "--usb", "off"]
+        end
+        slave.ssh.host = ip
+
+        slave.vm.synced_folder ".", "/vagrant", disabled: true
       end
-      slave.ssh.host = ip
-
-      slave.vm.synced_folder ".", "/vagrant", disabled: true
     end
   end
 end
