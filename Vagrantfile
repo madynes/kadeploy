@@ -1,5 +1,6 @@
 # Samples:
 #   DEV=1 INSTALL=build vagrant up
+#   DISTRIB=redhat INSTALL=package vagrant up
 #
 # Configure/Tune the kabootstrap receipe: puppet/modules/kabootstrap/README
 
@@ -7,19 +8,31 @@ Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 50
   install = (ENV['INSTALL'] || 'init').downcase
   install = 'init' unless install =~ /(packages|build|sources|repository)/
+  distrib = (ENV['DISTRIB'] || 'debian').downcase
 
   config.vm.define :kadeploy do |master|
     if Vagrant::VERSION >= "1.5.0"
-      master.vm.box = 'chef/debian-7.4'
+      if distrib == 'redhat'
+        master.vm.box = 'chef/centos-6.5'
+      else
+        master.vm.box = 'chef/debian-7.4'
+      end
     else
-      master.vm.box = 'debian-7.4'
-      master.vm.box_url =
-        "https://vagrantcloud.com/chef/debian-7.4/version/1/provider/virtualbox.box"
+      if distrib == 'redhat'
+        master.vm.box = 'centos-6.5'
+        master.vm.box_url =
+          "https://vagrantcloud.com/chef/centos-6.5/version/1/provider/virtualbox.box"
+      else
+        master.vm.box = 'debian-7.4'
+        master.vm.box_url =
+          "https://vagrantcloud.com/chef/debian-7.4/version/1/provider/virtualbox.box"
+      end
     end
 
     master.vm.network :private_network, ip: '10.0.10.253'
     master.vm.provider :virtualbox do |vb|
-      vb.customize ["modifyvm", :id, "--memory", "1024"]
+      vb.cpus = 2
+      vb.memory = 1024
       vb.customize ["modifyvm", :id, "--nic1", "nat"]
       vb.customize ["modifyvm", :id, "--nic2", "hostonly"]
       vb.customize ["modifyvm", :id, "--hostonlyadapter2", "vboxnet0"]
@@ -34,7 +47,15 @@ Vagrant.configure("2") do |config|
         "echo 'export https_proxy=#{ENV['https_proxy'].strip}' >> /etc/profile"
     end
 
-    master.vm.provision :shell, path: 'addons/puppet4vagranttb/install_puppet.sh'
+    if distrib == 'redhat'
+      master.vm.provision :shell, inline: 'yum check-update; true'
+      master.vm.provision :shell, inline: 'yum install -y ruby rubygems redhat-lsb'
+    else
+      master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get update'
+      master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get install -y ruby rubygems lsb-release'
+    end
+    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter'
+    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc puppet'
 
     master.vm.provision :puppet do |puppet|
       puppet.manifests_path = 'puppet/manifests'
@@ -71,7 +92,7 @@ Vagrant.configure("2") do |config|
       slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
 
       slave.vm.provider :virtualbox do |vb|
-        vb.customize ["modifyvm", :id, "--memory", "384"]
+        vb.memory = 384
         vb.customize ["modifyvm", :id, "--boot1", "net"]
         vb.customize ["modifyvm", :id, "--macaddress1", mac]
         vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
