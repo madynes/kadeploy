@@ -6,6 +6,7 @@ class kabootstrap::params {
   $network_mask           = '255.255.255.0'
   $network_interface      = 'eth0'
   $nat_interface          = undef
+  $pxe_bootstrap_method   = 'PXElinux'
   $pxe_bootstrap_program  = 'pxelinux.0'
   $pxe_profiles_directory = 'pxelinux.cfg'
   $pxe_chainload_program  = undef
@@ -27,6 +28,7 @@ class kabootstrap::params {
   $sources_directory      = undef
   $repository_url         = undef
   $packages_directory     = 'puppet:///modules/kabootstrap/packages'
+  $vm_scripts             = false
 
   case $::osfamily {
     redhat: {
@@ -48,7 +50,7 @@ class kabootstrap::params {
       $bind_dir = '/etc/bind'
       $pkg_name = 'kadeploy'
       $pkg_deps = ['ruby1.9.1','ruby-mysql','ssh','taktuk']
-      $pkg_install = 'dpkg -i'
+      $pkg_install = 'dpkg --force-confdef --force-confold -i'
       $pkg_ext = 'deb'
       $inst_deps = ['rake', 'help2man', 'texlive-latex-base','texlive-latex-recommended','texlive-latex-extra']
       $build_deps = ['git','debhelper','gem2deb','git-buildpackage']

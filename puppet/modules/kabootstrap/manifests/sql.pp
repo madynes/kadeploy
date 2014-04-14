@@ -17,8 +17,8 @@ class kabootstrap::sql (
   }
 
   mysql::db { $mysql_db_name:
-    user     => $mysql_deploy_user,
-    password => $mysql_deploy_password,
+    user     => $mysql_db_user,
+    password => $mysql_db_password,
     host     => 'localhost',
     grant    => ['ALL'],
     charset  => 'utf8',
@@ -29,22 +29,22 @@ class kabootstrap::sql (
 
   # Seems to be done by mysql::db
   #
-  # mysql_user { "${mysql_deploy_user}@localhost":
+  # mysql_user { "${mysql_db_user}@localhost":
   #   ensure => 'present',
   # }
-  # mysql_grant { "${mysql_deploy_user}@localhost/${mysql_db_name}.*":
+  # mysql_grant { "${mysql_db_user}@localhost/${mysql_db_name}.*":
   #   ensure     => 'present',
   #   options    => ['GRANT'],
   #   privileges => ['ALL'],
   #   table      => "${mysql_db_name}.*",
-  #   user       => "${mysql_deploy_user}@localhost",
+  #   user       => "${mysql_db_user}@localhost",
   # }
 
-  mysql_grant { "${mysql_deploy_user}@${dns_domain}/${mysql_db_name}.*":
+  mysql_grant { "${mysql_db_user}@${dns_domain}/${mysql_db_name}.*":
     ensure => 'present',
     options    => ['GRANT'],
     privileges => ['ALL'],
     table      => "${mysql_db_name}.*",
-    user       => "${mysql_deploy_user}@${dns_domain}",
+    user       => "${mysql_db_user}@${dns_domain}",
   }
 }

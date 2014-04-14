@@ -22,6 +22,7 @@ class kabootstrap (
   $sources_directory      = $::kabootstrap::params::sources_directory,
   $repository_url         = $::kabootstrap::params::repository_url,
   $packages_directory     = $::kabootstrap::params::packages_directory,
+  $vm_scripts             = $::kabootstrap::params::vm_scripts,
 ) inherits kabootstrap::params {
   # Check data structures
   unless is_ip_address($network_ip) {
@@ -37,6 +38,16 @@ class kabootstrap (
 
   if $http_proxy == undef and $facter_http_proxy != undef {
     $http_proxy = $facter_http_proxy
+  }
+
+  # TODO: find a better way to do it
+  if $::osfamily == 'redhat' or $install_kind == 'sources' {
+    $pkg_doc_dir = '/usr/share/doc/kadeploy3'
+    $pkg_scripts_dir = "${pkg_doc_dir}/scripts"
+  }
+  else {
+    $pkg_doc_dir = '/usr/share/doc/kadeploy'
+    $pkg_scripts_dir = "${pkg_doc_dir}/examples/scripts"
   }
 
   # Configure NAT
@@ -87,7 +98,7 @@ class kabootstrap (
     mysql_root_password => $mysql_root_password,
   }
 
-  # Kadeploy3
+  # Install Kadeploy3
   class {'kabootstrap::kadeploy':
     install_kind       => $install_kind,
     sources_directory  => $sources_directory,
@@ -98,4 +109,61 @@ class kabootstrap (
   Class['kabootstrap::dns']      -> Class['kabootstrap::kadeploy']
   Class['kabootstrap::tftp']     -> Class['kabootstrap::kadeploy']
   Class['kabootstrap::sql']      -> Class['kabootstrap::kadeploy']
+
+  if $vm_scripts == true {
+    $remoteops = {
+      'console' => {
+        'soft' => "SSH_CONNECTOR HOSTNAME_FQDN",
+      },
+      'reboot' => {
+        'soft' => "SSH_CONNECTOR HOSTNAME_FQDN /sbin/reboot",
+        'hard' => "/usr/local/bin/vmctl.sh reset HOSTNAME_SHORT",
+
+      },
+      'power_on' => {
+        'hard' => "/usr/local/bin/vmctl.sh on HOSTNAME_SHORT",
+      },
+      'power_off' => {
+        'hard' => "/usr/local/bin/vmctl.sh off HOSTNAME_SHORT",
+      }
+    }
+
+    file {'/usr/local/bin':
+      ensure => directory
+    }
+
+    file {'/usr/local/bin/vmctl.sh':
+      ensure  => present,
+      mode    => 755,
+      source  => 'puppet:///modules/kabootstrap/vmctl.sh',
+      require => File['/usr/local/bin'],
+    }
+  }
+  else {
+    $remoteops = {}
+  }
+
+  # Configure Kadeploy3
+  class {'kadeploy3':
+    install                => false,
+    package_doc_dir        => $pkg_doc_dir,
+    package_scripts_dir    => $pkg_scripts_dir,
+    dns_name               => $dns_name,
+    tftp_user              => $::tftp::params::username,
+    pxe_export             => 'tftp',
+    pxe_repository         => $::tftp::params::directory,
+    pxe_bootstrap_method   => $pxe_bootstrap_method,
+    pxe_bootstrap_program  => $pxe_bootstrap_program,
+    pxe_profiles_directory => $pxe_profiles_directory,
+    pxe_profiles_naming    => $pxe_profiles_naming,
+    pxe_kernel_vmlinuz     => $pxe_kernel_vmlinuz,
+    pxe_kernel_initrd      => $pxe_kernel_initrd,
+    mysql_db_host          => 'localhost',
+    mysql_db_name          => $mysql_db_name,
+    mysql_db_user          => $mysql_db_user,
+    mysql_db_password      => $mysql_db_password,
+    nodes                  => $nodes,
+    remoteops              => $remoteops,
+  }
+  Class['kabootstrap::kadeploy'] -> Class['kadeploy3']
 }

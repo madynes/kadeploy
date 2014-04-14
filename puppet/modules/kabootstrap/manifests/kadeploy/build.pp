@@ -1,7 +1,7 @@
 class kabootstrap::kadeploy::build {
   class {'kabootstrap::kadeploy::deps':
     kind       => 'build',
-    http_proxy => $::kaboostrap::kadeploy::http_proxy,
+    http_proxy => $::kabootstrap::kadeploy::http_proxy,
   }
 
   $src_dir = '/tmp/kadeploy-src'
@@ -39,13 +39,14 @@ class kabootstrap::kadeploy::build {
     cwd         => $src_dir,
     user        => 'root',
     environment => ['HOME=/root'], # see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=627171
-    require => [Class['deps'],Exec['git clean']],
+    require => [Class['kabootstrap::kadeploy::deps'],Exec['git clean']],
   }
 
   exec {"pkg install":
-    command => "${::kabootstrap::params::pkg_install} ${pkg_dir}",
-    path    => ['/bin','/sbin','/usr/bin/','/usr/sbin'],
-    user    => 'root',
-    require => Exec['rake pkg'],
+    command   => "${::kabootstrap::params::pkg_install} ${pkg_dir}",
+    path      => ['/bin','/sbin','/usr/bin/','/usr/sbin'],
+    user      => 'root',
+    require   => Exec['rake pkg'],
+    subscribe => Class['kadeploy3'],
   }
 }

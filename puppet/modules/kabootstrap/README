@@ -9,7 +9,7 @@ PXE boot files (pxelinux.0, chain.c32, netboot kernel, ...) should be copied in 
 
 For the moment, only 253 nodes can be installed with this class (to be improved).
 
-The classes kabootstrap::[nat|dns|dhcp|tftp|sql|pkg_repo|kadeploy] can be used independently from the kaboostrap class.
+The classes kabootstrap::[nat|dns|dhcp|tftp|sql|pkg_repo|kadeploy] can be used independently from the kabootstrap class.
 
 === Install ===
 To install kabootstrap module dependencies:
@@ -31,6 +31,7 @@ If you choosed a package install, packages have to be copied in the directory sp
   $network_mask: (default: 255.255.255.0)
   $network_interface: (default: eth0)
   $nat_interface: setup a NAT on the server (default: undef)
+  $pxe_bootstrap_method: used in Kadeploy3 configuration (default: PXElinux)
   $pxe_bootstrap_program: (default: pxelinux.0)
   $pxe_chainload_program: Comboot used to chainload on bootloader i.e chain.c32 (default: undef)
   $pxe_profiles_directory: (default: pxelinux.cfg)

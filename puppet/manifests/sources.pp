@@ -6,4 +6,5 @@ class {'kabootstrap':
   pxe_kernel_initrd     => 'initrd-3.2.0-4-amd64',
   sources_directory     => '/vagrant',
   install_kind          => 'sources',
+  vm_scripts            => true,
 }

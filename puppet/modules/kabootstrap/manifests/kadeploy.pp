@@ -1,22 +1,10 @@
 class kabootstrap::kadeploy (
-  $install_kind           = 'sources',
-  $sources_directory      = undef,
-  $repository_url         = undef,
-  $packages_directory     = 'puppet:///modules/kabootstrap/packages',
-  $http_proxy             = undef,
+  $install_kind       = 'sources',
+  $sources_directory  = undef,
+  $repository_url     = undef,
+  $packages_directory = 'puppet:///modules/kabootstrap/packages',
+  $http_proxy         = undef,
 ) {
-  group{'deploy':
-    ensure => present,
-  }
-  user{'deploy':
-    ensure  => present,
-    system  => true,
-    home    => '/var/lib/deploy',
-    gid     => 'deploy',
-    groups  => [$::tftp::params::username],
-    require => [Group['deploy'],Package['tftpd-hpa'],Class['::tftp']],
-  }
-
   case $install_kind {
     build: {
       include ::kabootstrap::kadeploy::build

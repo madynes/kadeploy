@@ -1,0 +1,81 @@
+---
+partitioning:
+  partitions:
+    tmp: 4
+    prod: 3
+    deploy: 2
+    swap: 1
+  disable_swap: false
+  block_device: /dev/sda
+  script: <%= "#{@package_scripts_dir}/partitioning/parted-sample-simple" %>
+boot:
+  install_bootloader: <%= "#{@package_scripts_dir}/bootloader/install_grub2" %>
+  kernels:
+    deploy:
+      vmlinuz: <%= @pxe_kernel_vmlinuz %>
+      initrd: <%= @pxe_kernel_initrd %>
+      params: console=tty0 rw
+      supported_fs: ext2, ext3, ext4
+    user:
+      params: console=tty0
+timeouts:
+  reboot: 120
+  kexec: 60
+remoteops:
+<% if @remoteops['console'] -%>
+  console:
+  <%- @remoteops['console'].each do |name,cmd| -%>
+  - name: <%= name %>
+    cmd: <%= cmd.gsub(/SSH_CONNECTOR/,@ssh_connector) %>
+  <%- end -%>
+<% end -%>
+<% if @remoteops['reboot'] -%>
+  reboot:
+  <%- @remoteops['reboot'].each do |name,cmd| -%>
+  - name: <%= name %>
+    cmd: <%= cmd.gsub(/SSH_CONNECTOR/,@ssh_connector) %>
+  <%- end -%>
+<% end -%>
+<% if @remoteops['power_on'] -%>
+  power_on:
+  <%- @remoteops['power_on'].each do |name,cmd| -%>
+  - name: <%= name %>
+    cmd: <%= cmd.gsub(/SSH_CONNECTOR/,@ssh_connector) %>
+  <%- end -%>
+<% end -%>
+<% if @remoteops['power_off'] -%>
+  power_off:
+  <%- @remoteops['power_off'].each do |name,cmd| -%>
+  - name: <%= name %>
+    cmd: <%= cmd.gsub(/SSH_CONNECTOR/,@ssh_connector) %>
+  <%- end -%>
+<% end -%>
+<% if @remoteops['power_status'] -%>
+  power_status:
+  <%- @remoteops['power_status'].each do |name,cmd| -%>
+  - name: <%= name %>
+    cmd: <%= cmd.gsub(/SSH_CONNECTOR/,@ssh_connector) %>
+  <%- end -%>
+<% end -%>
+pxe:
+  headers:
+    dhcp: |
+      PROMPT 1
+      SERIAL 0 38400
+      TIMEOUT 50
+    localboot: |
+      timeout=0
+automata:
+  macrosteps:
+    BootNewEnv:
+    - timeout: 150
+      type: Classical
+      retries: 1
+    BroadcastEnv:
+    - timeout: 300
+      type: Chain
+      retries: 2
+    SetDeploymentEnv:
+    - timeout: 200
+      type: Untrusted
+      retries: 2

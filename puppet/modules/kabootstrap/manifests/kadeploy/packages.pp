@@ -1,7 +1,7 @@
 class kabootstrap::kadeploy::packages {
   class {'::kabootstrap::kadeploy::deps':
     kind => 'package',
-    http_proxy => $::kaboostrap::kadeploy::http_proxy,
+    http_proxy => $::kabootstrap::http_proxy,
   }
 
   $pkg_dir = '/tmp/kadeploy-pkg'
@@ -17,6 +17,7 @@ class kabootstrap::kadeploy::packages {
     path    => ['/bin','/sbin','/usr/bin/','/usr/sbin'],
     cwd     => $pkg_dir,
     user    => 'root',
-    require => [Class['deps'],File[$pkg_dir]],
+    require => [Class['kabootstrap::kadeploy::deps'],File[$pkg_dir]],
+    subscribe => Class['kadeploy3'],
   }
 }

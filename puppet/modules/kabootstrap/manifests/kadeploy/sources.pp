@@ -1,7 +1,7 @@
 class kabootstrap::kadeploy::sources {
   class {'::kabootstrap::kadeploy::deps':
     kind => 'install',
-    http_proxy => $::kaboostrap::kadeploy::http_proxy,
+    http_proxy => $::kabootstrap::http_proxy,
   }
 
   exec {'rake install':
@@ -10,6 +10,7 @@ class kabootstrap::kadeploy::sources {
     cwd     => $::kabootstrap::kadeploy::sources_directory,
     user    => 'root',
     environment => ['HOME=/root'], # see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=627171
-    require => Class['deps'],
+    require => Class['kabootstrap::kadeploy::deps'],
+    subscribe => Class['kadeploy3'],
   }
 }

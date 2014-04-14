@@ -104,6 +104,11 @@ Vagrant.configure("2") do |config|
       master.vm.provision :shell, inline:
         'ln -sf /vagrant/addons/rc/debian/kadeploy /etc/init.d/'
     end
+
+    unless ENV['PKG']
+      master.vm.provision :shell, inline:
+        'kaenv3 -a /vagrant/addons/vagrant/wheezy-min.dsc; true'
+    end
   end
 
 

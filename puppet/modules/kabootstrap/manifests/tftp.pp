@@ -34,10 +34,7 @@ class kabootstrap::tftp (
 
   tftp::file { $pxe_profiles_directory:
     ensure => directory,
-  }
-
-  tftp::file { 'userfiles': # Kadeploy3 user specific PXE files
-    ensure  => directory,
+    mode   => 775,
   }
 
   tftp::file { "${pxe_profiles_directory}/default":
