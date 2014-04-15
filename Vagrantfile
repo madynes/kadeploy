@@ -5,6 +5,9 @@
 #
 # Configure/Tune the kabootstrap receipe: puppet/modules/kabootstrap/README
 
+TAKTUK_VERSION = '3.7.5-1.el6.x86_64'
+TAKTUK_URL = 'http://kadeploy3.gforge.inria.fr/files/taktuk'
+
 Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 50
   install = (ENV['INSTALL'] || 'init').downcase
@@ -51,6 +54,10 @@ Vagrant.configure("2") do |config|
     if distrib == 'redhat'
       master.vm.provision :shell, inline: 'yum check-update; true'
       master.vm.provision :shell, inline: 'yum install -y ruby rubygems redhat-lsb'
+      # Install TakTuk
+      master.vm.provision :shell, inline: "yum localinstall -y #{TAKTUK_URL}/taktuk-libs-#{TAKTUK_VERSION}.rpm"
+      master.vm.provision :shell, inline: "yum localinstall -y #{TAKTUK_URL}/taktuk-devel-#{TAKTUK_VERSION}.rpm"
+      master.vm.provision :shell, inline: "yum localinstall -y #{TAKTUK_URL}/taktuk-#{TAKTUK_VERSION}.rpm"
     else
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get update'
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get install -y ruby rubygems lsb-release'
