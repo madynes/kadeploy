@@ -106,6 +106,12 @@ INSTALL = {
     :group => 'deploy',
     :mode => '640',
   },
+  :doc => {
+    :dir => '/usr/share/doc/kadeploy3',
+    :user => 'root',
+    :group => 'root',
+    :mode => '644',
+  },
   :script => {
     :dir => '/usr/share/doc/kadeploy3/scripts',
     :user => 'root',
@@ -432,6 +438,14 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
     installf(:conf,f.path,'version')
   end
 
+  create_dir(:doc)
+  sh "gzip -c #{File.join(D[:addons],'kastafior','kastafior')} > #{File.join(D[:addons],'kastafior','kastafior')}.gz"
+  sh "gzip -c #{File.join(D[:addons],'kascade','kascade')} > #{File.join(D[:addons],'kascade','kascade')}.gz"
+  installf(:doc,File.join(D[:addons],'kastafior','kastafior.gz'))
+  installf(:doc,File.join(D[:addons],'kascade','kascade.gz'))
+  sh "rm #{File.join(D[:addons],'kastafior','kastafior')}.gz"
+  sh "rm #{File.join(D[:addons],'kascade','kascade')}.gz"
+
   create_dir(:script)
   installf(:script,File.join(D[:scripts],'bootloader','install_grub'))
   installf(:script,File.join(D[:scripts],'bootloader','install_grub2'))
@@ -487,6 +501,10 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:script,'parted-sample-simple')
   uninstallf(:script,'fdisk-sample')
   delete_dir(:script)
+
+  uninstallf(:doc,'kastafior.gz')
+  uninstallf(:doc,'kascade.gz')
+  delete_dir(:doc)
 
   uninstallf(:rc,'kadeploy')
   delete_dir(:rc)
