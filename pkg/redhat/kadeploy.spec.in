@@ -60,6 +60,8 @@ KADEPLOY3_LIBS/*
 %{_mandir}/man1/*
 %{_mandir}/man8/*
 %{_defaultdocdir}/kadeploy3/scripts/*
+%{_defaultdocdir}/kadeploy3/kastafior.gz
+%{_defaultdocdir}/kadeploy3/kascade.gz
 
 %files server
 %dir /var/log/kadeploy3
