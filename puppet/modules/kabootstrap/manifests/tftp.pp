@@ -9,6 +9,7 @@ class kabootstrap::tftp (
   class {'::tftp':
     inetd => false,
   }
+  Package['tftpd-hpa'] -> Service['tftpd-hpa'] # receipe bugfix
 
   tftp::file { $pxe_bootstrap_program:
     source  => "puppet:///modules/kabootstrap/${pxe_bootstrap_program}",

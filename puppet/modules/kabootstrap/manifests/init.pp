@@ -104,6 +104,8 @@ class kabootstrap (
     sources_directory  => $sources_directory,
     repository_url     => $repository_url,
     packages_directory => $packages_directory,
+    tftp_user          => $::tftp::params::username,
+    tftp_package       => $::tftp::params::package,
     http_proxy         => $http_proxy,
   }
   Class['kabootstrap::dns']      -> Class['kabootstrap::kadeploy']
@@ -146,10 +148,12 @@ class kabootstrap (
   # Configure Kadeploy3
   class {'kadeploy3':
     install                => false,
+    create_user            => false,
     package_doc_dir        => $pkg_doc_dir,
     package_scripts_dir    => $pkg_scripts_dir,
     dns_name               => $dns_name,
     tftp_user              => $::tftp::params::username,
+    tftp_package           => $::tftp::params::package,
     pxe_export             => 'tftp',
     pxe_repository         => $::tftp::params::directory,
     pxe_bootstrap_method   => $pxe_bootstrap_method,
@@ -164,6 +168,6 @@ class kabootstrap (
     mysql_db_password      => $mysql_db_password,
     nodes                  => $nodes,
     remoteops              => $remoteops,
+    require                => Class['kabootstrap::kadeploy'],
   }
-  Class['kabootstrap::kadeploy'] -> Class['kadeploy3']
 }

@@ -11,6 +11,5 @@ class kabootstrap::kadeploy::sources {
     user    => 'root',
     environment => ['HOME=/root'], # see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=627171
     require => Class['kabootstrap::kadeploy::deps'],
-    subscribe => Class['kadeploy3'],
   }
 }

@@ -12,12 +12,22 @@ class kabootstrap::kadeploy::packages {
     source  => $::kabootstrap::kadeploy::packages_directory,
   }
 
+  package {$::kabootstrap::params::pkg_name:
+    ensure => absent,
+  }
+  package {'kadeploy-client':
+    ensure  => absent,
+  }
+  package {'kadeploy-common':
+    ensure => absent,
+    require => [Package[$::kabootstrap::params::pkg_name],Package['kadeploy-client']],
+  }
+
   exec {"pkg install":
     command => "${::kabootstrap::params::pkg_install} *.${::kabootstrap::params::pkg_ext}",
     path    => ['/bin','/sbin','/usr/bin/','/usr/sbin'],
     cwd     => $pkg_dir,
     user    => 'root',
-    require => [Class['kabootstrap::kadeploy::deps'],File[$pkg_dir]],
-    subscribe => Class['kadeploy3'],
+    require => [Class['kabootstrap::kadeploy::deps'],File[$pkg_dir],Package['kadeploy-common']],
   }
 }

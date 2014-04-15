@@ -2,8 +2,10 @@ class kadeploy3::params {
   $install                = true
   $install_kastafior      = true
   $install_kascade        = true
+  $create_user            = true
   $dns_name               = 'kadeploy.testbed.lan'
   $tftp_user              = 'tftp'
+  $tftp_package           = 'tftpd-hpa'
   $pxe_repository         = '/var/lib/tftpboot'
   $pxe_export             = 'tftp'
   $pxe_bootstrap_method   = 'PXElinux'
@@ -41,11 +43,15 @@ class kadeploy3::params {
       $package_name = 'kadeploy-server'
       $package_doc_dir = '/usr/share/doc/kadeploy3'
       $package_scripts_dir = "${package_doc_dir}/scripts"
+      $bootloader_scripts_dir = $package_scripts_dir
+      $partitioning_scripts_dir = $package_scripts_dir
     }
     debian: {
       $package_name = 'kadeploy'
       $package_doc_dir = '/usr/share/doc/kadeploy'
       $package_scripts_dir = "${$package_doc_dir}/examples/scripts"
+      $bootloader_scripts_dir = "${package_scripts_dir}/bootloader"
+      $partitioning_scripts_dir = "${package_scripts_dir}/partitioning"
     }
   }
 }

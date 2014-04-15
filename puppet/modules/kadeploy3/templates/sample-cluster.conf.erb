@@ -7,9 +7,9 @@ partitioning:
     swap: 1
   disable_swap: false
   block_device: /dev/sda
-  script: <%= "#{@package_scripts_dir}/partitioning/parted-sample-simple" %>
+  script: <%= "#{@partitioning_scripts_dir}/parted-sample-simple" %>
 boot:
-  install_bootloader: <%= "#{@package_scripts_dir}/bootloader/install_grub2" %>
+  install_bootloader: <%= "#{@bootloader_scripts_dir}/install_grub2" %>
   kernels:
     deploy:
       vmlinuz: <%= @pxe_kernel_vmlinuz %>
@@ -18,9 +18,6 @@ boot:
       supported_fs: ext2, ext3, ext4
     user:
       params: console=tty0
-timeouts:
-  reboot: 120
-  kexec: 60
 remoteops:
 <% if @remoteops['console'] -%>
   console:
@@ -61,21 +58,23 @@ pxe:
   headers:
     dhcp: |
       PROMPT 1
-      SERIAL 0 38400
-      TIMEOUT 50
+      TIMEOUT 30
     localboot: |
       timeout=0
+timeouts:
+  reboot: 120
+  kexec: 60
 automata:
   macrosteps:
+    SetDeploymentEnv:
+    - timeout: 150
+      type: Untrusted
+      retries: 1
+    BroadcastEnv:
+    - timeout: 150
+      type: Kastafior
+      retries: 2
     BootNewEnv:
     - timeout: 150
       type: Classical
       retries: 1
-    BroadcastEnv:
-    - timeout: 300
-      type: Chain
-      retries: 2
-    SetDeploymentEnv:
-    - timeout: 200
-      type: Untrusted
-      retries: 2

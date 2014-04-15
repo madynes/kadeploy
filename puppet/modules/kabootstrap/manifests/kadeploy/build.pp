@@ -42,11 +42,21 @@ class kabootstrap::kadeploy::build {
     require => [Class['kabootstrap::kadeploy::deps'],Exec['git clean']],
   }
 
+  package {$::kabootstrap::params::pkg_name:
+    ensure => absent,
+  }
+  package {'kadeploy-client':
+    ensure  => absent,
+  }
+  package {'kadeploy-common':
+    ensure => absent,
+    require => [Package[$::kabootstrap::params::pkg_name],Package['kadeploy-client']],
+  }
+
   exec {"pkg install":
     command   => "${::kabootstrap::params::pkg_install} ${pkg_dir}",
     path      => ['/bin','/sbin','/usr/bin/','/usr/sbin'],
     user      => 'root',
-    require   => Exec['rake pkg'],
-    subscribe => Class['kadeploy3'],
+    require   => [Exec['rake pkg'],Package['kadeploy-common']],
   }
 }

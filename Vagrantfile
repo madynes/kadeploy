@@ -53,7 +53,7 @@ Vagrant.configure("2") do |config|
 
     if distrib == 'redhat'
       master.vm.provision :shell, inline: 'yum check-update; true'
-      master.vm.provision :shell, inline: 'yum install -y ruby rubygems redhat-lsb'
+      master.vm.provision :shell, inline: 'yum install -y ruby rubygems redhat-lsb nc'
       # Install TakTuk
       master.vm.provision :shell, inline: "yum localinstall -y #{TAKTUK_URL}/taktuk-libs-#{TAKTUK_VERSION}.rpm"
       master.vm.provision :shell, inline: "yum localinstall -y #{TAKTUK_URL}/taktuk-devel-#{TAKTUK_VERSION}.rpm"
