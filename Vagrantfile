@@ -1,19 +1,39 @@
 # Samples:
 #   DEV=1 INSTALL=build vagrant up
 #   DISTRIB=redhat INSTALL=package vagrant up
-#   PKG=1 vagrant up # sources files are copied in vagrant's homedir kadeploy3/
+#   PKG=1 vagrant up # sources files in /home/vagrant/kadeploy3/
+#   NODES=4 DISTRIB=redhat vagrant up
+#   NODES=2 GUI=1 vagrant up
+#   NODES=4 vagrant destroy -f
 #
 # Configure/Tune the kabootstrap receipe: puppet/modules/kabootstrap/README
+#
+# !!! Be careful, once the VMs were deployed with kadeploy it's not possible to re-launch them using the "vagrant up" command (pxe boot profiles)
+
+require 'yaml'
 
 TAKTUK_VERSION = '3.7.5-1.el6.x86_64'
 TAKTUK_URL = 'http://kadeploy3.gforge.inria.fr/files/taktuk'
 
 Vagrant.configure("2") do |config|
   config.vm.boot_timeout = 50
-  install = (ENV['INSTALL'] || 'init').downcase
-  install = 'init' unless install =~ /(packages|build|sources|repository)/
+  install = (ENV['INSTALL'] || 'default').downcase
+  install = 'default' unless install =~ /(packages|build|sources|repository)/
   distrib = (ENV['DISTRIB'] || 'debian').downcase
+  nodes = {}
+  unless ENV['PKG']
+    (ENV['NODES'] || 1).to_i.times do |i|
+      nodes["node-#{i+1}"] = {
+        'mac' => '02:00:02:00:02:%02x'%(i+1),
+        'ip'  => "10.0.10.#{i+2}" # The first IP of the network is used by the host
+      }
+    end
+    File.open('puppet/hiera/nodes.yaml','w') do |f|
+      f.write({'kabootstrap::nodes' => nodes}.to_yaml)
+    end
+  end
 
+  # Setup the service machine
   config.vm.define :kadeploy do |master|
     if Vagrant::VERSION >= "1.5.0"
       if distrib == 'redhat'
@@ -33,6 +53,7 @@ Vagrant.configure("2") do |config|
       end
     end
 
+    master.vm.hostname = 'kadeploy'
     master.vm.network :private_network, ip: '10.0.10.253'
     master.vm.provider :virtualbox do |vb|
       vb.cpus = 2
@@ -62,18 +83,21 @@ Vagrant.configure("2") do |config|
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get update'
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get install -y ruby rubygems lsb-release'
     end
-    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter'
-    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc puppet'
+    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter puppet hiera'
 
-    master.vm.provision :puppet do |puppet|
+    master.vm.provision 'puppet' do |puppet|
+      puppet.hiera_config_path = 'puppet/hiera.yaml'
       puppet.manifests_path = 'puppet/manifests'
       puppet.module_path = 'puppet/modules'
       if ENV['PKG'] # Only install dependencies to build Kadeploy packages
         puppet.manifest_file = 'deps.pp'
       else # Install the service
-        puppet.manifest_file = "#{install}.pp"
+        puppet.manifest_file = "hiera.pp"
       end
-      puppet.facter = {'facter_http_proxy' => ENV['http_proxy']} if ENV['http_proxy']
+      facter = {}
+      facter['http_proxy'] = ENV['http_proxy'] if ENV['http_proxy'] and !ENV['http_proxy'].empty?
+      facter['install_kind'] = install
+      puppet.facter = facter
       puppet.options = "--verbose --debug" if ENV['DEBUG']
     end
 
@@ -118,34 +142,27 @@ Vagrant.configure("2") do |config|
     end
   end
 
+  # Setup virtual nodes
+  nodes.each_pair do |name,node|
+    config.vm.define name do |slave|
+      slave.vm.box = 'tcl'
+      slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
 
-  unless ENV['PKG']
-    cluster_size = ENV['CLUSTER_SIZE'] || 1
-
-    cluster_size.to_i.times do |i|
-      id = i + 1
-      mac = "0200020002" + "%02x" % id
-      name = "node-#{id}"
-      ip = "10.0.10.#{id + 1}"
-      config.vm.define name do |slave|
-        slave.vm.box = 'tcl'
-        slave.vm.box_url = 'http://kadeploy3.gforge.inria.fr/files/tcl.box'
-
-        slave.vm.provider :virtualbox do |vb|
-          vb.memory = 384
-          vb.customize ["modifyvm", :id, "--boot1", "net"]
-          vb.customize ["modifyvm", :id, "--macaddress1", mac]
-          vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
-          vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
-          vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
-          # Disable USB since it's not necessary and depends on extra modules
-          vb.customize ["modifyvm", :id, "--usbehci", "off"]
-          vb.customize ["modifyvm", :id, "--usb", "off"]
-        end
-        slave.ssh.host = ip
-
-        slave.vm.synced_folder ".", "/vagrant", disabled: true
+      slave.vm.provider :virtualbox do |vb|
+        vb.gui = true if ENV['GUI']
+        vb.memory = 384
+        vb.customize ["modifyvm", :id, "--boot1", "net"]
+        vb.customize ["modifyvm", :id, "--macaddress1", node['mac'].delete(':')]
+        vb.customize ["modifyvm", :id, "--nic1", "hostonly"]
+        vb.customize ["modifyvm", :id, "--nictype1", "82540EM"]
+        vb.customize ["modifyvm", :id, "--hostonlyadapter1", "vboxnet0"]
+        # Disable USB since it's not necessary and depends on extra modules
+        vb.customize ["modifyvm", :id, "--usbehci", "off"]
+        vb.customize ["modifyvm", :id, "--usb", "off"]
       end
+      slave.ssh.host = node['ip']
+
+      slave.vm.synced_folder ".", "/vagrant", disabled: true
     end
   end
 end

@@ -36,10 +36,6 @@ class kabootstrap (
   }
   validate_hash($nodes)
 
-  if $http_proxy == undef and $facter_http_proxy != undef {
-    $http_proxy = $facter_http_proxy
-  }
-
   # TODO: find a better way to do it
   if $::osfamily == 'redhat' or $install_kind == 'sources' {
     $pkg_doc_dir = '/usr/share/doc/kadeploy3'

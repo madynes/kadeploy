@@ -1,0 +1,9 @@
+---
+classes: kabootstrap
+kabootstrap::network_interface: eth1
+kabootstrap::nat_interface: eth1
+kabootstrap::pxe_chainload_program: chain.c32
+kabootstrap::pxe_kernel_vmlinuz: vmlinuz-3.2.0-4-amd64
+kabootstrap::pxe_kernel_initrd: initrd-3.2.0-4-amd64
+kabootstrap::sources_directory: /vagrant
+kabootstrap::vm_scripts: true
