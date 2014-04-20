@@ -32,6 +32,13 @@ class kabootstrap::kadeploy::build {
     user    => 'root',
     require => Exec['cp sources'],
   }
+  exec {'git reset':
+    command => "git reset --hard",
+    path    => ['/bin','/sbin','/usr/bin/','/usr/sbin'],
+    cwd     => $src_dir,
+    user    => 'root',
+    require => Exec['git clean'],
+  }
 
   exec {"rake pkg":
     command     => "rake ${::kabootstrap::params::build_method}[${build_dir}]",
@@ -39,7 +46,7 @@ class kabootstrap::kadeploy::build {
     cwd         => $src_dir,
     user        => 'root',
     environment => ['HOME=/root'], # see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=627171
-    require => [Class['kabootstrap::kadeploy::deps'],Exec['git clean']],
+    require => [Class['kabootstrap::kadeploy::deps'],Exec['git reset']],
   }
 
   package {$::kabootstrap::params::pkg_name:
