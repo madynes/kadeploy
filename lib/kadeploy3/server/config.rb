@@ -143,7 +143,7 @@ module Configuration
 
     def load_caches()
       ret = {}
-      if !@static[:disable_cache] and @static[:caches][:global]
+      if @static[:caches] and @static[:caches][:global]
         ret[:global] = Cache.new(
           @static[:caches][:global][:directory],
           @static[:caches][:global][:size],
@@ -508,24 +508,19 @@ module Configuration
           @verbose_level = cp.value('clients',Fixnum,3,(0..4))
         end
 
-        cp.parse('cache',true) do
-          static[:disable_cache] = cp.value(
-            'disabled',[TrueClass, FalseClass],false
+        cp.parse('cache',true) do |inf_cache|
+          static[:caches] = {} unless static[:caches]
+          static[:caches][:global] = {}
+          static[:caches][:global][:directory] = cp.value('directory',String,'/tmp',
+            {
+              :type => 'dir',
+              :readable => true,
+              :writable => true,
+              :create => true,
+              :mode => 0700
+            }
           )
-          unless static[:disable_cache]
-            static[:caches] = {} unless static[:caches]
-            static[:caches][:global] = {}
-            static[:caches][:global][:directory] = cp.value('directory',String,'/tmp',
-              {
-                :type => 'dir',
-                :readable => true,
-                :writable => true,
-                :create => true,
-                :mode => 0700
-              }
-            )
-            static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
-          end
+          static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
         end
 
         cp.parse('windows') do

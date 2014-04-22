@@ -503,7 +503,6 @@ verbosity:
 cache:
   directory: /var/cache/kadeploy
   size: /tmp/kadeploy_cache
-  disabled: false
 network:
   server_hostname: kadeploy.lan
   vlan:
@@ -655,7 +654,7 @@ external:
   \item \ypath{/cache}
   \begin{itemize}
     \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment.
-    \item \yfieldd{size}{Integer}{8000} size (MB) of the Kadeploy cache.
+    \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
   \end{itemize}
 
   \item \ypath{/network}
