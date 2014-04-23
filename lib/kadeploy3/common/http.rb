@@ -113,7 +113,7 @@ module HTTP
           raise unless request.is_a?(Net::HTTPRequest)
           response = client.request(request)
         rescue Exception => e
-          error("Invalid request on #{server}:#{port} (#{e.class.name})")
+          error("Invalid request on #{server}:#{port} (#{e.message})")
         end
 
         body = nil

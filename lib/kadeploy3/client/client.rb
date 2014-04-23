@@ -494,9 +494,9 @@ class Client
         ret = HTTP::Client::get(host,port,path,secure,nil,nil,nil,headers)
       end
     rescue Timeout::Error
-      error("Request timeout: cannot GET #{path} on the #{server} server")
+      error("Request timeout: cannot GET #{path} on #{host}:#{port}")
     rescue Errno::ECONNRESET
-      error("The #{server} server refused the connection on port #{port}")
+      error("The server refused the connection on #{host}:#{port}")
     rescue HTTP::ClientError => e
       error(e.message)
     end
