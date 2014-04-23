@@ -85,6 +85,7 @@ Vagrant.configure("2") do |config|
     end
     master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter puppet hiera'
 
+    master.vm.provision :shell, inline: 'chattr -i /etc/resolv.conf' # disable the hack that avoid DHCP to change the resolv.conf file
     master.vm.provision 'puppet' do |puppet|
       puppet.hiera_config_path = 'puppet/hiera.yaml'
       puppet.manifests_path = 'puppet/manifests'
@@ -100,6 +101,7 @@ Vagrant.configure("2") do |config|
       puppet.facter = facter
       puppet.options = "--verbose --debug" if ENV['DEBUG']
     end
+    master.vm.provision :shell, inline: 'chattr +i /etc/resolv.conf' # enable the hack that avoid DHCP to change the resolv.conf file
 
     if ENV['PKG']
       gerrit='https://helpdesk.grid5000.fr/gerrit/kadeploy3'
