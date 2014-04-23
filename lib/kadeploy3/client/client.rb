@@ -323,7 +323,15 @@ class Client
       unreachables = []
       options[:servers].each_pair do |server,inf|
         next if server.downcase == "default"
-        unless PortScanner::is_open?(inf[0], inf[1])
+
+        reachable = nil
+        4.times do
+          reachable = PortScanner::is_open?(inf[0], inf[1])
+          break if reachable
+          sleep 2
+        end
+
+        unless reachable
           debug("The #{server} server is unreachable")
           unreachables << server
         end
