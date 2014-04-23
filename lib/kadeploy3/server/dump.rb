@@ -10,14 +10,31 @@ end
 
 module Kadeploy
   def self.dump(file=nil,width=80)
+    file = STDOUT unless file
+    GC.start
+
+    objects = Hash.new(0)
+    total = ObjectSpace.each_object{|obj| objects[obj.class] += 1 }
+    objects[Object] = total
+
+    file.puts("--- Objects by number ---")
+    PP.pp(Hash[objects.select{|k,v| v > 4}.sort_by{|k,v| -v}],file,width)
+
+    file.puts("\n--- Objects by name ---")
+    PP.pp(Hash[objects.sort_by{|k,v| k.name}],file,width)
+
+    file.puts("\n--- Raw objects ---")
+    PP.pp(ObjectSpace.count_objects,file,width)
+    objects = nil
+
+    if GC.respond_to?(:stat)
+      file.puts("\n--- GC stats ---")
+      PP.pp(GC.stat,file,width)
+    end
+
     if $kadeploy
-      file = STDOUT unless file
+      file.puts("\n--- Kadeploy structures ---")
       PP.pp($kadeploy,file,width)
     end
-    objects = Hash.new(0)
-    ObjectSpace.each_object{|obj| objects[obj.class] += 1 }
-    PP.pp(objects.sort_by{|k,v| -v},file,width)
-    objects = nil
-    PP.pp(GC.stat,file,width) if GC.respond_to?(:stat)
   end
 end
