@@ -652,7 +652,7 @@ module Configuration
           args[:binary] = 'DHCP_PXEBIN'
         else
           args[:binary] = cp.value('binary',String,nil,
-            {:type => 'file', :prefix => args[:repository_dir]}
+            {:type => 'file', :prefix => args[:repository_dir], :const => true}
           )
         end
 
