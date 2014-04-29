@@ -154,6 +154,14 @@ def detect_who_i_am
     who = my_list.index(host) if host
   end
   unless who
+    host=`hostname -s`.strip
+    who = my_list.index(host) if host
+  end
+  unless who
+    host=`hostname --fqdn`.strip
+    who = my_list.index(host) if host
+  end
+  unless who
     who = my_list.index(local_ip($config[:master]))
   end
   who
