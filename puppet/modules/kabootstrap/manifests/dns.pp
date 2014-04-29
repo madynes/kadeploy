@@ -25,6 +25,7 @@ class kabootstrap::dns (
     recursion          => 'no',
     dnssec_enable      => 'no',
     dnssec_validation  => 'no',
+    dnssec_lookaside   => 'no', # see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=650030
     memstatistics_file => false,
     statistics_file    => false,
     dump_file          => false,
