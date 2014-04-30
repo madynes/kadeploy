@@ -179,6 +179,7 @@ module Configuration
     end
 
     def check_hash(val, hash, fieldname)
+      val = val.clone if hash[:const]
       self.send("customcheck_#{hash[:type].downcase}".to_sym,val,fieldname,hash)
     end
 
@@ -241,10 +242,8 @@ module Configuration
         raise ParserError.new("Invalid expression '#{args[:code]}'")
       end
     end
-
     def customcheck_file(val, fieldname, args)
       return if args[:disable]
-
       if args[:command]
         val = val.split(/\s+/).first||''
         if !val.empty? and !Pathname.new(val).absolute?
