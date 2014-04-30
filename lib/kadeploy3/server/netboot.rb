@@ -74,14 +74,13 @@ module NetBoot
 
       profile, meth = send("boot_#{kind.to_s}".to_sym,*args)
 
-      profile = "#{headers[kind]}\n#{labelize(kind.to_s,profile,args)}\n" \
-        unless kind == :custom
+      profile = labelize(headers[kind],kind.to_s,profile,args) unless kind == :custom
 
       write_profile(nodes,profile,meth)
     end
 
     protected
-    def labelize(kind,profile,args)
+    def labelize(header,kind,profile,args)
       raise 'Should be reimplemented'
     end
 
@@ -175,7 +174,8 @@ module NetBoot
       end
     end
 
-    def labelize(kind,profile,args=[])
+    def labelize(header,kind,profile,args=[])
+      header+
       "DEFAULT #{kind}\n"\
       "LABEL #{kind}\n"\
       + profile.collect{|line| "\t#{line}"}.join("\n")
@@ -268,8 +268,8 @@ module NetBoot
       end
     end
 
-    def labelize(kind,profile,args=[])
-      "#!ipxe\n#{profile.join("\n")}"
+    def labelize(header,kind,profile,args=[])
+      "#!ipxe\n#{header}\n#{profile.join("\n")}"
     end
 
     def boot_chain(pxebin)
@@ -322,7 +322,9 @@ module NetBoot
       end
     end
 
-    def labelize(kind,profile,args=[])
+    def labelize(header,kind,profile,args=[])
+      header += "\ntimeout=0\n" unless header.include?("timeout")
+      header +
       "default=0\n"\
       "menuentry #{kind} {\n"\
       "#{profile.collect{|line| "\t#{line}"}.join("\n")}\n"\
