@@ -217,6 +217,7 @@ module Configuration
     attr_reader :kascade_options
     attr_reader :secure_client
     attr_reader :autoclean_threshold
+    attr_reader :cmd_ext
 
     # Constructor of CommonConfig
     #
@@ -229,6 +230,7 @@ module Configuration
       @nodes = Nodes::NodeSet.new
       @cache = {}
       @pxe = {}
+      @cmd_ext = {}
     end
 
     # Load the common configuration file
@@ -587,9 +589,12 @@ module Configuration
 
         @autoclean_threshold = cp.value('autoclean_threshold',Fixnum,60*6).abs * 60 # 6h by default
 
-        cp.parse('external',true) do
-          cp.parse('taktuk',true) do
-            @taktuk_connector = cp.value('connector',String)
+        cp.parse('external') do
+           @cmd_ext[:default_connector] = cp.value('default_connector',String,'ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes')
+          cp.parse('taktuk') do
+            @taktuk_connector = cp.value('connector',String,'DEFAULT_CONNECTOR')
+            @taktuk_connector.gsub!('DEFAULT_CONNECTOR',@cmd_ext[:default_connector])
+
             @taktuk_tree_arity = cp.value('tree_arity',Fixnum,0)
             @taktuk_auto_propagate = cp.value(
               'auto_propagate',[TrueClass,FalseClass],true
@@ -739,7 +744,7 @@ module Configuration
               :type => 'file', :readable => true, :prefix => Config.dir()})
 
           conf = self[clname] = ClusterSpecificConfig.new(
-            cp.value('prefix',String,''))
+            cp.value('prefix',String,''),commonconfig.cmd_ext)
           return false unless conf.load(clname,clfile)
 
 
@@ -837,6 +842,8 @@ module Configuration
     attr_reader :admin_pre_install
     attr_reader :admin_post_install
     attr_reader :use_ip_to_deploy
+    attr_reader :cmd_ext
+
 
     # Constructor of ClusterSpecificConfig
     #
@@ -844,7 +851,7 @@ module Configuration
     # * nothing
     # Output
     # * nothing
-    def initialize(prefix=nil)
+    def initialize(prefix=nil,cmd_ext={})
       @prefix = prefix
       @workflow_steps = []
       @deploy_kernel_args = ""
@@ -854,7 +861,7 @@ module Configuration
       @pxe_header = {}
       @use_ip_to_deploy = false
 
-      @cmd_ext = {}
+      @cmd_ext = cmd_ext.clone
     end
 
     def handle_cmd_priority(obj,conf_path,cp,cluster=null,limit=3)
@@ -876,6 +883,7 @@ module Configuration
           cmd = obj[idx]
           if cmd
             raise "The provided command is not a string." unless cmd.is_a? String
+            obj[idx] = cmd.gsub!('DEFAULT_CONNECTOR',@cmd_ext[:default_connector]) || obj[idx]
             cp.customcheck_file(cmd,nil,{
                   :type => 'file', :command => true,
                   :readable => true, :executable => true
