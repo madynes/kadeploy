@@ -489,7 +489,7 @@ class Client
   def self.get(host,port,path,secure,headers=nil)
     ret = nil
     begin
-      Timeout.timeout(8) do
+      Timeout.timeout(32) do
         ret = HTTP::Client::get(host,port,path,secure,nil,nil,nil,headers)
       end
     rescue Timeout::Error
