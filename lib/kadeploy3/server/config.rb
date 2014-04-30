@@ -151,7 +151,7 @@ module Configuration
         )
       end
 
-      if @static[:caches][:netboot]
+      if @static[:caches] and @static[:caches][:netboot]
         ret[:netboot] = Cache.new(
           @static[:caches][:netboot][:directory],
           @static[:caches][:netboot][:size],
@@ -557,81 +557,17 @@ module Configuration
 
         cp.parse('pxe',true) do
           chain = nil
-          pxemethod = Proc.new do |name,info|
-            unless info[:empty]
-              args = []
-              args << cp.value('method',String,'PXElinux',
-                ['PXElinux','GPXElinux','IPXE','GrubPXE']
-              )
-              repo = cp.value('repository',String,nil,Dir)
-
-              if name == :dhcp
-                args << 'DHCP_PXEBIN'
-              else
-                args << cp.value('binary',String,nil,
-                  {:type => 'file', :prefix => repo}
-                )
-              end
-
-              cp.parse('export') do
-                args << cp.value('kind',String,'tftp',['http','ftp','tftp']).to_sym
-                args << cp.value('server',String,'LOCAL_IP')
-              end
-
-              args << repo
-              if name == :dhcp
-                cp.parse('userfiles',true) do
-                  files = cp.value('directory',String,nil,
-                    {:type => 'dir', :prefix => repo}
-                  )
-                  args << files
-                  static[:caches] = {} unless static[:caches]
-                  static[:caches][:netboot] = {}
-                  static[:caches][:netboot][:directory] = File.join(repo,files)
-                  static[:caches][:netboot][:size] = cp.value('max_size',Fixnum)*1024*1024
-                end
-              else
-                args << 'PXE_CUSTOM'
-              end
-
-              cp.parse('profiles') do
-                #TODO : check profile config for example : pxelinuix => pxelinux.cfg,ip_hex another=> another
-                profiles_dir = cp.value('directory',String,'pxelinux.cfg')
-                args << profiles_dir
-                if profiles_dir.empty?
-                  profiles_dir = repo
-                elsif !Pathname.new(profiles_dir).absolute?
-                  profiles_dir = File.join(repo,profiles_dir)
-                end
-                if !File.exist?(profiles_dir) or !File.directory?(profiles_dir)
-                  raise ArgumentError.new(Parser.errmsg(info[:path],"The directory '#{profiles_dir}' does not exist"))
-                end
-                args << cp.value('filename',String,'ip_hex',
-                  ['ip','ip_hex','hostname','hostname_short']
-                )
-              end
-              args << chain
-
-              begin
-                @pxe[name] = NetBoot.Factory(*args)
-              rescue NetBoot::Exception => nbe
-                raise ArgumentError.new(Parser.errmsg(info[:path],nbe.message))
-              end
-            end
-          end
-
           cp.parse('dhcp',true) do |info|
-            pxemethod.call(:dhcp,info)
+            chain = pxemethod(:dhcp,info,cp,static)
           end
 
-          chain = @pxe[:dhcp]
           cp.parse('localboot') do |info|
-            pxemethod.call(:local,info)
+            pxemethod(:local,info,cp,static,chain)
           end
           @pxe[:local] = chain unless @pxe[:local]
 
           cp.parse('networkboot') do |info|
-            pxemethod.call(:network,info)
+            pxemethod(:network,info,cp,static,chain)
           end
           @pxe[:network] = chain unless @pxe[:network]
         end
@@ -706,6 +642,67 @@ module Configuration
       end
 
       return static
+    end
+
+    # Parse pxe part to build NetBoot object
+    def pxemethod (name,info,cp,static,chain = nil)
+      unless info[:empty]
+        args = {}
+        args[:kind] = cp.value('method',String,'PXElinux',
+          ['PXElinux','GPXElinux','IPXE','GrubPXE']
+        )
+        args[:repository_dir] = cp.value('repository',String,nil,Dir)
+
+        if name == :dhcp
+          args[:binary] = 'DHCP_PXEBIN'
+        else
+          args[:binary] = cp.value('binary',String,nil,
+            {:type => 'file', :prefix => args[:repository_dir]}
+          )
+        end
+
+        cp.parse('export') do
+          args[:export_kind] = cp.value('kind',String,'tftp',['http','ftp','tftp']).to_sym
+          args[:export_server] = cp.value('server',String,'LOCAL_IP')
+        end
+
+        if name == :dhcp
+            cp.parse('userfiles',true) do |info_userfiles|
+              args[:custom_dir] = cp.value('directory',String,nil,
+                {:type => 'dir', :prefix => args[:repository_dir]}
+              )
+              static[:caches] = {} unless static[:caches]
+              static[:caches][:netboot] = {}
+              static[:caches][:netboot][:directory] = File.join(args[:repository_dir],args[:custom_dir])
+              static[:caches][:netboot][:size] = cp.value('max_size',Fixnum)*1024*1024
+            end
+        else
+          args[:custom_dir] = 'PXE_CUSTOM'
+        end
+
+        cp.parse('profiles') do
+          #TODO : check profile config for example : pxelinuix => pxelinux.cfg,ip_hex another=> another
+          args[:profiles_dir] = cp.value('directory',String,'pxelinux.cfg')
+          if args[:profiles_dir].empty?
+            args[:profiles_dir] = args[:repository_dir]
+          elsif !Pathname.new(args[:profiles_dir]).absolute?
+            args[:profiles_dir] = File.join(args[:repository_dir],args[:profiles_dir])
+          end
+          if !File.exist?(args[:profiles_dir]) or !File.directory?(args[:profiles_dir])
+            raise ArgumentError.new(Parser.errmsg(info[:path],"The directory '#{args[:profiles_dir]}' does not exist"))
+          end
+          args[:profiles_kind] = cp.value('filename',String,'ip_hex',
+            ['ip','ip_hex','hostname','hostname_short']
+          )
+        end
+
+        begin
+          @pxe[name] = NetBoot.Factory(args[:kind], args[:binary], args[:export_kind], args[:export_server],
+                          args[:repository_dir], args[:custom_dir], args[:profiles_dir], args[:profiles_kind], chain)
+        rescue NetBoot::Exception => nbe
+          raise ArgumentError.new(Parser.errmsg(info[:path],nbe.message))
+        end
+      end
     end
   end
 
