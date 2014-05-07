@@ -22,10 +22,12 @@ module Kadeploy
 
     file.puts("\n--- Objects by name ---")
     PP.pp(Hash[objects.sort_by{|k,v| k.name}],file,width)
-
-    file.puts("\n--- Raw objects ---")
-    PP.pp(ObjectSpace.count_objects,file,width)
     objects = nil
+
+    if ObjectSpace.respond_to?(:count_objects)
+      file.puts("\n--- Raw objects ---")
+      PP.pp(ObjectSpace.count_objects,file,width)
+    end
 
     if GC.respond_to?(:stat)
       file.puts("\n--- GC stats ---")
