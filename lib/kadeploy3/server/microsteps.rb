@@ -96,15 +96,18 @@ class Microstep < Automata::QueueTask
 
   def kill(dofree=true)
     # Be carefull to kill @runthread before killing @current_operation, in order to avoid the res condition: @runthread create the Operation object but do not set @current_operation because it was killed
-    unless @runthread.nil?
-      @runthread.kill if @runthread.alive?
-      @runthread.join
-    end
     @waitreboot_threads.list.each do |thr|
       thr.kill if thr.alive?
-      thr.join
     end
     @current_operation.kill unless @current_operation.nil?
+    unless @runthread.nil?
+      begin
+        Timeout::timeout(4){ @runthread.join }
+      rescue Timeout::Error
+        @runthread.kill
+      rescue SignalException
+      end
+    end
     @done = true
     free() if dofree
   end
@@ -1187,13 +1190,19 @@ class Microstep < Automata::QueueTask
     expected_clients = @nodes.length
     if not Bittorrent::wait_end_of_download(context[:common].bt_download_timeout, torrent, context[:common].bt_tracker_ip, tracker_port, expected_clients) then
       failed_microstep("A timeout for the bittorrent download has been reached")
-      Execute.kill_recursive(seed_pid)
+      begin
+        Execute.kill_recursive(seed_pid)
+      rescue Errno::ESRCH
+      end
       return false
     end
-    debug(3, "Shutdown the seed for #{torrent}")
-    Execute.kill_recursive(seed_pid)
-    debug(3, "Shutdown the tracker for #{torrent}")
-    Execute.kill_recursive(tracker_pid)
+    begin
+      debug(3, "Shutdown the seed for #{torrent}")
+      Execute.kill_recursive(seed_pid)
+      debug(3, "Shutdown the tracker for #{torrent}")
+      Execute.kill_recursive(tracker_pid)
+    rescue Errno::ESRCH
+    end
     command("rm -f #{btdownload_state}")
 
     if not parallel_exec(decompress) then
