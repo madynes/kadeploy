@@ -18,6 +18,7 @@ class Microstep < Automata::QueueTask
     @waitreboot_threads = ThreadGroup.new
     @timestart = Time.now.to_i
     @done = false
+    @lock = Mutex.new
   end
 
   def debug(level,msg,info=true,opts={})
@@ -95,20 +96,31 @@ class Microstep < Automata::QueueTask
   end
 
   def kill(dofree=true)
-    # Be carefull to kill @runthread before killing @current_operation, in order to avoid the res condition: @runthread create the Operation object but do not set @current_operation because it was killed
     @waitreboot_threads.list.each do |thr|
       thr.kill if thr.alive?
     end
-    @current_operation.kill unless @current_operation.nil?
-    unless @runthread.nil?
-      begin
-        Timeout::timeout(4){ @runthread.join }
-      rescue Timeout::Error
-        @runthread.kill
-      rescue SignalException
+    @lock.synchronize do
+      @current_operation.kill unless @current_operation.nil?
+
+      unless @runthread.nil? # Waits for @runthread to finish
+        timestart = Time.now
+        while ((Time.now - timestart) < 4) and @runthread.alive? do
+          sleep 0.5
+        end
+
+        if @runthread.alive?
+          @runthread.kill
+        else
+          begin
+            @runthread.join
+          rescue SignalException
+          end
+        end
       end
+
+      @done = true
     end
-    @done = true
+
     free() if dofree
   end
 
@@ -116,9 +128,7 @@ class Microstep < Automata::QueueTask
     super()
     @output = nil
     @debugger = nil
-    @runthread = nil
     @current_operation.free if @current_operation
-    @current_operation = nil
     @waitreboot_threads = nil
     @timestart = nil
     @done = nil
@@ -222,21 +232,25 @@ class Microstep < Automata::QueueTask
   def command(cmd,opts={},&block)
     raise '@current_operation should not be set' if @current_operation
     res = nil
-    @current_operation = Execute[cmd]
+    @lock.synchronize{ @current_operation = Execute[cmd] }
     @current_operation.run(opts)
     res = @current_operation.wait(opts)
     yield(*res) if block_given?
-    @current_operation.free
-    @current_operation = nil
+    @lock.synchronize do
+      @current_operation.free
+      @current_operation = nil
+    end
     (res[0].exitstatus == 0)
   end
 
   def parallel_op(obj)
     raise '@current_operation should not be set' if @current_operation
-    @current_operation = obj
+    @lock.synchronize{ @current_operation = obj }
     yield(obj)
-    @current_operation.free
-    @current_operation = nil
+    @lock.synchronize do
+      @current_operation.free
+      @current_operation = nil
+    end
   end
 
   # Wrap a parallel command
