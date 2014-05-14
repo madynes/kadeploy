@@ -667,7 +667,6 @@ module Automata
 
       unless @runthread.nil?
         @runthread.kill if @runthread.alive?
-        @runthread.join
         @runthread = nil
       end
 
@@ -682,8 +681,7 @@ module Automata
           @threads.each_pair do |task,threads|
             task.kill(false)
             threads.each_pair do |key,thread|
-              thread.kill
-              thread.join
+              thread.kill if thread.alive?
             end
             task.free
           end

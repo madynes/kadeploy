@@ -22,6 +22,10 @@ module Kadeploy
     end
 
     def free
+      if @execs
+        @execs.each_value{|ex| ex.free}
+        @execs.clear
+      end
       @execs = nil
       @output = nil
       @nodesetid = nil
@@ -47,8 +51,8 @@ module Kadeploy
     # * nothing
     def run
       @execs.each_pair do |node,exec|
-        exec.run
         tid = Thread.new do
+          exec.run
           status,stdout,stderr = exec.wait(:checkstatus => false)
           node.last_cmd_stdout = stdout.chomp
           node.last_cmd_stderr = stderr.chomp
@@ -65,6 +69,7 @@ module Kadeploy
     # Output
     # * nothing
     def wait
+      @runthread = Thread.current
       @threads.list.each do |thr|
         thr.join
       end
@@ -73,13 +78,18 @@ module Kadeploy
 
     # Kill every running process
     def kill
-      @threads.list.each do |thr|
-        thr.kill if thr.alive?
-        thr.join
-      end
       @execs.each_value do |exec|
         exec.kill
       end
+
+      # Waiting threads from @threads that will die by themselves
+      @threads.list.each do |thr|
+        begin
+          thr.join
+        rescue SignalException
+        end
+      end
+
       free()
     end
 
