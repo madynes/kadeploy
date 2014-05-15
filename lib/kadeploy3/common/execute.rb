@@ -24,12 +24,8 @@ class Execute
 
   def free
     @command = nil
-    @exec_pid = nil
     @stdout = nil
     @stderr = nil
-    @status = nil
-    @child_io = nil
-    @parent_io = nil
   end
 
   def self.[](*cmd)
@@ -58,33 +54,34 @@ class Execute
       @child_io, @parent_io = Execute.init_ios(opts)
       @parent_io.each { |io| io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC) if io }
       @exec_pid = fork {
-        @parent_io.each do |io|
-          begin
-            io.close if io and !io.closed?
-          rescue IOError
-          end
-        end
-
-        std = nil
-        if opts[:stdin]
-          std = [STDIN, STDOUT, STDERR]
-        else
-          std = [nil, STDOUT, STDERR]
-        end
-
-        std.each_index do |i|
-          next unless std[i]
-          std[i].reopen(@child_io[i])
-          begin
-            @child_io[i].close
-          rescue IOError
-          end
-        end
-
         begin
+          @parent_io.each do |io|
+            begin
+              io.close if io and !io.closed?
+            rescue IOError
+            end
+          end
+
+          std = nil
+          if opts[:stdin]
+            std = [STDIN, STDOUT, STDERR]
+          else
+            std = [nil, STDOUT, STDERR]
+          end
+
+          std.each_index do |i|
+            next unless std[i]
+            begin
+              std[i].reopen(@child_io[i])
+              @child_io[i].close
+            rescue IOError
+            end
+          end
+
           exec(*@command)
-        rescue SystemCallError => sce
-          STDERR.puts "#{sce.message} (#{sce.class.name})"
+        rescue SystemCallError, Exception => e
+          STDERR.puts "Fork Error: #{e.message} (#{e.class.name})"
+          STDERR.puts e.backtrace
         end
         exit! 1
       }
@@ -131,55 +128,63 @@ class Execute
     unless @exec_pid.nil?
       emptypipes = true
       begin
-        begin
-          @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
-        rescue IOError
-        end
-
-        if opts[:stdout_size] and opts[:stdout_size] > 0
-          @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
-          emptypipes = false unless @parent_io[1].eof?
-          unless @parent_io[1].closed?
-            begin
-              @parent_io[1].readpartial(4096) while true
-            rescue EOFError
-            end
+        if @parent_io
+          begin
+            @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
+          rescue IOError
           end
-        else
-          @stdout = @parent_io[1].read unless @parent_io[1].closed?
         end
 
-        if opts[:stderr_size] and opts[:stderr_size] > 0
-          @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
-          emptypipes = false unless @parent_io[2].eof?
-          unless @parent_io[2].closed?
-            begin
-              @parent_io[2].readpartial(4096) while true
-            rescue EOFError
+        if @parent_io
+          if opts[:stdout_size] and opts[:stdout_size] > 0
+            @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
+            emptypipes = false if !@parent_io[1].closed? and !@parent_io[1].eof?
+            unless @parent_io[1].closed?
+              begin
+                @parent_io[1].readpartial(4096) while true
+              rescue EOFError
+              end
             end
+          else
+            @stdout = @parent_io[1].read unless @parent_io[1].closed?
           end
-        else
-          @stderr = @parent_io[2].read unless @parent_io[2].closed?
         end
 
+        if @parent_io
+          if opts[:stderr_size] and opts[:stderr_size] > 0
+            @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
+            emptypipes = false if !@parent_io[1].closed? and !@parent_io[2].eof?
+            unless @parent_io[2].closed?
+              begin
+                @parent_io[2].readpartial(4096) while true
+              rescue EOFError
+              end
+            end
+          else
+            @stderr = @parent_io[2].read unless @parent_io[2].closed?
+          end
+        end
         _, @status = Process.wait2(@exec_pid)
-        @exec_pid = nil
-      rescue Errno::ECHILD
-        @status = nil
         @exec_pid = nil
       ensure
         if @exec_pid # Process.wait2 did not finish, the current thread was probably killed
           kill()
+          begin
+            _, @status = Process.wait2(@exec_pid)
+          rescue Errno::ESRCH
+          end
+          @exec_pid = nil
         else
-          @parent_io.each do |io|
-            begin
-              io.close if io and !io.closed?
-            rescue IOError
-            end
-          end if @parent_io
+          @kill_lock.synchronize do
+            @parent_io.each do |io|
+              begin
+                io.close if io and !io.closed?
+              rescue IOError
+              end
+            end if @parent_io
+          end
         end
-        @parent_io = nil
-        @child_io = nil
+        raise SignalException.new(@status.termsig) if @status and @status.signaled?
       end
 
       raise KadeployExecuteError.new(
@@ -191,51 +196,48 @@ class Execute
   end
 
   def self.kill_recursive(pid)
-    begin
-      # Check that the process still exists
-      Process.kill(0,pid)
-      # SIGSTOPs the process to avoid it creating new children
-      Process.kill('STOP',pid)
-      # Gather the list of children before killing the parent in order to
-      # be able to kill children that will be re-attached to init
-      children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
-      # Directly kill the process not to generate <defunct> children
-      Process.kill('KILL',pid)
-      children.each do |cpid|
-        kill_recursive(cpid)
-      end
-    rescue Errno::ESRCH
-    end
+    # Check that the process still exists
+    Process.kill(0,pid)
+    # SIGSTOPs the process to avoid it creating new children
+    Process.kill('STOP',pid)
+    # Gather the list of children before killing the parent in order to
+    # be able to kill children that will be re-attached to init
+    children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i rescue nil}
+    children.compact!
+    # Check that the process still exists
+    # Directly kill the process not to generate <defunct> children
+    children.each do |cpid|
+      kill_recursive(cpid)
+    end if children
+    Process.kill('KILL',pid)
   end
 
   def kill()
-    @kill_lock.synchronize do
-      @parent_io.each do |io|
-        begin
-          io.close if io and !io.closed?
-        rescue IOError
-        end
-      end if @parent_io
-      @parent_io = nil
+    @kill_lock.synchronize{ kill! }
+  end
 
-      @child_io.each do |io|
-        begin
-          io.close if io and !io.closed?
-        rescue IOError
-        end
-      end if @child_io
-      @child_io = nil
-
-      unless @exec_pid.nil?
-        begin
-          Execute.kill_recursive(@exec_pid)
-          Process.wait(@exec_pid)
-        rescue Errno::ESRCH
-        end
-        @exec_pid = nil
+  def kill!()
+    unless @exec_pid.nil?
+      begin
+        Execute.kill_recursive(@exec_pid)
+      rescue Errno::ESRCH
       end
-      free()
+      # This function do not wait the PID since the thread that use wait() is supposed to be running and to do so
     end
+
+    @parent_io.each do |io|
+      begin
+        io.close if io and !io.closed?
+      rescue IOError
+      end
+    end if @parent_io
+
+    @child_io.each do |io|
+      begin
+        io.close if io and !io.closed?
+      rescue IOError
+      end
+    end if @child_io
   end
 
   def self.do(*cmd,&block)

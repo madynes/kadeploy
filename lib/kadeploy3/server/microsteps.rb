@@ -18,6 +18,7 @@ class Microstep < Automata::QueueTask
     @waitreboot_threads = ThreadGroup.new
     @timestart = Time.now.to_i
     @done = false
+    @lock = Mutex.new
   end
 
   def debug(level,msg,info=true,opts={})
@@ -95,17 +96,31 @@ class Microstep < Automata::QueueTask
   end
 
   def kill(dofree=true)
-    # Be carefull to kill @runthread before killing @current_operation, in order to avoid the res condition: @runthread create the Operation object but do not set @current_operation because it was killed
-    unless @runthread.nil?
-      @runthread.kill if @runthread.alive?
-      @runthread.join
-    end
     @waitreboot_threads.list.each do |thr|
       thr.kill if thr.alive?
-      thr.join
     end
-    @current_operation.kill unless @current_operation.nil?
-    @done = true
+    @lock.synchronize do
+      @current_operation.kill unless @current_operation.nil?
+
+      unless @runthread.nil? # Waits for @runthread to finish
+        timestart = Time.now
+        while ((Time.now - timestart) < 4) and @runthread.alive? do
+          sleep 0.5
+        end
+
+        if @runthread.alive?
+          @runthread.kill
+        else
+          begin
+            @runthread.join
+          rescue SignalException
+          end
+        end
+      end
+
+      @done = true
+    end
+
     free() if dofree
   end
 
@@ -113,9 +128,7 @@ class Microstep < Automata::QueueTask
     super()
     @output = nil
     @debugger = nil
-    @runthread = nil
     @current_operation.free if @current_operation
-    @current_operation = nil
     @waitreboot_threads = nil
     @timestart = nil
     @done = nil
@@ -219,21 +232,25 @@ class Microstep < Automata::QueueTask
   def command(cmd,opts={},&block)
     raise '@current_operation should not be set' if @current_operation
     res = nil
-    @current_operation = Execute[cmd]
+    @lock.synchronize{ @current_operation = Execute[cmd] }
     @current_operation.run(opts)
     res = @current_operation.wait(opts)
     yield(*res) if block_given?
-    @current_operation.free
-    @current_operation = nil
+    @lock.synchronize do
+      @current_operation.free
+      @current_operation = nil
+    end
     (res[0].exitstatus == 0)
   end
 
   def parallel_op(obj)
     raise '@current_operation should not be set' if @current_operation
-    @current_operation = obj
+    @lock.synchronize{ @current_operation = obj }
     yield(obj)
-    @current_operation.free
-    @current_operation = nil
+    @lock.synchronize do
+      @current_operation.free
+      @current_operation = nil
+    end
   end
 
   # Wrap a parallel command
@@ -1187,13 +1204,19 @@ class Microstep < Automata::QueueTask
     expected_clients = @nodes.length
     if not Bittorrent::wait_end_of_download(context[:common].bt_download_timeout, torrent, context[:common].bt_tracker_ip, tracker_port, expected_clients) then
       failed_microstep("A timeout for the bittorrent download has been reached")
-      Execute.kill_recursive(seed_pid)
+      begin
+        Execute.kill_recursive(seed_pid)
+      rescue Errno::ESRCH
+      end
       return false
     end
-    debug(3, "Shutdown the seed for #{torrent}")
-    Execute.kill_recursive(seed_pid)
-    debug(3, "Shutdown the tracker for #{torrent}")
-    Execute.kill_recursive(tracker_pid)
+    begin
+      debug(3, "Shutdown the seed for #{torrent}")
+      Execute.kill_recursive(seed_pid)
+      debug(3, "Shutdown the tracker for #{torrent}")
+      Execute.kill_recursive(tracker_pid)
+    rescue Errno::ESRCH
+    end
     command("rm -f #{btdownload_state}")
 
     if not parallel_exec(decompress) then

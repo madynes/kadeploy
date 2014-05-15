@@ -138,12 +138,16 @@ class HTTPFetchFile < FetchFile
 
   def grab(dest,dir=nil)
     begin
-      if (code = HTTP.fetch_file(@path,dest)) != 200
-        error("Unable to grab the file #{@path} (http error ##{code})")
-      end
+      HTTP.fetch_file(@path,dest)
       nil
     rescue KadeployError => ke
       raise ke
+    rescue KadeployHTTPError => k
+      error("Unable to grab the file #{@path} (http error ##{k.errno})")
+    rescue KadeployError => ke
+      raise ke
+    rescue Errno::ECONNREFUSED
+      error("Unable to grab the file #{@path} (connection refused)")
     rescue Exception => e
       error("Unable to grab the file #{@path} (#{e.message})")
     end
