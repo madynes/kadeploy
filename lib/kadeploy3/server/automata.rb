@@ -452,8 +452,9 @@ module Automata
       task.context[:local][:timeout] = timeout
 
       timestart = Time.now
-      thr = Thread.new { task.run }
+      thr = nil
       @threads_lock.synchronize do
+        thr = Thread.new { task.run }
         @threads[task] = {} unless @threads[task]
         @threads[task][:run] = thr
       end
@@ -663,13 +664,13 @@ module Automata
 
     def kill(dofree=true)
       @threads_lock.synchronize{ clean_threads() } if @threads
-      @queue.clear()
 
       unless @runthread.nil?
         @runthread.kill if @runthread.alive?
-        @runthread.join
         @runthread = nil
       end
+
+      @queue.clear()
 
       unless @cleaner.nil?
         @cleaner.kill if @cleaner.alive?
@@ -682,8 +683,7 @@ module Automata
           @threads.each_pair do |task,threads|
             task.kill(false)
             threads.each_pair do |key,thread|
-              thread.kill
-              thread.join
+              thread.kill if thread.alive?
             end
             task.free
           end
