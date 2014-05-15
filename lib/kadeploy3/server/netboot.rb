@@ -175,10 +175,10 @@ module NetBoot
     end
 
     def labelize(header,kind,profile,args=[])
-      header+
+      "#{header}\n"\
       "DEFAULT #{kind}\n"\
       "LABEL #{kind}\n"\
-      + profile.collect{|line| "\t#{line}"}.join("\n")
+      "#{profile.collect{|line| "\t#{line}"}.join("\n")}\n"
     end
 
     def boot_chain(pxebin)
@@ -269,7 +269,9 @@ module NetBoot
     end
 
     def labelize(header,kind,profile,args=[])
-      "#!ipxe\n#{header}\n#{profile.join("\n")}"
+      "#!ipxe\n"\
+      "#{header}\n"\
+      "#{profile.join("\n")}\n"
     end
 
     def boot_chain(pxebin)
@@ -324,11 +326,12 @@ module NetBoot
 
     def labelize(header,kind,profile,args=[])
       header += "\ntimeout=0\n" unless header.include?("timeout")
-      header +
+
+      "#{header}\n"\
       "default=0\n"\
       "menuentry #{kind} {\n"\
       "#{profile.collect{|line| "\t#{line}"}.join("\n")}\n"\
-      "}"
+      "}\n"
     end
 
     def boot_chain(pxebin)
