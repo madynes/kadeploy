@@ -690,7 +690,7 @@ module Automata
         end
       end
 
-      @threads = {}
+      @threads_lock.synchronize{ @threads = {} }
       @nodes_done.clean()
       @queue.clear()
       @nodes.linked_copy(@nodes_done)
