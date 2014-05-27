@@ -99,23 +99,23 @@ CFG_KADEPLOY_SOFT_REBOOT = false
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 1,
-  :timeout => 200
+  :timeout => 900
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
   :retries => 1,
-  :timeout => 200
+  :timeout => 900
 }
 CFG_KADEPLOY_MACROSTEP3 = [
   {
     :name => 'BootNewEnv|BootNewEnvKexec',
     :retries => 0,
-    :timeout => 200
+    :timeout => 900
   },
   {
     :name => 'BootNewEnv|BootNewEnvHardReboot',
     :retries => 1,
-    :timeout => 200
+    :timeout => 900
   }
 ]
 
@@ -800,7 +800,7 @@ def cfg_kadeploy_specific_conf_filename(cluster)
     CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster
   end
 end
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 200
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 900
 CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,fat'
 
 def cfg_kadeploy_specific_conf(cluster)
