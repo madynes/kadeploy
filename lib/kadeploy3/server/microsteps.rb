@@ -1563,7 +1563,7 @@ class Microstep < Automata::QueueTask
         { :input_file => tmpfile.path, :scattering => :tree }
       )
 
-      ret = ret && parallel_exec(shell_detach('/sbin/kexec -e'))
+      ret = ret && parallel_exec(shell_detach('/sbin/reboot'))
 
       tmpfile.unlink
 
