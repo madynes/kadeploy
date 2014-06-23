@@ -108,7 +108,7 @@ module Kadeploy
         @threads.each do |thr|
           begin
             thr.join
-          rescue SignalException => se
+          rescue SignalException
           end
         end
       end
