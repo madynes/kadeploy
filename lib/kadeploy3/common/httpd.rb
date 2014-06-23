@@ -357,6 +357,8 @@ module HTTPd
             "---- Stack trace ----\n"\
             "#{e.backtrace.join("\n")}\n"\
             "---------------------"
+          #Write the error in stderr
+          $stderr.puts("[#{Time.now}] Internal Server Error  #{res}")
           response.status = 500
           response['Content-Type'] = 'text/plain'
         end
