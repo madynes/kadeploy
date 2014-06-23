@@ -245,6 +245,11 @@ module HTTPd
       # class_eval "alias :\"do_#{m.to_s.upcase}\", :do_METHOD"
     end
 
+    #This function override the inspect function of Object class and it avoids a recursive inspection by webrick
+    def inspect()
+      self.class.name
+    end
+
     def get_instance(server, *options)
       self
     end
