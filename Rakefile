@@ -88,6 +88,12 @@ INSTALL = {
     :group => 'root',
     :mode => '644',
   },
+  :lib_kaadmin=> {
+    :dir => vendordir('kadeploy3','kaadmin'),
+    :user => 'root',
+    :group => 'root',
+    :mode => '644',
+  },
   :log => {
     :dir => '/var/log/kadeploy3',
     :user => 'root',
@@ -148,6 +154,7 @@ DESC = {
   :kapower3 => 'allows to perform several operations to control the power status of nodes',
   :kareboot3 => 'allows to perform several reboot operations on the nodes involved in a deployment',
   :kastat3 => 'allows to get statistics on the deployments',
+  :kaadmin3 => 'Administration stuff for kadeploy3 (image installer, migration script,...)',
 }
 
 
@@ -530,6 +537,18 @@ desc "Install kascade"
 task :install_kascade, [:root_dir,:distrib] => [:prepare] do
   create_dir(:bin)
   installf(:bin,File.join(D[:addons],'kascade','kascade'))
+end
+
+desc "Install Kaadmin"
+task :install_kaadmin, [:root_dir,:distrib] => [:prepare] do
+  create_dir(:sbin)
+  installf(:sbin,File.join(D[:addons],'kaadmin','sbin','kaadmin3'))
+  create_dir(:lib)
+  installf(:lib,File.join(D[:addons],'kaadmin','lib','kadeploy3','kaadmin.rb'))
+  create_dir(:lib_kaadmin)
+  Dir[File.join(D[:addons],'kaadmin','lib','kadeploy3','kaadmin','*.rb')].each do |f|
+    installf(:lib_kaadmin,f)
+  end
 end
 
 desc "Clean the build directory"

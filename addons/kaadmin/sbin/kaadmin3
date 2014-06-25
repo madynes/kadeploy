@@ -1,0 +1,17 @@
+#!/usr/bin/ruby -w
+
+require 'kadeploy3/kaadmin'
+
+require 'pp'
+
+
+if OPTIONS[ARGV[0]]
+  OPTIONS[ARGV[0]][:call].launch(ARGV[1..-1])
+else
+  $stderr.puts "'#{ARGV[0]}' is not a valid command" unless ARGV[0]=='--help' or ARGV[0]=='-?'
+  $stderr.puts "\nusage: #{__FILE__} command <options>"
+  $stderr.puts "\nThe list of commands :"
+  OPTIONS.each_pair do |k,v|
+    $stderr.puts "#{k}:\t#{v[:description]}"
+  end
+end
