@@ -1472,35 +1472,39 @@ class Microstep < Automata::QueueTask
         return false
       end
     when "deploy_to_deployed_env"
-      nodes = get_nodes.call(true)
-      if context[:execution].pxe and context[:execution].pxe[:profile]
-        unless context[:common].pxe[:dhcp].boot(
-          :custom,
-          nodes,
-          context[:cluster].pxe_header,
-          context[:execution].pxe[:profile],
-          context[:execution].user,
-          context[:wid],
-          context[:execution].pxe[:singularities]
-        ) then
-          failed_microstep("Cannot perform the set_pxe_for_custom operation")
-          return false
+      p = Proc.new { |nodes|
+        if context[:execution].pxe and context[:execution].pxe[:profile]
+          unless context[:common].pxe[:dhcp].boot(
+            :custom,
+            nodes,
+            context[:cluster].pxe_header,
+            context[:execution].pxe[:profile],
+            context[:execution].user,
+            context[:wid],
+            context[:execution].pxe[:singularities]
+          ) then
+            failed_microstep("Cannot perform the set_pxe_for_custom operation")
+            return false
+          end
+        else
+          unless context[:common].pxe[:local].boot(
+            :local,
+            nodes,
+            context[:cluster].pxe_header,
+            context[:execution].environment,
+            get_block_device_str(),
+            get_block_device_num(),
+            context[:execution].boot_part || get_deploy_part_num(),
+            context[:cluster].kernel_params
+          ) then
+            failed_microstep("Cannot perform the set_pxe_for_local operation")
+            return false
+          end
         end
-      else
-        unless context[:common].pxe[:local].boot(
-          :local,
-          nodes,
-          context[:cluster].pxe_header,
-          context[:execution].environment,
-          get_block_device_str(),
-          get_block_device_num(),
-          context[:execution].boot_part || get_deploy_part_num(),
-          context[:cluster].kernel_params
-        ) then
-          failed_microstep("Cannot perform the set_pxe_for_local operation")
-          return false
-        end
-      end
+      }
+      #We have to generate PXE profiles for both production and VLAN networks if --vlan switch is used
+      p.call(get_nodes.call(true)) if context[:execution].vlan_id
+      p.call(get_nodes.call(false))
     end
     return true
   end
