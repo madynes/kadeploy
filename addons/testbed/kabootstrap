@@ -94,7 +94,7 @@ CFG_CA_PRIVATE_KEY = File.join(CFG_SSL_CERT_PATH,'testbed-ca.key')
 # Kadeploy default config
 CFG_KADEPLOY_USER = 'deploy'
 
-CFG_KADEPLOY_SOFT_REBOOT = false
+CFG_KADEPLOY_SOFT_REBOOT = true
 
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
@@ -633,12 +633,20 @@ def cfg_kadeploy_specific_conf_postinstall_path(cluster)
   postinstall
 end
 
-def cfg_kadeploy_kapower_cmd(cmd)
-  "ssh #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{ENV['USER']}@#{getgw()} \"kapower3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}` #{cmd}\""
+def forge_ssh_cmd_frontend(cmd)
+  user = ENV['USER']
+  host = "frontend.#{$site}"
+  pxy = ""
+  pxy = "-o ProxyCommand='ssh #{user}@#{getgw()} #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} -W %h:%p'" if $tunnels
+  "ssh #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{pxy} #{user}@#{host} \"#{cmd}\""
 end
 
-def cfg_kadeploy_kaconsole_cmd(user=ENV['USER'])
-  "ssh -t #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{user}@#{getgw()} \"kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`\""
+def cfg_kadeploy_kapower_cmd(cmd)
+  forge_ssh_cmd_frontend("kapower3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}` #{cmd}")
+end
+
+def cfg_kadeploy_kaconsole_cmd()
+  forge_ssh_cmd_frontend("kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`")
 end
 
 def cfg_kadeploy_kvm_cmd(cmd,user='root')
