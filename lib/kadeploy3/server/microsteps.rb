@@ -1876,7 +1876,7 @@ class Microstep < Automata::QueueTask
   # * ports_down: down ports used to perform a reach test on the nodes
   # Output
   # * return true if some nodes are here, false otherwise
-  def ms_wait_reboot(kind='classical', env='deploy', vlan=false, timeout=nil,ports_up=nil, ports_down=nil)
+  def ms_wait_reboot(kind='classical', env='deploy', vlan=false, timeout=nil, ports_up=nil, ports_down=nil)
     unless timeout
       if kind == 'kexec'
         timeout = context[:execution].timeout_reboot_kexec \
@@ -1886,7 +1886,7 @@ class Microstep < Automata::QueueTask
           || context[:cluster].timeout_reboot_classical
       end
     end
-    n = n = @nodes.length
+    n = @nodes.length
     timeout = eval(timeout).to_i
 
     unless ports_up
