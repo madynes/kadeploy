@@ -1,0 +1,82 @@
+#!/usr/bin/ruby
+
+$:.unshift File.dirname(__FILE__)
+
+require 'common-g5k'
+
+unless ARGV.size >= 1
+  vars = KADEPLOY_ENV_VARS.inject(''){|tmp,var| tmp << "  #{var} (default: #{self.class.const_get(var)})\n"}
+  error("usage: #{$0} [git:|gerrit:]<commit/branch> <frontend user@host> [<sources dir>] [<exp file>]\ncustomizable env vars:\n#{vars}\nsamples:\n  #{$0} master 8 (git is used by default)\n  #{$0} git:3.1.7 7 test_config.yml kadeploy3-sources/\n  #{$0} git:5f4b6c54949b0769596b10087c1d14150930d84f 7\n  #{$0} gerrit:refs/changes/27/1027/13 7")
+end
+
+$repo,$commit,$repo_kind = get_repo_commit(ARGV[0])
+tmp=ARGV[1].split('@')
+$user=tmp[0]
+$host=tmp[1]
+
+if ARGV[2] and !ARGV[2].empty? and !File.readable?(ARGV[2])
+  error("source dir not found '#{ARGV[2]}'")
+end
+
+if ARGV[3] and !File.readable?(ARGV[3])
+  error("exp file not found '#{ARGV[3]}'")
+end
+
+puts "Cleaning testsuite"
+ssh($user,$host,"rm -rf #{TMP_DIR}")
+puts '... done'
+
+if ARGV[2] and !ARGV[2].empty?
+  puts "Copying testsuite"
+  scp($user,$host,ARGV[2],TMP_DIR)
+  puts '... done'
+else
+  begin
+    puts "Fetching #{$repo_kind} repository #{$commit}"
+    $git_repo=fetch_git_repo($repo_kind,$repo,$commit)
+    puts "... done"
+
+    puts "Copying testsuite"
+    scp($user,$host,$git_repo,TMP_DIR)
+    puts '... done'
+  ensure
+    cmd("rm -Rf #{$git_repo}",false) if $git_repo
+  end
+end
+
+if ARGV[3]
+  puts "Copying exp file"
+  scp($user,$host,ARGV[3],TMP_DIR)
+  puts '... done'
+end
+
+puts "Install dependencies"
+ssh('root',$host,"grep proxy /etc/hosts || echo '\n127.0.0.1\tproxy' >> /etc/hosts")
+ssh('root',$host,"apt-get -y update")
+ssh('root',$host,"apt-get -y --force-yes install rake")
+ssh('root',$host,"cd #{File.join(TMP_DIR,'addons','kanalyze')}; rake stats_install_deps")
+puts '... done'
+
+puts "Run kanalyze"
+task = "launch"
+task << "[#{File.join(TMP_DIR,File.basename(ARGV[3]))}]" if ARGV[3]
+stdout,stderr,status = ssh($user,$host,"cd #{File.join(TMP_DIR,'addons','kanalyze')}; rake #{task} NODEFILE=~/NODEFILE",false)
+puts '... done'
+
+puts 'Failed !' unless status
+puts "----------------" if !stdout.empty? or !stderr.empty?
+puts "\t" + stdout.lines.to_a * "\t" unless stdout.empty?
+puts "----------------" if !stdout.empty? and !stderr.empty?
+puts "\t" + stderr.lines.to_a * "\t" unless stderr.empty?
+puts "----------------" if !stdout.empty? or !stderr.empty?
+puts '... done'
+
+if status
+  cmd("mkdir -p #{KANALYZE_RESULTS_DIR}")
+  puts 'Copying results'
+  scp($user,$host,File.join(TMP_DIR,'addons','kanalyze','kanalyze-*'),KANALYZE_RESULTS_DIR,true)
+  puts '... done'
+  exit 0
+else
+  exit 1
+end

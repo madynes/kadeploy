@@ -23,6 +23,13 @@ VERSION="#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}"
 
 DEPLOY_USER='deploy'
 
+def vendordir(*args)
+  if RUBY_VERSION >= "1.9.0"
+    File.join(RbConfig::CONFIG["vendordir"],*args)
+  else
+    File.join(RbConfig::CONFIG["vendorlibdir"],*args)
+  end
+end
 # Directories
 D = {
   :base => File.dirname(__FILE__),
@@ -58,25 +65,25 @@ INSTALL = {
     :mode => '644',
   },
   :lib => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3'),
+    :dir => vendordir('kadeploy3'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_client => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','client'),
+    :dir => vendordir('kadeploy3','client'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_server => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','server'),
+    :dir => vendordir('kadeploy3','server'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
   },
   :lib_common => {
-    :dir => File.join(RbConfig::CONFIG["vendordir"],'kadeploy3','common'),
+    :dir => vendordir('kadeploy3','common'),
     :user => 'root',
     :group => 'root',
     :mode => '644',
@@ -88,7 +95,7 @@ INSTALL = {
     :mode => '770',
   },
   :run => {
-    :dir => '/var/log/kadeploy3d',
+    :dir => '/var/run/kadeploy3d',
     :user => DEPLOY_USER,
     :group => 'root',
     :mode => '755',
@@ -215,6 +222,12 @@ def uninstallf(kind,file,filename=nil)
   sh "rm -f #{File.join(dest,file.to_s)}*"
 end
 
+def gen_man(file,level)
+  filename = File.basename(file)
+  %x{#{file} --help}
+  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s #{level} -o #{D[:man]}/#{filename}.#{level} #{file}"
+end
+
 def deb_versions()
   if RELEASE_VERSION =~ /git|alpha|rc/
     [
@@ -224,7 +237,7 @@ def deb_versions()
   else
     [
       "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
-      "v#{deb_version}",
+      "v#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
     ]
   end
 end
@@ -241,10 +254,9 @@ task :man_client => :man_client_clean do
   raise "help2man is missing !" unless system('which help2man')
 
   Dir[File.join(D[:bin],'/*')].each do |bin|
-    filename = File.basename(bin)
-	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 1 -o #{D[:man]}/#{filename}.1 #{bin}"
+    gen_man(bin,1)
   end
+  gen_man(File.join(D[:sbin],'karights3'),8)
 end
 
 desc "Clean manpages files"
@@ -255,12 +267,7 @@ end
 desc "Generate server manpages"
 task :man_server => :man_server_clean do
   raise "help2man is missing !" unless system('which help2man')
-
-  Dir[File.join(D[:sbin],'*')].each do |bin|
-    filename = File.basename(bin)
-	  %x{#{bin} --help}
-	  sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s 8 -o #{D[:man]}/#{filename}.8 #{bin}"
-  end
+  gen_man(File.join(D[:sbin],'kadeploy3d'),8)
 end
 
 desc "Clean manpages files"
@@ -433,7 +440,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:sbin,:kadeploy3d)
 
   create_dir(:rc)
-  installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy3d'))
+  installf(:rc,File.join(D[:addons],'rc',args.distrib,'kadeploy'))
 
   create_dir(:log)
   create_dir(:run)
@@ -478,7 +485,7 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:script,'fdisk-sample')
   delete_dir(:script)
 
-  uninstallf(:rc,'kadeploy3d')
+  uninstallf(:rc,'kadeploy')
   delete_dir(:rc)
 
   logs = File.join(INSTALL[:log][:dir],'*')
@@ -570,7 +577,7 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   git push origin #{tag_version}:refs/tags/#{tag_version}
   git push origin upstream#{suff}/#{tag_version}:refs/tags/upstream#{suff}/#{tag_version}
 ### After the packaging work, tag the final Debian package, push the tag:
-  git commit -m "Update Debian changelog for #{deb_version}" debian#{suff}/changelog
+  git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
   git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
   git push origin debian#{suff}/#{tag_version}-1:refs/tags/debian#{suff}/#{tag_version}-1
 EOF

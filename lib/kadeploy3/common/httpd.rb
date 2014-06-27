@@ -245,6 +245,11 @@ module HTTPd
       # class_eval "alias :\"do_#{m.to_s.upcase}\", :do_METHOD"
     end
 
+    #This function override the inspect function of Object class and it avoids a recursive inspection by webrick
+    def inspect()
+      self.class.name
+    end
+
     def get_instance(server, *options)
       self
     end
@@ -263,7 +268,7 @@ module HTTPd
       Thread.current[:run_thr] = Thread.new{ ret = handle(req,resp,request_handler) }
 
       sock = Thread.current[:WEBrickSocket]
-      while Thread.current[:run_thr].alive? do
+      while Thread.current[:run_thr] and Thread.current[:run_thr].alive? do
         if IO.select([sock], nil, nil, 0.5) and sock.eof?
         # The client disconnected
           kill()
@@ -272,7 +277,7 @@ module HTTPd
           raise WEBrick::HTTPStatus::EOFError
         end
       end
-      Thread.current[:run_thr].join
+      Thread.current[:run_thr].join if Thread.current[:run_thr]
       Thread.current[:run_thr] = nil
 
       if IO.select([sock], nil, nil, 0) and sock.eof?
@@ -409,16 +414,11 @@ module HTTPd
       @method = method
       @args = args
       @blocks = blocks
-      @params = {}
     end
 
-    def handle(request, response, request_handler)
-      args = nil
-      if @args.is_a?(ContentBinding)
-        args = @args[get_method(request)]
-      else
-        args = @args
-      end
+    def handle(request, response, request_handler, args=nil, params={})
+      args = @args.dup if args.nil? and !@args.nil?
+      args = args[get_method(request)] if args.is_a?(ContentBinding)
       args = [] if args.nil?
       args = [args] unless args.is_a?(Array)
 
@@ -429,11 +429,9 @@ module HTTPd
         name = @method.to_s.to_sym
       end
 
-      @params[:kind] = get_method(request)
-      @params[:request] = request
-      @params[:params] = request_handler.params
-      params = @params
-      @params = {}
+      params[:kind] = get_method(request)
+      params[:request] = request
+      params[:params] = request_handler.params
 
       begin
         return @obj.send(name,params,*args)#,&proc{request})
@@ -467,7 +465,9 @@ module HTTPd
     end
 
     def handle(request, response, request_handler)
-      @args = []
+      args = (@args.nil? ? nil : @args.dup)
+      args = [] if args.nil?
+      params = {}
 
       filter = nil
       if @filter.is_a?(ContentBinding)
@@ -481,9 +481,9 @@ module HTTPd
 
       if @static
         if @static.is_a?(ContentBinding)
-          @args += @static[get_method(request)]
+          args += @static[get_method(request)]
         else
-          @args += @static
+          args += @static
         end
       end
 
@@ -503,16 +503,16 @@ module HTTPd
       #end
 
       fields = request.request_uri.path.split('/')[1..-1]
-      @args += fields.values_at(*filter).compact.collect{|v| URI.decode_www_form_component(v)}
-      @params[:names] = fields.values_at(*names).compact
-      @params[:names] = nil if @params[:names].empty?
+      args += fields.values_at(*filter).compact.collect{|v| URI.decode_www_form_component(v)}
+      params[:names] = fields.values_at(*names).compact
+      params[:names] = nil if params[:names].empty?
       #if suffix.empty?
       #  @method = prefix.to_sym
       #else
       #  @method = (prefix.to_s + '_' + suffix.join('_')).to_sym
       #end
 
-      return super(request, response, request_handler)
+      return super(request, response, request_handler, args, params)
     end
   end
 

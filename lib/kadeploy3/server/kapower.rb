@@ -44,10 +44,9 @@ module Kapower
 
       work_create(:power,cexec) do |info|
         info[:output].push(0,'---')
-        #info[:nodes].set.each do |node|
-        #  info[:output].push(0,"  #{node.hostname}: #{node.last_cmd_stdout}")
-        #end
-        info[:output].push(0,info[:nodes].to_s(true,false,"\n"))
+        info[:nodes_ok].each do |node|
+          info[:output].push(0,"#{node}: #{info[:state].get(node)[:out]}")
+        end
         info[:output].push(0,'---')
       end
     else
