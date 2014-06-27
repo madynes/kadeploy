@@ -23,35 +23,26 @@ module HTTP
   # * etag: ETag of the file (http_response is -1 if Tempfiles cannot be created)
   # Output
   # * return http_response and ETag
-  def self.fetch_file(uri, output, cache_dir, expected_etag)
-    http_response = String.new
-    etag = String.new
-    begin
-      if cache_dir
-        wget_output = Tempfile.new("wget_output", cache_dir)
-        wget_download = Tempfile.new("wget_download", cache_dir)
-      else
-        wget_output = Tempfile.new("wget_output")
-        wget_download = Tempfile.new("wget_download")
-      end
-    rescue StandardError
-      return -1,0
-    end
-    if (expected_etag == nil) then
-      cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} 2> #{wget_output.path}"
-    else
-      cmd = "LANG=C wget --debug #{uri} --no-check-certificate --output-document=#{wget_download.path} --header='If-None-Match: \"#{expected_etag}\"' 2> #{wget_output.path}"
-    end
-    system(cmd)
-    http_response = `grep "^HTTP/1\.." #{wget_output.path}|tail -1|cut -f 2 -d' '`.chomp
-    if (http_response == "200") then
-      if not system("mv #{wget_download.path} #{output}") then
-        return -2,0
+  def self.fetch_file(uri,destfile)
+    ret = nil
+    url = URI.parse(uri)
+    http = Net::HTTP.new(url.host, url.port)
+    http.use_ssl = url.is_a?(URI::HTTPS)
+    http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+    http.start
+    http.request_get(url.path,{}) do |resp|
+      raise KadeployHTTPError.new(resp.code) if !resp.is_a?(Net::HTTPSuccess) and !resp.is_a?(Net::HTTPNotModified)
+
+      ret = resp.to_hash
+      File.open(destfile,'w+') do |f|
+        resp.read_body do |chunk|
+          f.write chunk
+          nil
+        end
       end
     end
-    etag = `grep "ETag" #{wget_output.path}|cut -f 2 -d' '`.chomp
-    wget_output.unlink
-    return http_response.to_i, etag
+
+    return ret
   end
 
   def self.check_file(uri, expected_etag=nil)
@@ -124,7 +115,7 @@ module HTTP
           raise unless request.is_a?(Net::HTTPRequest)
           response = client.request(request)
         rescue Exception => e
-          error("Invalid request on #{server}:#{port} (#{e.class.name})")
+          error("Invalid request on #{server}:#{port} (#{e.message})")
         end
 
         body = nil
@@ -165,24 +156,20 @@ module HTTP
           case response.code.to_i
           when 400
             if response['X-Application-Error-Code']
-              error("[Kadeploy Error ##{response['X-Application-Error-Code']}]\n#{body}",(response['X-Application-Error-Code'].to_i rescue 1))
+              error("#{body.strip}\n"\
+                "[Kadeploy Error ##{response['X-Application-Error-Code']}]",
+                (response['X-Application-Error-Code'].to_i rescue 1))
             else
-              error(
-                "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
-                "-----------------\n"\
-                "#{body}\n"\
-                "-----------------"
-              )
+              error("#{body.strip}\n"\
+                "[HTTP Error ##{response.code} on #{request.method} #{request.path}]",2)
             end
+          when 404
+            error("Resource not found #{request.path.split('?').first}")
           when 500
-            error("[Internal Server Error]\n#{body}")
+            error("[Internal Server Error]\n#{body.strip}",3)
           else
-            error(
-              "[HTTP Error ##{response.code} on #{request.method} #{request.path}]\n"\
-              "-----------------\n"\
-              "#{body}\n"\
-              "-----------------"
-            )
+            error("#{body.strip}\n"\
+              "[HTTP Error ##{response.code} on #{request.method} #{request.path}]",2)
           end
         end
       end
@@ -255,8 +242,8 @@ module HTTP
       request(server,port,secure,gen_request(:PUT,path,data,content_type,accept_type,headers),parse)
     end
 
-    def self.delete(server,port,path,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
-      request(server,port,secure,gen_request(:DELETE,path,nil,nil,accept_type,headers),parse)
+    def self.delete(server,port,path,data,secure=true,content_type=nil,accept_type=nil,parse=nil,headers=nil)
+      request(server,port,secure,gen_request(:DELETE,path,data,content_type,accept_type,headers),parse)
     end
   end
 end

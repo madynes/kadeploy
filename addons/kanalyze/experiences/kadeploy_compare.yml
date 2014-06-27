@@ -1,7 +1,5 @@
 ---
 - name: kadeploy_317
-  git: 3.1.7
-  version: 3.1.7
   times: 20
   environments:
     - debian-min
@@ -20,8 +18,6 @@
       retries: 0
 
 - name: kadeploy_316
-  git: 3.1.6
-  version: 3.1.6
   times: 20
   environments:
     - debian-min

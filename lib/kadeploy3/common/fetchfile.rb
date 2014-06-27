@@ -85,7 +85,7 @@ class ServerFetchFile < FetchFile
   def grab(dest,dir=nil)
     if File.readable?(@path)
       begin
-        FileUtils.cp(@path,dest)
+        Execute['cp',@path,dest].run!.wait
       rescue Exception => e
         error("Unable to grab the file #{@path} (#{e.message})")
       end
@@ -138,19 +138,16 @@ class HTTPFetchFile < FetchFile
 
   def grab(dest,dir=nil)
     begin
-      resp, _ = HTTP.fetch_file(@path,dest,dir,nil)
-      case resp
-      when -1
-        error("Tempfiles cannot be created",APIError::CACHE_ERROR)
-      when -2
-        error("File cannot be moved from tempfile",APIError::CACHE_ERROR)
-      when 200
-        nil
-      else
-        error("Unable to grab the file #{@path} (http error ##{resp})")
-      end
+      HTTP.fetch_file(@path,dest)
+      nil
     rescue KadeployError => ke
       raise ke
+    rescue KadeployHTTPError => k
+      error("Unable to grab the file #{@path} (http error ##{k.errno})")
+    rescue KadeployError => ke
+      raise ke
+    rescue Errno::ECONNREFUSED
+      error("Unable to grab the file #{@path} (connection refused)")
     rescue Exception => e
       error("Unable to grab the file #{@path} (#{e.message})")
     end

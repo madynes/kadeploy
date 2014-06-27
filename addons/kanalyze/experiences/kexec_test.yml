@@ -1,7 +1,5 @@
 ---
 - name: kexec
-  git: 3.1.7
-  version: 3.1.7
   times: 10
   environments:
     - debian-min

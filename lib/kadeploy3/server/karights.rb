@@ -128,14 +128,20 @@ module Karights
     partitions = cexec.partitions
     partitions = nil if partitions and partitions.empty?
 
-    if nodes and existing.include?('*')
+    if nodes and existing.is_a?(Array) # Rights are defined on all the nodes (*)
       kaerror(APIError::CONFLICTING_ELEMENTS,"Trying to remove rights for a specific node while rights are defined with a wildcard")
     end
 
     if partitions
-      existing.each do |n,parts|
-        if parts.include?('*')
+      if existing.is_a?(Array)
+        if existing.include?('*')
           kaerror(APIError::CONFLICTING_ELEMENTS,"Trying to remove rights on a specific partition of node #{n} while rights are defined with a wildcard")
+        end
+      else
+        existing.each do |n,parts|
+          if parts.include?('*')
+            kaerror(APIError::CONFLICTING_ELEMENTS,"Trying to remove rights on a specific partition of node #{n} while rights are defined with a wildcard")
+          end
         end
       end
     end
@@ -147,13 +153,21 @@ module Karights
       remaining = remaining[user] if remaining
 
       nodes = nil
-      if remaining # Some rights remaining on nodes for the user
-        nodes = existing.keys - remaining.keys # The list of nodes with no more rights for the user
-      else # No more rights on existing nodes for the user
-        nodes = existing.keys
+      if existing.is_a?(Array) # Rights are defined on all the nodes
+        if remaining # Some rights remaining on nodes for the user
+          nodes = get_nodes() - remaining.keys
+        else
+          nodes = get_nodes()
+        end
+      else
+        if remaining # Some rights remaining on nodes for the user
+          nodes = existing.keys - remaining.keys # The list of nodes with no more rights for the user
+        else # No more rights on existing nodes for the user
+          nodes = existing.keys
+        end
       end
 
-      workflows_kill(nodes)
+      workflows_kill(nodes,user)
 
       ret
     else

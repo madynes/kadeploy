@@ -47,7 +47,6 @@ class Client
   end
 
   def kill
-    debug "Error encountered, let's clean everything ..."
   end
 
   def self.api_path(path=nil,kind=nil,*args)
@@ -113,10 +112,12 @@ class Client
     begin
       begin
         config = YAML.load_file(configfile)
-      rescue ArgumentError
-        raise ArgumentError.new("Invalid YAML file '#{configfile}'")
+      rescue Psych::SyntaxError => se
+        error("Invalid YAML file '#{configfile}'\n#{se.message}")
+      rescue ArgumentError => ae
+        error("Invalid YAML file '#{configfile}' (#{ae.message})")
       rescue Errno::ENOENT
-        raise ArgumentError.new("File not found '#{configfile}'")
+        error("File not found '#{configfile}'")
       end
 
       servers = {}
@@ -163,18 +164,17 @@ class Client
   def self.load_envfile(envfile,srcfile)
     tmpfile = Tempfile.new("env_file")
     begin
-      uri = URI(File.absolute_path(srcfile))
-      uri.scheme = 'server'
-      uri.send(:set_host, '')
-      FetchFile[uri.to_s].grab(tmpfile.path)
+      uri = URI(srcfile)
+      if uri.scheme.nil? or uri.scheme.empty?
+        uri.send(:set_scheme,'server')
+        uri.send(:set_path,File.absolute_path(srcfile))
+      end
+      FetchFile[uri.to_s,true].grab(tmpfile.path)
       tmpfile.close
       uri = nil
     rescue KadeployError => ke
-      msg = KadeployError.to_msg(ke.errno) || ''
-      msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
-      msg += ke.message if ke.message and !ke.message.empty?
       tmpfile.unlink
-      error(msg)
+      error(ke.message)
     end
 
     unless `file --mime-type --brief #{tmpfile.path}`.chomp == "text/plain"
@@ -184,9 +184,12 @@ class Client
 
     begin
       ret = YAML.load_file(tmpfile.path)
-    rescue ArgumentError
+    rescue Psych::SyntaxError => se
+      error("Invalid YAML file '#{srcfile}'\n#{se.message.gsub(tmpfile.path,srcfile)}")
       tmpfile.unlink
-      error("Invalid YAML file '#{srcfile}'")
+    rescue ArgumentError => ae
+      error("Invalid YAML file '#{srcfile}' (#{ae.message.gsub(tmpfile.path,srcfile)})")
+      tmpfile.unlink
     rescue Errno::ENOENT
       tmpfile.unlink
       error("File not found '#{srcfile}'")
@@ -195,7 +198,7 @@ class Client
     tmpfile.unlink
 
     begin
-      Environment.new.load_from_desc(Marshal.load(Marshal.dump(ret)),[],USER,nil,false)
+      Environment.new.load_from_desc(Marshal.load(Marshal.dump(ret)),[],USER,nil,false,$stdout)
     rescue KadeployError => ke
       msg = KadeployError.to_msg(ke.errno) || ''
       msg = "#{msg} (error ##{ke.errno})\n" if msg and !msg.empty?
@@ -239,9 +242,10 @@ class Client
 
     begin
       config = YAML.load_file(file)
-    rescue ArgumentError
-      $stderr.puts "Invalid YAML file '#{file}'"
-      return false
+    rescue Psych::SyntaxError => se
+      error("Invalid YAML file '#{file}'\n#{se.message}")
+    rescue ArgumentError => ae
+      error("Invalid YAML file '#{file}' (#{ae.message})")
     rescue Errno::ENOENT
       return true
     end
@@ -319,7 +323,15 @@ class Client
       unreachables = []
       options[:servers].each_pair do |server,inf|
         next if server.downcase == "default"
-        unless PortScanner::is_open?(inf[0], inf[1])
+
+        reachable = nil
+        4.times do
+          reachable = PortScanner::is_open?(inf[0], inf[1])
+          break if reachable
+          sleep 2
+        end
+
+        unless reachable
           debug("The #{server} server is unreachable")
           unreachables << server
         end
@@ -477,13 +489,13 @@ class Client
   def self.get(host,port,path,secure,headers=nil)
     ret = nil
     begin
-      Timeout.timeout(8) do
+      Timeout.timeout(32) do
         ret = HTTP::Client::get(host,port,path,secure,nil,nil,nil,headers)
       end
     rescue Timeout::Error
-      error("Request timeout: cannot GET #{path} on the #{server} server")
+      error("Request timeout: cannot GET #{path} on #{host}:#{port}")
     rescue Errno::ECONNRESET
-      error("The #{server} server refused the connection on port #{port}")
+      error("The server refused the connection on #{host}:#{port}")
     rescue HTTP::ClientError => e
       error(e.message)
     end
@@ -550,18 +562,14 @@ class Client
     end
   end
 
-  def delete(uri,params=nil,accept_type=nil,parse=nil)
+  def delete(uri,data={},content_type=nil,accept_type=nil,parse=nil)
     host,port,path,query = parse_uri(uri)
-    if query
-      path = "#{path}?#{query}"
-    elsif params
-      path = HTTP::Client.path_params(path,params)
-    end
+    path = "#{path}?#{query}" if query
     host = @server unless host
     port = @port unless port
     headers = {"#{@auth_headers_prefix}User" => USER}
     begin
-      HTTP::Client::delete(host,port,path,@secure,nil,accept_type,parse,headers)
+      HTTP::Client::delete(host,port,path,data,@secure,content_type,accept_type,parse,headers)
     rescue HTTP::ClientError => e
       error(e.message,e.code)
     end
@@ -1120,6 +1128,12 @@ class ClientWorkflow < Client
     }
   end
 
+  def self.parse_hook(opt,options)
+    add_opt(opt,"--[no-]hook", "Launch server's hook at the end of operation, disabled by default") { |h|
+      options[:hook] = h
+    }
+  end
+
   def self.global_load_options()
     super.merge(
       {
@@ -1153,6 +1167,7 @@ class ClientWorkflow < Client
       parse_force(opt,options)
       parse_breakpoint(opt,options)
       parse_custom_ops(opt,options)
+      parse_hook(opt,options)
       opt.separator ""
       yield(opt,options)
     end
@@ -1192,6 +1207,7 @@ class ClientWorkflow < Client
     ret[:force] = options[:force] if options[:force]
     ret[:breakpoint] = options[:breakpoint] if options[:breakpoint]
     ret[:custom_operations] = options[:custom_operations] if options[:custom_operations]
+    ret[:hook] = options[:hook] if options[:hook]
 
     ret
   end

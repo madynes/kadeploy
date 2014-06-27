@@ -9,90 +9,77 @@ class GrabFile
   include Printer
 
   @config = nil
-  @files = nil
   attr_accessor :files
   attr_reader :output
 
-  def initialize(cache, output, mode=0640, client = nil)
+  def initialize(cache, files, lock, output, mode=0640, client = nil)
     @cache = cache
+    @files = files
+    @lock = lock
     @output = output
     @mode = mode
     @client = client
-    @files = []
   end
 
   def error(errno,msg)
-    clean()
+    # If something is going wrong, the will be cleaned by kaworkflow
     raise KadeployError.new(errno,nil,msg)
-  end
-
-  def clean()
-    @files.each do |file|
-      file.release
-    end
-    @cache.clean() if @cache
   end
 
   def grab(path,version,user,priority,tag,checksum=nil,opts={})
     return nil if !path or path.empty?
     cf = nil
-    begin
-      fetcher = FetchFile[path,@client]
-      if fetcher.is_a?(ServerFetchFile)
-        unless File.readable?(fetcher.path)
-          error(APIError::CACHE_ERROR,"Unable to read the file '#{fetcher.path}'")
-        end
-        return fetcher.path
-      elsif !@cache
-        error(APIError::CACHE_ERROR,
-          "Impossible to cache the file '#{path}', the cache is disabled")
-      end
+    fetcher = FetchFile[path,@client]
 
-      if fetcher.size > @cache.maxsize
-        error(APIError::CACHE_ERROR,
-          "Impossible to cache the file '#{path}', the file is too big for the cache")
-      end
-
-      if opts[:maxsize] and fetcher.size > opts[:maxsize]
-        error(APIError::INVALID_FILE,
-          "The #{tag} file '#{path}' is too big "\
-          "(#{opts[:maxsize]/(1024*1024)} MB is the max allowed size)"
-        )
-      end
-
-      fmtime = lambda{ fetcher.mtime }
-      fchecksum = lambda{ fetcher.checksum }
-      fpath = nil
-      fpath = opts[:file] if opts[:file]
-
-      cf = @cache.cache(
-        path,version,user,priority,tag,fetcher.size,
-        fpath,fchecksum,fmtime
-      ) do |file,op,hit|
-        if checksum and !checksum.empty?
-          # A file was already on the cache with the wrong checksum
-          if hit
-            error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
-              "(an update is necessary)")
-          # The file does not have the checksum specified in the database
-          elsif !fetcher.uptodate?(checksum,0)
-            error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
-              "(an update is necessary)")
-          end
-        end
-
-        # The file isnt in the cache, grab it
-        debug(3, "Grab the #{tag} file #{path}")
-        fetcher.grab(file,@cache.directory)
-        op[:mode] = @mode
-        op[:norename] = (!opts[:file].nil? and !opts[:file].empty?)
-      end
-      cf.acquire
-      @files << cf
-    rescue Exception => e
-      clean()
-      raise e
+    unless @cache
+      error(APIError::CACHE_ERROR,
+        "Impossible to cache the file '#{path}', the cache is disabled")
     end
+
+    if fetcher.size > @cache.maxsize
+      error(APIError::CACHE_ERROR,
+        "Impossible to cache the file '#{path}', the file is too big for the cache")
+    end
+
+    if opts[:maxsize] and fetcher.size > opts[:maxsize]
+      error(APIError::INVALID_FILE,
+        "The #{tag} file '#{path}' is too big "\
+        "(#{opts[:maxsize]/(1024*1024)} MB is the max allowed size)"
+      )
+    end
+
+    fmtime = lambda{ fetcher.mtime }
+    fchecksum = lambda{ fetcher.checksum }
+    fpath = nil
+    fpath = opts[:file] if opts[:file]
+
+    cf = @cache.cache(
+      path,version,user,priority,tag,fetcher.size,
+      fpath,fchecksum,fmtime
+    ) do |file,op,hit|
+      if checksum and !checksum.empty?
+        # A file was already on the cache with the wrong checksum
+        if hit
+          error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
+            "(an update is necessary)")
+        # The file does not have the checksum specified in the database
+        elsif !fetcher.uptodate?(checksum,0)
+          error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
+            "(an update is necessary)")
+        end
+      end
+
+      # The file isnt in the cache, grab it
+      debug(3, "Grab the #{tag} file #{path}")
+      fetcher.grab(file,@cache.directory)
+      op[:mode] = @mode
+      op[:norename] = (!opts[:file].nil? and !opts[:file].empty?)
+    end
+
+    @lock.synchronize do
+      @files << cf
+    end
+
     cf
   end
 
@@ -136,20 +123,19 @@ class GrabFile
     file
   end
 
-  def self.grab_user_files(context)
-    files = []
-
+  def self.grab_user_files(context,files,lock)
+    # If something is going wrong, the will be cleaned by kaworkflow
     cexec = context[:execution]
 
-    gfm = self.new(
-      context[:caches][:global], context[:output], 640, cexec.client
-    )
+    gfm = self.new(context[:caches][:global],files[:global],lock,
+      context[:output],640,cexec.client)
 
     env = cexec.environment
+    envprio = nil
+    envprio = (env.recorded? ? :db : :anon) if env
 
     # Env tarball
     if env and tmp = env.tarball
-      envprio = (env.recorded? ? :db : :anon)
       grab(gfm,context,tmp['file'],envprio,'tarball',
         :md5=>tmp['md5'], :env => env
       )
@@ -191,34 +177,25 @@ class GrabFile
         end
       end
     end
-    files += gfm.files
 
     # Custom PXE files
-    begin
-      if cexec.pxe and cexec.pxe[:profile] and cexec.pxe[:files] and !cexec.pxe[:files].empty?
-        gfmk = self.new(context[:caches][:netboot], context[:output],
-          744, cexec.client)
+    if cexec.pxe and cexec.pxe[:profile] and cexec.pxe[:files] and !cexec.pxe[:files].empty?
+      gfmk = self.new(context[:caches][:netboot],files[:netboot],lock,
+        context[:output],744, cexec.client)
 
-        cexec.pxe[:files].each do |pxefile|
-          grab(gfmk,context,pxefile,:anon,'pxe',
-            :file => File.join(context[:caches][:netboot].directory,
-              (
-                NetBoot.custom_prefix(
-                  cexec.user,
-                  context[:wid]
-                ) + '--' + File.basename(pxefile)
-              )
+      cexec.pxe[:files].each do |pxefile|
+        grab(gfmk,context,pxefile,:anon,'pxe',
+          :file => File.join(context[:caches][:netboot].directory,
+            (
+              NetBoot.custom_prefix(
+                cexec.user,
+                context[:wid]
+              ) + '--' + File.basename(pxefile)
             )
           )
-        end
-        files += gfmk.files
+        )
       end
-    rescue Exception => e
-      gfm.clean
-      raise e
     end
-
-    files
   end
 end
 

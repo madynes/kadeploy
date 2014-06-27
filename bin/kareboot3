@@ -8,6 +8,7 @@ Signal.trap("INT") do
 end
 
 require 'kadeploy3/client'
+require 'uri'
 
 module Kadeploy
 
@@ -131,14 +132,14 @@ class KarebootClient < ClientWorkflow
     params[:check_destructive] = options[:check_demolishing] if options[:check_demolishing]
 
     if options[:env_name]
-      username = options[:env_user] || ''
-      envname = options[:env_name]
+      username = URI.encode_www_form_component(options[:env_user]) || ''
+      envname = URI.encode_www_form_component(options[:env_name])
       envversion = options[:env_version] || ''
 
       tmp = {}
       tmp[:last] = true unless options[:env_version]
       envs = get2(options,api_path("/#{username}/#{envname}/#{envversion}",:envs),tmp)
-      error("The environment '#{envname}' does not exist") if envs.size <= 0
+      error("The environment '#{options[:env_name]}' does not exist") if envs.size <= 0
       env = envs.first
 
       params[:environment] = {

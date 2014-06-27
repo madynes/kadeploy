@@ -67,6 +67,10 @@ module Kaconsole
 
     context.info = console_init_info(context)
 
+    if operation == :create
+      error_forbidden!("This feature is disabled: no console command is given in configuration file.") unless context.config.clusters[context.info[:node].cluster].cmd_console
+    end
+
     context
   end
 
@@ -152,27 +156,30 @@ module Kaconsole
       ret
     end
 
-    workflow_get(:console,wid) do |infos|
-      if infos.is_a?(Array)
-        ret = []
-        infos.each do |info|
-          ret << get_status.call(info)
-        end
-        ret
-      else
-        get_status.call(infos)
+    if wid
+      workflow_get(:console,wid) do |info|
+        get_status.call(info)
       end
+    else
+      ret = []
+      workflow_list(:console) do |info|
+        ret << get_status.call(info)
+      end
+      ret
     end
   end
 
   def console_delete(cexec,wid)
     workflow_delete(:console,wid) do |info|
-      console_kill(info)
-      console_free(info)
-
-      GC.start
-      { :wid => info[:wid] }
+      console_delete!(cexec,info)
     end
+  end
+
+  def console_delete!(cexec,info)
+    console_kill(info)
+    console_free(info)
+
+    { :wid => info[:wid] }
   end
 
   def console_kill(info)
@@ -245,7 +252,7 @@ module Kaconsole
               begin
                 sock.sysread(1,c)
                 w.syswrite(c)
-              rescue EOFError
+              rescue EOFError, Errno::ECONNRESET
                 sock.close_read
                 done = true
               end
@@ -259,7 +266,10 @@ module Kaconsole
           unless ret # client disconnection
             Thread.current[:kill].synchronize do # provide conflict with DELETE
               if Thread.current[:pid]
-                Execute.kill_recursive(pid)
+                begin
+                  Execute.kill_recursive(pid)
+                rescue Errno::ESRCH
+                end
                 PTY.check(pid)
                 Thread.current[:pid] = nil
               end
@@ -300,7 +310,10 @@ module Kaconsole
 
       client[:kill].synchronize do
         if client[:pid]
-          Execute.kill_recursive(client[:pid])
+          begin
+            Execute.kill_recursive(client[:pid])
+          rescue Errno::ESRCH
+          end
           sleep 2 # wait for the thread to clean itself
           if client[:pid]
             PTY.check(client[:pid])

@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# kadeploy3d        Startup script for the Kadeploy 3 server
+# kadeploy        Startup script for the Kadeploy 3 server
 #
 # processname: kadeploy3d
 #
 ### BEGIN INIT INFO
-# Provides: kadeploy3d
+# Provides: kadeploy
 # Should-Start: distcache
 # Short-Description: start and stop Kadeploy 3 Server
 # Description: Kadeploy 3 server.
@@ -19,11 +19,11 @@
 
 prog="Kadeploy 3"
 kadeploy3d=/usr/sbin/kadeploy3d
-pidfile=/var/run/kadeploy3d.pid
-args="--pidfile $pidfile"
+rundir=/var/run/kadeploy3d
+pidfile=${rundir}/kadeploy3d.pid
+args="--pidfile $pidfile --detach"
 lockfile=/var/lock/subsys/kadeploy3d
 user=deploy
-rundir=/var/run/kadeploy3
 RETVAL=0
 
 start() {

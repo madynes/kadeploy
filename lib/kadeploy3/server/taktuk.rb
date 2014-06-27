@@ -459,7 +459,6 @@ module TakTuk
     end
 
     def kill!()
-      @curthread.kill if @curthread.alive?
       unless @exec.nil?
         @exec.kill
         @exec = nil
