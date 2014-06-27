@@ -266,7 +266,10 @@ module Kaconsole
           unless ret # client disconnection
             Thread.current[:kill].synchronize do # provide conflict with DELETE
               if Thread.current[:pid]
-                Execute.kill_recursive(pid)
+                begin
+                  Execute.kill_recursive(pid)
+                rescue Errno::ESRCH
+                end
                 PTY.check(pid)
                 Thread.current[:pid] = nil
               end
@@ -307,7 +310,10 @@ module Kaconsole
 
       client[:kill].synchronize do
         if client[:pid]
-          Execute.kill_recursive(client[:pid])
+          begin
+            Execute.kill_recursive(client[:pid])
+          rescue Errno::ESRCH
+          end
           sleep 2 # wait for the thread to clean itself
           if client[:pid]
             PTY.check(client[:pid])
