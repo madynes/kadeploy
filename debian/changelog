@@ -1,5 +1,6 @@
-kadeploy (3.2.0~git+20140221163831+bbf7f5d-1) UNRELEASED; urgency=low
+kadeploy (3.2.0.8-1) UNRELEASED; urgency=low
 
+  [ Luc Sarzyniec ]
   * Move karights3 binaries in the client package
   * Add the Kastafior binary in the server package
   * New Git snapshot based on v3.2.0_rc2.
@@ -13,7 +14,10 @@ kadeploy (3.2.0~git+20140221163831+bbf7f5d-1) UNRELEASED; urgency=low
   * Create the /etc/kadeploy3/keys directory in the server package
   * Renamed .yml configuration files to .conf
 
- -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Fri, 21 Feb 2014 16:52:34 +0100
+  [ Emmanuel Jeanvoine ]
+  * New Git snapshot based on v3.2.0.8.
+
+ -- Emmanuel Jeanvoine <ejeanvoi@vm-wheezy.loria.fr>  Fri, 27 Jun 2014 14:19:55 +0200
 
 kadeploy (3.2.0~alpha1) unstable; urgency=low
 
