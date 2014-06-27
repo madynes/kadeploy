@@ -18,7 +18,10 @@ module Kadeploy
       @output = output
       @nodesetid = nodesetid
 
-      @threads = ThreadGroup.new
+      @threads = []
+      @listlock = Mutex.new
+      @execlock = Mutex.new
+      @killed = false
     end
 
     def free
@@ -30,6 +33,9 @@ module Kadeploy
       @output = nil
       @nodesetid = nil
       @threads = nil
+      @listlock = nil
+      @execlock = nil
+      @killed = nil
     end
 
     # Add a command related to a node
@@ -51,14 +57,26 @@ module Kadeploy
     # * nothing
     def run
       @execs.each_pair do |node,exec|
-        tid = Thread.new do
-          exec.run
-          status,stdout,stderr = exec.wait(:checkstatus => false)
-          node.last_cmd_stdout = stdout.chomp
-          node.last_cmd_stderr = stderr.chomp
-          node.last_cmd_exit_status = status.exitstatus.to_s
+        @listlock.synchronize do
+          raise SignalException.new(0) if @killed
+
+          tid = Thread.new do
+            @execlock.synchronize do
+              if !@killed
+                exec.run
+              else
+                raise SignalException.new(0)
+              end
+            end
+
+            status,stdout,stderr = exec.wait(:checkstatus => false)
+            node.last_cmd_stdout = stdout.chomp
+            node.last_cmd_stderr = stderr.chomp
+            node.last_cmd_exit_status = status.exitstatus.to_s
+          end
+
+          @threads << tid
         end
-        @threads.add(tid)
       end
     end
 
@@ -69,24 +87,29 @@ module Kadeploy
     # Output
     # * nothing
     def wait
-      @runthread = Thread.current
-      @threads.list.each do |thr|
-        thr.join
+      @listlock.synchronize do
+        @threads.each do |thr|
+          thr.join
+        end
       end
-      @threads = ThreadGroup.new
     end
 
     # Kill every running process
     def kill
-      @execs.each_value do |exec|
-        exec.kill
+      @execlock.synchronize do
+        @killed = true
+        @execs.each_value do |exec|
+          exec.kill
+        end
       end
 
       # Waiting threads from @threads that will die by themselves
-      @threads.list.each do |thr|
-        begin
-          thr.join
-        rescue SignalException
+      @listlock.synchronize do
+        @threads.each do |thr|
+          begin
+            thr.join
+          rescue SignalException => se
+          end
         end
       end
 
