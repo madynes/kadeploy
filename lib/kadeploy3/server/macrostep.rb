@@ -122,9 +122,10 @@ module Macrostep
     end
 
     def delete_task(taskname)
+      to_delete = []
       delete = lambda do |arr,index|
         if arr[index][0] == taskname
-          arr.delete_at(index)
+          to_delete << [arr,index]
           debug(5, " * Bypassing the step #{macroname}-#{taskname.to_s}",nsid)
         end
       end
@@ -134,11 +135,21 @@ module Macrostep
           tasks[i].each do |j|
             delete.call(tasks[i],j)
           end
-          tasks.delete_at(i) if tasks[i].empty?
         else
           delete.call(tasks,i)
         end
       end
+      to_delete.each{|tmp| tmp[0].delete_at(tmp[1])}
+      to_delete.clear
+
+      # clean empty tasks
+      tasks.each_index do |i|
+        to_delete << [tasks,i] if tasks[i].empty?
+      end
+      to_delete.each{|tmp| tmp[0].delete_at(tmp[1])}
+      to_delete.clear
+
+      to_delete = nil
     end
 
 
@@ -232,7 +243,7 @@ module Macrostep
     end
 
     def load_tasks
-      @tasks = steps()
+      @tasks = steps().dup
       cexec = context[:execution]
 
       # Deploy on block device
