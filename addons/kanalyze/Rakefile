@@ -42,7 +42,7 @@ task :run, [:expfile] do |t,args|
   file=nil
   if !args[:expfile]
     if !ENV['EXPFILE'] or ENV['EXPFILE'].empty?
-      file = File.join(Dir.pwd,'experiences','dummy_exp.yml')
+      raise Exception.new('Error: experience path is missing !')
     else
       file = ENV['EXPFILE']
     end
