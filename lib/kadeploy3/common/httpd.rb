@@ -364,6 +364,7 @@ module HTTPd
             "---------------------"
           #Write the error in stderr
           $stderr.puts("[#{Time.now}] Internal Server Error  #{res}")
+          $stderr.flush
           response.status = 500
           response['Content-Type'] = 'text/plain'
         end
