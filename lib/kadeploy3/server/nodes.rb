@@ -197,7 +197,6 @@ module Nodes
   end
 
   class NodeSet
-    @@idlock = Mutex.new
     attr_accessor :set, :id
 
     # Constructor of NodeSet
@@ -211,11 +210,6 @@ module Nodes
       @id = id
     end
 
-    def self.newid(context)
-      @@idlock.synchronize do
-        context[:nodesets_id] += 1
-      end
-    end
 
     def equal?(sub)
       ret = true
@@ -1085,6 +1079,23 @@ module Nodes
 
     def get(hostname)
       @states[hostname]
+    end
+  end
+  class NodeSetId
+    def initialize(i=0)
+      @mutex = Mutex.new
+      @i = i
+    end
+    def to_i()
+      @i
+    end
+    def to_s()
+      @i.to_s()
+    end
+    def inc(i=1)
+      @mutex.synchronize do
+        @i +=i
+      end
     end
   end
 end
