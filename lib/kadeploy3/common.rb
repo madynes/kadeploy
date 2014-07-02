@@ -1,4 +1,3 @@
-require 'kadeploy3/common/custom_types'
 require 'kadeploy3/common/api'
 require 'kadeploy3/common/compat'
 require 'kadeploy3/common/configparser'

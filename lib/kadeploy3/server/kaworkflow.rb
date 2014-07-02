@@ -305,7 +305,7 @@ module Kaworkflow
           #:nodelist => cexec.nodelist,
           #:nodes => cexec.nodes,
           :states => info[:state],
-          :nodesets_id => CustomTypes::MutableInteger.new(),
+          :nodesets_id => 0,
 
           :execution => cexecdup,
           :common => info[:config].common,
@@ -352,7 +352,6 @@ module Kaworkflow
               else
                 context[:cluster_prefix] = context[:cluster].prefix.dup
               end
-              context[:nodesets_id]=context[:nodesets_id].dup
             else
               context[:cluster_prefix] = ''
             end
