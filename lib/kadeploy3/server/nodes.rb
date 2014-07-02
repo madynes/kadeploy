@@ -213,7 +213,7 @@ module Nodes
 
     def self.newid(context)
       @@idlock.synchronize do
-        context[:nodesets_id] += 1
+        context[:nodesets_id].inc
       end
     end
 
