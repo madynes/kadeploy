@@ -258,6 +258,9 @@ module Workflow
       end
       log('success', false, nodeset)
       @logger.error(nodeset,context[:states])
+    end
+
+    def display_fail_message(task,nodeset)
       debug(1,
         "#{self.class.opname().capitalize} failed for #{nodeset.to_s_fold} "\
         "after #{Time.now.to_i - @start_time}s",

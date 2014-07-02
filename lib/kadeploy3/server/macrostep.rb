@@ -183,13 +183,16 @@ module Macrostep
       log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
     end
 
-    def fail!(task,nodeset)
+    def display_fail_message(task,nodeset)
       debug(2,"!!! The nodes #{nodeset.to_s_fold} failed on step #{task.name.to_s}",task.nsid)
       debug(1,
         "Step #{macroname} failed for #{nodeset.to_s_fold} "\
         "after #{Time.now.to_i - @start_time}s",
         task.nsid
       )
+    end
+
+    def fail!(task,nodeset)
       log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
     end
 

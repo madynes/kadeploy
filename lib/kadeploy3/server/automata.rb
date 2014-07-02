@@ -213,6 +213,9 @@ module Automata
     def fail!(task,nodeset)
     end
 
+    def display_fail_message(task,nodeset)
+    end
+
     def timeout!(task)
     end
 
@@ -366,7 +369,6 @@ module Automata
     def split_nodeset(task)
       ok_nsid = Nodes::NodeSet.newid(context)
       ko_nsid = Nodes::NodeSet.newid(context)
-
       split!(task.nsid,ok_nsid,task.nodes_ok,ko_nsid,task.nodes_ko)
       [ok_nsid,ko_nsid]
     end
@@ -486,11 +488,13 @@ module Automata
         if success
           treated = Nodes::NodeSet.new
 
-          if !task.nodes_ok.empty? and !task.nodes_ko.empty?
-            ok_nsid,ko_nsid = split_nodeset(task)
-          end
+          unless task.nodes_ko.empty? # some nodes failed
+            display_fail_message(task,task.nodes_ko)
 
-          unless task.nodes_ko.empty?
+            unless task.nodes_ok.empty? # some nodes didn't fail, we need to split
+              ok_nsid,ko_nsid = split_nodeset(task)
+            end
+
             clean_nodeset(task.nodes_ko)
             task.nodes_ko.linked_copy(treated)
           end
