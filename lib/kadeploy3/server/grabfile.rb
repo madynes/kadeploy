@@ -123,7 +123,7 @@ class GrabFile
     file
   end
 
-  def self.grab_user_files(context,files,lock)
+  def self.grab_user_files(context,files,lock,kind)
     # If something is going wrong, the will be cleaned by kaworkflow
     cexec = context[:execution]
 
@@ -134,31 +134,34 @@ class GrabFile
     envprio = nil
     envprio = (env.recorded? ? :db : :anon) if env
 
-    # Env tarball
-    if env and tmp = env.tarball
-      grab(gfm,context,tmp['file'],envprio,'tarball',
-        :md5=>tmp['md5'], :env => env
-      )
-    end
-
     # SSH key file
     grab(gfm,context,cexec.key,:anon,'key')
 
-    # Preinstall archive
-    if env and tmp = env.preinstall
-      grab(gfm,context,tmp['file'],envprio,'preinstall',
-        :md5 => tmp['md5'], :env => env,
-        :maxsize => context[:common].max_preinstall_size
-      )
-    end
-
-    # Postinstall archive
-    if env and env.postinstall
-      env.postinstall.each do |f|
-        grab(gfm,context,f['file'],envprio,'postinstall',
-          :md5 => f['md5'], :env => env,
-          :maxsize => context[:common].max_postinstall_size
+    #Grab tarball, Prinstall and Postinstall archive if only inside deploy kind
+    if kind == :deploy
+      # Env tarball
+      if env and tmp = env.tarball
+        grab(gfm,context,tmp['file'],envprio,'tarball',
+          :md5=>tmp['md5'], :env => env
         )
+      end
+
+      # Preinstall archive
+      if env and tmp = env.preinstall
+        grab(gfm,context,tmp['file'],envprio,'preinstall',
+          :md5 => tmp['md5'], :env => env,
+          :maxsize => context[:common].max_preinstall_size
+        )
+      end
+
+      # Postinstall archive
+      if env and env.postinstall
+        env.postinstall.each do |f|
+          grab(gfm,context,f['file'],envprio,'postinstall',
+            :md5 => f['md5'], :env => env,
+            :maxsize => context[:common].max_postinstall_size
+          )
+        end
       end
     end
 

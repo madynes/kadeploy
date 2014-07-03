@@ -324,7 +324,7 @@ module Kaworkflow
 
         # Cache the files
         begin
-          GrabFile.grab_user_files(context,info[:cached_files],workflow_lock(kind,info[:wid]))
+          GrabFile.grab_user_files(context,info[:cached_files],workflow_lock(kind,info[:wid]),kind)
         rescue KadeployError => ke
           info[:lock].synchronize do
             info[:nodes].set_state('aborted',nil,context[:database],context[:user])
