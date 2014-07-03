@@ -833,6 +833,7 @@ module Configuration
     attr_reader :group_of_nodes #Hashtable (key is a command name)
     attr_reader :partitioning_script
     attr_reader :bootloader_script
+    attr_reader :sleep_time_before_ping
     attr_reader :prefix
     attr_reader :drivers
     attr_reader :pxe_header
@@ -963,6 +964,7 @@ module Configuration
         end
 
         cp.parse('boot',true) do
+          @sleep_time_before_ping = cp.value('sleep_time_before_ping',Integer,20)
           @bootloader_script = cp.value('install_bootloader',String,nil,
             { :type => 'file', :readable => true, :prefix => Config.dir() })
           cp.parse('kernels',true) do

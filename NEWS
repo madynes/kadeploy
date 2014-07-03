@@ -4,7 +4,8 @@
   - It's now possible to define new alias DEFAULT_CONNECTOR in external section
     with default_connector item.
     It can be used  with the following fields: taktuk connector and all remotes operations.
-
+  - It's now possible to specify the sleep time before ping in "wait reboot" step.
+    This is a new parameter in cluster configuration called "sleep_time_before_ping" in "boot" section.
 
 ## New in 3.2 ##
 == User interface ==
