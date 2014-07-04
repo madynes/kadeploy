@@ -48,6 +48,7 @@ MACROSTEPS = {
     :types => [
       'Chain',
       'Kastafior',
+      'Kascade',
       'Tree',
       'Bittorrent',
       'Dummy',
