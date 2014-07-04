@@ -787,6 +787,16 @@ def run_test(exp)
       else
         test_env(envdir,exp['name'],run_id,macrosteps,env,i,exp)
       end
+      #execute clean command if it provided
+      if exp['cleaner_cmd']
+        ENV['kanalyze_exp_name'] = exp['name']
+        ENV['kanalyze_kadeploy_version'] = $version
+        ENV['kanalyze_node_list'] = $nodes.join(' ')
+        ENV['kanalyze_iteration'] = i.to_s
+        ENV['kanalyze_env'] = env
+        ENV['kanalyze_total_iterations'] = exp['times'].to_s
+        system(exp['cleaner_cmd'])
+      end
     end
   end
   store_stats(exp['name'],expdir,exp['times'])
