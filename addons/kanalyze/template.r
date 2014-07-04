@@ -232,5 +232,5 @@ ggsave(file=paste("pictures/microsteps3-boxplot.jpeg",sep=""),dpi=300)
 #---MICROSTEPS---
 
 con <- file("data.tex", open = "w")
-writeLines(output, con = con)
+writeLines(gsub("\\_","\\\\_",output), con = con)
 close(con)
