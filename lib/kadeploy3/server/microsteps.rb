@@ -1933,7 +1933,7 @@ class Microstep < Automata::QueueTask
     )
 
     start = Time.now.tv_sec
-    sleep(20)
+    sleep(context[:cluster].sleep_time_before_ping)
 
     while (((Time.now.tv_sec - start) < timeout) && (not @nodes.all_ok?))
       sleep(5)

@@ -1059,6 +1059,7 @@ automata:
 
   \item \ypath{/boot}
   \begin{itemize}
+    \item \yfieldd{sleep\_time\_before\_boot}{Integer}{20} seconds of sleep before the first ping request to detect when a node is ready. Generally, it represents the average time during the node power up until it sends a dhcp request.
     \item \yfield{install\_bootloader}{String} Path to a script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
 
