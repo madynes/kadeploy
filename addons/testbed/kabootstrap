@@ -1339,7 +1339,7 @@ def cfg_dhcp(net=nil)
   "    option domain-name \"#{DOMAIN}\";\n"\
   "    option domain-name-servers #{select_server_type($kanodes,:dns)[0][:ipv4]};\n"\
   + # Kadeploy server
-  "    if exists user-class and option user-class = \"iPXE\" {\n"\
+  "    if exists user-class and option user-class = \"gPXE\" {\n"\
   "      filename=concat(\"http://#{(HTTP_OVER_NFS ? $services[:www][:fqdn] : $kanodes[:kadeploy][:ipv4])}/\",host-decl-name);\n"\
   "    } else {\n"\
   "      filename \"#{pxe}\";\n"\
