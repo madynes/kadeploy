@@ -2099,6 +2099,7 @@ options[:network_config] = nil
 options[:dns_forward] = nil
 options[:dns_config] = nil
 options[:upload] = []
+options[:sort] = true
 
 $debug                = false
 $netiface             = NET_ADMIN_IFACE
@@ -2133,6 +2134,9 @@ optparse = OptionParser.new(USAGE) do |opts|
 
   opts.on( '-i', '--ssh-key [<ssh_key_file>]', 'Specify the path of the ssh private key to use' ) do |k|
     options[:ssh_key] = k
+  end
+  opts.on('', '--[no-]sort',"Sort nodes list (#{options[:sort] ? 'enabled' : 'disabled' } by default)") do |k|
+    options[:sort] = k
   end
 
   opts.on( '-K', '--kvm', 'Use KVM nodes instead of deployed ones in kavlan (default)' ) do |k|
@@ -2748,7 +2752,7 @@ rescue Errno::ENOENT
 end
 
 msg("nodelist parameter empty",MSG_ERROR,true) if $allnodes.empty?
-$allnodes.sort!
+$allnodes.sort! if options[:sort]
 
 if $mode == :VLANKVM
   msg("hostlist parameter empty",MSG_ERROR,true) if select_type($kanodes,:HOST).empty?
