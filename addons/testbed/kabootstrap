@@ -2179,15 +2179,19 @@ optparse = OptionParser.new(USAGE) do |opts|
     $deploysendmeth = :HTTP
   end
 
-  opts.on( '-d', '--kadeploy-daemon <node_address>', 'Specify which node should be used as kadeploy daemon (default: first node)' ) do |d|
+  opts.on( '-d', '--default-daemon <node_address>', 'Specify which node should be used by default (default: first node)' ) do |d|
+    options[:default_server] = d || nil
+  end
+
+  opts.on( '-k', '--kadeploy-daemon <node_address>', 'Specify which node should be used as kadeploy daemon' ) do |d|
     options[:daemon_kadeploy] = d || nil
   end
 
-  opts.on( '-a', '--dns-daemon <node_address>', 'Specify which node should be used as dns daemon (default: same as kadeploy one)' ) do |d|
+  opts.on( '-a', '--dns-daemon <node_address>', 'Specify which node should be used as dns daemon' ) do |d|
     options[:daemon_dns] = d || nil
   end
 
-  opts.on( '-b', '--dhcp-daemon <node_address>', 'Specify which node should be used as dhcp daemon (default: same as kadeploy one)' ) do |d|
+  opts.on( '-b', '--dhcp-daemon <node_address>', 'Specify which node should be used as dhcp daemon' ) do |d|
     options[:daemon_dhcp] = d || nil
   end
 
@@ -2907,14 +2911,17 @@ create_kaservice = Proc.new do |service|
   end
 end
 
-
 if $kanodes[:kadeploy]
   defaulthost = $kanodes[:kadeploy][:basename]
   defaultip = $kanodes[:kadeploy][:ipv4]
 else
   case $mode
     when :KAVLAN
-      server = $allnodes[0]
+      if options[:default_server]
+        server = options[:default_server]
+      else
+        server = $allnodes[0]
+      end
     when :KVM
       msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
     when :VLANKVM
