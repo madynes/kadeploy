@@ -57,7 +57,7 @@ KVM_BRIDGE_DEV = 'br0'
 
 DEFAULT_CONSOLE_BAUD_RATE = '19200'
 DEFAULT_CONSOLE_TTY_ID = '0'
-DEFAULT_RAMDISK_SIZE = 290000
+DEFAULT_RAMDISK_SIZE = 512000
 
 # Used when can't auto detect
 DEFAULT_NET_DRIVER = 'e1000e'
@@ -822,7 +822,7 @@ def cfg_kadeploy_specific_conf_filename(cluster)
   end
 end
 CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 900
-CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,fat'
+CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,ext4,fat'
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
