@@ -158,6 +158,16 @@ CFG_KADEPLOY_TEST_VLAN_PATH="#{CFG_KADEPLOY_TEST_PATH}-vlan"
 CFG_KADEPLOY_TEST_HOOK_PATH="#{CFG_KADEPLOY_TEST_PATH}-hook"
 
 
+def cfg_console_baudrate(cluster=nil)
+  cluster = {:basename=>'unknown'} if !cluster
+  case cluster[:basename]
+    when 'graphene' then 38400
+    when 'graphite' then 115200
+    else DEFAULT_CONSOLE_BAUD_RATE
+  end
+end
+
+
 def cfg_environment_desc(env,http=false)
   basepath = nil
   postinstall = ''
@@ -791,13 +801,16 @@ def cfg_kadeploy_disk_device()
 end
 
 def cfg_kadeploy_deploy_kernel_args(cluster)
+  more = case cluster[:basename]
+    when 'graphite' then ' igb.blacklist=yes'
+    else ' '
+  end
   #"#{USE_NET_DRIVER ? "ETH_DRV=#{cluster[:drivers][:network]} " : ''}"\
   #"ETH_DEV=#{$netiface} init=/linuxrc"\
   #"#{USE_DISK_DRIVER ? "DISK_DRV=#{cluster[:drivers][:disk]} " : ''}"\
   "console=tty#{DEFAULT_CONSOLE_TTY_ID} "\
-  "console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8 "\
-  "ramdisk_size=#{DEFAULT_RAMDISK_SIZE} "\
-  "rw noapic"
+  "console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8 "\
+  "ramdisk_size=#{DEFAULT_RAMDISK_SIZE}#{more}"
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
@@ -818,9 +831,9 @@ def cfg_kadeploy_specific_conf(cluster)
     deploy_kernel = nil
     if $version >= 7
       pxe_headers = {
-        'dhcp' => CFG_PXE_HEADER,
-        'localboot' => CFG_PXE_HEADER,
-        'networkboot' => CFG_PXE_HEADER,
+        'dhcp' => cfg_pxe_header(cluster),
+        'localboot' => cfg_pxe_header(cluster),
+        'networkboot' => cfg_pxe_header(cluster),
       }
       deploy_kernel = {
         'vmlinuz' => File.join(CFG_PXE_KERNELS_DIR,File.basename(cluster[:kernel][:vmlinuz])),
@@ -829,7 +842,7 @@ def cfg_kadeploy_specific_conf(cluster)
         'supported_fs' => CFG_DEPLOY_ENV_SUPPORTED_FS,
       }
     else
-      pxe_headers = "#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')
+      pxe_headers = "#{cfg_pxe_header(cluster)}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')
       deploy_kernel = {
         'vmlinuz' => File.basename(cluster[:kernel][:vmlinuz]),
         'initrd' => File.basename(cluster[:kernel][:initrd]),
@@ -928,7 +941,7 @@ def cfg_kadeploy_specific_conf(cluster)
       cfg['boot']['kernels'] = {
         'deploy' => deploy_kernel,
         'user' => {
-          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8",
         },
       }
     else
@@ -936,7 +949,7 @@ def cfg_kadeploy_specific_conf(cluster)
       cfg['kernels'] = {
         'deploy' => deploy_kernel,
         'user' => {
-          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8",
         },
       }
     end
@@ -965,10 +978,10 @@ def cfg_kadeploy_specific_conf(cluster)
     "cmd_power_status = #{cfg_kadeploy_power_status_cmd()}\n"\
     + # Kaconsole
     "cmd_console = #{cfg_kadeploy_console_cmd()}\n"\
-    "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8\n"\
+    "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8\n"\
     + # >>> TODO: UPDATE
     "partition_creation_kind = fdisk\n"\
-    "pxe_header = #{"#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')}\n"\
+    "pxe_header = #{"#{cfg_pxe_header(cluster)}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')}\n"\
     "use_ip_to_deploy = true\n"\
     + #Automata description
     "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1)}\n"\
@@ -1085,10 +1098,12 @@ CFG_PXE_BOOTFILES = [
 CFG_PXE_PROFILES_DIR = 'pxelinux.cfg'
 CFG_PXE_KERNELS_DIR = 'kernels'
 CFG_PXE_USERS_DIR = 'userfiles'
-CFG_PXE_HEADER = \
-  "PROMPT 1\n"\
-  "SERIAL 0 #{DEFAULT_CONSOLE_BAUD_RATE}\n"\
+
+def cfg_pxe_header(cluster=nil)
+  "PROMPT 1\n"
+  "SERIAL 0 #{cfg_console_baudrate(cluster)}\n"\
   "TIMEOUT 50\n\n"
+end
 
 def cfg_pxe_path(suffix=nil)
   ret = ''
@@ -1102,7 +1117,7 @@ def cfg_pxe_path(suffix=nil)
 end
 
 def cfg_pxe(bootkernel=CFG_PXE_KERNEL,bootdisk=CFG_PXE_DISK,bootpart=CFG_PXE_PART)
-  CFG_PXE_HEADER +
+  cfg_pxe_header() +
   "LABEL bootlabel\n"\
   "KERNEL #{bootkernel}\n"\
   "APPEND #{bootdisk} #{bootpart}\n"
