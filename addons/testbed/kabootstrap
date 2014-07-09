@@ -822,8 +822,8 @@ def cfg_kadeploy_specific_conf_filename(cluster)
     CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster
   end
 end
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 900
 CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,ext4,fat'
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 350
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
