@@ -1576,15 +1576,23 @@ class Microstep < Automata::QueueTask
   def ms_kexec( systemkind, systemdir, kernelfile, initrdfile, kernelparams)
     if (systemkind == "linux") then
 
-      exec_cmd=shell_kexec(
+      tmpfile = Tempfile.new('kexec')
+      tmpfile.write(shell_kexec(
         kernelfile,
         initrdfile,
         kernelparams,
         systemdir
+      ))
+      tmpfile.close
+
+      ret = parallel_exec(
+        "/bin/bash -se",
+        { :input_file => tmpfile.path, :scattering => :tree }
       )
-      ret = parallel_exec(exec_cmd,{:scattering => :tree })
 
       ret = ret && parallel_exec(shell_detach('/sbin/reboot'))
+
+      tmpfile.unlink
 
       return ret
     else
@@ -1595,23 +1603,26 @@ class Microstep < Automata::QueueTask
 
   # Check the kernel files on the nodes
   #
-  # Arguments
-  # * systemking: the kind of the system to boot ('linux', ...)
-  # * systemdir: the directory of the filesystem containing the system to boot
-  # * kernelfile: the (local to 'systemdir') path to the kernel image
-  # * initrdfile: the (local to 'systemdir') path to the initrd image
-  # * kernelparams: the commands given to the kernel when booting
   # Output
-  # * return false if the kexec execution failed
+  # * return false if one file is missing
   def ms_check_kernel_files()
+    envkernel = context[:execution].environment.kernel
+    envinitrd = context[:execution].environment.initrd
     envdir = context[:common].environment_extraction_dir
-    envkernel = file_join(envdir,context[:execution].environment.kernel)
-    envinitrd = file_join(envdir,context[:execution].environment.initrd)
 
-    cmd= "( readlink -e \"#{envkernel}\" || (echo \"Environment kernel file #{envkernel} not found in tarball (${kernel})\" 1>&2; false) ) && "\
-      "( readlink -e \"#{envinitrd}\" || (echo \"Environment initrd file #{envinitrd} not found in tarball (${initrd})\" 1>&2; false) )"
+    tmpfile = Tempfile.new('kernel_check')
+    tmpfile.write(
+      "kernel=#{shell_follow_symlink(envkernel,envdir)}\n"\
+      "initrd=#{shell_follow_symlink(envinitrd,envdir)}\n"\
+      "test -e \"$kernel\" || (echo \"Environment kernel file #{envkernel} not found in tarball (${kernel})\" 1>&2; false)\n"\
+      "test -e \"$initrd\" || (echo \"Environment initrd file #{envinitrd} not found in tarball (${initrd})\" 1>&2; false)\n"
+    )
+    tmpfile.close
 
-    return parallel_exec(cmd,{:scattering => :tree })
+    return parallel_exec(
+      "/bin/bash -se",
+      { :input_file => tmpfile.path, :scattering => :tree }
+    )
   end
 
   # Get the shell command used to execute then detach a command
@@ -1634,15 +1645,40 @@ class Microstep < Automata::QueueTask
   # Output
   # * return a string that describe the shell command to be executed
   def shell_kexec(kernel,initrd,kernel_params='',prefixdir=nil)
-      "/sbin/kexec -l \"#{file_join(prefixdir,kernel)}\" "\
-      "--initrd=\"#{file_join(prefixdir,initrd)}\" "\
+    "kernel=#{shell_follow_symlink(kernel,prefixdir)} "\
+    "&& initrd=#{shell_follow_symlink(initrd,prefixdir)} "\
+    "&& /sbin/kexec "\
+      "-l $kernel "\
+      "--initrd=$initrd "\
       "--append=\"#{kernel_params}\" "
   end
 
-  def file_join(prefix,file)
-    prefix==nil ? file : File.join(prefix,file)
+  # Get the shell command used to follow a symbolic link until reaching the real file 
+  # such as inside of chroot prefix.
+  # * filename: the file
+  # * prefixpath: if specified, follow the link as if chrooted in 'prefixpath' directory
+  def shell_follow_symlink(filename,prefixpath=nil)
+    "$("\
+      "prefix=#{(prefixpath and !prefixpath.empty? ? prefixpath : '')} "\
+      "&& file=#{filename} "\
+      "&& while test -L ${prefix}$file; "\
+      "do "\
+        "tmp=`"\
+          "stat ${prefix}$file --format='%N' "\
+          "| sed "\
+            "-e 's/^.*->\\ *\\(.[^\\ ]\\+.\\)\\ *$/\\1/' "\
+            "-e 's/^.\\(.\\+\\).$/\\1/'"\
+        "` "\
+        "&& echo $tmp | grep '^/.*$' &>/dev/null "\
+          "&& dir=`dirname $tmp` "\
+          "|| dir=`dirname $file`/`dirname $tmp` "\
+        "&& dir=`cd ${prefix}$dir; pwd -P` "\
+        "&& dir=`echo $dir | sed -e \"s\#${prefix}##g\"` "\
+        "&& file=$dir/`basename $tmp`; "\
+      "done "\
+      "&& echo ${prefix}/$file"\
+    ")"
   end
-
 
   # Send the deploy kernel files to an environment kexec repository
   #
