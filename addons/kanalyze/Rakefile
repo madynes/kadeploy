@@ -103,10 +103,18 @@ end
 
 desc "Install packages that are needed to generate statistics (debian)"
 task :stats_install_deps do
-  ENV['http_proxy'] = 'http://proxy:3128/'
-  ENV['https_proxy'] = 'http://proxy:3128/'
+  url = 'http://cran.r-project.org/bin/linux/debian'
 
-  sh "grep r-project /etc/apt/sources.list || echo 'deb http://cran.r-project.org/bin/linux/debian wheezy-cran3/' >> /etc/apt/sources.list"
+  require('open-uri')
+  begin
+    open(url) { |l| l.readline }
+  rescue Exception => ex
+    $stderr.puts "Unable to connect on #{url}"
+    $stderr.puts "Maybe the proxy environment variable is missing ?"
+    raise ex
+  end
+
+  sh "grep '#{url}' /etc/apt/sources.list || echo 'deb #{url} wheezy-cran3/' >> /etc/apt/sources.list"
   sh "apt-get -y update"
   sh "apt-get -y --force-yes install texlive-base texlive-latex-extra r-base r-base-dev r-cran-ggplot2"
   sh "R <<< 'options(repos=structure(c(CRAN=\"http://cran.rstudio.com/\"))); update.packages(checkBuilt = TRUE, ask = FALSE)' --save"
