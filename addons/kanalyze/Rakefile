@@ -117,7 +117,7 @@ task :stats_install_deps do
   sh "grep '#{url}' /etc/apt/sources.list || echo 'deb #{url} wheezy-cran3/' >> /etc/apt/sources.list"
   sh "apt-get -y update"
   sh "apt-get -y --force-yes install texlive-base texlive-latex-extra r-base r-base-dev r-cran-ggplot2"
-  sh "R <<< 'options(repos=structure(c(CRAN=\"http://cran.rstudio.com/\"))); update.packages(checkBuilt = TRUE, ask = FALSE)' --save"
+  sh "echo 'options(repos=structure(c(CRAN=\"http://cran.rstudio.com/\"))); update.packages(checkBuilt = TRUE, ask = FALSE)' | R --save"
 end
 
 desc "Generate statistics (DIRECTORY,FILES,MICROSTEPS)"
