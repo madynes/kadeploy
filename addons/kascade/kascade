@@ -113,13 +113,14 @@ end
 
 #return local ip used to contact host.
 def local_ip(destination)
-   orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true
-   UDPSocket.open do |s|
-     s.connect destination, 1
-     s.addr.last
-   end
-   ensure
-     Socket.do_not_reverse_lookup = orig
+  destination=destination.split(':')[0]
+  orig, Socket.do_not_reverse_lookup = Socket.do_not_reverse_lookup, true
+  UDPSocket.open do |s|
+    s.connect destination, 1
+    s.addr.last
+  end
+  ensure
+    Socket.do_not_reverse_lookup = orig
 end
 
 #Read protocol command
@@ -247,14 +248,15 @@ def detect_who_i_am
 end
 
 #Get port from list
-def get_port(line, add=0)
+def get_port(line, add=0,peace=false)
   host=line.split(':')
   host[1]=$config[:port] if host[1]==nil
   host[1]=host[1].to_i+add
-  kill_port(host[1]) if $config[:aggressive]
-  $log.debug "Try to listen on #{host[1]+add}"
+  kill_port(host[1]) if $config[:aggressive] && !peace
+  $log.debug "Try to listen on #{host[1]}"
   host[1]
 end
+
 
 #Open tcp socket and listen
 def open_tcp_server(line = $config[:nodeList][$config[:who_i_am]])
@@ -296,7 +298,7 @@ class Deploy
     @nodes_ports = Shellwords.escape($config[:nodeList]*"\n")
 
     #Prepare commands : Behaviour intermediate node have retries 1 and 2 or only 2 ?
-    @common_options="-D none -M -b #{$config[:buffer_size]} -n '#{@nodes_path}' -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
+    @common_options="-D none -M -b #{$config[:buffer_size]} -n '#{@nodes_path}' -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -p #{$config[:port]} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
     @command_fountain="ruby #{@fountain_path} #{@common_options} #{$config[:output].arg}"
   end
 
@@ -876,7 +878,6 @@ class FirstFountain<AbstractFountain
   end
 
   def start
-    master_server
     start_sender
     @master_server_thread.join
   end
@@ -984,10 +985,28 @@ class FirstFountain<AbstractFountain
   end
 
   #Launch the master server.
+  #Can change the $config[:master] value !
   def master_server
+    counter = -1
+    @master_server = nil
+
+    #Adjust port in case of another kascade running on same node.
+    begin
+      counter += 1
+      begin
+        port = get_port($config[:master],counter,$config[:adjust_port])
+        @master_server=TCPServer.new(port)
+      rescue Errno::EADDRINUSE => ex
+        raise ex if !$config[:adjust_port]
+      end
+    end while @master_server==nil
+    if counter > 0
+      $log.warn("Adjust master port to #{port}")
+      $config[:master] = $config[:master].split(':')[0]+':'+port.to_s
+      $config[:port] = port
+    end
     @master_server_thread=Thread.new do
       begin
-        @master_server=open_tcp_server($config[:master])
         until @shunting_down
           Thread.start(@master_server.accept) do |client|
             begin
@@ -1225,6 +1244,7 @@ end
 
 # CONFIGURATION -----------------------
 $config = {
+    :adjust_port => true,
     :buffer_in_memory => 1600,
     :buffer_size => 1024*64, #1460*64
     :check_master => true,
@@ -1238,7 +1258,7 @@ $config = {
     :mr_proper => false,
     :ok_file => nil,
     :output => nil,
-    :port => 10000,
+    :port => 29015,
     :retries => 10,
     :retries2 => [10, 0],
     :ssh_command => nil,
@@ -1336,6 +1356,7 @@ OptionParser.new do |opts|
   opts.on('-u', '--number-of-buffer NB', "Number of max buffer stored (default: #{$config[:buffer_in_memory]})") { |v| $config[:buffer_in_memory]=v.to_i }
   opts.on('-w', '--[no-]wait-deploy', 'wait end of deployment algorithm') { |v| $config[:wait_deploy] = v }
   opts.on('-W', '--who-i-am NUM', 'master node\'s index in the node list') { |v| $config[:who_i_am] = Integer(v) rescue nil }
+  opts.on('', '--[no-]adjust-port', "Take the successor port if the port is already bound (#{$config[:adjust_port] ? 'enabled' : 'disabled'} by default)") { |v| $config[:adjust_port] = v }
 end.parse!
 
 if $config[:nodeList].nil?
@@ -1363,21 +1384,21 @@ if $config[:who_i_am]==-1 && $config[:check_master]
     $log.warn 'master node is in the nodes list, removing it'
     $config[:modified_node_list]=true
     #inform than list loaded in memory is newest than file.
-    #The effect is the deployer rewrite another file before to copy on nodes.
+    #The effect is the master rewrite another file before to copy on nodes.
   end
 end
 
-#if the detection of who i am is failed.
+#if the detection of who I am is failed.
 unless $config[:who_i_am]
   $config[:who_i_am]=detect_who_i_am
   fatal_error('I don\'t know who I am!') unless $config[:who_i_am]
 end
 
-#If the adress of master is not precised in options
+#If the address of master is not provided in options
 unless $config[:master]
   if $config[:who_i_am]==-1
-    #if we are the master. We use local ip to contact the first node.
-    #TODO : accept than chain is shared to distinct network linked by master
+    #if we are the master. We use local IP to contact the first node.
+    #TODO : A problem can occurs when each node of chain has distinct address to connect to the master
     if $config[:use_ip]
       $config[:master]=local_ip($config[:nodeList][0])
     else
@@ -1401,12 +1422,10 @@ else
   $log.info('second timeout is not activated')
 end
 
-#Deploy if needed and we are the master.
-$config[:deploy].start if $config[:deploy]!=nil && $config[:who_i_am]==-1
 
 time_before_fountain = Time.now
 
-#Set the fountain and interuption control, and ping server.
+#Set the fountain and interruption control, and ping server.
 if $config[:who_i_am]==-1 # master
   if $config[:input].nil?
     fatal_error("No input specified. Use '-i -' for stdin")
@@ -1428,8 +1447,18 @@ if $config[:who_i_am]==-1 # master
     end
   end
 
-  ping=PingServer.new($config[:master])
+
   fountain=FirstFountain.new
+  begin
+    fountain.master_server()
+  rescue Errno::EADDRINUSE
+    fatal_error("Port #{$config[:master].split(':')[1] || $config[:port]} is already bound")
+  end
+
+  #Deploy the fountain to another nodes if it asked
+  #(Please don't add fatal check after here)
+  $config[:deploy].start if $config[:deploy]!=nil && $config[:who_i_am]==-1
+
 else
   Signal.trap('INT') { exit! 1 }
   ping=PingServer.new
@@ -1442,7 +1471,7 @@ end
 fountain.start
 
 #Stop the ping server
-ping.shutdown
+ping.shutdown if ping
 
 $log.info 'fountain exited'
 fountain.stop
