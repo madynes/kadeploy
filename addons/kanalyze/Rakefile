@@ -55,7 +55,7 @@ task :run, [:expfile] do |t,args|
   if !ENV['DIRECTORY'] or ENV['DIRECTORY'].empty?
     dir = File.join(
       Dir.pwd,
-      "#{ENV['EXPNAME']||'kanalyze'}-#{Time.now.strftime("%Y-%m-%d-%H-%M-%S")}"
+      "#{ENV['EXPNAME']||'results_kanalyze'}_#{Time.now.strftime("%Y-%m-%d_%H-%M-%S")}"
     )
     sh "mkdir -p #{dir}"
     expdir(dir)
