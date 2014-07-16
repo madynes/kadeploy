@@ -414,7 +414,8 @@ def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,envcondir,nodes,wid)
           hashes[branch]["kadeploy"]=$version
           hashes[branch]["iter"]=iter
           hashes[branch]["id"]=expname+"-"+iter.to_s+"-"+env+"-"+branch
-          hashes[branch]["success"]=nok*100/(nok+nko)
+          hashes[branch]["n_success"]=nok
+          hashes[branch]["n_fail"]=nko
 
           if line =~ /Nodeset \[([\w|:]+)\] split into :/
             trunk=Regexp.last_match(1)
