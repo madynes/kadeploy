@@ -21,6 +21,7 @@ require 'fileutils'
 require 'optparse'
 require 'csv'
 require 'shellwords'
+require 'set'
 
 # Config
 SSH_KEY='~/.ssh/id_rsa.pub'
@@ -277,12 +278,16 @@ def store_stats(expname,expdir, iterCount)
   statfile.write($stats.to_yaml)
   statfile.close
   if($stats.size>0)
+    keys=Set.new
+    $stats.each do |_,stat|
+        keys.merge(stat.keys)
+    end
+    keystab=keys.sort
     csvfile=CSV.open(File.join($statsdir,expname+".csv"),"w") do |csv|
-      csv<<$stats.first[1].keys.sort
+      csv<<keystab
       $stats.each do |key,stat|
-        keytab=stat.keys.sort
         stattab=[]
-        keytab.each do |k|
+        keystab.each do |k|
           stattab.push(stat[k])
         end
         csv<<stattab
