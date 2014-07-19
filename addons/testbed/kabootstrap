@@ -803,7 +803,8 @@ end
 def cfg_kadeploy_deploy_kernel_args(cluster)
   more = case cluster[:basename]
     when 'graphite' then ' igb.blacklist=yes'
-    else ' '
+    when 'griffon' then ' myri10ge.blacklist=yes'
+    else ''
   end
   #"#{USE_NET_DRIVER ? "ETH_DRV=#{cluster[:drivers][:network]} " : ''}"\
   #"ETH_DEV=#{$netiface} init=/linuxrc"\
