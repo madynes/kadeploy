@@ -133,8 +133,10 @@ graph=graph+scale_fill_discrete(name="Kadeploy Versions")
 graph<-graph+ylab("Time (s)")+xlab("Versions")+ggtitle(paste("Times of step 3 for different versions of Kadeploy"))
 graph<-graph+theme(axis.text.x = element_text(angle = 90))
 ggsave(file=paste("pictures/boxplot3-per-kadeploy.jpeg",sep=""),dpi=300)
-groups=paste(experiments,iters)
+
+groups=paste(experiments,sprintf("%03i",iters))
 fr=data.frame(groups,success_percent,experiments)
+fr=aggregate(success_percent ~ groups + experiments ,fr,mean)
 
 graph<-ggplot(fr,aes(x=groups,y=success_percent,fill=experiments))+geom_bar(stat="identity",alpha=.5)
 graph=graph+scale_fill_discrete(name="Experiments")
