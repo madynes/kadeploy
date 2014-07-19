@@ -752,6 +752,24 @@ def load_cmdline_options
   check_args(name,ARGV.first,nodes,keyfile,exp)
 end
 
+def launch_cmd(cmd,exp,env,iter,testdir)
+        ENV['kanalyze_savedir'] = $savedir
+        ENV['kanalyze_expdir'] = File.join($savedir,testdir)
+        ENV['kanalyze_exp_name'] = exp['name']
+        ENV['kanalyze_kadeploy_version'] = $version
+        ENV['kanalyze_node_list'] = $nodes.join(' ')
+        ENV['kanalyze_iteration'] = iter.to_s
+        ENV['kanalyze_env'] = env
+        ENV['kanalyze_first_round'] = (iter==0).to_s
+        ENV['kanalyze_last_round'] = (exp['time'] == iter+1).to_s
+        ENV['kanalyze_total_iterations'] = exp['times'].to_s
+        Dir.chdir($pwd)
+        system(cmd)
+        e_status = $?.exitstatus
+        error("The command '#{cmd}' ends with #{e_status} exit status") if e_status != 0
+        Dir.chdir($savedir)
+end
+
 def run_test(exp)
   $results=Array.new
   info("Running experiment '#{exp['name']}'")
@@ -778,6 +796,10 @@ def run_test(exp)
       debug("    Creating environment dir '#{envdir}'")
       FileUtils.mkdir_p(envdir)
 
+      if exp['prepare_cmd']
+        info("      launch the prepare command(#{exp['prepare_cmd']})")
+        launch_cmd(exp['prepare_cmd'],exp,env,i,testdir)
+      end
       if exp['simult']
         exp['simult'].each do |simult|
           if simult > $nodes.size
@@ -795,13 +817,8 @@ def run_test(exp)
       end
       #execute clean command if it provided
       if exp['cleaner_cmd']
-        ENV['kanalyze_exp_name'] = exp['name']
-        ENV['kanalyze_kadeploy_version'] = $version
-        ENV['kanalyze_node_list'] = $nodes.join(' ')
-        ENV['kanalyze_iteration'] = i.to_s
-        ENV['kanalyze_env'] = env
-        ENV['kanalyze_total_iterations'] = exp['times'].to_s
-        system(exp['cleaner_cmd'])
+        info("      launch the cleaner (#{exp['cleaner_cmd']})")
+        launch_cmd(exp['cleaner_cmd'],exp,env,i,testdir)
       end
     end
   end
@@ -823,6 +840,7 @@ end
 info("Working directory: #{$savedir}")
 info("Copying experiment description file #{File.basename(ARGV.first)}")
 FileUtils.cp(ARGV.first,$savedir)
+$pwd=Dir.pwd
 Dir.chdir($savedir)
 
 $statsdir=File.join('stats')
