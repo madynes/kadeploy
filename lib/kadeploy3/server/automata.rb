@@ -367,8 +367,9 @@ module Automata
     end
 
     def split_nodeset(task)
-      ok_nsid = Nodes::NodeSet.newid(context)
-      ko_nsid = Nodes::NodeSet.newid(context)
+      ok_nsid = context[:nodesets_id].inc
+      ko_nsid = context[:nodesets_id].inc
+
       split!(task.nsid,ok_nsid,task.nodes_ok,ko_nsid,task.nodes_ko)
       [ok_nsid,ko_nsid]
     end
