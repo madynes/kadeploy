@@ -22,14 +22,15 @@ require 'optparse'
 require 'csv'
 require 'shellwords'
 require 'set'
+require 'open3'
 
 # Config
 SSH_KEY='~/.ssh/id_rsa.pub'
 KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
 REMOTE=false
-CONSOLE_BIN="/usr/local/conman/bin/conman"
-CONSOLE_CMD="#{CONSOLE_BIN} -f -d conman"
-SCRIPT_BIN="/usr/bin/script"
+CONSOLE_END_SEQ  = '&.'
+CONSOLE_CMD="conman -m -f -d conman NODE_SHORT"
+SCRIPT_BIN="script"
 KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
 KASTAT_BIN=ENV['KASTAT_BIN']||'kastat3'
 
@@ -79,9 +80,9 @@ def debug(msg)
   msg.each{|l| puts "[D] #{l}"} if msg and !msg.empty? and $verbose
 end
 
-def error(msg)
+def error(msg, exit_status = 1)
   $stderr.puts msg
-  exit 1
+  exit exit_status if !exit_status.nil?
 end
 
 def yaml_error(msg)
@@ -124,37 +125,43 @@ def kill_recursive(pid)
   end
 end
 
+
 def conlogger_start(envcondir,nodes)
-  pids=[]
+  $cons_io={} if !$cons_io
   info("      Initialize monitors")
   nodes.each do |node|
-    info("        init #{node}")
-    cmd="#{SCRIPT_BIN} -f -c '#{CONSOLE_CMD} #{node.split(".")[0]}' "
-    cmd+="-t 2>#{File.join(envcondir,node+".timing")} "
-    cmd+="-a #{File.join(envcondir,node+".typescript")} "
-    cmd+="1>/dev/null"
-    cmd+="&"
-    system(cmd)
+    #info("        init #{node}")
+    cmd="#{SCRIPT_BIN} -q -f -c '#{CONSOLE_CMD}' "\
+        "'-t#{File.join(envcondir,node+".timing")}' "\
+        "-a '#{File.join(envcondir,node+".typescript")}' "\
+        ">/dev/null 2>&1"
+    cmd.gsub!('NODE_SHORT', node.split(".")[0])
+    cmd.gsub!('NODE', node)
+    $cons_io[node] = Open3.popen2e(cmd)
   end
-  info("      Start monitoring")
 end
 
+
 def conlogger_stop(envcondir,nodes)
-  info("      Kill monitors")
+  info("      Stopping nodes monitoring")
   nodes.each do |node|
-    # Get the list of processus for the current user
-    psresult=`ps -u $(id -nu) -o pid= -o command=`.split("\n")
-    # Only select the monitoring processus on the selected node
-    commands=psresult.select { |line| (line =~ /#{SCRIPT_BIN}/ && line=~/#{CONSOLE_BIN}/ && line =~/#{node}\ /) }
-    if(!commands.empty?)
-     # Get the pid of the command
-      pid=commands[0].split(" ")[0]
-      info("        killing #{node} monitoring")
-      kill_recursive(pid.to_i)
+    begin
+      $cons_io[node][0].print(CONSOLE_END_SEQ)
+      $cons_io[node][0].close()
+      $cons_io[node][1].close()
+    rescue Exception => ex
+      error("Error occured while end of console: #{ex}",nil)
+      kill_recursive($cons_io[node][2].pid)
     end
   end
-  info("      Stop monitoring")
+  nodes.each do |node|
+    $cons_io[node][2].join
+    #info("        End of #{node} monitoring ")
+    $cons_io.delete(node)
+  end
 end
+
+
 
 def check_field(name,val,type=nil)
   yaml_error("experiment should have a field '#{name}'") if val.nil? or (type.nil? and val.empty?)
@@ -517,7 +524,7 @@ def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter
   end
   cmd += " #{automata_opt}" if automata_opt and !automata_opt.empty?
   cmd += " -k"
-  cmd+=" #{$key}" if $key!=""
+  cmd +=" #{$key}" if $key!=""
   cmd += " --write-workflow-id #{envwidfile}"
 
   cmd += " | sed 's/.*/(#{simultid}) &/'" if simultid
@@ -532,7 +539,7 @@ def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter
   info("      Init conman monitoring #{(simultid ? simultid : '')}")
   pids=[]
   conlogger_start(envcondir,nodes)
-  info("        Running Kadeploy")
+  info("      Running Kadeploy")
   debug(cmd)
   res=system(cmd)
   #res=system("touch "+envdebugfile) #useful to test without really deploying...
@@ -649,11 +656,19 @@ def test_env(workdir,expname,run_id,macrosteps,env,iter,exp,simult=nil)
   end
 end
 
+def check_external_program(cmd)
+  cmd = cmd.split(' ')[0]
+  error("#{cmd} does not exist") if !system("which #{cmd} > /dev/null 2>&1")
+end
+
 def check_args(name,yaml_file,nodes,keyfile,exp)
   $exps=Array.new
   $nodes=Array.new
   $key=String.new
   $name=String.new
+#checks external program
+  check_external_program(CONSOLE_CMD)
+  check_external_program(SCRIPT_BIN)
 
 #checks the name
   $name = (name.empty? ? '' : "#{name}-") + Time.now.strftime("%Y-%m-%d-%H-%M-%S")
