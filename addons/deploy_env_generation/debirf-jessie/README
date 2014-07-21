@@ -1,0 +1,11 @@
+Deployment kernel generation based on Debirf (http://cmrg.fifthhorseman.net/wiki/debirf).
+
+There are some issues with non-root builds, since they involve many tricks
+using fakeroot. (see http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=680235
+for example). Therefore we generate the image as root (using debirf make -r).
+
+You can add additional packages by adding their names in the variable INCLUDE at the very end of the file kadeploy-deploy-kernel/debirf.conf .
+
+If you want to add additional scripts (to tune your kernel), you should create a file as the sample kadeploy-deploy-kernel/modules/blacklist_sample.
+
+You can specify which network device will be used by the deployment kernel (setup with DHCP) adding 'ETH_DEV=#NAME' (where #NAME is the name of the device) to the kernel command line parameters [if not specified the default value is 'eth0'].

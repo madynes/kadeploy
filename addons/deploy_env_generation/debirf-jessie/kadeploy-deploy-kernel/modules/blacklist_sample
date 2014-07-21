@@ -1,0 +1,15 @@
+#!/bin/bash -e
+#
+# debirf module: kadeploy-addons
+#
+# The debirf scripts were written by
+# Jameson Rollins <jrollins@fifthhorseman.net>
+# and
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>.
+#
+# They are Copyright 2007, and are all released under the GPL,
+# version 3 or later.
+
+
+# mkdir -p $DEBIRF_ROOT/etc/modprobe.d/
+# echo "blacklist myri10ge" >> $DEBIRF_ROOT/etc/modprobe.d/blacklist.conf
