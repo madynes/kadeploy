@@ -36,53 +36,43 @@ class Execute
     if opts[:stdin]
       in_r, in_w = IO::pipe
       in_w.sync = true
-
-      out_r, out_w = IO::pipe
-      err_r, err_w = IO::pipe
-
-      [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
     else
-      out_r, out_w = IO::pipe
-      err_r, err_w = IO::pipe
-
-      [ [nil,out_w,err_w], [nil,out_r,err_r] ]
+      in_r, in_w = [nil,nil]
     end
+
+    out_r, out_w = IO::pipe
+    err_r, err_w = IO::pipe
+
+    [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
   end
 
   def run(opts={:stdin => false})
     @@forkmutex.synchronize do
       @child_io, @parent_io = Execute.init_ios(opts)
-      @parent_io.each { |io| io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC) if io }
       @exec_pid = fork {
         begin
-          @parent_io.each do |io|
-            begin
-              io.close if io and !io.closed?
-            rescue IOError
+
+          #stdin
+          STDIN.reopen(@child_io[0]) if opts[:stdin]
+
+          #stdout
+          STDOUT.reopen(@child_io[1])
+
+          #stderr
+          STDERR.reopen(@child_io[2])
+
+
+          # Close useless file descriptors.
+          # Since ruby 2.0, FD_CLOEXEC is set when ruby opens a descriptor.
+          # After performing exec(), all file descriptors are closed excepted 0,1,2
+          # https://bugs.ruby-lang.org/issues/5041
+          if RUBY_VERSION < "2.0"
+            ObjectSpace.each_object(IO) do |f|
+              #Some IO objects are not initialized while testing.
+              #So the function 'closed?' raises an exception. We ignore that.
+              f.close  if !f.closed? && ![0,1,2].include?(f.fileno) rescue IOError
             end
           end
-
-          std = nil
-          if opts[:stdin]
-            std = [STDIN, STDOUT, STDERR]
-          else
-            std = [nil, STDOUT, STDERR]
-          end
-
-          std.each_index do |i|
-            next unless std[i]
-            begin
-              std[i].reopen(@child_io[i])
-              @child_io[i].close
-            rescue IOError
-            end
-          end
-
-          #close unused opened file descriptor
-          ObjectSpace.each_object(IO) do |f|
-              f.close() if !f.closed? && !(0..2).include?(f.fileno)
-          end
-
           exec(*@command)
         rescue SystemCallError, Exception => e
           STDERR.puts "Fork Error: #{e.message} (#{e.class.name})"
@@ -92,10 +82,7 @@ class Execute
       }
 
       @child_io.each do |io|
-        begin
-          io.close if io and !io.closed?
-        rescue IOError
-        end
+        io.close if io and !io.closed?
       end
     end
     result = [@exec_pid, *@parent_io]
