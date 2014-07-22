@@ -9,8 +9,8 @@ class Mutex
 end
 
 module Kadeploy
-  def self.dump(file=nil,width=80)
-    file = STDOUT unless file
+  def self.dump(width=80)
+    file = STDERR
     GC.start
 
     objects = Hash.new(0)
@@ -38,5 +38,7 @@ module Kadeploy
       file.puts("\n--- Kadeploy structures ---")
       PP.pp($kadeploy,file,width)
     end
+
+    file.flush
   end
 end

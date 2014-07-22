@@ -12,7 +12,6 @@ $kadeploy_logfiles = {}
 LOGFILE_DEBUG='output.log'
 LOGFILE_ERROR='error.log'
 RUNFILE_RELOAD='reload'
-RUNFILE_DUMP='dump'
 
 AUTOCLEAN_PITCH = 300
 
@@ -94,16 +93,13 @@ end
 Signal::trap("USR1") do
   require 'kadeploy3/server/dump'
 
-  file = File.open(File.join($kadeploy_rundir,RUNFILE_DUMP),'w+')
   begin
-    STDOUT.puts "[#{Time.now.to_s}] Dump internal structures"
-    Kadeploy.dump(file)
+    STDERR.puts "[#{Time.now.to_s}] Dump internal structures"
+    Kadeploy.dump
   rescue Exception => e
-    STDOUT.puts e.class.name
-    STDOUT.puts e.message
-    STDOUT.puts e.backtrace
-  ensure
-    file.close unless file.closed?
+    STDERR.puts e.class.name
+    STDERR.puts e.message
+    STDERR.puts e.backtrace
   end
 end
 
