@@ -103,9 +103,25 @@ Signal::trap("USR1") do
   end
 end
 
+require 'thread'
+
+# code snippet coming from
+# http://itreallymatters.net/post/29549982905/generating-thread-dumps-for-ruby-scripts
+Signal::trap('USR2') do
+  if RUBY_VERSION =~ /^1\.8\./
+    STDERR.puts "Current thread: #{Thread.inspect}"
+    STDERR.puts caller.join("\n    \\_ ")
+  else
+    Thread.list.each do |thread|
+      STDERR.puts "========= Thread #{thread.object_id.to_s}"
+      STDERR.puts thread.backtrace.join("\n    \\_ ")
+    end
+  end
+  STDERR.flush
+end
+
 require 'kadeploy3/server'
 
-require 'thread'
 require 'fileutils'
 require 'json'
 require 'optparse'
