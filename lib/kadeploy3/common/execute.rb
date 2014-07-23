@@ -78,6 +78,11 @@ class Execute
             end
           end
 
+          #close unused opened file descriptor
+          ObjectSpace.each_object(IO) do |f|
+              f.close() if !f.closed? && !(0..2).include?(f.fileno)
+          end
+
           exec(*@command)
         rescue SystemCallError, Exception => e
           STDERR.puts "Fork Error: #{e.message} (#{e.class.name})"
