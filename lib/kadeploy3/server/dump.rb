@@ -21,7 +21,7 @@ module Kadeploy
     PP.pp(Hash[objects.select{|k,v| v > 4}.sort_by{|k,v| -v}],file,width)
 
     file.puts("\n--- Objects by name ---")
-    PP.pp(Hash[objects.sort_by{|k,v| k.name}],file,width)
+    PP.pp(Hash[objects.sort_by{|k,v| k.name || ''}],file,width)
     objects = nil
 
     if ObjectSpace.respond_to?(:count_objects)
