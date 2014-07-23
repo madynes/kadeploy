@@ -202,7 +202,7 @@ class Execute
     Process.kill('STOP',pid)
     # Gather the list of children before killing the parent in order to
     # be able to kill children that will be re-attached to init
-    children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i rescue nil}
+    children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
     children.compact!
     # Check that the process still exists
     # Directly kill the process not to generate <defunct> children
