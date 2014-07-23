@@ -195,21 +195,38 @@ class Execute
     end
   end
 
+  EXECDEBUG = false
+  # kill a tree of processes. The killing is done in three steps:
+  # 1) STOP the target process
+  # 2) recursively kill all children
+  # 3) KILL the target process
   def self.kill_recursive(pid)
-    # Check that the process still exists
-    Process.kill(0,pid)
+    puts "Killing PID #{pid} from PID #{$$}" if EXECDEBUG
+
     # SIGSTOPs the process to avoid it creating new children
-    Process.kill('STOP',pid)
+    begin
+      Process.kill('STOP',pid)
+    rescue Errno::ESRCH # "no such process". The process was already killed, return.
+      puts "got ESRCH on STOP" if EXECDEBUG
+      return
+    end
     # Gather the list of children before killing the parent in order to
     # be able to kill children that will be re-attached to init
     children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
     children.compact!
+    puts "Children: #{children}" if EXECDEBUG
     # Check that the process still exists
     # Directly kill the process not to generate <defunct> children
     children.each do |cpid|
       kill_recursive(cpid)
     end if children
-    Process.kill('KILL',pid)
+
+    begin
+      Process.kill('KILL',pid)
+    rescue Errno::ESRCH # "no such process". The process was already killed, return.
+      puts "got ESRCH on KILL" if EXECDEBUG
+      return
+    end
   end
 
   def kill()
@@ -218,10 +235,7 @@ class Execute
 
   def kill!()
     unless @exec_pid.nil?
-      begin
-        Execute.kill_recursive(@exec_pid)
-      rescue Errno::ESRCH
-      end
+      Execute.kill_recursive(@exec_pid)
       # This function do not wait the PID since the thread that use wait() is supposed to be running and to do so
     end
 
