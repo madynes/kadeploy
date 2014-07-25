@@ -98,17 +98,6 @@ class String
   end
 end
 
-#Kill process which use a port
-def kill_port(port)
-  pid_to_kill = `lsof -t -i :#{port}`.strip
-  if pid_to_kill!=''
-    $log.info "kill pid #{pid_to_kill} because it using port #{port}"
-    Process.kill('KILL', pid_to_kill.to_i)
-    sleep(1)
-  end
-end
-
-
 ############ Network tools
 
 #return local ip used to contact host.
@@ -248,11 +237,10 @@ def detect_who_i_am
 end
 
 #Get port from list
-def get_port(line, add=0,peace=false)
+def get_port(line, add=0)
   host=line.split(':')
   host[1]=$config[:port] if host[1]==nil
   host[1]=host[1].to_i+add
-  kill_port(host[1]) if $config[:aggressive] && !peace
   $log.debug "Try to listen on #{host[1]}"
   host[1]
 end
@@ -298,7 +286,7 @@ class Deploy
     @nodes_ports = Shellwords.escape($config[:nodeList]*"\n")
 
     #Prepare commands : Behaviour intermediate node have retries 1 and 2 or only 2 ?
-    @common_options="-D none -M -b #{$config[:buffer_size]} -n '#{@nodes_path}' -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} #{$config[:aggressive] ? '-A' : ''} -p #{$config[:port]} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
+    @common_options="-D none -M -b #{$config[:buffer_size]} -n '#{@nodes_path}' -r #{$config[:retries]} -R #{$config[:retries2][0]},#{$config[:retries2][1]} -v #{$log.level} -p #{$config[:port]} -m #{$config[:master]} -t #{$config[:timeout]} -W nil"
     @command_fountain="ruby #{@fountain_path} #{@common_options} #{$config[:output].arg}"
   end
 
@@ -994,7 +982,7 @@ class FirstFountain<AbstractFountain
     begin
       counter += 1
       begin
-        port = get_port($config[:master],counter,$config[:adjust_port])
+        port = get_port($config[:master],counter)
         @master_server=TCPServer.new(port)
       rescue Errno::EADDRINUSE => ex
         raise ex if !$config[:adjust_port]
@@ -1326,7 +1314,6 @@ OptionParser.new do |opts|
   end
   opts.separator ''
   opts.separator 'Performance & tuning options:'
-  opts.on('-A', '--[no-]aggressive', 'kill the process using the listening port') { |v| $config[:aggressive] = v }
   opts.on('-b', '--buffer-size SIZE', "read buffer size, in bytes (default: #{$config[:buffer_size]})") { |v| $config[:buffer_size] = v.to_i }
   opts.on('-c', '--disable-check-master', 'disable check master in node list') { |v| $config[:check_master] = false }
   opts.on('-C', '--chunk-size SIZE', "size of chunks (amount of data between headers). unit: buffer size (default: #{$config[:chunk_size]})")
