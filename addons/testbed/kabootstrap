@@ -449,8 +449,8 @@ def cfg_kadeploy_conf()
         ],
         'taktuk' => {
           'auto_propagate' => false,
-          'tree_arity' => 0,
-          'connector' => "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root"
+          'tree_arity' => 3,
+          'connector' => "ssh -A -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root"
         },
       },
     }
@@ -500,8 +500,8 @@ def cfg_kadeploy_conf()
     "deploy_db_login = #{CFG_SQL_USER}\n"\
     "deploy_db_passwd = #{CFG_SQL_PASS_USER}\n"\
     "rights_kind = db\n"\
-    "taktuk_connector = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
-    "taktuk_tree_arity = 0\n"\
+    "taktuk_connector = ssh -A -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
+    "taktuk_tree_arity = 3\n"\
     "taktuk_auto_propagate = true\n"\
     "tarball_dest_dir = /tmp\n"\
     "environment_extraction_dir = /mnt/dest\n"\
