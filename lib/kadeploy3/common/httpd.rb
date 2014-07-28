@@ -264,31 +264,39 @@ module HTTPd
 
     def treatment(req,resp)
       request_handler = RequestHandler.new(req)
-      ret = nil
-      Thread.current[:run_thr] = Thread.new{ ret = handle(req,resp,request_handler) }
-
-      sock = Thread.current[:WEBrickSocket]
-      while Thread.current[:run_thr] and Thread.current[:run_thr].alive? do
-        if IO.select([sock], nil, nil, 0.5) and sock.eof?
-        # The client disconnected
-          kill()
-          request_handler.free
-          request_handler = nil
-          raise WEBrick::HTTPStatus::EOFError
-        end
-      end
-      Thread.current[:run_thr].join if Thread.current[:run_thr]
-      Thread.current[:run_thr] = nil
-
-      if IO.select([sock], nil, nil, 0) and sock.eof?
-      # The client disconnected
-        request_handler.free
-        request_handler = nil
-        ret.free if ret.respond_to?(:free)
-        ret = nil
-        raise WEBrick::HTTPStatus::EOFError
-      end
-
+#
+# = A client disconnection kills the handle thread. 
+#   The handle thread can allocate some resources (ex : refs token in cache or compressedCSV) and be killed
+#   out of all ensure and it does not return ret.
+#
+#      TODO : implement a method to kill kastat when a user interrupts the client.
+#
+#      ret = nil
+#      Thread.current[:run_thr] = Thread.new{ ret = handle(req,resp,request_handler) }
+#
+#      sock = Thread.current[:WEBrickSocket]
+#      while Thread.current[:run_thr] and Thread.current[:run_thr].alive? do
+#        if IO.select([sock], nil, nil, 0.5) and sock.eof?
+#        # The client disconnected
+#          kill()
+#          request_handler.free
+#          request_handler = nil
+#          raise WEBrick::HTTPStatus::EOFError
+#        end
+#      end
+#      Thread.current[:run_thr].join if Thread.current[:run_thr]
+#      Thread.current[:run_thr] = nil
+#
+#      if IO.select([sock], nil, nil, 0) and sock.eof?
+#      # The client disconnected
+#        request_handler.free
+#        request_handler = nil
+#        ret.free if ret.respond_to?(:free)
+#        ret = nil
+#        raise WEBrick::HTTPStatus::EOFError
+#      end
+# ======
+      ret = handle(req,resp,request_handler)
       [ret,request_handler]
     end
 
