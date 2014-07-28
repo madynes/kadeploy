@@ -672,6 +672,7 @@ module Automata
 
       unless @runthread.nil?
         @runthread.kill if @runthread.alive?
+        @runthread.join
         @runthread = nil
       end
 
