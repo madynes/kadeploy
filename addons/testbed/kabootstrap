@@ -440,11 +440,15 @@ def cfg_kadeploy_conf()
         'mkfs' => [
           {
             'fstype' => 'ext2',
-            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index -F',
           },
           {
             'fstype' => 'ext3',
-            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index -F',
+          },
+          {
+            'fstype' => 'ext4',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index -F',
           },
         ],
         'taktuk' => {
