@@ -109,12 +109,14 @@ require 'thread'
 # http://itreallymatters.net/post/29549982905/generating-thread-dumps-for-ruby-scripts
 Signal::trap('USR2') do
   if RUBY_VERSION =~ /^1\.8\./
-    STDERR.puts "Current thread: #{Thread.inspect}"
+    STDERR.puts "== Current thread: #{Thread.inspect} =="
     STDERR.puts caller.join("\n    \\_ ")
   else
     Thread.list.each do |thread|
-      STDERR.puts "========= Thread #{thread.object_id.to_s}"
-      STDERR.puts thread.backtrace.join("\n    \\_ ")
+      t=Time.now
+      STDERR.puts "[#{t}]========= Thread #{thread.object_id.to_s} =========="
+      STDERR.puts thread.backtrace.join("\n[#{t}]    \\_ ")
+      STDERR.puts "[#{t}]================= END ================="
     end
   end
   STDERR.flush
