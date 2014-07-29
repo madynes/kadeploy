@@ -231,7 +231,7 @@ def detect_who_i_am
     who = my_list.index(host) if host
   end
   unless who
-    who = my_list.index(local_ip($config[:master]))
+    who = my_list.index(local_ip($config[:master] || $config[:nodeList][0]))
   end
   who
 end
