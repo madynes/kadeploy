@@ -20,6 +20,10 @@ override_dh_fixperms:
 	dh_fixperms
 	chmod 640 debian/kadeploy/etc/kadeploy3/*.conf
 
+override_dh_clean:
+	dh_clean
+	rm -f debian/kadeploy.init
+
 # generation of custom packages with a suffix
 # use with DEB_BUILD_OPTIONS=devpkg=dev
 ifneq (,$(filter devpkg=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
@@ -31,5 +35,6 @@ override_dh_builddeb:
 
 override_dh_clean:
 	dh_clean
+	rm -f debian/kadeploy.init
 	debian/generate-devel-package clean
 endif
