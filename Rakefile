@@ -592,23 +592,10 @@ task :build_deb, [:dir] => :build do
   sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
 end
 
-desc "Generate debian package (Be careful it will break your Git repository !)"
-task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
+desc "Show information about the Debian package building process"
+task :deb_info do |f, args|
   suff = args.branch_suffix || ''
   deb_version, tag_version = deb_versions()
-  sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
-  sh "git tag -d 'upstream#{suff}/#{tag_version}'; true"
-  sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
-  sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
-  sh "git checkout debian#{suff}"
-  sh "git-import-orig "\
-    "--upstream-version=#{deb_version} "\
-    "--upstream-vcs-tag='#{tag_version}' "\
-    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
-  sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
-  sh 'git-buildpackage --git-ignore-new -uc -us || true'
-  Rake::Task[:build_clean].reenable
-  Rake::Task[:build_clean].invoke
   puts <<-EOF
 ## When you package is ready, you will need to:
 ### Push upstream and merge modifications and tags
@@ -626,6 +613,26 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
 ### If you want to build a -dev package, use:
   DEB_BUILD_OPTIONS=devpkg=dev git-buildpackage -us -uc
 EOF
+end
+
+desc "Generate debian package (Be careful it will break your Git repository !)"
+task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
+  suff = args.branch_suffix || ''
+  deb_version, tag_version = deb_versions()
+  sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
+  sh "git tag -d 'upstream#{suff}/#{tag_version}'; true"
+  sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
+  sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
+  sh "git checkout debian#{suff}"
+  sh "git-import-orig "\
+    "--upstream-version=#{deb_version} "\
+    "--upstream-vcs-tag='#{tag_version}' "\
+    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
+  sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
+  sh 'git-buildpackage --git-ignore-new -uc -us || true'
+  Rake::Task[:build_clean].reenable
+  Rake::Task[:build_clean].invoke
+  Rake::Task[:deb_info].invoke
 end
 
 desc "Generate debian changelog file"
