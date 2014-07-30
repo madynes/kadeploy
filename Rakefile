@@ -599,7 +599,9 @@ task :deb_info do |f, args|
   puts <<-EOF
 ## When you package is ready, you will need to:
 ### Push upstream and merge modifications and tags
- First, push your changes on the master or 3.X branch (e.g. git push origin HEAD:refs/for/master)
+ First, push your changes on the master or 3.X branch. EXAMPLES:
+  git push origin master:refs/for/master
+  OR git push origin 3.2:refs/for/3.2
  Then:
   git push origin upstream#{suff}:refs/for/upstream#{suff}
   git push origin debian#{suff}:refs/for/debian#{suff}
