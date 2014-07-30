@@ -738,7 +738,7 @@ module Kaworkflow
       run=Execute[cmd]
       begin
         Timeout::timeout(20) do
-          run.run!()
+          run.run!(:stdin=>false,:stdout=>false,:stderr=>false)
           run.wait(:checkstatus=>false)
         end
       rescue SignalException
