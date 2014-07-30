@@ -145,16 +145,16 @@ INSTALL = {
 }
 
 DESC = {
-  :karights3 => 'allows to set the deployment rights to users',
-  :kadeploy3d => 'the launcher of Kadeploy server',
-  :kaconsole3 =>  'allows to get a console on the deploying nodes',
-  :kadeploy3 => 'allows to perform efficient deployments on cluster nodes',
-  :kaenv3 => 'allows to manage the Kadeploy environments',
-  :kanodes3 => 'allows to get information on the current deployments',
-  :kapower3 => 'allows to perform several operations to control the power status of nodes',
-  :kareboot3 => 'allows to perform several reboot operations on the nodes involved in a deployment',
-  :kastat3 => 'allows to get statistics on the deployments',
-  :kaadmin3 => 'Administration stuff for kadeploy3 (image installer, migration script,...)',
+  :karights3 => 'manage users deployment rights',
+  :kadeploy3d => 'Kadeploy server',
+  :kaconsole3 =>  'access the console of deploying nodes',
+  :kadeploy3 => 'Kadeploy client -- perform efficient deployments on cluster nodes',
+  :kaenv3 => 'manage the Kadeploy environments',
+  :kanodes3 => 'get information on the current deployments',
+  :kapower3 => 'control the power status of nodes',
+  :kareboot3 => 'perform reboot operations on the nodes involved in a deployment',
+  :kastat3 => 'get statistics on the deployments',
+  :kaadmin3 => 'administration stuff for Kadeploy (image installer, migration script,...)',
 }
 
 
