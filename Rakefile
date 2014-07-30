@@ -615,6 +615,7 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   git push origin upstream#{suff}:refs/for/upstream#{suff}
   git push origin debian#{suff}:refs/for/debian#{suff}
   git push origin #{tag_version}:refs/tags/#{tag_version}
+  git push origin pristine-tar#{suff}:refs/for/pristine-tar#{suff}
   git push origin upstream#{suff}/#{tag_version}:refs/tags/upstream#{suff}/#{tag_version}
 ### After the packaging work, tag the final Debian package, push the tag:
   git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
