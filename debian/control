@@ -3,7 +3,7 @@ Section: admin
 Priority: extra
 Build-Depends: debhelper (>= 8), rake, help2man, gem2deb, texlive-latex-base, texlive-latex-recommended, texlive-latex-extra
 Maintainer: Kadeploy developers <kadeploy3-devel@lists.gforge.inria.fr>
-Uploaders: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>, Lucas Nussbaum <lucas@debian.org>, Luc Sarzyniec <luc.sarzyniec@inria.fr>
+Uploaders: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>, Lucas Nussbaum <lucas@debian.org>
 XS-Ruby-Versions: all
 Standards-Version: 3.9.4
 Homepage: http://kadeploy3.gforge.inria.fr/
