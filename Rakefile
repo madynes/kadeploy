@@ -606,7 +606,7 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
     "--upstream-vcs-tag='#{tag_version}' "\
     "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
   sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
-  sh 'git-buildpackage --git-ignore-new -uc -us'
+  sh 'git-buildpackage --git-ignore-new -uc -us || true'
   Rake::Task[:build_clean].reenable
   Rake::Task[:build_clean].invoke
   puts <<-EOF
