@@ -13,19 +13,43 @@ Vcs-Browser: https://gforge.inria.fr/scm/browser.php?group_id=2026
 Package: kadeploy-common
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ruby | ruby-interpreter
-Description: Kadeploy: the cluster deployment tool - common part
+Description: Scalable, efficient and reliable cluster provisioning solution (common files)
+ Kadeploy is a scalable, efficient and reliable deployment system (cluster
+ provisioning solution) for cluster and grid computing. It provides a set of
+ tools for cloning, configuring (post installation) and managing cluster nodes.
+ It can deploy a 300-nodes cluster in a few minutes, and also supports
+ authorizing users to initiate their own nodes deployments (including with
+ concurrent deployments).
+ .
+ This package contains files common to the Kadeploy client and server.
 XB-Ruby-Versions: ${ruby:Versions}
 
 Package: kadeploy-client
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby | ruby-interpreter
 Recommends: oidentd | pidentd | ident2 | nullidentd
-Description: Kadeploy: the cluster deployment tool - client part
+Description: Scalable, efficient and reliable cluster provisioning solution (client)
+ Kadeploy is a scalable, efficient and reliable deployment system (cluster
+ provisioning solution) for cluster and grid computing. It provides a set of
+ tools for cloning, configuring (post installation) and managing cluster nodes.
+ It can deploy a 300-nodes cluster in a few minutes, and also supports
+ authorizing users to initiate their own nodes deployments (including with
+ concurrent deployments).
+ .
+ This package contains the Kadeploy client.
 XB-Ruby-Versions: ${ruby:Versions}
 
 Package: kadeploy
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby | ruby-interpreter, ruby-mysql | libmysql-ruby, openssh-client | ssh, taktuk
 Recommends: kadeploy-client (= ${binary:Version}), tftpd-hpa | atftpd | tftpd, syslinux-common
-Description: Kadeploy: the cluster deployment tool - server part
+Description: Scalable, efficient and reliable cluster provisioning solution (server)
+ Kadeploy is a scalable, efficient and reliable deployment system (cluster
+ provisioning solution) for cluster and grid computing. It provides a set of
+ tools for cloning, configuring (post installation) and managing cluster nodes.
+ It can deploy a 300-nodes cluster in a few minutes, and also supports
+ authorizing users to initiate their own nodes deployments (including with
+ concurrent deployments).
+ .
+ This package contains the Kadeploy server.
 XB-Ruby-Versions: ${ruby:Versions}
