@@ -592,6 +592,29 @@ task :build_deb, [:dir] => :build do
   sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
 end
 
+desc "Show information about the Debian package building process"
+task :deb_info do |f, args|
+  suff = args.branch_suffix || ''
+  deb_version, tag_version = deb_versions()
+  puts <<-EOF
+## When you package is ready, you will need to:
+### Push upstream and merge modifications and tags
+ First, push your changes on the master or 3.X branch (e.g. git push origin HEAD:refs/for/master)
+ Then:
+  git push origin upstream#{suff}:refs/for/upstream#{suff}
+  git push origin debian#{suff}:refs/for/debian#{suff}
+  git push origin #{tag_version}:refs/tags/#{tag_version}
+  git push origin pristine-tar#{suff}:refs/for/pristine-tar#{suff}
+  git push origin upstream#{suff}/#{tag_version}:refs/tags/upstream#{suff}/#{tag_version}
+### After the packaging work, tag the final Debian package, push the tag:
+  git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
+  git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
+  git push origin debian#{suff}/#{tag_version}-1:refs/tags/debian#{suff}/#{tag_version}-1
+### If you want to build a -dev package, use:
+  DEB_BUILD_OPTIONS=devpkg=dev git-buildpackage -us -uc
+EOF
+end
+
 desc "Generate debian package (Be careful it will break your Git repository !)"
 task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   suff = args.branch_suffix || ''
@@ -609,21 +632,7 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   sh 'git-buildpackage --git-ignore-new -uc -us || true'
   Rake::Task[:build_clean].reenable
   Rake::Task[:build_clean].invoke
-  puts <<-EOF
-## When you package is ready, you will need to:
-### Push upstream and merge modifications and tags
-  git push origin upstream#{suff}:refs/for/upstream#{suff}
-  git push origin debian#{suff}:refs/for/debian#{suff}
-  git push origin #{tag_version}:refs/tags/#{tag_version}
-  git push origin pristine-tar#{suff}:refs/for/pristine-tar#{suff}
-  git push origin upstream#{suff}/#{tag_version}:refs/tags/upstream#{suff}/#{tag_version}
-### After the packaging work, tag the final Debian package, push the tag:
-  git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
-  git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
-  git push origin debian#{suff}/#{tag_version}-1:refs/tags/debian#{suff}/#{tag_version}-1
-### If you want to build a -dev package, use:
-  DEB_BUILD_OPTIONS=devpkg=dev git-buildpackage -us -uc
-EOF
+  Rake::Task[:deb_info].invoke
 end
 
 desc "Generate debian changelog file"
