@@ -620,6 +620,8 @@ task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
   git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
   git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
   git push origin debian#{suff}/#{tag_version}-1:refs/tags/debian#{suff}/#{tag_version}-1
+### If you want to build a -dev package, use:
+  DEB_BUILD_OPTIONS=devpkg=dev git-buildpackage -us -uc
 EOF
 end
 
