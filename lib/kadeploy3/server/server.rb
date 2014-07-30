@@ -17,7 +17,7 @@ class KadeployServer
   include Kanodes
   include Kaconsole
 
-  attr_reader :host, :port, :secure, :local, :cert, :private_key, :logfile, :window_managers, :httpd
+  attr_reader :host, :port, :secure, :local, :cert, :private_key, :logfile, :window_managers, :httpd, :ssh_private_key
   attr_writer :shutdown
 
   def initialize()
@@ -30,6 +30,7 @@ class KadeployServer
     @private_key = @config.static[:private_key]
     @cert = @config.static[:cert]
     @logfile = @config.static[:logfile]
+    @ssh_private_key = @config.static[:ssh_private_key]
     check_database()
     @window_managers = {
       :reboot => WindowManager.new(

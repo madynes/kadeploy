@@ -1,0 +1,15 @@
+$TTL 3h
+@  IN  SOA  dns.<%= @dns_domain %>.  postmaster.<%= @dns_domain %>. (
+	2014033001 ; YYYYMMD##
+	4h
+	1h
+	4w
+	1h
+)
+
+@		NS	dns.<%= @dns_domain %>.
+<%= @server_ip.split('.').last %>	PTR	<%= @dns_domain %>.
+
+<% @nodes.each_pair do |name,node| -%>
+<%= node['ip'].split('.').last  %>	PTR	<%= name %>.<%= @dns_domain %>.
+<% end -%>

@@ -1,0 +1,9 @@
+name 'inria-kabootstrap'
+version '0.0.1'
+dependency 'puppetlabs/stdlib', '>= 4.1.0'
+dependency 'puppetlabs/firewall', '>= 1.0.2'
+dependency 'thias/bind', '>= 0.5.0'
+dependency 'puppetlabs/dhcp', '>= 0.2.0'
+dependency 'puppetlabs/tftp', '>= 0.2.1'
+dependency 'puppetlabs/mysql', '>= 2.2.1'
+description "Be careful, this receipe is for testing purpose ! It bootstrap every services needed for a Kadeploy3 service to run. Every services are installed and configured on the same machine."

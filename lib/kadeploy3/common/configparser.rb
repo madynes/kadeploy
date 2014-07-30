@@ -179,6 +179,7 @@ module Configuration
     end
 
     def check_hash(val, hash, fieldname)
+      val = val.clone if hash[:const]
       self.send("customcheck_#{hash[:type].downcase}".to_sym,val,fieldname,hash)
     end
 
@@ -241,10 +242,8 @@ module Configuration
         raise ParserError.new("Invalid expression '#{args[:code]}'")
       end
     end
-
     def customcheck_file(val, fieldname, args)
       return if args[:disable]
-
       if args[:command]
         val = val.split(/\s+/).first||''
         if !val.empty? and !Pathname.new(val).absolute?
@@ -371,7 +370,7 @@ module Configuration
     # if no defaultvalue defined, field is mandatory
     def value(fieldname,type,defaultvalue=nil,expected=nil)
       ret = nil
-      check_field(fieldname,defaultvalue.nil?,type) do |val,provided|
+      check_field(fieldname,defaultvalue.nil?,type) do |val,_|
         if val.nil?
           ret = defaultvalue
         else

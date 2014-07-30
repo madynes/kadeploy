@@ -1,0 +1,60 @@
+== About ==
+Be careful, this receipe is for testing purpose !
+
+It bootstrap every services needed for a Kadeploy3 service to run.
+Every services are installed and configured on the same machine.
+
+The default netboot stack based on syslinux PXELinux.
+PXE boot files (pxelinux.0, chain.c32, netboot kernel, ...) should be copied in the files/ directory.
+
+For the moment, only 253 nodes can be installed with this class (to be improved).
+
+The classes kabootstrap::[nat|dns|dhcp|tftp|sql|pkg_repo|kadeploy] can be used independently from the kabootstrap class.
+
+=== Install ===
+To install kabootstrap module dependencies:
+  gem install librarian-puppet
+  librarian-puppet install --path=.. --verbose
+Depending on the boot method selected when the kabootstrap class is defined,
+copy static files to the puppet/modules/kabootstrap/files directory, for sample:
+  puppet/modules/kabootstrap/files/chain.c32
+  puppet/modules/kabootstrap/files/pxelinux.0
+  puppet/modules/kabootstrap/files/initrd-3.2.0-4-amd64
+  puppet/modules/kabootstrap/files/vmlinuz-3.2.0-4-amd64
+If you choosed a package install, packages have to be copied in the directory specified in the receipe, by default, puppet/modules/kabootstrap/files/packages/ .
+
+=== Class Parameters ===
+  $server_ip: The server IP in $network, it should be greater than the IP of every nodes (default: 10.0.10.253)
+  $dns_domain (default: testbed.lan)
+  $dns_forward: (default: 10.0.2.3)
+  $network_ip: (default: 10.0.10.0)
+  $network_mask: (default: 255.255.255.0)
+  $network_interface: (default: eth0)
+  $nat_interface: setup a NAT on the server (default: undef)
+  $pxe_bootstrap_method: used in Kadeploy3 configuration (default: PXElinux)
+  $pxe_bootstrap_program: (default: pxelinux.0)
+  $pxe_chainload_program: Comboot used to chainload on bootloader i.e chain.c32 (default: undef)
+  $pxe_profiles_directory: (default: pxelinux.cfg)
+  $pxe_kernel_vmlinuz: (default: undef)
+  $pxe_kernel_initrd: (default: undef)
+  $pxe_boot_method: default pxe boot method, can be local or network (default: local)
+  $nodes: (default: {
+      'node-1' => {
+        'ip' => '10.0.10.1',
+        'mac' => '02:00:02:00:02:01',
+      },
+    }
+  )
+  $mysql_db_name: (default: deploy3)
+  $mysql_db_user: (default: deploy)
+  $mysql_db_password: (default: passwd)
+  $mysql_root_password (default: root)
+  $http_proxy (default: undef)
+  $build_kind: specify how to install the Kadeploy service (default: source)
+    * sources: install from sources ($source_directory)
+    * build: build packages from sources ($source_directory)
+    * repository: use an external repository ($repository_url)
+    * packages: install from package files ($package_directory)
+  $sources_directory: specify the directory to install Kadeploy3 from the source using Rakefile instead of installing the package (default: undef) [useful when $build_kind is "sources" or "build"]
+  $repository_url: (default: undef) [useful when $build_kind is "repository"]
+  $packages_directory: the package directory relative to the module's file/ directory (default: puppet:///modules/kabootstrap/packages) [useful when $build_kind is "packages"]

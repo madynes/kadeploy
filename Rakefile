@@ -88,6 +88,12 @@ INSTALL = {
     :group => 'root',
     :mode => '644',
   },
+  :lib_kaadmin=> {
+    :dir => vendordir('kadeploy3','kaadmin'),
+    :user => 'root',
+    :group => 'root',
+    :mode => '644',
+  },
   :log => {
     :dir => '/var/log/kadeploy3',
     :user => 'root',
@@ -105,6 +111,12 @@ INSTALL = {
     :user => 'root',
     :group => 'deploy',
     :mode => '640',
+  },
+  :doc => {
+    :dir => '/usr/share/doc/kadeploy3',
+    :user => 'root',
+    :group => 'root',
+    :mode => '644',
   },
   :script => {
     :dir => '/usr/share/doc/kadeploy3/scripts',
@@ -142,6 +154,7 @@ DESC = {
   :kapower3 => 'allows to perform several operations to control the power status of nodes',
   :kareboot3 => 'allows to perform several reboot operations on the nodes involved in a deployment',
   :kastat3 => 'allows to get statistics on the deployments',
+  :kaadmin3 => 'Administration stuff for kadeploy3 (image installer, migration script,...)',
 }
 
 
@@ -267,7 +280,10 @@ end
 desc "Generate server manpages"
 task :man_server => :man_server_clean do
   raise "help2man is missing !" unless system('which help2man')
-  gen_man(File.join(D[:sbin],'kadeploy3d'),8)
+
+  Dir[File.join(D[:sbin],'kadeploy3d'),File.join(D[:sbin],'kaimagehelper3')].each  do |bin|
+    gen_man(bin,8)
+  end
 end
 
 desc "Clean manpages files"
@@ -318,7 +334,7 @@ task :apidoc_clean do
 end
 
 task :prepare, [:root_dir] do |f,args|
-  @root_dir = args.root_dir
+  @root_dir = args.root_dir if args.root_dir and !args.root_dir.empty?
 end
 
 desc "Install the client and the server"
@@ -410,7 +426,7 @@ end
 desc "Install the server"
 task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_common] do |f,args|
   args.with_defaults(:distrib => 'debian')
-  raise "unknown distrib '#{args.distrib}'" unless %w{debian fedora}.include?(args.distrib)
+  raise "unknown distrib '#{args.distrib}'" unless %w{debian redhat}.include?(args.distrib)
   raise "user #{DEPLOY_USER} not found: useradd --system #{DEPLOY_USER}" unless system("id #{DEPLOY_USER}")
 
   create_dir(:man8)
@@ -428,6 +444,14 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
     f.close
     installf(:conf,f.path,'version')
   end
+
+  create_dir(:doc)
+  sh "gzip -c #{File.join(D[:addons],'kastafior','kastafior')} > #{File.join(D[:addons],'kastafior','kastafior')}.gz"
+  sh "gzip -c #{File.join(D[:addons],'kascade','kascade')} > #{File.join(D[:addons],'kascade','kascade')}.gz"
+  installf(:doc,File.join(D[:addons],'kastafior','kastafior.gz'))
+  installf(:doc,File.join(D[:addons],'kascade','kascade.gz'))
+  sh "rm #{File.join(D[:addons],'kastafior','kastafior')}.gz"
+  sh "rm #{File.join(D[:addons],'kascade','kascade')}.gz"
 
   create_dir(:script)
   installf(:script,File.join(D[:scripts],'bootloader','install_grub'))
@@ -485,6 +509,10 @@ task :uninstall_server, [:root_dir] => [:prepare, :uninstall_common] do
   uninstallf(:script,'fdisk-sample')
   delete_dir(:script)
 
+  uninstallf(:doc,'kastafior.gz')
+  uninstallf(:doc,'kascade.gz')
+  delete_dir(:doc)
+
   uninstallf(:rc,'kadeploy')
   delete_dir(:rc)
 
@@ -509,6 +537,18 @@ desc "Install kascade"
 task :install_kascade, [:root_dir,:distrib] => [:prepare] do
   create_dir(:bin)
   installf(:bin,File.join(D[:addons],'kascade','kascade'))
+end
+
+desc "Install Kaadmin"
+task :install_kaadmin, [:root_dir,:distrib] => [:prepare] do
+  create_dir(:sbin)
+  installf(:sbin,File.join(D[:addons],'kaadmin','sbin','kaadmin3'))
+  create_dir(:lib)
+  installf(:lib,File.join(D[:addons],'kaadmin','lib','kadeploy3','kaadmin.rb'))
+  create_dir(:lib_kaadmin)
+  Dir[File.join(D[:addons],'kaadmin','lib','kadeploy3','kaadmin','*.rb')].each do |f|
+    installf(:lib_kaadmin,f)
+  end
 end
 
 desc "Clean the build directory"
@@ -599,7 +639,7 @@ desc "Generate rpm package"
 task :rpm, [:dir] => :build do
   sh "mkdir -p #{File.join(D[:build],'SOURCES')}"
   sh "mv #{File.join(D[:build],'*')} #{File.join(D[:build],'SOURCES')} || true"
-  specs = File.read(File.join(D[:pkg],'fedora','kadeploy.spec.in'))
+  specs = File.read(File.join(D[:pkg],'redhat','kadeploy.spec.in'))
   specs.gsub!(/KADEPLOY3_LIBS/,INSTALL[:lib][:dir])
   specs.gsub!(/MAJOR_VERSION/,MAJOR_VERSION)
   specs.gsub!(/MINOR_VERSION/,MINOR_VERSION)

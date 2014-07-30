@@ -305,8 +305,7 @@ module Kaworkflow
           #:nodelist => cexec.nodelist,
           #:nodes => cexec.nodes,
           :states => info[:state],
-          :nodesets_id => 0,
-
+          :nodesets_id => Nodes::NodeSetId.new,
           :execution => cexecdup,
           :common => info[:config].common,
           :caches => info[:config].caches,
@@ -324,7 +323,7 @@ module Kaworkflow
 
         # Cache the files
         begin
-          GrabFile.grab_user_files(context,info[:cached_files],workflow_lock(kind,info[:wid]))
+          GrabFile.grab_user_files(context,info[:cached_files],workflow_lock(kind,info[:wid]),kind)
         rescue KadeployError => ke
           info[:lock].synchronize do
             info[:nodes].set_state('aborted',nil,context[:database],context[:user])
@@ -352,6 +351,7 @@ module Kaworkflow
               else
                 context[:cluster_prefix] = context[:cluster].prefix.dup
               end
+              context[:nodesets_id] = context[:nodesets_id].dup #Avoid to link the counter of different clusters, because they have different prefixs.
             else
               context[:cluster_prefix] = ''
             end

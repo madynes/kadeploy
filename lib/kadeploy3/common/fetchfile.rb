@@ -140,14 +140,12 @@ class HTTPFetchFile < FetchFile
     begin
       HTTP.fetch_file(@path,dest)
       nil
-    rescue KadeployError => ke
-      raise ke
     rescue KadeployHTTPError => k
-      error("Unable to grab the file #{@path} (http error ##{k.errno})")
+      error("Unable to get the mtime of #{@path} (http error ##{k.errno})")
     rescue KadeployError => ke
       raise ke
     rescue Errno::ECONNREFUSED
-      error("Unable to grab the file #{@path} (connection refused)")
+      error("Unable to get the mtime of #{@path} (connection refused)")
     rescue Exception => e
       error("Unable to grab the file #{@path} (#{e.message})")
     end

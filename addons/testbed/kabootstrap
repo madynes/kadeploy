@@ -57,7 +57,7 @@ KVM_BRIDGE_DEV = 'br0'
 
 DEFAULT_CONSOLE_BAUD_RATE = '19200'
 DEFAULT_CONSOLE_TTY_ID = '0'
-DEFAULT_RAMDISK_SIZE = 290000
+DEFAULT_RAMDISK_SIZE = 512000
 
 # Used when can't auto detect
 DEFAULT_NET_DRIVER = 'e1000e'
@@ -94,28 +94,28 @@ CFG_CA_PRIVATE_KEY = File.join(CFG_SSL_CERT_PATH,'testbed-ca.key')
 # Kadeploy default config
 CFG_KADEPLOY_USER = 'deploy'
 
-CFG_KADEPLOY_SOFT_REBOOT = false
+CFG_KADEPLOY_SOFT_REBOOT = true
 
 CFG_KADEPLOY_MACROSTEP1 = {
   :name => 'SetDeploymentEnv|SetDeploymentEnvUntrusted',
   :retries => 1,
-  :timeout => 200
+  :timeout => 900
 }
 CFG_KADEPLOY_MACROSTEP2 = {
   :name => 'BroadcastEnv|BroadcastEnvKastafior',
   :retries => 1,
-  :timeout => 200
+  :timeout => 900
 }
 CFG_KADEPLOY_MACROSTEP3 = [
   {
     :name => 'BootNewEnv|BootNewEnvKexec',
     :retries => 0,
-    :timeout => 200
+    :timeout => 900
   },
   {
     :name => 'BootNewEnv|BootNewEnvHardReboot',
     :retries => 1,
-    :timeout => 200
+    :timeout => 900
   }
 ]
 
@@ -156,6 +156,16 @@ CFG_KADEPLOY_BOOTLOADER_SCRIPT = File.join(CFG_KADEPLOY_CONF_PATH,'install_grub2
 CFG_KADEPLOY_TEST_PATH='/tmp/test'
 CFG_KADEPLOY_TEST_VLAN_PATH="#{CFG_KADEPLOY_TEST_PATH}-vlan"
 CFG_KADEPLOY_TEST_HOOK_PATH="#{CFG_KADEPLOY_TEST_PATH}-hook"
+
+
+def cfg_console_baudrate(cluster=nil)
+  cluster = {:basename=>'unknown'} if !cluster
+  case cluster[:basename]
+    when 'graphene' then 38400
+    when 'graphite' then 115200
+    else DEFAULT_CONSOLE_BAUD_RATE
+  end
+end
 
 
 def cfg_environment_desc(env,http=false)
@@ -430,17 +440,21 @@ def cfg_kadeploy_conf()
         'mkfs' => [
           {
             'fstype' => 'ext2',
-            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index -F',
           },
           {
             'fstype' => 'ext3',
-            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index -F',
+          },
+          {
+            'fstype' => 'ext4',
+            'args' => '-q -b 4096 -O sparse_super,filetype,resize_inode,dir_index -F',
           },
         ],
         'taktuk' => {
           'auto_propagate' => false,
-          'tree_arity' => 0,
-          'connector' => "ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root"
+          'tree_arity' => 3,
+          'connector' => "ssh -A -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root"
         },
       },
     }
@@ -490,8 +504,8 @@ def cfg_kadeploy_conf()
     "deploy_db_login = #{CFG_SQL_USER}\n"\
     "deploy_db_passwd = #{CFG_SQL_PASS_USER}\n"\
     "rights_kind = db\n"\
-    "taktuk_connector = ssh -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
-    "taktuk_tree_arity = 0\n"\
+    "taktuk_connector = ssh -A -q #{SSH_OPTIONS} -o BatchMode=yes -i #{CFG_KADEPLOY_SSHKEY_DEFAULT} -l root\n"\
+    "taktuk_tree_arity = 3\n"\
     "taktuk_auto_propagate = true\n"\
     "tarball_dest_dir = /tmp\n"\
     "environment_extraction_dir = /mnt/dest\n"\
@@ -633,12 +647,20 @@ def cfg_kadeploy_specific_conf_postinstall_path(cluster)
   postinstall
 end
 
-def cfg_kadeploy_kapower_cmd(cmd)
-  "ssh #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{ENV['USER']}@#{getgw()} \"kapower3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}` #{cmd}\""
+def forge_ssh_cmd_frontend(cmd)
+  user = ENV['USER']
+  host = "frontend.#{$site}"
+  pxy = ""
+  pxy = "-o ProxyCommand='ssh #{user}@#{getgw()} #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} -W %h:%p'" if $tunnels
+  "ssh #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{pxy} #{user}@#{host} \"#{cmd}\""
 end
 
-def cfg_kadeploy_kaconsole_cmd(user=ENV['USER'])
-  "ssh -t #{SSH_OPTIONS} -i #{CFG_KADEPLOY_HOSTNAMES_SSHKEY} #{user}@#{getgw()} \"kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`\""
+def cfg_kadeploy_kapower_cmd(cmd)
+  forge_ssh_cmd_frontend("kapower3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}` #{cmd}")
+end
+
+def cfg_kadeploy_kaconsole_cmd()
+  forge_ssh_cmd_frontend("kaconsole3 -m `cat #{File.join(CFG_KADEPLOY_HOSTNAMES_PATH,'HOSTNAME_FQDN')}`")
 end
 
 def cfg_kadeploy_kvm_cmd(cmd,user='root')
@@ -783,13 +805,17 @@ def cfg_kadeploy_disk_device()
 end
 
 def cfg_kadeploy_deploy_kernel_args(cluster)
+  more = case cluster[:basename]
+    when 'graphite' then ' igb.blacklist=yes'
+    when 'griffon' then ' myri10ge.blacklist=yes'
+    else ''
+  end
   #"#{USE_NET_DRIVER ? "ETH_DRV=#{cluster[:drivers][:network]} " : ''}"\
   #"ETH_DEV=#{$netiface} init=/linuxrc"\
   #"#{USE_DISK_DRIVER ? "DISK_DRV=#{cluster[:drivers][:disk]} " : ''}"\
   "console=tty#{DEFAULT_CONSOLE_TTY_ID} "\
-  "console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8 "\
-  "ramdisk_size=#{DEFAULT_RAMDISK_SIZE} "\
-  "rw noapic"
+  "console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8 "\
+  "ramdisk_size=#{DEFAULT_RAMDISK_SIZE}#{more}"
 end
 
 CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX = File.join(CFG_KADEPLOY_CONF_PATH,'specific_conf_')
@@ -800,8 +826,8 @@ def cfg_kadeploy_specific_conf_filename(cluster)
     CFG_KADEPLOY_SPECIFIC_CONF_FILE_PREFIX+cluster
   end
 end
-CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 200
-CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,fat'
+CFG_DEPLOY_ENV_SUPPORTED_FS='ext2,ext3,ext4,fat'
+CFG_KADEPLOY_SPECIFIC_CONF_TIMEOUT_REBOOT = 350
 
 def cfg_kadeploy_specific_conf(cluster)
   postinstallpath = cfg_kadeploy_specific_conf_postinstall_path(cluster)
@@ -810,9 +836,9 @@ def cfg_kadeploy_specific_conf(cluster)
     deploy_kernel = nil
     if $version >= 7
       pxe_headers = {
-        'dhcp' => CFG_PXE_HEADER,
-        'localboot' => CFG_PXE_HEADER,
-        'networkboot' => CFG_PXE_HEADER,
+        'dhcp' => cfg_pxe_header(cluster),
+        'localboot' => cfg_pxe_header(cluster),
+        'networkboot' => cfg_pxe_header(cluster),
       }
       deploy_kernel = {
         'vmlinuz' => File.join(CFG_PXE_KERNELS_DIR,File.basename(cluster[:kernel][:vmlinuz])),
@@ -821,7 +847,7 @@ def cfg_kadeploy_specific_conf(cluster)
         'supported_fs' => CFG_DEPLOY_ENV_SUPPORTED_FS,
       }
     else
-      pxe_headers = "#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')
+      pxe_headers = "#{cfg_pxe_header(cluster)}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')
       deploy_kernel = {
         'vmlinuz' => File.basename(cluster[:kernel][:vmlinuz]),
         'initrd' => File.basename(cluster[:kernel][:initrd]),
@@ -920,7 +946,7 @@ def cfg_kadeploy_specific_conf(cluster)
       cfg['boot']['kernels'] = {
         'deploy' => deploy_kernel,
         'user' => {
-          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8",
         },
       }
     else
@@ -928,7 +954,7 @@ def cfg_kadeploy_specific_conf(cluster)
       cfg['kernels'] = {
         'deploy' => deploy_kernel,
         'user' => {
-          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8",
+          'params' => "console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8",
         },
       }
     end
@@ -957,10 +983,10 @@ def cfg_kadeploy_specific_conf(cluster)
     "cmd_power_status = #{cfg_kadeploy_power_status_cmd()}\n"\
     + # Kaconsole
     "cmd_console = #{cfg_kadeploy_console_cmd()}\n"\
-    "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{DEFAULT_CONSOLE_BAUD_RATE}n8\n"\
+    "kernel_params = console=tty#{DEFAULT_CONSOLE_TTY_ID} console=ttyS#{DEFAULT_CONSOLE_TTY_ID},#{cfg_console_baudrate(cluster)}n8\n"\
     + # >>> TODO: UPDATE
     "partition_creation_kind = fdisk\n"\
-    "pxe_header = #{"#{CFG_PXE_HEADER}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')}\n"\
+    "pxe_header = #{"#{cfg_pxe_header(cluster)}DEFAULT boot\nLABEL boot\n".gsub("\n",'\n')}\n"\
     "use_ip_to_deploy = true\n"\
     + #Automata description
     "macrostep = #{cfg_kadeploy_macrostep(CFG_KADEPLOY_MACROSTEP1)}\n"\
@@ -1077,10 +1103,12 @@ CFG_PXE_BOOTFILES = [
 CFG_PXE_PROFILES_DIR = 'pxelinux.cfg'
 CFG_PXE_KERNELS_DIR = 'kernels'
 CFG_PXE_USERS_DIR = 'userfiles'
-CFG_PXE_HEADER = \
-  "PROMPT 1\n"\
-  "SERIAL 0 #{DEFAULT_CONSOLE_BAUD_RATE}\n"\
+
+def cfg_pxe_header(cluster=nil)
+  "PROMPT 1\n"
+  "SERIAL 0 #{cfg_console_baudrate(cluster)}\n"\
   "TIMEOUT 50\n\n"
+end
 
 def cfg_pxe_path(suffix=nil)
   ret = ''
@@ -1094,7 +1122,7 @@ def cfg_pxe_path(suffix=nil)
 end
 
 def cfg_pxe(bootkernel=CFG_PXE_KERNEL,bootdisk=CFG_PXE_DISK,bootpart=CFG_PXE_PART)
-  CFG_PXE_HEADER +
+  cfg_pxe_header() +
   "LABEL bootlabel\n"\
   "KERNEL #{bootkernel}\n"\
   "APPEND #{bootdisk} #{bootpart}\n"
@@ -1316,7 +1344,7 @@ def cfg_dhcp(net=nil)
   "    option domain-name \"#{DOMAIN}\";\n"\
   "    option domain-name-servers #{select_server_type($kanodes,:dns)[0][:ipv4]};\n"\
   + # Kadeploy server
-  "    if exists user-class and option user-class = \"iPXE\" {\n"\
+  "    if exists user-class and option user-class = \"gPXE\" {\n"\
   "      filename=concat(\"http://#{(HTTP_OVER_NFS ? $services[:www][:fqdn] : $kanodes[:kadeploy][:ipv4])}/\",host-decl-name);\n"\
   "    } else {\n"\
   "      filename \"#{pxe}\";\n"\
@@ -2076,6 +2104,7 @@ options[:network_config] = nil
 options[:dns_forward] = nil
 options[:dns_config] = nil
 options[:upload] = []
+options[:sort] = true
 
 $debug                = false
 $netiface             = NET_ADMIN_IFACE
@@ -2088,7 +2117,7 @@ optparse = OptionParser.new(USAGE) do |opts|
       exit
   end
 
-  opts.on( '-f', '--deploy-node-list <nodelist_file>', 'Specify a file containing the list of the nodes that should be deployed' ) do |n|
+  opts.on( '-f', '--deploy-node-list <nodelist_file>', 'Specify a file containing the list of the nodes that will be deployed' ) do |n|
     options[:node_list] = n
   end
 
@@ -2110,6 +2139,9 @@ optparse = OptionParser.new(USAGE) do |opts|
 
   opts.on( '-i', '--ssh-key [<ssh_key_file>]', 'Specify the path of the ssh private key to use' ) do |k|
     options[:ssh_key] = k
+  end
+  opts.on('', '--[no-]sort',"Sort nodes list (#{options[:sort] ? 'enabled' : 'disabled' } by default)") do |k|
+    options[:sort] = k
   end
 
   opts.on( '-K', '--kvm', 'Use KVM nodes instead of deployed ones in kavlan (default)' ) do |k|
@@ -2136,7 +2168,7 @@ optparse = OptionParser.new(USAGE) do |opts|
     options[:gateway] = g
   end
 
-  opts.on( '-u', '--update <updatefile>', "Update kadeploy files (the YAML update file should contain the local path for keys {#{UPDATE_PATH_CHECK.keys * ','}} to be bind on kadeploy server)" ) do |u|
+  opts.on( '-u', '--update <updatefile>', "Update kadeploy files (the YAML update file contains the local path for keys {#{UPDATE_PATH_CHECK.keys * ','}} to be bind on kadeploy server)" ) do |u|
     options[:update_file] = u
   end
 
@@ -2152,15 +2184,19 @@ optparse = OptionParser.new(USAGE) do |opts|
     $deploysendmeth = :HTTP
   end
 
-  opts.on( '-d', '--kadeploy-daemon <node_address>', 'Specify which node should be used as kadeploy daemon (default: first node)' ) do |d|
+  opts.on( '-d', '--default-daemon <node_address>', 'Specify which node will be used by default (default: first node)' ) do |d|
+    options[:default_server] = d || nil
+  end
+
+  opts.on( '-k', '--kadeploy-daemon <node_address>', 'Specify which node will be used as kadeploy daemon' ) do |d|
     options[:daemon_kadeploy] = d || nil
   end
 
-  opts.on( '-a', '--dns-daemon <node_address>', 'Specify which node should be used as dns daemon (default: same as kadeploy one)' ) do |d|
+  opts.on( '-a', '--dns-daemon <node_address>', 'Specify which node will be used as dns daemon' ) do |d|
     options[:daemon_dns] = d || nil
   end
 
-  opts.on( '-b', '--dhcp-daemon <node_address>', 'Specify which node should be used as dhcp daemon (default: same as kadeploy one)' ) do |d|
+  opts.on( '-b', '--dhcp-daemon <node_address>', 'Specify which node will be used as dhcp daemon' ) do |d|
     options[:daemon_dhcp] = d || nil
   end
 
@@ -2180,11 +2216,11 @@ optparse = OptionParser.new(USAGE) do |opts|
     options[:upload] << f
   end
 
-  opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes should be used as daemon in a YAML file with fields "host" and "newip" given for each services' ) do |d|
+  opts.on( '-s', '--service-config <service_config_file>', 'Specify which nodes will be used as daemon in a YAML file with fields "host" and "newip" given for each services' ) do |d|
     options[:daemon_config] = d || nil
   end
 
-  opts.on( '-n', '--network-config <network_config_file>', 'The network configuration that should be used for the testbed. Need to be a YAML file with fields "network" and "subnetworks" (list of "name","address"). Subnetworks are only used to optimise services configuration, they are not created/routed. Address have to be in CIDR notation (default: the network hosts are currently in)' ) do |n|
+  opts.on( '-n', '--network-config <network_config_file>', 'The network configuration that be will used for the testbed. Need to be a YAML file with fields "network" and "subnetworks" (list of "name","address"). Subnetworks are only used to optimise services configuration, they are not created/routed. Address have to be in CIDR notation (default: the network hosts are currently in)' ) do |n|
     options[:network_config] = n
   end
 
@@ -2247,7 +2283,7 @@ end
 if options[:gateway]
   begin
     addr = IPAddr.new(options[:gateway])
-    msg('gatewat should be specified by hostname',MSG_ERROR,true)
+    msg('gateway should be specified by hostname',MSG_ERROR,true)
   rescue ArgumentError
   end
   $gateway = options[:gateway]
@@ -2725,7 +2761,7 @@ rescue Errno::ENOENT
 end
 
 msg("nodelist parameter empty",MSG_ERROR,true) if $allnodes.empty?
-$allnodes.sort!
+$allnodes.sort! if options[:sort]
 
 if $mode == :VLANKVM
   msg("hostlist parameter empty",MSG_ERROR,true) if select_type($kanodes,:HOST).empty?
@@ -2880,14 +2916,17 @@ create_kaservice = Proc.new do |service|
   end
 end
 
-
 if $kanodes[:kadeploy]
   defaulthost = $kanodes[:kadeploy][:basename]
   defaultip = $kanodes[:kadeploy][:ipv4]
 else
   case $mode
     when :KAVLAN
-      server = $allnodes[0]
+      if options[:default_server]
+        server = options[:default_server]
+      else
+        server = $allnodes[0]
+      end
     when :KVM
       msg('you must specify a Kadeploy daemon (-d option)',MSG_ERROR,true)
     when :VLANKVM

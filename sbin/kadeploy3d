@@ -9,12 +9,9 @@ $kadeploy_rundir=ENV['KADEPLOY3_RUN_DIR']||'/var/run/kadeploy3d'
 $kadeploy_confdir=ENV['KADEPLOY3_CONFIG_DIR']||'/etc/kadeploy3'
 $kadeploy_logfiles = {}
 
-SSH_KEY=File.join($kadeploy_confdir,'keys/id_deploy')
-
 LOGFILE_DEBUG='output.log'
 LOGFILE_ERROR='error.log'
 RUNFILE_RELOAD='reload'
-RUNFILE_DUMP='dump'
 
 AUTOCLEAN_PITCH = 300
 
@@ -23,6 +20,7 @@ $autoclean = nil
 $kadeploy = nil
 $httpd = nil
 $mainthread = nil
+$ssh_key = nil
 
 Signal::trap("INT") do
   puts "\nSIGINT trapped, let's clean everything ..."
@@ -95,22 +93,37 @@ end
 Signal::trap("USR1") do
   require 'kadeploy3/server/dump'
 
-  file = File.open(File.join($kadeploy_rundir,RUNFILE_DUMP),'w+')
   begin
-    STDOUT.puts "[#{Time.now.to_s}] Dump internal structures"
-    Kadeploy.dump(file)
+    STDERR.puts "[#{Time.now.to_s}] Dump internal structures"
+    Kadeploy.dump
   rescue Exception => e
-    STDOUT.puts e.class.name
-    STDOUT.puts e.message
-    STDOUT.puts e.backtrace
-  ensure
-    file.close unless file.closed?
+    STDERR.puts e.class.name
+    STDERR.puts e.message
+    STDERR.puts e.backtrace
   end
+end
+
+require 'thread'
+
+# code snippet coming from
+# http://itreallymatters.net/post/29549982905/generating-thread-dumps-for-ruby-scripts
+Signal::trap('USR2') do
+  if RUBY_VERSION =~ /^1\.8\./
+    STDERR.puts "== Current thread: #{Thread.inspect} =="
+    STDERR.puts caller.join("\n    \\_ ")
+  else
+    Thread.list.each do |thread|
+      t=Time.now
+      STDERR.puts "[#{t}]========= Thread #{thread.object_id.to_s} =========="
+      STDERR.puts thread.backtrace.join("\n[#{t}]    \\_ ")
+      STDERR.puts "[#{t}]================= END ================="
+    end
+  end
+  STDERR.flush
 end
 
 require 'kadeploy3/server'
 
-require 'thread'
 require 'fileutils'
 require 'json'
 require 'optparse'
@@ -145,8 +158,6 @@ def error(msg='',abrt = true)
   exit 1 if abrt
 end
 
-
-$ssh_key = nil
 $pidfile = nil
 $detach = false
 $redirect_stdin = true
@@ -161,10 +172,6 @@ OptionParser.new do |opts|
 
   opts.on("-p", "--pidfile FILE", "Write the pid of the daemon process in a file") do |p|
     $pidfile = p
-  end
-
-  opts.on("-k", "--agent-key SSH_KEY_FILE", "The ssh key file to be add to the SSH agent") do |a|
-    $ssh_key = a
   end
 
   opts.on("-d", "--detach", "Run the application in background") do
@@ -236,20 +243,19 @@ rescue Kadeploy::KadeployError => ke
     "#{(ke.message and !ke.message.empty? ? ': ' + ke.message : '')}")
 end
 $stdout.puts 'Configuration files loaded'
+$ssh_key=$kadeploy.ssh_private_key
 
 # Loading SSH agent
-if $ssh_key
-  error("Unable to read the SSH key file '#{$ssh_key}'") unless File.readable?($ssh_key)
-else
-  $ssh_key = SSH_KEY if File.readable?(SSH_KEY)
-end
+
+#Normaly, it was checked by conf
+error("Unable to read the SSH key file '#{$ssh_key}'") unless File.readable?($ssh_key)
 
 if $ssh_key
-  tmp=`eval $(ssh-agent) >/dev/null && echo $SSH_AGENT_PID $SSH_AUTH_SOCK`.strip.split(' ')
+  tmp=`ssh-agent -s`
   error('Unable to run ssh-agent') unless $?.success?
-  $ssh_agent_pid = tmp[0]
+  $ssh_agent_pid =tmp[/SSH_AGENT_PID=(\d+);/,1]
+  $ssh_agent_sock = tmp[/SSH_AUTH_SOCK=(.+?);/,1]
   ENV['SSH_AGENT_PID'] = $ssh_agent_pid
-  $ssh_agent_sock = tmp[1]
   ENV['SSH_AUTH_SOCK'] = $ssh_agent_sock
   `ssh-add #{$ssh_key} 2>/dev/null`
   error('Unable to add the key to the ssh-agent') unless $?.success?

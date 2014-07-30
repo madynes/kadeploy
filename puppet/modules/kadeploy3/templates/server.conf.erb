@@ -1,0 +1,81 @@
+---
+database:
+  name: <%= @mysql_db_name %>
+  kind: mysql
+  host: <%= @mysql_db_host %>
+  login: <%= @mysql_db_user %>
+  passwd: <%= @mysql_db_password %>
+rights:
+  purge_deployment_timer: 900
+  kind: db
+  almighty_users: root,deploy
+authentication:
+  acl:
+    whitelist:
+    - localhost
+    - <%= @dns_name %>
+security:
+  secure_server: <%= @secure %>
+#  local_only: true
+logs:
+  database: true
+  logfile: /var/log/kadeploy3/kadeploy.log
+  debugfile: /var/log/kadeploy3/kadeploy.debug
+verbosity:
+  logs: 3
+  clients: 3
+cache:
+  size: 1000
+  directory: /tmp/kadeploy-cache
+  disabled: false
+network:
+  server_hostname: <%= @dns_name %>
+  tcp_buffer_size: 8192
+  vlan:
+    hostname_suffix: -kavlan-VLAN_ID
+    set_cmd: kavlan NODES -s -i VLAN_ID -u USER
+  ports:
+    test_deploy_env: 25300
+    kadeploy_server: <%= @port %>
+    ssh: 22
+windows:
+  reboot:
+    sleep_time: 10
+    size: 50
+  check:
+    size: 50
+environments:
+  max_postinstall_size: 20
+  max_preinstall_size: 20
+  deployment:
+    rambin_dir: /rambin
+    extraction_dir: /mnt/dest
+    tarball_dir: /tmp
+pxe:
+  dhcp:
+    method: <%= @pxe_bootstrap_method %>
+    repository: <%= @pxe_repository %>
+    export:
+      kind: <%= @pxe_export %>
+      server: <%= @dns_name %>
+    profiles:
+      directory: <%= @pxe_profiles_directory %>
+      filename: <%= @pxe_profiles_naming %>
+    userfiles:
+      directory: <%= @pxe_userfiles %>
+      max_size: 800
+autoclean_threshold: 360
+hooks:
+  end_of_deployment: echo WORKFLOW_ID
+external:
+  mkfs:
+  - args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index -q
+    fstype: ext2
+  - args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index -q
+    fstype: ext3
+  - args: -b 4096 -O sparse_super,filetype,resize_inode,dir_index -q
+    fstype: ext4
+  taktuk:
+    auto_propagate: false
+    tree_arity: 0
+    connector: <%= @ssh_connector %>

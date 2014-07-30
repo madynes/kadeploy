@@ -174,10 +174,23 @@ mysql> GRANT select, insert, update, delete, create, drop, alter, \
 
 Once the database is created and the user granted, you can use the SQL script provided in the distribution (\texttt{db/db\_creation.sql}) to create the tables in the database.
 
+\subsection{TakTuk}
+Kadeploy3 have a strong dependence on the TakTuk software, this software should be installed on the machine that hosts the Kadeploy3 service in order for it to work properly.
+
+\noindent \textbf{Note for Debian users}
+
+\noindent The TakTuk software is available in the official repositories.
+
+\noindent \textbf{Note for RedHat users}
+
+\noindent The TakTuk software is not packaged in RedHat-based distributions for the moment. Some RPM packages are available on the Kadeploy3 website: \url{http://kadeploy3.gforge.inria.fr/files/taktuk/}. It's also possible to install the TakTuk software from the sources, more information on the project's website: \url{http://taktuk.gforge.inria.fr/}.
+
+
+
 \section{Kadeploy installation}
 Since Kadeploy is based on a client/server architecture, you must perform the install on both the server and the client if it is not the same machine.
 
-Two ways are provided to install Kadeploy, a basic installer and packages (for Debian and Fedora). In both cases, you had to ensure that a user \texttt{deploy} is existing on your system. This user is used to execute the Kadeploy server. Furthermore, all the installation operations must be performed with root rights.
+Two ways are provided to install Kadeploy, a basic installer and packages (for Debian and RedHat). In both cases, you had to ensure that a user \texttt{deploy} is existing on your system. This user is used to execute the Kadeploy server. Furthermore, all the installation operations must be performed with root rights.
 
 \subsection{Basic installation}
 First of all , you have to uncompress the Kadeploy tarball.
@@ -210,16 +223,16 @@ First of all , you have to uncompress the Kadeploy tarball.
 
 \paragraph{remark:} If there are already configuration files, the new example of configuration files will be installed with \texttt{.dist} extension.
 
-\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and Fedora (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
+\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and RedHat (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
 \begin{small}
 \begin{verbatim}
-> rake install[root_dir,fedora]
+> rake install[root_dir,redhat]
 \end{verbatim}
 \end{small}
 or if you do not install the server side on the same machine than the client side:
 \begin{small}
 \begin{verbatim}
-> rake install_server[root_dir,fedora]
+> rake install_server[root_dir,redhat]
 \end{verbatim}
 \end{small}
 
@@ -280,8 +293,8 @@ This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, 
 \paragraph{Warning}
 In order to preserve your configuration files, the removal of a Kadeploy package will preserve the configuration files (unless you specify the \texttt{-{}-purge} tag).
 
-\subsection{Fedora packages}
-The following installation method works only an Fedora based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
+\subsection{RedHat packages}
+The following installation method works only an RedHat based distribution. We assume that you have a configured rpm build environment. Furthermore, Taktuk must be installed on the server side.
 \subsubsection{Build}
 \noindent First, you have to uncompress the Kadeploy tarball.
 \begin{small}
@@ -323,7 +336,6 @@ This will generate three rpm package in the RPMS package of your build environme
 \end{Verbatim}
 \end{small}
 
-
 \section{Launching the Kadeploy server}
 After being installed and configured, the Kadeploy server can be run either interactively:
 \begin{small}
@@ -338,7 +350,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \end{verbatim}
 \end{small}
 
-\subsection{Automatic launch on a Debian and a Fedora based distribution}
+\subsection{Automatic launch on a Debian and a RedHat based distribution}
 \noindent On a these distributions, if you use the provided packages, the rc script will be automatically launched at the startup.
 
 \chapter{Server side configuration}\label{chap:Server_side_conf}
@@ -491,7 +503,6 @@ verbosity:
 cache:
   directory: /var/cache/kadeploy
   size: /tmp/kadeploy_cache
-  disabled: false
 network:
   server_hostname: kadeploy.lan
   vlan:
@@ -625,6 +636,8 @@ external:
     \item \yfield{file}{String} the path to a file containing the private key.
   \end{itemize}
 
+  \item \yfieldd{ssh\_private\_key}{String}{/etc/kadeploy3/keys/id\_deploy} specify private key loaded in ssh-agent.
+
   \item \ypath{/logs}
   \begin{itemize}
     \item \yfieldd{logfile}{String}{''} path of a file that will contain the log information. If you do not wish to use a log file, do not set this field.
@@ -642,12 +655,11 @@ external:
   \begin{itemize}
     \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment.
     \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
-    \item \yfieldd{disable}{boolean}{false} disable the use of a cache. Be careful, if you disable the cache, it will not be possible to use HTTP hosted files in environments.
   \end{itemize}
 
   \item \ypath{/network}
   \begin{itemize}
-    \item \yfield{server\_hostname}{String} hostname of the Kadeploy server
+    \item \yfieldd{server\_hostname}{String}{ruby Socket.gethostname} hostname of the Kadeploy server
     \item \yfieldd{tcp\_buffer\_size}{Integer}{8192} TCP buffer size (Bytes) for the Kadeploy file server
   \end{itemize}
 
@@ -690,13 +702,13 @@ external:
 
   \item \ypath{/pxe/dhcp} the default method used to PXE boot. Further information are available in the paragraph \texttt{Booting over the network}.
   \begin{itemize}
-    \item \yfield{method}{String} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
+    \item \yfieldd{method}{String}{PXElinux} the PXE method used to boot over the network (expected values are PXElinux, GPXElinux, IPXE or GrubPXE)
     \item \yfield{repository}{String} absolute path of the repository where PXE files are accessibles (TFTP, HTTP, ...). Warning, as far as the Kadeploy server is launched by the \texttt{deploy} user, \texttt{deploy} must have the rights to write in this directory.
   \end{itemize}
   \item \ypath{/pxe/dhcp/export}
   \begin{itemize}
-    \item \yfield{kind}{String} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
-    \item \yfield{server}{String} The server where PXE files are stored. To be complicant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
+    \item \yfieldd{kind}{String}{tftp} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
+    \item \yfieldd{server}{String}{hostname} The server where PXE files are stored. To be complicant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
   \end{itemize}
   \item \ypath{/pxe/dhcp/profiles}
   \begin{itemize}
@@ -764,9 +776,10 @@ The information used to generate this filenames are the one specified for each n
 
   \item \yfieldd{autoclean\_threshold}{Fixnum}{360} at the end of an operation (deploy/reboot/power) it's status kept until the user explicitly deletes them. This value fix the maximal time (in minutes) this information will be kept in memory by the server until the autoclean loop delete them.
 
+  \item \yfieldd{/external/default\_connector}{String}{ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes} define alias for DEFAULT\_CONNECTOR in taktuk connector and remoteops for cluster specific file.
   \item \ypath{/external/taktuk}
   \begin{itemize}
-    \item \yfield{connector}{String} connector used by Taktuk
+    \item \yfieldd{connector}{String}{DEFAULT\_CONNECTOR} connector used by Taktuk
     \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
     \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
     \item \yfieldd{outputs\_size}{Integer}{20000} to avoid big taktuk outputs to be loaded in the server's memory, it's possible to setup a limit of the per-node output size. If TakTuk returns an output bigger than \texttt{(NODES\_NUMBER * outputs\_size)} an error will be returned. This limit can be disabled by setting the \texttt{0} value.
@@ -1039,13 +1052,14 @@ automata:
   \item \ypath{/partitioning/partitions}
   \begin{itemize}
     \item \yfieldd{swap}{Integer}{1} number of the swap partition on the disk
-    \item \yfield{prod}{Integer} number of the production partition on the disk
-    \item \yfield{deploy}{Integer} number of the deployment partition on the disk
-    \item \yfield{tmp}{Integer} number of the tmp partition on the disk
+    \item \yfieldd{prod}{Integer}{-1} number of the production partition on the disk
+    \item \yfieldd{deploy}{Integer}{2} number of the deployment partition on the disk
+    \item \yfieldd{tmp}{Integer}{-1} number of the tmp partition on the disk
   \end{itemize}
 
   \item \ypath{/boot}
   \begin{itemize}
+    \item \yfieldd{sleep\_time\_before\_boot}{Integer}{20} seconds of sleep before the first ping request to detect when a node is ready. Generally, it represents the average time during the node power up until it sends a dhcp request.
     \item \yfield{install\_bootloader}{String} Path to a script that install a bootloader on the deployment partition. You can use Kadeploy3 environment variables (see section \ref{sec:env_vars}) in this script. Please refer to section \ref{sec:bootscript}) for further informations.
   \end{itemize}
 
@@ -1060,7 +1074,7 @@ automata:
     \item \yfield{vmlinuz}{String} name of the kernel file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfield{initrd}{String} name of the initrd file of the deployment environment. This file will be specified in the PXE profiles using the \ypath{pxe/networkboot/export} and \ypath{pxe/networkboot/repository} settings of the general configuration file.
     \item \yfieldd{params}{String}{""} boot parameters of the deployment environment kernel
-    \item \yfield{supported\_fs}{String} list of file systems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
+    \item \yfieldd{supported\_fs}{String}{ext2,ext3,ext4,vfat} list of file systems that are supported by the deployment environment. The syntax is: fstype1,fstype2,fstype3,... . When deploying an environment with a non supported filesystem type, the deployment workflow will be modified (see section \ref{sec:macro_desc}).
     \item \yfieldd{drivers}{String}{""} list of drivers that must be loaded in the deployment environment. The syntax is: driver1,driver2,driver3,...
   \end{itemize}
 
@@ -1073,7 +1087,7 @@ automata:
 
   \item \ypath{/timeouts}
   \begin{itemize}
-    \item \yfield{reboot}{Integer/String} classical reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
+    \item \yfieldd{reboot}{Integer/String}{120} classical reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
     \item \yfieldd{kexec}{Integer/String}{60} kexec reboot timeout. A Ruby expression can be used here to represent a function depending on \emph{n} (the number of nodes currently rebooted)
   \end{itemize}
   \item \ypath{/localops/broadcastenv} A custom command that will be used when sending an environment in a \texttt{BroadcastEnv} macro-step of kind \texttt{Custom}. Be careful, this command will be launched from the Kadeploy3 server.
@@ -1081,6 +1095,7 @@ automata:
     \item \yfield{cmd}{String} The command that will send the environment file. You can use the \texttt{ENVFILE}, \texttt{NODEFILE}, \texttt{TAKTUK\_CONNECTOR} and \texttt{DECOMPRESS} patterns in the command-line. The pattern \texttt{DECOMPRESS} will replaced by a command that can be used to decompress the file while receiving it (if not specify, the \texttt{decompress} parameter should be set to false). The pattern \texttt{TAKTUK\_CONNECTOR} will be replaced by the TakTuk connector (see section \ref{sec:general_config}).
     \item \yfieldd{decompress}{Boolean}{true} If the script decompress the file while receiving it, it should be set to \emph{true}. If the script don't, an extra micro-step will be add to the deployment process in order to decompress the file after it has been sent.
   \end{itemize}
+  \item \yfieldd{level\_name}{String Array}{\["soft","hard","very hard"\]} defines level name by priority order.
   \item \ypath{/remoteops/[reboot]} The reboot commands, an escalation of them will be performed in the order of the List. Warning: at the moment, only the names \emph{soft}, \emph{hard} and \emph{very\_hard} can be used.
   \begin{itemize}
     \item \yfield{name}{String} the name of the command (used in the display)
