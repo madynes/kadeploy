@@ -22,12 +22,13 @@ require 'timeout'
 require 'tempfile'
 require 'json'
 require 'yaml'
+require 'etc'
 require 'io/console' if RUBY_VERSION >= '1.9'
 
 
 module Kadeploy
 CONTACT_EMAIL = "kadeploy3-users@lists.gforge.inria.fr"
-USER = `id -nu`.strip
+USER = ENV['USER'] || ENV['USERNAME'] || Etc.getlogin || `id -nu`
 STATUS_UPDATE_DELAY = 1
 SLEEP_PITCH = 1
 R_HOSTNAME = /\A[A-Za-z0-9\.\-\[\]\,]*\Z/
@@ -592,8 +593,8 @@ class Client
       elsif !STDIN.tty? or STDIN.closed?
         @@terminal_width = 80
       else
-        if !(size = `stty size`.strip).empty?
-          @@terminal_width = size.split(' ')[1].to_i
+        if !(sizes = STDIN.winsize).empty?
+          @@terminal_width = sizes[1]
         else
           @@terminal_width = 80
         end

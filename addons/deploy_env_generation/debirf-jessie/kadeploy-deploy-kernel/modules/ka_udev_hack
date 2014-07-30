@@ -1,0 +1,5 @@
+#!/bin/sh -e
+
+# reset default udev persistent-net rule
+rm -f "${DEBIRF_ROOT}"/etc/udev/rules.d/*-persistent-net.rules
+

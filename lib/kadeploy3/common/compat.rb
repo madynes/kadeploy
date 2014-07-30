@@ -121,6 +121,15 @@ if RUBY_VERSION < '1.9'
     system('stty cooked')
   end
 
+  def STDIN.winsize()
+    ret = `stty size`.strip
+    if ret.empty?
+      []
+    else
+      ret.split(/\s+/).collect{|v| v.to_i rescue nil}.compact
+    end
+  end
+
   module Psych
     class SyntaxError < Exception
     end

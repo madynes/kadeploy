@@ -1,0 +1,18 @@
+$TTL 3h
+
+@  IN  SOA  dns.<%= @dns_domain %>.  postmaster.<%= @dns_domain %>. (
+	2014033001 ; YYYYMMD##
+	4h
+	1h
+	4w
+	1h
+)
+
+@		NS	dns
+@		A	<%= @server_ip %>
+dns		A       <%= @server_ip %>
+kadeploy	CNAME	<%= @dns_domain %>.
+
+<% @nodes.each_pair do |name,node| -%>
+<%= name %>	A	<%= node['ip'] %>
+<% end -%>

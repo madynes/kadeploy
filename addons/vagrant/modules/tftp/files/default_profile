@@ -1,0 +1,8 @@
+PROMPT 1
+SERIAL 0 38400
+TIMEOUT 1
+DEFAULT local
+LABEL local
+  COM32 /chain.c32
+  APPEND hd0 0
+

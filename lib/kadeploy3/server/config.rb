@@ -5,6 +5,7 @@ require 'resolv'
 require 'ipaddr'
 require 'yaml'
 require 'webrick'
+require 'socket'
 
 module Kadeploy
 
@@ -142,7 +143,7 @@ module Configuration
 
     def load_caches()
       ret = {}
-      if !@static[:disable_cache] and @static[:caches][:global]
+      if @static[:caches] and @static[:caches][:global]
         ret[:global] = Cache.new(
           @static[:caches][:global][:directory],
           @static[:caches][:global][:size],
@@ -150,7 +151,7 @@ module Configuration
         )
       end
 
-      if @static[:caches][:netboot]
+      if @static[:caches] and @static[:caches][:netboot]
         ret[:netboot] = Cache.new(
           @static[:caches][:netboot][:directory],
           @static[:caches][:netboot][:size],
@@ -216,6 +217,7 @@ module Configuration
     attr_reader :kascade_options
     attr_reader :secure_client
     attr_reader :autoclean_threshold
+    attr_reader :cmd_ext
 
     # Constructor of CommonConfig
     #
@@ -228,6 +230,7 @@ module Configuration
       @nodes = Nodes::NodeSet.new
       @cache = {}
       @pxe = {}
+      @cmd_ext = {}
     end
 
     # Load the common configuration file
@@ -268,8 +271,8 @@ module Configuration
           )
         end
 
-        cp.parse('network',true) do
-          cp.parse('vlan',true) do
+        cp.parse('network',false) do
+          cp.parse('vlan') do
             @vlan_hostname_suffix = cp.value('hostname_suffix',String,'')
             @set_vlan_cmd = cp.value('set_cmd',String,'',{
               :type => 'file', :command => true,
@@ -291,7 +294,7 @@ module Configuration
           @kadeploy_tcp_buffer_size = cp.value(
             'tcp_buffer_size',Fixnum,8192
           )
-          static[:host] = cp.value('server_hostname',String)
+          static[:host] = cp.value('server_hostname',String,Socket.gethostname)
         end
 
         cp.parse('security') do |info|
@@ -466,16 +469,16 @@ module Configuration
             end
           end
 
-          cp.parse('ident',false) do |inf|
-            next if inf[:empty]
+          cp.parse('ident',false,Hash,false) do |info_ident|
+            next unless info_ident[:provided]
             static[:auth] = {} unless static[:auth]
             static[:auth][:ident] = IdentAuthentication.new
             if static[:local]
-              static[:auth][:ident].whitelist << parse_hostname.call('localhost',inf[:path])
+              static[:auth][:ident].whitelist << parse_hostname.call('localhost',info_ident[:path])
             else
-              cp.parse('whitelist',true,Array) do |info|
-                next if info[:empty]
-                static[:auth][:ident].whitelist << parse_hostname.call(info[:val][info[:iter]],info[:path])
+              cp.parse('whitelist',true,Array) do |info_white|
+                next if info_white[:empty]
+                static[:auth][:ident].whitelist << parse_hostname.call(info_white[:val][info_white[:iter]],info_white[:path])
               end
             end
           end
@@ -484,6 +487,9 @@ module Configuration
             raise ArgumentError.new(Parser.errmsg(nfo[:path],"You must set at least one authentication method"))
           end
         end
+
+        static[:ssh_private_key] = cp.value('ssh_private_key',String, File.join($kadeploy_confdir,'keys','id_deploy'),
+            { :type => 'file', :readable => true, :prefix => Config.dir()})
 
         cp.parse('logs') do
           static[:logfile] = cp.value(
@@ -504,24 +510,19 @@ module Configuration
           @verbose_level = cp.value('clients',Fixnum,3,(0..4))
         end
 
-        cp.parse('cache',true) do
-          static[:disable_cache] = cp.value(
-            'disabled',[TrueClass, FalseClass],false
+        cp.parse('cache',true) do |inf_cache|
+          static[:caches] = {} unless static[:caches]
+          static[:caches][:global] = {}
+          static[:caches][:global][:directory] = cp.value('directory',String,'/tmp',
+            {
+              :type => 'dir',
+              :readable => true,
+              :writable => true,
+              :create => true,
+              :mode => 0700
+            }
           )
-          unless static[:disable_cache]
-            static[:caches] = {} unless static[:caches]
-            static[:caches][:global] = {}
-            static[:caches][:global][:directory] = cp.value('directory',String,'/tmp',
-              {
-                :type => 'dir',
-                :readable => true,
-                :writable => true,
-                :create => true,
-                :mode => 0700
-              }
-            )
-            static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
-          end
+          static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
         end
 
         cp.parse('windows') do
@@ -553,80 +554,17 @@ module Configuration
 
         cp.parse('pxe',true) do
           chain = nil
-          pxemethod = Proc.new do |name,info|
-            unless info[:empty]
-              args = []
-              args << cp.value('method',String,nil,
-                ['PXElinux','GPXElinux','IPXE','GrubPXE']
-              )
-              repo = cp.value('repository',String,nil,Dir)
-
-              if name == :dhcp
-                args << 'DHCP_PXEBIN'
-              else
-                args << cp.value('binary',String,nil,
-                  {:type => 'file', :prefix => repo}
-                )
-              end
-
-              cp.parse('export',true) do
-                args << cp.value('kind',String,nil,['http','ftp','tftp']).to_sym
-                args << cp.value('server',String)
-              end
-
-              args << repo
-              if name == :dhcp
-                cp.parse('userfiles',true) do
-                  files = cp.value('directory',String,nil,
-                    {:type => 'dir', :prefix => repo}
-                  )
-                  args << files
-                  static[:caches] = {} unless static[:caches]
-                  static[:caches][:netboot] = {}
-                  static[:caches][:netboot][:directory] = File.join(repo,files)
-                  static[:caches][:netboot][:size] = cp.value('max_size',Fixnum)*1024*1024
-                end
-              else
-                args << 'PXE_CUSTOM'
-              end
-
-              cp.parse('profiles',true) do
-                profiles_dir = cp.value('directory',String,'')
-                args << profiles_dir
-                if profiles_dir.empty?
-                  profiles_dir = repo
-                elsif !Pathname.new(profiles_dir).absolute?
-                  profiles_dir = File.join(repo,profiles_dir)
-                end
-                if !File.exist?(profiles_dir) or !File.directory?(profiles_dir)
-                  raise ArgumentError.new(Parser.errmsg(info[:path],"The directory '#{profiles_dir}' does not exist"))
-                end
-                args << cp.value('filename',String,nil,
-                  ['ip','ip_hex','hostname','hostname_short']
-                )
-              end
-              args << chain
-
-              begin
-                @pxe[name] = NetBoot.Factory(*args)
-              rescue NetBoot::Exception => nbe
-                raise ArgumentError.new(Parser.errmsg(info[:path],nbe.message))
-              end
-            end
-          end
-
           cp.parse('dhcp',true) do |info|
-            pxemethod.call(:dhcp,info)
+            chain = pxemethod(:dhcp,info,cp,static)
           end
 
-          chain = @pxe[:dhcp]
           cp.parse('localboot') do |info|
-            pxemethod.call(:local,info)
+            pxemethod(:local,info,cp,static,chain)
           end
           @pxe[:local] = chain unless @pxe[:local]
 
           cp.parse('networkboot') do |info|
-            pxemethod.call(:network,info)
+            pxemethod(:network,info,cp,static,chain)
           end
           @pxe[:network] = chain unless @pxe[:network]
         end
@@ -651,9 +589,12 @@ module Configuration
 
         @autoclean_threshold = cp.value('autoclean_threshold',Fixnum,60*6).abs * 60 # 6h by default
 
-        cp.parse('external',true) do
-          cp.parse('taktuk',true) do
-            @taktuk_connector = cp.value('connector',String)
+        cp.parse('external') do
+           @cmd_ext[:default_connector] = cp.value('default_connector',String,'ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes')
+          cp.parse('taktuk') do
+            @taktuk_connector = cp.value('connector',String,'DEFAULT_CONNECTOR')
+            @taktuk_connector.gsub!('DEFAULT_CONNECTOR',@cmd_ext[:default_connector])
+
             @taktuk_tree_arity = cp.value('tree_arity',Fixnum,0)
             @taktuk_auto_propagate = cp.value(
               'auto_propagate',[TrueClass,FalseClass],true
@@ -702,6 +643,67 @@ module Configuration
 
       return static
     end
+
+    # Parse pxe part to build NetBoot object
+    def pxemethod (name,info,cp,static,chain = nil)
+      unless info[:empty]
+        args = {}
+        args[:kind] = cp.value('method',String,'PXElinux',
+          ['PXElinux','GPXElinux','IPXE','GrubPXE']
+        )
+        args[:repository_dir] = cp.value('repository',String,nil,Dir)
+
+        if name == :dhcp
+          args[:binary] = 'DHCP_PXEBIN'
+        else
+          args[:binary] = cp.value('binary',String,nil,
+            {:type => 'file', :prefix => args[:repository_dir], :const => true}
+          )
+        end
+
+        cp.parse('export') do
+          args[:export_kind] = cp.value('kind',String,'tftp',['http','ftp','tftp']).to_sym
+          args[:export_server] = cp.value('server',String,'LOCAL_IP')
+        end
+
+        if name == :dhcp
+            cp.parse('userfiles',true) do |info_userfiles|
+              args[:custom_dir] = cp.value('directory',String,nil,
+                {:type => 'dir', :prefix => args[:repository_dir]}
+              )
+              static[:caches] = {} unless static[:caches]
+              static[:caches][:netboot] = {}
+              static[:caches][:netboot][:directory] = File.join(args[:repository_dir],args[:custom_dir])
+              static[:caches][:netboot][:size] = cp.value('max_size',Fixnum)*1024*1024
+            end
+        else
+          args[:custom_dir] = 'PXE_CUSTOM'
+        end
+
+        cp.parse('profiles') do
+          #TODO : check profile config for example : pxelinuix => pxelinux.cfg,ip_hex another=> another
+          args[:profiles_dir] = cp.value('directory',String,'pxelinux.cfg')
+          if args[:profiles_dir].empty?
+            args[:profiles_dir] = args[:repository_dir]
+          elsif !Pathname.new(args[:profiles_dir]).absolute?
+            args[:profiles_dir] = File.join(args[:repository_dir],args[:profiles_dir])
+          end
+          if !File.exist?(args[:profiles_dir]) or !File.directory?(args[:profiles_dir])
+            raise ArgumentError.new(Parser.errmsg(info[:path],"The directory '#{args[:profiles_dir]}' does not exist"))
+          end
+          args[:profiles_kind] = cp.value('filename',String,'ip_hex',
+            ['ip','ip_hex','hostname','hostname_short']
+          )
+        end
+
+        begin
+          @pxe[name] = NetBoot.Factory(args[:kind], args[:binary], args[:export_kind], args[:export_server],
+                          args[:repository_dir], args[:custom_dir], args[:profiles_dir], args[:profiles_kind], chain)
+        rescue NetBoot::Exception => nbe
+          raise ArgumentError.new(Parser.errmsg(info[:path],nbe.message))
+        end
+      end
+    end
   end
 
   class ClustersConfig < Hash
@@ -742,7 +744,7 @@ module Configuration
               :type => 'file', :readable => true, :prefix => Config.dir()})
 
           conf = self[clname] = ClusterSpecificConfig.new(
-            cp.value('prefix',String,''))
+            cp.value('prefix',String,''),commonconfig.cmd_ext)
           return false unless conf.load(clname,clfile)
 
 
@@ -831,6 +833,7 @@ module Configuration
     attr_reader :group_of_nodes #Hashtable (key is a command name)
     attr_reader :partitioning_script
     attr_reader :bootloader_script
+    attr_reader :sleep_time_before_ping
     attr_reader :prefix
     attr_reader :drivers
     attr_reader :pxe_header
@@ -840,6 +843,8 @@ module Configuration
     attr_reader :admin_pre_install
     attr_reader :admin_post_install
     attr_reader :use_ip_to_deploy
+    attr_reader :cmd_ext
+
 
     # Constructor of ClusterSpecificConfig
     #
@@ -847,7 +852,7 @@ module Configuration
     # * nothing
     # Output
     # * nothing
-    def initialize(prefix=nil)
+    def initialize(prefix=nil,cmd_ext={})
       @prefix = prefix
       @workflow_steps = []
       @deploy_kernel_args = ""
@@ -857,18 +862,41 @@ module Configuration
       @pxe_header = {}
       @use_ip_to_deploy = false
 
-      @cmd_reboot_soft = nil
-      @cmd_reboot_hard = nil
-      @cmd_reboot_very_hard = nil
-      @cmd_console = nil
-      @cmd_power_on_soft = nil
-      @cmd_power_on_hard = nil
-      @cmd_power_on_very_hard = nil
-      @cmd_power_off_soft = nil
-      @cmd_power_off_hard = nil
-      @cmd_power_off_very_hard = nil
-      @cmd_power_status = nil
+      @cmd_ext = cmd_ext.clone
     end
+
+    def handle_cmd_priority(obj,conf_path,cp,cluster=null,limit=3)
+      begin
+        raise "This is not an array, please check the documentation." unless obj.is_a? Array
+        raise "This version accepts only #{limit} commands." if obj.size > limit
+        if (not obj.empty?) and (obj[0].is_a? Hash)
+          output = []
+          obj.each do |element|
+              idx = @level_name.index(element['name'])
+              raise "the '#{element['name']}' is not a valid name." if idx<0
+              output[idx] = element['cmd']
+              group = element['group']
+              add_group_of_nodes("#{name}_reboot", group, cluster) unless group.nil? || cluster.nil?
+          end
+          obj = output
+        end
+        obj.each_index do |idx|
+          cmd = obj[idx]
+          if cmd
+            raise "The provided command is not a string." unless cmd.is_a? String
+            obj[idx] = cmd.gsub!('DEFAULT_CONNECTOR',@cmd_ext[:default_connector]) || obj[idx]
+            cp.customcheck_file(cmd,nil,{
+                  :type => 'file', :command => true,
+                  :readable => true, :executable => true
+                })
+          end
+        end
+        obj
+      rescue Exception => ex
+        raise ArgumentError.new("error in #{conf_path}, #{ex}")
+      end
+    end
+
 
     def load(cluster, configfile)
       begin
@@ -886,25 +914,57 @@ module Configuration
           raise ArgumentError.new("Invalid file format'#{configfile}'")
         end
 
+        #The method to add default automata is ugly, but it is readable.
+        unless config['automata']
+          add={'automata'=>{
+                'macrosteps'=>{
+                    'SetDeploymentEnv'=> [{
+                        'timeout'=> 200,
+                        'type'=>'Untrusted',
+                        'retries'=> 2,
+                    }],
+                    'BroadcastEnv'=> [{
+                        'timeout'=> 300,
+                        'type'=>'Kascade',
+                        'retries'=> 2,
+                    }],
+                    'BootNewEnv'=> [
+                      {
+                        'timeout'=> 150,
+                        'type'=>'Classical',
+                        'retries'=> 0,
+                      },{
+                        'timeout'=> 120,
+                        'type'=>'HardReboot',
+                        'retries'=> 1
+                      }
+                    ],
+                  }
+                }
+              }
+          config.merge!(add)
+        end
+        #end of ugly
+
         @name = cluster
         cp = Parser.new(config)
 
         cp.parse('partitioning',true) do
           @block_device = cp.value('block_device',String,nil,Pathname)
+
+          @swap_part = cp.value('disable_swap',[TrueClass,FalseClass],false)? 'none':nil
           cp.parse('partitions',true) do
-            @swap_part = cp.value('swap',Fixnum,1).to_s
-            @prod_part = cp.value('prod',Fixnum).to_s
+            @swap_part = cp.value('swap',Fixnum,nil).to_s unless @swap_part
+            @prod_part = cp.value('prod',Fixnum,-1).to_s
             @deploy_part = cp.value('deploy',Fixnum).to_s
-            @tmp_part = cp.value('tmp',Fixnum).to_s
+            @tmp_part = cp.value('tmp',Fixnum,-1).to_s
           end
-          @swap_part = 'none' if cp.value(
-            'disable_swap',[TrueClass,FalseClass],false
-          )
           @partitioning_script = cp.value('script',String,nil,
             { :type => 'file', :readable => true, :prefix => Config.dir() })
         end
 
         cp.parse('boot',true) do
+          @sleep_time_before_ping = cp.value('sleep_time_before_ping',Integer,20)
           @bootloader_script = cp.value('install_bootloader',String,nil,
             { :type => 'file', :readable => true, :prefix => Config.dir() })
           cp.parse('kernels',true) do
@@ -920,7 +980,7 @@ module Configuration
                 'drivers',String,''
               ).split(',').collect{ |v| v.strip }
               @deploy_supported_fs = cp.value(
-                'supported_fs',String
+                'supported_fs',String,'ext2, ext3, ext4, vfat'
               ).split(',').collect{ |v| v.strip }
             end
 
@@ -931,136 +991,22 @@ module Configuration
           end
         end
 
-        cp.parse('remoteops',true) do
-          #ugly temporary hack
-          group = nil
-          addgroup = Proc.new do
-            if group
-              unless add_group_of_nodes("#{name}_reboot", group, cluster)
-                raise ArgumentError.new(Parser.errmsg(
-                    info[:path],"Unable to create group of node '#{group}' "
-                  )
-                )
-              end
+        cp.parse('remoteops',true) do  |remoteops_info|
+          @level_name = cp.value('level_name',Array,['soft','hard','very_hard'])
+          level_symbols = [:soft,:hard,:very_hard]
+
+          [:power_off,:power_on,:reboot].each do |symb|
+            @cmd_ext[symb]=handle_cmd_priority(cp.value(symb.to_s,Array,[]),remoteops_info[:path],cp,cluster)
+            0.upto(level_symbols.length-1)  do |idx|
+              self.instance_variable_set("@cmd_#{symb.to_s}_#{level_symbols[idx].to_s}".to_sym,@cmd_ext[symb][idx])
             end
           end
 
-          cp.parse('reboot',false,Array) do |info|
-=begin
-            if info[:empty]
-              raise ArgumentError.new(Parser.errmsg(
-                  info[:path],'You need to specify at least one value'
-                )
-              )
-            else
-=end
-            unless info[:empty]
-              #ugly temporary hack
-              name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-              group = cp.value('group',String,false)
+          @cmd_ext[:power_status] = handle_cmd_priority(cp.value('power_status',Array,[]),remoteops_info[:path],cp,nil,1)
+          @cmd_power_status = @cmd_ext[:power_status][0]
+          @cmd_ext[:console] = handle_cmd_priority(cp.value('console',Array,[]),remoteops_info[:path],cp,nil,1)
+          @cmd_console = @cmd_ext[:console][0]
 
-              addgroup.call
-
-              case name
-                when 'soft'
-                  @cmd_reboot_soft = cmd
-                when 'hard'
-                  @cmd_reboot_hard = cmd
-                when 'very_hard'
-                  @cmd_reboot_very_hard = cmd
-              end
-            end
-          end
-
-          cp.parse('power_on',false,Array) do |info|
-            unless info[:empty]
-              #ugly temporary hack
-              name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-              group = cp.value('group',String,false)
-
-              addgroup.call
-
-              case name
-                when 'soft'
-                  @cmd_power_on_soft = cmd
-                when 'hard'
-                  @cmd_power_on_hard = cmd
-                when 'very_hard'
-                  @cmd_power_on_very_hard = cmd
-              end
-            end
-          end
-
-          cp.parse('power_off',false,Array) do |info|
-            unless info[:empty]
-              #ugly temporary hack
-              name = cp.value('name',String,nil,['soft','hard','very_hard'])
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-              group = cp.value('group',String,false)
-
-              addgroup.call
-
-              case name
-                when 'soft'
-                  @cmd_power_off_soft = cmd
-                when 'hard'
-                  @cmd_power_off_hard = cmd
-                when 'very_hard'
-                  @cmd_power_off_very_hard = cmd
-              end
-            end
-          end
-
-          cp.parse('power_status',false,Array) do |info|
-            unless info[:empty]
-              #ugly temporary hack
-              if info[:iter] > 0
-                raise ArgumentError.new(Parser.errmsg(
-                    info[:path],"At the moment you can only set one single value "
-                  )
-                )
-              end
-              _ = cp.value('name',String)
-              cmd = cp.value('cmd',String,'',{
-                :type => 'file', :command => true,
-                :readable => true, :executable => true
-              })
-              cmd = nil if cmd.empty?
-
-              @cmd_power_status = cmd
-            end
-          end
-
-          cp.parse('console',true,Array) do |info|
-            #ugly temporary hack
-            if info[:iter] > 0
-              raise ArgumentError.new(Parser.errmsg(
-                  info[:path],"At the moment you can only set one single value "
-                )
-              )
-            end
-            _ = cp.value('name',String)
-            cmd = cp.value('cmd',String,'',{
-              :type => 'file', :command => true,
-              :readable => true, :executable => true
-            })
-            cmd = nil if cmd.empty?
-            @cmd_console = cmd
-          end
         end
 
         cp.parse('localops') do |info|
@@ -1208,8 +1154,8 @@ module Configuration
           end
         end
 
-        cp.parse('timeouts',true) do |info|
-          code = cp.value('reboot',Object,nil,
+        cp.parse('timeouts') do |info|
+          code = cp.value('reboot',Object,120,
             { :type => 'code', :prefix => 'n=1;' }
           ).to_s
           begin
@@ -1330,12 +1276,11 @@ module Configuration
     def add_group_of_nodes(command, file, cluster)
       if File.readable?(file) then
         @group_of_nodes[command] = Array.new
-        IO.readlines(file).each { |line|
+        IO.readlines(file).each do |line|
           @group_of_nodes[command].push(line.strip.split(","))
-        }
-        return true
+        end
       else
-        return false
+         raise ArgumentError.new(Parser.errmsg(info[:path],"Unable to read group of node '#{file}'"))
       end
     end
   end

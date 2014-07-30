@@ -154,12 +154,14 @@ module Database
           @dbh.reconnect = true
         end
       rescue Timeout::Error
-        $stderr.puts "MySQL error: Timeout when connecting to DB (#{user}@#{host}/#{base})"
+        $stderr.puts "[#{Time.now}] MySQL error: Timeout when connecting to DB (#{user}@#{host}/#{base})"
+        $stderr.flush
         ret = false
       rescue Mysql::Error => e
-        $stderr.puts "MySQL error (code): #{e.errno}"
-        $stderr.puts "MySQL error (message): #{e.error}"
-        $stderr.puts "Kadeploy server cannot connect to DB #{user}@#{host}/#{base}"
+        $stderr.puts "[#{Time.now}] MySQL error (code): #{e.errno}"
+        $stderr.puts "[#{Time.now}] MySQL error (message): #{e.error}"
+        $stderr.puts "[#{Time.now}] Kadeploy server cannot connect to DB #{user}@#{host}/#{base}"
+        $stderr.flush
         ret = false
       end
       return ret

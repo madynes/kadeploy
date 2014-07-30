@@ -1,0 +1,15 @@
+HOWTO
+
+0/ Ignore changes to the generated file nodes.yaml (avoid git build-package issues)
+$> git update-index --assume-unchanged puppet/hiera/nodes.yaml
+
+1/ Launch the script addons/vagrant/vbox_handler.sh
+
+2/ Connect into the kadeploy VM
+$> cd $KADEPLOY_ROOT_DIR
+$> NODES=2 vagrant up
+$> vagrant ssh kadeploy
+
+3/ Become root and try to deploy
+$> sudo su -
+$> kadeploy3 -e wheezy-min -m node-[1,2]

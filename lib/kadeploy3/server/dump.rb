@@ -9,8 +9,8 @@ class Mutex
 end
 
 module Kadeploy
-  def self.dump(file=nil,width=80)
-    file = STDOUT unless file
+  def self.dump(width=80)
+    file = STDERR
     GC.start
 
     objects = Hash.new(0)
@@ -21,7 +21,7 @@ module Kadeploy
     PP.pp(Hash[objects.select{|k,v| v > 4}.sort_by{|k,v| -v}],file,width)
 
     file.puts("\n--- Objects by name ---")
-    PP.pp(Hash[objects.sort_by{|k,v| k.name}],file,width)
+    PP.pp(Hash[objects.sort_by{|k,v| k.name || ''}],file,width)
     objects = nil
 
     if ObjectSpace.respond_to?(:count_objects)
@@ -38,5 +38,7 @@ module Kadeploy
       file.puts("\n--- Kadeploy structures ---")
       PP.pp($kadeploy,file,width)
     end
+
+    file.flush
   end
 end

@@ -45,16 +45,14 @@ module HTTP
     return ret
   end
 
-  def self.check_file(uri, expected_etag=nil)
+  def self.check_file(uri)
     url = URI.parse(uri)
     resp = nil
     http = Net::HTTP.new(url.host, url.port)
     http.use_ssl = url.is_a?(URI::HTTPS)
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE
     http.start
-    opts = {}
-    opts['If-None-Match'] = expected_etag if expected_etag
-    resp = http.head(url.path,opts)
+    resp = http.head(url.path,{})
     raise KadeployHTTPError.new(resp.code) if !resp.is_a?(Net::HTTPSuccess) and !resp.is_a?(Net::HTTPNotModified)
     return resp.to_hash
   end

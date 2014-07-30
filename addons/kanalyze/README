@@ -1,13 +1,11 @@
 # Launching some experimentations and generate statistics
-rake launch NODEFILE=~/nodes
 rake launch[experiences/dummy_exp.yml] NODEFILE=~/nodes DIRECTORY=output-dir/
-rake launch NODEFILE=~/nodes EXPNAME=mytest KEYFILE=/root/.ssh/authorized_keys
-rake launch NODEFILE=~/nodes EXPNUM=42 KASTAT=1 VERBOSE=1 # See kanalyze options
+rake launch[experiences/dummy_exp.yml] NODEFILE=~/nodes EXPNAME=mytest KEYFILE=/root/.ssh/authorized_keys
+rake launch[experiences/dummy_exp.yml] NODEFILE=~/nodes EXPNUM=42 KASTAT=1 VERBOSE=1 # See kanalyze options
 
 # Run experimentations (only)
-rake run NODEFILE=~/nodes
 rake run[experiences/dummy_exp.yml] NODEFILE=~/nodes DIRECTORY=output-dir/
-KADEPLOY_BIN=kadeploy3-dev rake run
+KADEPLOY_BIN=kadeploy3-dev rake run[experiences/dummy_exp.yml]
 
 # Generate statistics (only)
 rake stats DIRECTORY=kanalyze-2014-01-01-10-00-00

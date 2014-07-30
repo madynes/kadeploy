@@ -1,0 +1,9 @@
+---
+clusters:
+- name: sample-cluster
+  conf_file: sample-cluster.conf
+  nodes:
+<% @nodes.each do |name,config| -%>
+  - name: <%= name %>
+    address: <%= config['ip'] %>
+<% end -%>

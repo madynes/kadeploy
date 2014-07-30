@@ -1,0 +1,343 @@
+############
+# Automata #
+############
+
+=== Design ===
+ (lib/kadeploy3/server/automata.rb)
+
+Task:
+  - Run a specific treatment
+  - Track OK/KO nodes during the treatment using two specific lists
+  - Can raise OK/KO nodes to it's manager during the traitment
+
+TaskManager:
+  - Manages (run) Tasks, take in account timeouts and retries of each step
+  - Implements a list of steps
+  - Dispatch nodes in tasks depending on the defined step list and on the current context (nodes in failure, ...)
+  - Can be controlled by interacting with it's queue
+
+TaskedTaskManager:
+  - Acts as a task (runnable) but can spawn sub-tasks as a TaskManager
+
+=== Kadeploy ===
+
+In Kadeploy:
+  - Micro-steps are Tasks
+  - Macro-steps are TaskedTaskManagers
+  - Workflows are TaskManagers
+
+So Workflows spawns Macro-steps that are spawning micro-steps depending on the pre-defined step list (and on the configuration).
+
+=== Simplified algorithm ===
+
+--- Task ---
+
+* run()
+  # ... treatment ...
+  if fail_during_treatment
+    @nodes_ko.add(failed_nodes)
+  end
+
+  # ... or to optimize performances ...
+  if fail_during_treatment
+    @manager.queue.push(failed_nodes,KO)
+  end
+
+  # ... treatment ...
+
+  if success
+    @nodes_ok.add(@nodes - failed_nodes)
+    return true
+  else
+    @nodes_ko.add(@nodes)
+    return false
+  end
+
+
+--- TaskManager ---
+
+* start()
+    until @nodes_processing.empty?
+      # Unstack the top of the queue
+      step,nodes,status = @queue.pop
+
+      # Choose to continue or not depending on the current step status
+      # and on the predefined step list
+      if next_step?(step,status)
+        nextstep = get_next_step(step,status)
+        run_task(Task.new(nextstep))
+      else
+        case(status)
+          when OK: @nodes_ok.add(nodes)
+          when KO: @nodes_ko.add(nodes)
+          when BRK: @nodes_brk.add(nodes)
+        end
+        @nodes_processing.delete(nodes)
+      end
+    end
+
+            -----------------------------------------------------------------
+* @queue   | T1 (s3,node-[1-3],OK) | T1 (s3,node-4,KO) | T2 (s1,node-10,BRK) |
+            -----------------------------------------------------------------
+                             ^              ^                 ^
+* run_task(T1):              |              |                 |
+    breakpoint?(T1)          |              |                 |
+    T1.run()                 |              |                 |
+    wait(T1)/check timeout   |              |                 |
+    @queue.push(T1.ok_nodes,OK)             |                 |
+    @queue.push(T1.ko_nodes,KO)-------------                  |
+* run_task(T2):                                               |
+    breakpoint?(T2)                                           |
+    @queue.push(T1.nodes,BRK) --------------------------------
+
+
+--- TaskedTaskManager ---
+
+(inherits from Task and TaskManager)
+
+* run() # Have to be reimplemented (Task)
+    start() # Inherited from TaskManager
+    return true
+
+
+#########
+# Cache #
+#########
+
+The cache system is deleting the files depending on a priority + LRU sort. First of all, every files (that are not in use) with the lowest priority are deleted depending on their last access date (LRU); then the files with a bigger priority, and so on until enough space has been freed from the cache.
+
+In kadeploy the anonymous environment files have a low priority, the recorded environment files have a big one (stays longer in the cache).
+
+For every cached files, two files are created in the filesystem: a _UID_.file file containing the data and a _UID_.meta file containing metadata in order for the service to be able to reload the cache after a restart. However, this feature has been temporary disabled, so at the moment, the _UID_.meta file is only useful for admins to get more information about a cached file.
+
+=== Design ===
+ (lib/kadeploy3/server/cache.rb, lib/kadeploy3/server/grabfile.rb)
+
+--- CacheFile ---
+@refs: the number of operations currently using the object
+* used?()
+  check if the file is currently in use (@refs > 0), try_lock
+* acquire()
+  increments @refs
+* release()
+  decrements @refs
+* idx()
+  generate the file's UID based on a CacheIndex object
+* save()
+  save the file: update .meta file and changed UID depending on the attributes that were modified
+* remove()
+  delete the file from the filesystem
+
+--- Cache ---
+Kadeploy independent implementation of the cache
+
+* load()
+  initialize the cache, reload (valid) files that are present in the cache directory [has been temporary disabled]
+* cache(*file_info,&block)
+  ensure that a file is present in the cache. If the file is in the cache, update it's last access time, increment @refs and lock it. If the file is not present in the cache, &block is called with the path to a temporary file in which data should be saved/downloaded to, the file is also locked.
+* remove(*file_info)
+  take the lock on the file and remove it from the cache if there is no @refs left
+* release(file)
+  decrement @refs on a specific file
+
+--- GrabFile ---
+Link between Kadeploy and the Cache library
+@cache: the Cache instance
+
+* grab(file)
+  cache (eventually download) the specified file into @cache using Cache.cache()
+* GrabFile.grab_user_files(context)
+  cache every user specific files depending on the current context (environments files for deployments, user specific PXE files for reboots, ...)
+
+
+############
+# REST API #
+############
+
+=== Design ===
+ (lib/kadeploy3/common/httpd.rb, lib/kadeploy3/common/http.rb)
+
+Based on ruby WEBrick
+Treatment done via a custom HTTPServlet::AbstractServlet (HTTPdHandler)
+HTTP client facilities: HTTP::Client
+
+--- HTTPd::Server ---
+launch a WEBrick server with some specific initialization parameters, setup custom content handling methods (bindings)
+
+--- RequestHandler ---
+setup the HTTP response depending on the HTTP request's content and headers (Accept, Accept-Encoding)
+
+--- HTTPdHandler ----
+* treatment()
+  launch a Thread to take care of the treatment (call to the handle() method) of the request, stops the Thread on client disconnection
+
+* do_METHOD()
+  launch the treatment and set the HTTP response depending on the object or exception the treatment returned (Content-Type, Content-Length, Content-Encoding, ...)
+
+* handle() [abstract]
+  the treatment associated with a specific HTTP request depending on the handler type
+
+--- HTTPdHandler children ---
+* ContentHandler: return some static content
+* ProcedureHandler: calls a specific procedure
+* MethodHandler: calls specific method
+* MethodFilterHandler: dynamically calls a method depending on the request's parameters (for sample "GET /deployment/1234/logs/cluster1" can call get_deployment_logs(1234,cluster1))
+
+
+=== Documentation ===
+ (doc/api/apidoc, doc/api/*.api)
+
+Ruby-based DSL to describe resources, generated via "rake apidoc"
+
+
+##################
+# Authentication #
+##################
+
+=== Design ===
+ (lib/kadeploy3/server/authentication.rb, lib/kadeploy3/server/server.rb)
+
+--- Server ---
+* authenticate!(http_request)
+this method is called on each request on the server, it determine if the user is correctly identified by one of the available (enabled) methods. If the user cant be authentified by at least one method, an error is returned. Authenticate objects are used to check if the user is autenticated.
+
+--- Authentication ---
+* check_host?()
+  checks if the client (http_request) is found in the whitelist (if there is a whitelist)
+* auth!(source_socket,*) [abstract]
+  authenticate the user using a specific method
+
+--- ACLAuthentication ---
+Access Control List based authentication, only trust people authenticated from whitelisted machines
+
+--- CertificateAuthentication ---
+x509 certificate authentication, the client provides a certificate that is signed with a trusted private key, the CN field must contain the username
+
+--- IdentAuthentication ---
+Ident protocol based authentication (rfc 1413), the server contacts the Ident service on the client's machine to know usernames matches, a list of whitelisted Ident services can be providen
+
+--- HTTPBasicAuthentication ---
+HTTP Basic Authentication based authentication (rfc 1945), standard authentication method based on the WWW-Authenticate HTTP header
+
+
+###########
+# Netboot #
+###########
+
+=== Design ===
+ (lib/kadeploy3/server/netboot.rb)
+
+Design pattern: Factory
+
+--- NetBoot.Factory ---
+factory that generates NetBoot instances
+
+--- NetBoot::PXE ---
+PXE netboot methods, generate boot profiles
+
+* @binary: the boot method's binary (pxelinux.0, grubpxe.0, ...)
+* @export: object used to generate export paths depending on the export server and kind (http://server/kernel, tftp://server/kernel, ...)
+* @repository_dir: the directory PXE files are saved/exported in (/var/lib/tftp, ...)
+* @profiles_dir: the directory the profiles are stored in, depending on the boot method (pxelinux.cfg, ...)
+* @profiles_kind: the method used to generate profile's filenames (ip, ip_hex, hostname, ...)
+* @chain: the next PXE method to chain over this method
+
+* labelize(header,kind,profile) [abstract]
+  generate the profile with it's headers and default values
+* boot_local(env,diskname,dev_id,part_id) [abstract]
+  generate a profile to perform a local boot on the partition part_id of the device dev_id
+* boot_network(kernel,initrd,params) [abstract]
+  generate a profile to boot on a kernel that is downloaded over the network (using the method described in @export)
+* boot_chain(pxebin) [abstract]
+  chain another PXE boot method
+
+* NetBoot::PXE::Export
+  Used to describe file exports in PXE profiles
+
+* Netboot::PXE::PXELinux
+* Netboot::PXE::GPXELinux
+* Netboot::PXE::IPXE
+* Netboot::PXE::GrubPXE
+
+
+=== Chaining PXE boot methods ===
+
+DHCP
+  # config
+  filename: pxelinux.0
+  next_server: tftp.domain.tld
+-> PXELinux
+  # profile
+  KERNEL grubpxe.0
+  APPEND keeppxe
+-> GrubPXE
+  # profile
+  set root=(hd0,0)
+  linux /boot/vmlinuz
+  initrd /boot/initrd
+
+
+#######################
+# Configuration files #
+#######################
+
+=== Design ===
+  (lib/kadeploy3/server/config.rb, lib/kadeploy3/common/configparser.rb)
+
+There is one class for each configuration file, each class uses a Configuration::Parser object to validate the YAML structures (types, nested structures, allowed values).
+
+The configuration objects are then used in the server to know how to configure the service.
+
+Configuration files can be reloaded without shutting the service down, however some fields cannot be reloaded without restarting (the values stored in the @static hash).
+
+--- Configuration ---
+The base module
+* parse_custom_operations()
+  parse and verify a custom operations file
+
+--- ConfigFile ---
+* file() [abstract]
+  check that the configuration file exists and is readable
+* duplicate()
+  duplicates the configuration object (usefull for the hot reload)
+
+--- Config ---
+Class that aggregate the treatment on the different file specific configuration objects
+@common: a CommonConfig object
+@clusters: a ClusterSpecificConfig object
+@caches: a containing a pointer on the PXE and environment caches (if they are enabled in the configuration files)
+@static: a hash that contains static configuration fields (that cannot be modified without shutting down the service)
+
+* initialize()
+  init the object plus a *Config object of each kind (CommonConfig, ClustersConfig, ...) then call the load() method on them
+
+* sanity_check()
+  ensure that each mandatory configuration file is present
+
+* load_caches()
+  load (create) Cache objects in the @caches hash depending on the configuration
+
+--- CommonConfig ---
+* load()
+  loads the config file in the current object using the parser
+
+--- ClustersConfig ---
+* load()
+  loads the config file in the current object using the parser
+
+--- ClusterSpecificConfig ---
+* load()
+  loads the config file in the current object using the parser
+
+--- CommandsConfig ---
+* load()
+  loads the config file in the current object using the parser
+
+--- Configuration::Parser ---
+The class that helps to validate ruby Hash structures (kind of DTD)
+
+* parse(fieldname, mandatory, type, &block)
+  checks that fieldname is present (if mandatory) and has the right type, then calls &block with main_hash[...][fieldname] as parameter. Several calls to parse() can be nested to validate nested structures
+
+* value(fieldname, type, defaultvalue, expectedvalues)
+  checks and returns the value of fieldname (main_hash[...][fieldname]), a default value can be set, this value is returned if the field is empty. This method calls a type-specific check method "check_#{type.downcase}"

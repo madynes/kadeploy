@@ -1,0 +1,14 @@
+PROMPT 1
+TIMEOUT 1
+DEFAULT <%= @pxe_boot_method %>
+
+<%- if @pxe_chainload_program %>
+LABEL local
+  KERNEL <%= @pxe_chainload_program %>
+  APPEND hd0 0
+<% end -%>
+<%- if @pxe_kernel_vmlinuz %>
+LABEL network
+  KERNEL <%= @pxe_kernel_vmlinuz %>
+  APPEND initrd=<%= @pxe_kernel_initrd %> root=/dev/sda1
+<% end -%>

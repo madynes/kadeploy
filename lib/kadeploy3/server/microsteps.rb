@@ -1495,35 +1495,39 @@ class Microstep < Automata::QueueTask
         return false
       end
     when "deploy_to_deployed_env"
-      nodes = get_nodes.call(true)
-      if context[:execution].pxe and context[:execution].pxe[:profile]
-        unless context[:common].pxe[:dhcp].boot(
-          :custom,
-          nodes,
-          context[:cluster].pxe_header,
-          context[:execution].pxe[:profile],
-          context[:execution].user,
-          context[:wid],
-          context[:execution].pxe[:singularities]
-        ) then
-          failed_microstep("Cannot perform the set_pxe_for_custom operation")
-          return false
+      p = Proc.new { |nodes|
+        if context[:execution].pxe and context[:execution].pxe[:profile]
+          unless context[:common].pxe[:dhcp].boot(
+            :custom,
+            nodes,
+            context[:cluster].pxe_header,
+            context[:execution].pxe[:profile],
+            context[:execution].user,
+            context[:wid],
+            context[:execution].pxe[:singularities]
+          ) then
+            failed_microstep("Cannot perform the set_pxe_for_custom operation")
+            return false
+          end
+        else
+          unless context[:common].pxe[:local].boot(
+            :local,
+            nodes,
+            context[:cluster].pxe_header,
+            context[:execution].environment,
+            get_block_device_str(),
+            get_block_device_num(),
+            context[:execution].boot_part || get_deploy_part_num(),
+            context[:cluster].kernel_params
+          ) then
+            failed_microstep("Cannot perform the set_pxe_for_local operation")
+            return false
+          end
         end
-      else
-        unless context[:common].pxe[:local].boot(
-          :local,
-          nodes,
-          context[:cluster].pxe_header,
-          context[:execution].environment,
-          get_block_device_str(),
-          get_block_device_num(),
-          context[:execution].boot_part || get_deploy_part_num(),
-          context[:cluster].kernel_params
-        ) then
-          failed_microstep("Cannot perform the set_pxe_for_local operation")
-          return false
-        end
-      end
+      }
+      #We have to generate PXE profiles for both production and VLAN networks if --vlan switch is used
+      p.call(get_nodes.call(true)) if context[:execution].vlan_id
+      p.call(get_nodes.call(false))
     end
     return true
   end
@@ -1586,7 +1590,7 @@ class Microstep < Automata::QueueTask
         { :input_file => tmpfile.path, :scattering => :tree }
       )
 
-      ret = ret && parallel_exec(shell_detach('/sbin/kexec -e'))
+      ret = ret && parallel_exec(shell_detach('/sbin/reboot'))
 
       tmpfile.unlink
 
@@ -1599,14 +1603,8 @@ class Microstep < Automata::QueueTask
 
   # Check the kernel files on the nodes
   #
-  # Arguments
-  # * systemking: the kind of the system to boot ('linux', ...)
-  # * systemdir: the directory of the filesystem containing the system to boot
-  # * kernelfile: the (local to 'systemdir') path to the kernel image
-  # * initrdfile: the (local to 'systemdir') path to the initrd image
-  # * kernelparams: the commands given to the kernel when booting
   # Output
-  # * return false if the kexec execution failed
+  # * return false if one file is missing
   def ms_check_kernel_files()
     envkernel = context[:execution].environment.kernel
     envinitrd = context[:execution].environment.initrd
@@ -1655,7 +1653,8 @@ class Microstep < Automata::QueueTask
       "--append=\"#{kernel_params}\" "
   end
 
-  # Get the shell command used to follow a symbolic link until reaching the real file
+  # Get the shell command used to follow a symbolic link until reaching the real file 
+  # such as inside of chroot prefix.
   # * filename: the file
   # * prefixpath: if specified, follow the link as if chrooted in 'prefixpath' directory
   def shell_follow_symlink(filename,prefixpath=nil)
@@ -1899,7 +1898,7 @@ class Microstep < Automata::QueueTask
   # * ports_down: down ports used to perform a reach test on the nodes
   # Output
   # * return true if some nodes are here, false otherwise
-  def ms_wait_reboot(kind='classical', env='deploy', vlan=false, timeout=nil,ports_up=nil, ports_down=nil)
+  def ms_wait_reboot(kind='classical', env='deploy', vlan=false, timeout=nil, ports_up=nil, ports_down=nil)
     unless timeout
       if kind == 'kexec'
         timeout = context[:execution].timeout_reboot_kexec \
@@ -1909,7 +1908,6 @@ class Microstep < Automata::QueueTask
           || context[:cluster].timeout_reboot_classical
       end
     end
-    n = n = @nodes.length
     timeout = eval(timeout).to_i
 
     unless ports_up
@@ -1930,7 +1928,7 @@ class Microstep < Automata::QueueTask
     )
 
     start = Time.now.tv_sec
-    sleep(20)
+    sleep(context[:cluster].sleep_time_before_ping)
 
     while (((Time.now.tv_sec - start) < timeout) && (not @nodes.all_ok?))
       sleep(5)

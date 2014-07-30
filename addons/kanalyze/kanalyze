@@ -21,16 +21,21 @@ require 'fileutils'
 require 'optparse'
 require 'csv'
 require 'shellwords'
+require 'set'
+require 'open3'
+require 'pathname'
 
 # Config
 SSH_KEY='~/.ssh/id_rsa.pub'
 KAREMOTE_SCRIPT='PATH_TO_SCRIPT'
 REMOTE=false
-CONSOLE_BIN="/usr/local/conman/bin/conman"
-CONSOLE_CMD="#{CONSOLE_BIN} -f -d conman"
-SCRIPT_BIN="/usr/bin/script"
+CONSOLE_END_SEQ  = '&.'
+CONSOLE_CMD="conman -m -f -d conman NODE_SHORT"
+SCRIPT_BIN="script"
 KADEPLOY_BIN=ENV['KADEPLOY_BIN']||'kadeploy3'
 KASTAT_BIN=ENV['KASTAT_BIN']||'kastat3'
+TIMING_EXT =".timing"
+TYPESCRIPT_EXT=".typescript"
 
 # Allowed values
 MACROSTEPS = {
@@ -48,6 +53,7 @@ MACROSTEPS = {
     :types => [
       'Chain',
       'Kastafior',
+      'Kascade',
       'Tree',
       'Bittorrent',
       'Dummy',
@@ -77,9 +83,9 @@ def debug(msg)
   msg.each{|l| puts "[D] #{l}"} if msg and !msg.empty? and $verbose
 end
 
-def error(msg)
+def error(msg, exit_status = 1)
   $stderr.puts msg
-  exit 1
+  exit exit_status if !exit_status.nil?
 end
 
 def yaml_error(msg)
@@ -122,37 +128,43 @@ def kill_recursive(pid)
   end
 end
 
+
 def conlogger_start(envcondir,nodes)
-  pids=[]
+  $cons_io={} if !$cons_io
   info("      Initialize monitors")
   nodes.each do |node|
-    info("        init #{node}")
-    cmd="#{SCRIPT_BIN} -f -c '#{CONSOLE_CMD} #{node.split(".")[0]}' "
-    cmd+="-t 2>#{File.join(envcondir,node+".timing")} "
-    cmd+="-a #{File.join(envcondir,node+".typescript")} "
-    cmd+="1>/dev/null"
-    cmd+="&"
-    system(cmd)
+    #info("        init #{node}")
+    cmd="#{SCRIPT_BIN} -q -f -c '#{CONSOLE_CMD}' "\
+        "'-t#{File.join(envcondir,node+TIMING_EXT)}' "\
+        "-a '#{File.join(envcondir,node+TYPESCRIPT_EXT)}' "\
+        ">/dev/null 2>&1"
+    cmd.gsub!('NODE_SHORT', node.split(".")[0])
+    cmd.gsub!('NODE', node)
+    $cons_io[node] = Open3.popen2e(cmd)
   end
-  info("      Start monitoring")
 end
 
+
 def conlogger_stop(envcondir,nodes)
-  info("      Kill monitors")
+  info("      Stop nodes monitoring")
   nodes.each do |node|
-    # Get the list of processus for the current user
-    psresult=`ps -u $(id -nu) -o pid= -o command=`.split("\n")
-    # Only select the monitoring processus on the selected node
-    commands=psresult.select { |line| (line =~ /#{SCRIPT_BIN}/ && line=~/#{CONSOLE_BIN}/ && line =~/#{node}\ /) }
-    if(!commands.empty?)
-     # Get the pid of the command
-      pid=commands[0].split(" ")[0]
-      info("        killing #{node} monitoring")
-      kill_recursive(pid.to_i)
+    begin
+      $cons_io[node][0].print(CONSOLE_END_SEQ)
+      $cons_io[node][0].close()
+      $cons_io[node][1].close()
+    rescue Exception => ex
+      error("Error occured while end of console: #{ex}",nil)
+      kill_recursive($cons_io[node][2].pid)
     end
   end
-  info("      Stop monitoring")
+  nodes.each do |node|
+    $cons_io[node][2].join
+    #info("        End of #{node} monitoring ")
+    $cons_io.delete(node)
+  end
 end
+
+
 
 def check_field(name,val,type=nil)
   yaml_error("experiment should have a field '#{name}'") if val.nil? or (type.nil? and val.empty?)
@@ -276,12 +288,16 @@ def store_stats(expname,expdir, iterCount)
   statfile.write($stats.to_yaml)
   statfile.close
   if($stats.size>0)
+    keys=Set.new
+    $stats.each do |_,stat|
+        keys.merge(stat.keys)
+    end
+    keystab=keys.sort
     csvfile=CSV.open(File.join($statsdir,expname+".csv"),"w") do |csv|
-      csv<<$stats.first[1].keys.sort
+      csv<<keystab
       $stats.each do |key,stat|
-        keytab=stat.keys.sort
         stattab=[]
-        keytab.each do |k|
+        keystab.each do |k|
           stattab.push(stat[k])
         end
         csv<<stattab
@@ -291,58 +307,45 @@ def store_stats(expname,expdir, iterCount)
   end
 end
 
-def gen_logs_dir(workdir,env,simult)
+def gen_logs_dir(work_dir,env,simult)
   if simult
     workdir = File.join(workdir,"simult-#{simult}")#workdir is a folder like simult-n/simult-n:i with i<n
   end
+  ret = {}
+  ret[:log_dir] = File.join(work_dir,"logs")
+  debug("      Creating logs dir '#{ret[:log_dir]}'")
+  FileUtils.mkdir_p(ret[:log_dir])
 
-  envlogdir = File.join(workdir,"logs")
-  debug("      Creating logs dir '#{envlogdir}'")
-  FileUtils.mkdir_p(envlogdir)
-
-  if simult
-    envresultfile=File.join(workdir,'..','..','..','results')
+  ret[:result_file] = if simult
+    File.join(work_dir,'..','..','..','results')
   else
-    envresultfile = File.join(workdir,'..','..','results')
+    File.join(work_dir,'..','..','results')
   end
 
-  envdebugfile = File.join(envlogdir,'debug')
-  envwidfile = File.join(envlogdir,'wid')
-  envdatefile = File.join(envlogdir,'time')
+  ret[:debug_file] = File.join(ret[:log_dir],'debug')
+  ret[:wid_file] = File.join(ret[:log_dir],'wid')
+  ret[:date_file] = File.join(ret[:log_dir],'time')
+  ret[:ok_file] = File.join(ret[:log_dir],'ok')
+  ret[:ko_file] = File.join(ret[:log_dir],'ko')
 
-  envcondir = File.join(workdir,"consoles")
-  debug("      Creating consoles dir '#{envcondir}'")
-  FileUtils.mkdir_p(envcondir)
-  envconbugdir = File.join(envcondir,'bugs')
-  debug("      Creating consoles bugs dir '#{envconbugdir}'")
-  FileUtils.mkdir_p(envconbugdir)
+  ret[:con_dir] = File.join(work_dir,"consoles")
+  debug("      Creating consoles dir '#{ret[:con_dir]}'")
+  FileUtils.mkdir_p(ret[:con_dir])
+  ret[:confail_dir] = File.join(ret[:con_dir],'fails')
+  debug("      Creating fails nodes consoles dir '#{ret[:confail_dir]}'")
+  FileUtils.mkdir_p(ret[:confail_dir])
 
-  sleep 1
+  system("date > #{ret[:date_file]}")
 
-  system("date > #{envdatefile}")
-
-  return envcondir,envresultfile,envdebugfile,envconbugdir,envwidfile
+  ret
 end
 
-def link_bugs(envcondir,envresultfile, envdebugfile,envconbugdir)
-  info('      Linking bugs')
-  File.open(envdebugfile) do |file|
-    dirls = nil
-    file.each_line do |line|
-      if line =~ /^\s*### KO\[(\S+)\]\s*$/ \
-      or line =~ /^\s*### CantConnect\[(\S+)\]\s*$/
-        nodename = Regexp.last_match(1).split('.')[0].strip
-        dirls = Dir.entries(envcondir) unless dirls
-        dirls.each do |filename|
-          if filename =~ /^#{nodename}\..*\.gz$/
-            FileUtils.ln_sf(
-              File.expand_path(File.join(envcondir,filename)),
-              envconbugdir
-            )
-          end
-        end
-      end
-    end
+def link_fails(condir, konodes ,bugdir)
+  info("      Linking #{konodes.size} console(s) script(s) of fail node(s)")
+  relpath = Pathname.new(condir).relative_path_from(Pathname.new(bugdir)).to_s
+  konodes.each do |node|
+    FileUtils.ln_sf(File.join(relpath,"#{node}#{TIMING_EXT}.gz"),bugdir)
+    FileUtils.ln_sf(File.join(relpath,"#{node}#{TYPESCRIPT_EXT}.gz"),bugdir)
   end
 end
 
@@ -413,7 +416,8 @@ def add_stats(expname,envdebugfile,env,run_id,iter,nok,nko,envcondir,nodes,wid)
           hashes[branch]["kadeploy"]=$version
           hashes[branch]["iter"]=iter
           hashes[branch]["id"]=expname+"-"+iter.to_s+"-"+env+"-"+branch
-          hashes[branch]["success"]=nok*100/(nok+nko)
+          hashes[branch]["n_success"]=nok
+          hashes[branch]["n_fail"]=nko
 
           if line =~ /Nodeset \[([\w|:]+)\] split into :/
             trunk=Regexp.last_match(1)
@@ -481,10 +485,6 @@ end
 
 def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter, exp)
   info("    Launch[#{$name}/#{env}#{(simultid ? "(#{simultid})" : '')}]")
-  ok_file = Tempfile.new("kanalyze-ok")
-  ok = ok_file.path
-  ko_file = Tempfile.new("kanalyze-ko")
-  ko = ko_file.path
 
   node_list = String.new
   nodes.each { |node|
@@ -500,8 +500,9 @@ def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter
   end
 
   envcondir, envresultfile, envdebugfile, envconbugdir, envwidfile = gen_logs_dir(workdir, env, simultid)
+  paths = gen_logs_dir(workdir, env, simultid)
 
-  cmd = "#{$kadeploy} #{node_list} -e \"#{env}\" -o #{ok} -n #{ko}"
+  cmd = "#{$kadeploy} #{node_list} -e \"#{env}\" -o #{paths[:ok_file]} -n #{paths[:ko_file]}"
   cmd += " --set-custom-operations #{exp['custom']} " if exp['custom']
   if $version >= '3.2'
     cmd += " --force "
@@ -510,35 +511,26 @@ def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter
   end
   cmd += " #{automata_opt}" if automata_opt and !automata_opt.empty?
   cmd += " -k"
-  cmd+=" #{$key}" if $key!=""
-  cmd += " --write-workflow-id #{envwidfile}"
-
+  cmd +=" #{$key}" if $key!=""
+  cmd += " --write-workflow-id #{paths[:wid_file]}"
   cmd += " | sed 's/.*/(#{simultid}) &/'" if simultid
-  cmd += " 1> #{envdebugfile} 2> #{envdebugfile}"
+  cmd += " 1> #{paths[:debug_file]} 2>&1"
 
-  nodefile=Tempfile.new('nodefile')
-  nodes.each{ |node| nodefile.write(node+'\n') }
 
   $cur_run[:run_id] = run_id
-  $cur_run[:envcondir] = envcondir
+  $cur_run[:envcondir] = paths[:con_dir]
 
   info("      Init conman monitoring #{(simultid ? simultid : '')}")
   pids=[]
-  conlogger_start(envcondir,nodes)
-  info("        Running Kadeploy")
+  conlogger_start(paths[:con_dir],nodes)
+  info("      Running Kadeploy")
   debug(cmd)
   res=system(cmd)
-  #res=system("touch "+envdebugfile) #useful to test without really deploying...
-  #res=system("cp ~/debug #{envdebugfile}")
 
-  info("      Stop conman monitoring #{(simultid ? simultid : '')}")
-  conlogger_stop(envcondir,nodes)
+  conlogger_stop(paths[:con_dir],nodes)
 
-  nodefile.unlink
 
-  Dir[File.join(envcondir,'*.timing'),File.join(envcondir,'*.typescript')].each{ |f| `gzip -f #{f}` }
-
-  link_bugs(envcondir,envresultfile,envdebugfile,envconbugdir)
+  Dir[File.join(paths[:con_dir],"*#{TIMING_EXT}"),File.join(paths[:con_dir],"*#{TYPESCRIPT_EXT}")].each{ |f| `gzip -f #{f}` }
 
   unless res
     $stderr.puts 'Kadeploy command failed, exiting'
@@ -546,20 +538,23 @@ def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter
     exit!(1)
   end
 
-  nbok = File.exists?(ok) ? IO.readlines(ok).size : 0
-  nbko = File.exists?(ko) ? IO.readlines(ko).size : 0
+  ok_nodes = File.exists?(paths[:ok_file]) ? IO.readlines(paths[:ok_file]).map{ |p| p.strip} : []
+  ko_nodes = File.exists?(paths[:ko_file]) ? IO.readlines(paths[:ko_file]).map{ |p| p.strip} : []
 
-  add_stats(expname,envdebugfile,env,run_id,iter,nbok,nbko,envcondir,nodes,File.read(envwidfile).strip)
 
-  return (nbko == 0), nbok, nbko, envresultfile unless $check
+  link_fails(paths[:con_dir],ko_nodes,paths[:confail_dir])
+
+
+  nbok = ok_nodes.size
+  nbko = ko_nodes.size
+
+  add_stats(expname,paths[:debug_file],env,run_id,iter,nbok,nbko,paths[:condir],nodes,File.read(paths[:wid_file]).strip)
+
+  return (nbko == 0), nbok, nbko, paths[:result_file] unless $check
 
   if (nbok > 0 && nbko == 0) then
-    deployed_nodes = Array.new
-    IO.readlines(ok).each { |node|
-      deployed_nodes.push(node.chomp)
-    }
     results = Hash.new
-    deployed_nodes.each { |node|
+    ok_nodes.each { |node|
       cmd = "ssh -q -o BatchMode=yes -o StrictHostKeyChecking=no -o PreferredAuthentications=publickey -o ConnectTimeout=2 root@#{node} \"true\" 1>&2"
       res = system(cmd)
       results[node] = res
@@ -571,9 +566,9 @@ def test_deploy(expname, nodes, macrosteps, env, simultid, workdir, run_id, iter
         no_errors = false
       end
     }
-    return no_errors, nbok, nbko, envresultfile
+    return no_errors, nbok, nbko, paths[:result_file]
   else
-    return false, nbok, nbko, envresultfile
+    return false, nbok, nbko, paths[:result_file]
   end
 end
 
@@ -642,11 +637,19 @@ def test_env(workdir,expname,run_id,macrosteps,env,iter,exp,simult=nil)
   end
 end
 
+def check_external_program(cmd)
+  cmd = cmd.split(' ')[0]
+  error("#{cmd} does not exist") if !system("which #{cmd} > /dev/null 2>&1")
+end
+
 def check_args(name,yaml_file,nodes,keyfile,exp)
   $exps=Array.new
   $nodes=Array.new
   $key=String.new
   $name=String.new
+#checks external program
+  check_external_program(CONSOLE_CMD)
+  check_external_program(SCRIPT_BIN)
 
 #checks the name
   $name = (name.empty? ? '' : "#{name}-") + Time.now.strftime("%Y-%m-%d-%H-%M-%S")
@@ -745,6 +748,24 @@ def load_cmdline_options
   check_args(name,ARGV.first,nodes,keyfile,exp)
 end
 
+def launch_cmd(cmd,exp,env,iter,testdir)
+        ENV['kanalyze_savedir'] = $savedir
+        ENV['kanalyze_expdir'] = File.join($savedir,testdir)
+        ENV['kanalyze_exp_name'] = exp['name']
+        ENV['kanalyze_kadeploy_version'] = $version
+        ENV['kanalyze_node_list'] = $nodes.join(' ')
+        ENV['kanalyze_iteration'] = iter.to_s
+        ENV['kanalyze_env'] = env
+        ENV['kanalyze_first_round'] = (iter==0).to_s
+        ENV['kanalyze_last_round'] = (exp['time'] == iter+1).to_s
+        ENV['kanalyze_total_iterations'] = exp['times'].to_s
+        Dir.chdir($pwd)
+        system(cmd)
+        e_status = $?.exitstatus
+        error("The command '#{cmd}' ends with #{e_status} exit status") if e_status != 0
+        Dir.chdir($savedir)
+end
+
 def run_test(exp)
   $results=Array.new
   info("Running experiment '#{exp['name']}'")
@@ -771,6 +792,10 @@ def run_test(exp)
       debug("    Creating environment dir '#{envdir}'")
       FileUtils.mkdir_p(envdir)
 
+      if exp['prepare_cmd']
+        info("      launch the prepare command(#{exp['prepare_cmd']})")
+        launch_cmd(exp['prepare_cmd'],exp,env,i,testdir)
+      end
       if exp['simult']
         exp['simult'].each do |simult|
           if simult > $nodes.size
@@ -785,6 +810,11 @@ def run_test(exp)
         end
       else
         test_env(envdir,exp['name'],run_id,macrosteps,env,i,exp)
+      end
+      #execute clean command if it provided
+      if exp['cleaner_cmd']
+        info("      launch the cleaner (#{exp['cleaner_cmd']})")
+        launch_cmd(exp['cleaner_cmd'],exp,env,i,testdir)
       end
     end
   end
@@ -806,6 +836,7 @@ end
 info("Working directory: #{$savedir}")
 info("Copying experiment description file #{File.basename(ARGV.first)}")
 FileUtils.cp(ARGV.first,$savedir)
+$pwd=Dir.pwd
 Dir.chdir($savedir)
 
 $statsdir=File.join('stats')

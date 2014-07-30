@@ -1,0 +1,74 @@
+#!/bin/bash -e
+#
+# debirf module: kadeploy-addons
+#
+# The debirf scripts were written by
+# Jameson Rollins <jrollins@fifthhorseman.net>
+# and
+# Daniel Kahn Gillmor <dkg@fifthhorseman.net>.
+#
+# They are Copyright 2007, and are all released under the GPL,
+# version 3 or later.
+#
+# This module has been added by
+# Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>
+
+
+echo "Configure some stuffs for Kadeploy"
+mkdir -p $DEBIRF_ROOT/mnt/dest
+mkdir -p $DEBIRF_ROOT/rambin
+mkdir -p $DEBIRF_ROOT/mnt/tmp
+mkdir -p $DEBIRF_ROOT/usr/local/bin
+
+rm -f /var/lib/dhcp/dhclient*.leases
+
+cp $DEBIRF_BUILDD/kadeploy_specific/scripts/* $DEBIRF_ROOT/usr/local/bin
+chmod +x $DEBIRF_ROOT/usr/local/bin/*
+
+cat > "$DEBIRF_ROOT/etc/rc.local" <<'EOF'
+#!/bin/bash -e
+
+# parse kadeploy-specific kernel command line arguments
+netdev=eth0
+for param in $(cat /proc/cmdline); do
+  if printf "%s" "$param" | egrep -q '^ETH_DEV='
+  then
+    netdev="$(printf "%s" "$param" | cut -f2 -d=)"
+  fi
+done
+
+#waiting netdev
+while ! ifconfig -a | grep $netdev > /dev/null
+do
+  sleep 1
+done
+
+ifup "$netdev"=dhcp
+if [ ! -f "/var/lib/dhcp/dhclient.${netdev}.leases" ]
+then
+  exit 1
+fi
+
+(while true; do nc -l -p 25300; done) &
+
+exit 0
+EOF
+
+chmod a+x "$DEBIRF_ROOT/etc/rc.local"
+
+cat > "$DEBIRF_ROOT/etc/dhcp/dhclient-enter-hooks.d/hostname" <<'EOF'
+if [ -n $new_host_name ] && [ -n $new_domain_name ]
+then
+        echo "$new_host_name.$new_domain_name" > /etc/hostname
+        /bin/hostname "$new_host_name.$new_domain_name"
+        if [ -n $new_ip_address ]
+        then
+                echo "$new_ip_address $new_host_name.$new_domain_name $new_host_name" >> /etc/hosts
+        fi
+fi
+EOF
+
+debirf_exec ln -s "/lib/systemd/system/rc-local.service" "/etc/systemd/system/rc-local.service"
+
+mkdir -p $DEBIRF_ROOT/root/.ssh
+cat $DEBIRF_BUILDD/kadeploy_specific/ssh/*.pub >> $DEBIRF_ROOT/root/.ssh/authorized_keys

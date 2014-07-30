@@ -23,7 +23,7 @@ This package provide the common part of the Kadeploy deployment tool.
 
 %package server
 Summary:        Server part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}, taktuk >= 3.6
+Requires:       ruby, ruby-mysql, kadeploy-common = %{version}
 Group:          System/Cluster
 %description server
 This package provide the server part of the Kadeploy deployment tool.
@@ -42,7 +42,7 @@ This package provide the client part of the Kadeploy deployment tool.
 
 %install
 rm -rf $RPM_BUILD_ROOT
-rake install[${RPM_BUILD_ROOT},fedora]
+rake install[${RPM_BUILD_ROOT},redhat]
 rake install_kastafior[${RPM_BUILD_ROOT}]
 
 %check
@@ -60,6 +60,8 @@ KADEPLOY3_LIBS/*
 %{_mandir}/man1/*
 %{_mandir}/man8/*
 %{_defaultdocdir}/kadeploy3/scripts/*
+%{_defaultdocdir}/kadeploy3/kastafior.gz
+%{_defaultdocdir}/kadeploy3/kascade.gz
 
 %files server
 %dir /var/log/kadeploy3

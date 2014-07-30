@@ -183,13 +183,16 @@ module Macrostep
       log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
     end
 
-    def fail!(task,nodeset)
+    def display_fail_message(task,nodeset)
       debug(2,"!!! The nodes #{nodeset.to_s_fold} failed on step #{task.name.to_s}",task.nsid)
       debug(1,
         "Step #{macroname} failed for #{nodeset.to_s_fold} "\
         "after #{Time.now.to_i - @start_time}s",
         task.nsid
       )
+    end
+
+    def fail!(task,nodeset)
       log("step#{idx+1}_duration",(Time.now.to_i-@start_time),nodeset)
     end
 
@@ -206,11 +209,11 @@ module Macrostep
     def split!(nsid0,nsid1,ns1,nsid2,ns2)
       initnsid = Debug.prefix(context[:cluster_prefix],nsid0)
       initnsid = '[0] ' if initnsid.empty?
-      debug(1,'---')
-      debug(1,"Nodeset #{initnsid}split into :")
-      debug(1,"  #{Debug.prefix(context[:cluster_prefix],nsid1)}#{ns1.to_s_fold}")
-      debug(1,"  #{Debug.prefix(context[:cluster_prefix],nsid2)}#{ns2.to_s_fold}")
-      debug(1,'---')
+      debug(1,'---',nsid0)
+      debug(1,"Nodeset #{initnsid}split into :",nsid0)
+      debug(1,"  #{Debug.prefix(context[:cluster_prefix],nsid1)}#{ns1.to_s_fold}",nsid0)
+      debug(1,"  #{Debug.prefix(context[:cluster_prefix],nsid2)}#{ns2.to_s_fold}",nsid0)
+      debug(1,'---',nsid0)
     end
 
     def start!()

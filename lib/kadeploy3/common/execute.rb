@@ -36,48 +36,43 @@ class Execute
     if opts[:stdin]
       in_r, in_w = IO::pipe
       in_w.sync = true
-
-      out_r, out_w = IO::pipe
-      err_r, err_w = IO::pipe
-
-      [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
     else
-      out_r, out_w = IO::pipe
-      err_r, err_w = IO::pipe
-
-      [ [nil,out_w,err_w], [nil,out_r,err_r] ]
+      in_r, in_w = [nil,nil]
     end
+
+    out_r, out_w = IO::pipe
+    err_r, err_w = IO::pipe
+
+    [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
   end
 
   def run(opts={:stdin => false})
     @@forkmutex.synchronize do
       @child_io, @parent_io = Execute.init_ios(opts)
-      @parent_io.each { |io| io.fcntl(Fcntl::F_SETFD, Fcntl::FD_CLOEXEC) if io }
       @exec_pid = fork {
         begin
-          @parent_io.each do |io|
-            begin
-              io.close if io and !io.closed?
-            rescue IOError
+
+          #stdin
+          STDIN.reopen(@child_io[0]) if opts[:stdin]
+
+          #stdout
+          STDOUT.reopen(@child_io[1])
+
+          #stderr
+          STDERR.reopen(@child_io[2])
+
+
+          # Close useless file descriptors.
+          # Since ruby 2.0, FD_CLOEXEC is set when ruby opens a descriptor.
+          # After performing exec(), all file descriptors are closed excepted 0,1,2
+          # https://bugs.ruby-lang.org/issues/5041
+          if RUBY_VERSION < "2.0"
+            ObjectSpace.each_object(IO) do |f|
+              #Some IO objects are not initialized while testing.
+              #So the function 'closed?' raises an exception. We ignore that.
+              f.close  if !f.closed? && ![0,1,2].include?(f.fileno) rescue IOError
             end
           end
-
-          std = nil
-          if opts[:stdin]
-            std = [STDIN, STDOUT, STDERR]
-          else
-            std = [nil, STDOUT, STDERR]
-          end
-
-          std.each_index do |i|
-            next unless std[i]
-            begin
-              std[i].reopen(@child_io[i])
-              @child_io[i].close
-            rescue IOError
-            end
-          end
-
           exec(*@command)
         rescue SystemCallError, Exception => e
           STDERR.puts "Fork Error: #{e.message} (#{e.class.name})"
@@ -87,10 +82,7 @@ class Execute
       }
 
       @child_io.each do |io|
-        begin
-          io.close if io and !io.closed?
-        rescue IOError
-        end
+        io.close if io and !io.closed?
       end
     end
     result = [@exec_pid, *@parent_io]
@@ -195,21 +187,38 @@ class Execute
     end
   end
 
+  EXECDEBUG = false
+  # kill a tree of processes. The killing is done in three steps:
+  # 1) STOP the target process
+  # 2) recursively kill all children
+  # 3) KILL the target process
   def self.kill_recursive(pid)
-    # Check that the process still exists
-    Process.kill(0,pid)
+    puts "Killing PID #{pid} from PID #{$$}" if EXECDEBUG
+
     # SIGSTOPs the process to avoid it creating new children
-    Process.kill('STOP',pid)
+    begin
+      Process.kill('STOP',pid)
+    rescue Errno::ESRCH # "no such process". The process was already killed, return.
+      puts "got ESRCH on STOP" if EXECDEBUG
+      return
+    end
     # Gather the list of children before killing the parent in order to
     # be able to kill children that will be re-attached to init
-    children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i rescue nil}
+    children = `ps --ppid #{pid} -o pid=`.split("\n").collect!{|p| p.strip.to_i}
     children.compact!
+    puts "Children: #{children}" if EXECDEBUG
     # Check that the process still exists
     # Directly kill the process not to generate <defunct> children
     children.each do |cpid|
       kill_recursive(cpid)
     end if children
-    Process.kill('KILL',pid)
+
+    begin
+      Process.kill('KILL',pid)
+    rescue Errno::ESRCH # "no such process". The process was already killed, return.
+      puts "got ESRCH on KILL" if EXECDEBUG
+      return
+    end
   end
 
   def kill()
@@ -218,10 +227,7 @@ class Execute
 
   def kill!()
     unless @exec_pid.nil?
-      begin
-        Execute.kill_recursive(@exec_pid)
-      rescue Errno::ESRCH
-      end
+      Execute.kill_recursive(@exec_pid)
       # This function do not wait the PID since the thread that use wait() is supposed to be running and to do so
     end
 
