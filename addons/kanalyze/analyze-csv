@@ -1,0 +1,35 @@
+#!/usr/bin/ruby
+# Simple script to analyze Kanalyze csv files
+
+require 'csv'
+require 'pp'
+require 'array_stats'
+
+d = CSV.read(ARGV[0])
+h = []
+d[1..-1].each do |r|
+  r2 = {}
+  (0...r.length).each do |i|
+    r2[d[0][i]] = r[i]
+  end
+  h << r2
+end
+#pp h
+
+#puts "Experiments:"
+#h.each do |r|
+#  puts "#{r['iter']} #{r['branch']} #{r['time2']}/#{r['time2_1']}"
+#end
+
+times = h.map { |r| r['time2_1'].to_i }
+puts "count: #{times.length}"
+puts "mean: #{times.mean}"
+puts "median: #{times.median}"
+puts "min: #{times.min}"
+puts "max: #{times.max}"
+puts "three worst:" 
+sorted = h.sort { |a, b| a['time2_1'].to_i <=> b['time2_1'].to_i }.reverse
+sorted[0..2].each do |r|
+  puts "#{r['iter']} #{r['branch']} #{r['time2']}/#{r['time2_1']}"
+end
+
