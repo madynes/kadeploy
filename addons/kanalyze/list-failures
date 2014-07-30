@@ -1,0 +1,13 @@
+#!/usr/bin/ruby
+# Simple script to list deployment failures
+# ./list-failures /path/to/kanalyze/results
+require 'pp'
+
+Dir::glob(ARGV[0]+'/**/debug').sort.each do |f|
+  puts "======= #{f} ========="
+  s = IO::readlines(f)
+  idx = s.index("The deployment failed on nodes\n")
+  if idx
+    puts s[idx+1..-1]
+  end
+end
