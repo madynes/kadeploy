@@ -40,8 +40,8 @@ class Execute
       in_r, in_w = [nil,nil]
     end
 
-    out_r, out_w = IO::pipe
-    err_r, err_w = IO::pipe
+    out_r, out_w = opts[:stdout] == false ? [nil,nil] : IO::pipe
+    err_r, err_w = opts[:stderr] == false ? [nil,nil] : IO::pipe
 
     [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
   end
@@ -53,13 +53,13 @@ class Execute
         begin
 
           #stdin
-          STDIN.reopen(@child_io[0]) if opts[:stdin]
+          STDIN.reopen(@child_io[0] || '/dev/null')
 
           #stdout
-          STDOUT.reopen(@child_io[1])
+          STDOUT.reopen(@child_io[1] || '/dev/null')
 
           #stderr
-          STDERR.reopen(@child_io[2])
+          STDERR.reopen(@child_io[2] || '/dev/null')
 
 
           # Close useless file descriptors.
@@ -113,7 +113,20 @@ class Execute
     end
     self
   end
-
+  def read_parent_io(num,size,emptypipes)
+    if @parent_io[num]
+      if size and size > 0
+        out = @parent_io[num].read(size) unless @parent_io[num].closed?
+        emptypipes = false if !@parent_io[num].closed? and !@parent_io[num].eof?
+        unless @parent_io[num].closed?
+            @parent_io[num].readpartial(4096) until @parent_io[num].eof?
+        end
+      else
+        out = @parent_io[num].read unless @parent_io[num].closed?
+      end
+    end
+    [out,emptypipes]
+  end
   # When :stdout_size or :stderr_size is given, if after have read the specified
   # amount of data, the pipe is not empty, the 4th return value is set to false
   def wait(opts={:checkstatus => true})
@@ -127,35 +140,9 @@ class Execute
           end
         end
 
-        if @parent_io
-          if opts[:stdout_size] and opts[:stdout_size] > 0
-            @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
-            emptypipes = false if !@parent_io[1].closed? and !@parent_io[1].eof?
-            unless @parent_io[1].closed?
-              begin
-                @parent_io[1].readpartial(4096) while true
-              rescue EOFError
-              end
-            end
-          else
-            @stdout = @parent_io[1].read unless @parent_io[1].closed?
-          end
-        end
+        @stdout,emptypipes = read_parent_io(1,opts[:stdout_size],emptypipes)
+        @stderr,emptypipes = read_parent_io(2,opts[:stderr_size],emptypipes)
 
-        if @parent_io
-          if opts[:stderr_size] and opts[:stderr_size] > 0
-            @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
-            emptypipes = false if !@parent_io[1].closed? and !@parent_io[2].eof?
-            unless @parent_io[2].closed?
-              begin
-                @parent_io[2].readpartial(4096) while true
-              rescue EOFError
-              end
-            end
-          else
-            @stderr = @parent_io[2].read unless @parent_io[2].closed?
-          end
-        end
         _, @status = Process.wait2(@exec_pid)
         @exec_pid = nil
       ensure
