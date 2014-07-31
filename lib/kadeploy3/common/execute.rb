@@ -40,8 +40,8 @@ class Execute
       in_r, in_w = [nil,nil]
     end
 
-    out_r, out_w = IO::pipe
-    err_r, err_w = IO::pipe
+    out_r, out_w = opts[:stdout] == false ? [nil,nil] : IO::pipe
+    err_r, err_w = opts[:stderr] == false ? [nil,nil] : IO::pipe
 
     [ [in_r,out_w,err_w], [in_w,out_r,err_r] ]
   end
@@ -53,13 +53,13 @@ class Execute
         begin
 
           #stdin
-          STDIN.reopen(@child_io[0]) if opts[:stdin]
+          STDIN.reopen(@child_io[0] || '/dev/null')
 
           #stdout
-          STDOUT.reopen(@child_io[1])
+          STDOUT.reopen(@child_io[1] || '/dev/null')
 
           #stderr
-          STDERR.reopen(@child_io[2])
+          STDERR.reopen(@child_io[2] || '/dev/null')
 
 
           # Close useless file descriptors.
@@ -127,7 +127,7 @@ class Execute
           end
         end
 
-        if @parent_io
+        if @parent_io[1]
           if opts[:stdout_size] and opts[:stdout_size] > 0
             @stdout = @parent_io[1].read(opts[:stdout_size]) unless @parent_io[1].closed?
             emptypipes = false if !@parent_io[1].closed? and !@parent_io[1].eof?
@@ -142,10 +142,10 @@ class Execute
           end
         end
 
-        if @parent_io
+        if @parent_io[2]
           if opts[:stderr_size] and opts[:stderr_size] > 0
             @stderr = @parent_io[2].read(opts[:stderr_size]) unless @parent_io[2].closed?
-            emptypipes = false if !@parent_io[1].closed? and !@parent_io[2].eof?
+            emptypipes = false if !@parent_io[2].closed? and !@parent_io[2].eof?
             unless @parent_io[2].closed?
               begin
                 @parent_io[2].readpartial(4096) while true
