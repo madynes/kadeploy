@@ -471,6 +471,7 @@ module Automata
       end
       if thr.alive?
         thr.kill
+        thr.join
         task.kill(false)
         success = false
         timeout!(task)
@@ -690,6 +691,7 @@ module Automata
             task.kill(false)
             threads.each_pair do |key,thread|
               thread.kill if thread.alive?
+              thread.join
             end
             task.free
           end
