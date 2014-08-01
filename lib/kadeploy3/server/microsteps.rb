@@ -1096,8 +1096,9 @@ class Microstep < Automata::QueueTask
           "--ok #{okfile.path} "+
           "--ko #{kofile.path} "+
           "#{(context[:cluster].use_ip_to_deploy)?'-I ':''} "+
-          "-D taktuk"+
-          " #{context[:common].kascade_options}"
+          "-D taktuk "+
+          "-P '-d #{context[:common].taktuk_tree_arity}#{context[:common].taktuk_auto_propagate ? ' -s':''}' "+
+          "#{context[:common].kascade_options}"
 
     @nodes_ok.clean()
     status,out,err = nil
