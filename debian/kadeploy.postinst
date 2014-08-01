@@ -16,8 +16,6 @@ touch /var/log/kadeploy3/access.log
 chown -R root:deploy /var/log/kadeploy3
 chmod -R 770 /var/log/kadeploy3
 
-chown deploy /var/run/kadeploy3d
-
 #DEBHELPER#
 
 exit 0
