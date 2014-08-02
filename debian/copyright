@@ -2,8 +2,6 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: kadeploy3
 Source: https://gforge.inria.fr/frs/?group_id=2026
 
-Files: *
-Copyright: Copyright 2008-2013 INRIA, Kadeploy Developers <kadeploy-devel@lists.gforge.inria.fr>
 License: CeCILL version 2.0
  CeCILL FREE SOFTWARE LICENSE AGREEMENT
  .
@@ -511,6 +509,10 @@ License: CeCILL version 2.0
  .
  Version 2.0 dated 2006-09-05.
 
+Files: *
+Copyright: Copyright 2008-2013 INRIA, Kadeploy Developers <kadeploy-devel@lists.gforge.inria.fr>
+License: CeCILL version 2.0
+
 Files: debian/*
 Copyright: Copyright 2013 Kadeploy developers <kadeploy-devel@lists.gforge.inria.fr>
-License: same as upstream (CeCILL version 2.0)
+License: CeCILL version 2.0
