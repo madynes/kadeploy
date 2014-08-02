@@ -5,7 +5,7 @@ Build-Depends: debhelper (>= 8), rake, help2man, gem2deb, texlive-latex-base, te
 Maintainer: Kadeploy developers <kadeploy3-devel@lists.gforge.inria.fr>
 Uploaders: Emmanuel Jeanvoine <emmanuel.jeanvoine@inria.fr>, Lucas Nussbaum <lucas@debian.org>
 XS-Ruby-Versions: all
-Standards-Version: 3.9.4
+Standards-Version: 3.9.5
 Homepage: http://kadeploy3.gforge.inria.fr/
 Vcs-Git: git://scm.gforge.inria.fr/kadeploy3/kadeploy3.git
 Vcs-Browser: https://gforge.inria.fr/scm/browser.php?group_id=2026
