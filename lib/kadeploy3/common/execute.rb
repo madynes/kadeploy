@@ -18,6 +18,7 @@ class Execute
 
     @child_io = nil
     @parent_io = nil
+    @pipe_lock = Mutex.new
 
     @kill_lock = Mutex.new
   end
@@ -49,7 +50,7 @@ class Execute
   def run(opts={:stdin => false})
     @@forkmutex.synchronize do
       @child_io, @parent_io = Execute.init_ios(opts)
-      @exec_pid = fork {
+      @exec_pid = fork do
         begin
 
           #stdin
@@ -79,10 +80,12 @@ class Execute
           STDERR.puts e.backtrace
         end
         exit! 1
-      }
-
-      @child_io.each do |io|
-        io.close if io and !io.closed?
+      end
+      @pipe_lock.synchronize do
+        @child_io.each do |io|
+          io.close if io and !io.closed?
+        end
+        @child_io = nil
       end
     end
     result = [@exec_pid, *@parent_io]
@@ -92,14 +95,7 @@ class Execute
         wait(opts)
         return ret
       ensure
-        @parent_io.each do |io|
-          begin
-            io.close if io and !io.closed?
-          rescue IOError
-          end
-        end if @parent_io
-        @parent_io = nil
-        @child_io = nil
+        close_all_pipes()
       end
     end
     result
@@ -114,15 +110,20 @@ class Execute
     self
   end
   def read_parent_io(num,size,emptypipes)
-    if @parent_io[num]
+    out=''
+    if @parent_io and @parent_io[num]
       if size and size > 0
-        out = @parent_io[num].read(size) unless @parent_io[num].closed?
-        emptypipes = false if !@parent_io[num].closed? and !@parent_io[num].eof?
-        unless @parent_io[num].closed?
-            @parent_io[num].readpartial(4096) until @parent_io[num].eof?
+        @pipe_lock.synchronize do
+          out = @parent_io[num].read(size) unless @parent_io[num].closed?
+          emptypipes = false if !@parent_io[num].closed? and !@parent_io[num].eof?
+          unless @parent_io[num].closed?
+              @parent_io[num].readpartial(4096) until @parent_io[num].eof?
+          end
         end
       else
-        out = @parent_io[num].read unless @parent_io[num].closed?
+        @pipe_lock.synchronize do
+          out = @parent_io[num].read unless @parent_io[num].closed?
+        end
       end
     end
     [out,emptypipes]
@@ -133,10 +134,9 @@ class Execute
     unless @exec_pid.nil?
       emptypipes = true
       begin
-        if @parent_io
-          begin
-            @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
-          rescue IOError
+        @pipe_lock.synchronize do
+          if @parent_io and @parent_io[0] and !@parent_io[0].closed?
+            @parent_io[0].close
           end
         end
 
@@ -154,14 +154,7 @@ class Execute
           end
           @exec_pid = nil
         else
-          @kill_lock.synchronize do
-            @parent_io.each do |io|
-              begin
-                io.close if io and !io.closed?
-              rescue IOError
-              end
-            end if @parent_io
-          end
+          close_all_pipes()
         end
         raise SignalException.new(@status.termsig) if @status and @status.signaled?
       end
@@ -217,20 +210,21 @@ class Execute
       Execute.kill_recursive(@exec_pid)
       # This function do not wait the PID since the thread that use wait() is supposed to be running and to do so
     end
+    close_all_pipes()
+  end
 
-    @parent_io.each do |io|
-      begin
+  def close_all_pipes()
+    @pipe_lock.synchronize do
+      @parent_io.each do |io|
         io.close if io and !io.closed?
-      rescue IOError
-      end
-    end if @parent_io
+      end if @parent_io
+      @parent_io = nil
 
-    @child_io.each do |io|
-      begin
+      @child_io.each do |io|
         io.close if io and !io.closed?
-      rescue IOError
-      end
-    end if @child_io
+      end if @child_io
+      @child_io = nil
+    end
   end
 
   def self.do(*cmd,&block)
