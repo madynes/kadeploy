@@ -8,7 +8,7 @@ suffix = ENV['DEB_BUILD_OPTIONS'].split(/ /).select { |e| e =~ /^devpkg=/ }.firs
 pkgs = ['kadeploy-common', 'kadeploy', 'kadeploy-client']
 
 if stage == "clean"
-  if File::exists?('debian/control.devpkg')
+  if File::exist?('debian/control.devpkg')
     FileUtils::mv('debian/control.devpkg', 'debian/control')
   end
   exit(0)
@@ -89,7 +89,7 @@ BINARIES.each do |b|
 end
 pkgs.map { |pkg| "#{pkg}-#{suffix}"}.each do |pkg|
   PATTERNS.each_pair do |k, v|
-    if File::exists?("debian/#{pkg}/#{k}")
+    if File::exist?("debian/#{pkg}/#{k}")
       FileUtils::mv("debian/#{pkg}/#{k}", "debian/#{pkg}/#{v}")
     end
   end
