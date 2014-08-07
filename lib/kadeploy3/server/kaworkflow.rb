@@ -734,15 +734,23 @@ module Kaworkflow
 
   def work_end_hook(kind,info)
     if info[:hook]
-      cmd= info[:hook].gsub('WORKFLOW_ID',info[:wid])
-      run=Execute[cmd]
+      cmd = info[:hook].gsub('WORKFLOW_ID',info[:wid])
+      run = Execute[cmd]
       begin
         Timeout::timeout(20) do
           run.run!(:stdin=>false,:stdout=>false,:stderr=>false)
           run.wait(:checkstatus=>false)
         end
-      rescue SignalException
-        STDERR.puts("The hook command has expired (#{cmd})")
+        if run.status.exitstatus != 0
+          STDERR.puts("[#{Time.now}] The hook command has returned non-null status: #{run.status.exitstatus} (#{cmd})")
+          STDERR.flush
+        end
+      rescue Timeout::Error
+        STDERR.puts("[#{Time.now}] The hook command has expired (#{cmd})")
+        STDERR.flush
+      rescue Exception => ex
+        STDERR.puts "[#{Time.now}] #{ex}"
+        STDERR.puts ex.backtrace
         STDERR.flush
       end
     end
