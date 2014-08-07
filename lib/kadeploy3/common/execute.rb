@@ -131,6 +131,9 @@ class Execute
   # When :stdout_size or :stderr_size is given, if after have read the specified
   # amount of data, the pipe is not empty, the 4th return value is set to false
   def wait(opts={:checkstatus => true})
+    # WARNING: #wait cannot be called by two concurrent threads. This will break,
+    # as e.g. there's a race with @exec_pid. This needs to be fixed if we ever
+    # want to call #wait from two threads.
     unless @exec_pid.nil?
       emptypipes = true
       begin
