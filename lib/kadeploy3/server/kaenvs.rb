@@ -140,27 +140,15 @@ module Kaenvs
   def envs_get(cexec,user=nil,name=nil,version=nil)
     envs = nil
     if user and name
-      if !user.empty? and !name.empty?
-        envs = Environment.get_from_db(
+      error_not_found! if name.empty?
+      envs = Environment.get_from_db_context(
           cexec.database,
           name,
           version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           user,
-          (cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
-          false
-        )
-      elsif user.empty? and !name.empty? # if no user and an env name, look for public envs
-        envs = Environment.get_from_db(
-          cexec.database,
-          name,
-          version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           cexec.user,
-          true,
-          true
-        )
-      else
-        error_not_found!
-      end
+          cexec.almighty_users
+          )
     else
       envs = Environment.get_list_from_db(
         cexec.database,

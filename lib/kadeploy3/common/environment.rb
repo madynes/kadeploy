@@ -338,6 +338,43 @@ class Environment
     return ret[0]
   end
 
+  # Get environment from database with context.
+  #
+  # Arguments
+  # * dbh: database connection
+  # * name: name of the requested environment if provided, nil otherwise
+  # * owner_user: owner of the requested environment if provided, nil otherwise
+  # * version: requested version if provided, nil otherwise
+  # * context_user: name of the requester
+  # * almighty_users: list of the almighty users
+  # Output
+  # * return a set of environments
+  #
+  # ======= Behavior wrt the version
+  # * If version is a fixnum: return all elements with this version
+  # * If version is true: the list is ordered according to the version
+  # * Otherwise only the last version is returned
+  #
+  # ======= Behavior wrt the optional parameters
+  # * If owner_user is nil or empty, look for the environments belonging to context_user first.
+  # * Private environments are returned if:
+  #   * context_user is equal to owner_user or owner_user is nil
+  #   * context_user is an almighty user
+  # * Public environments are returned if:
+  #   * owner_user is nil or empty
+  #   * no environment belongs to owner_user
+  def self.get_from_db_context(dbh,name,version,owner_user,context_user,almighty_users)
+    user2 = owner_user.nil? || owner_user.empty? ? context_user : owner_user
+    get_from_db(
+      dbh,
+      name,
+      version,
+      user2,
+      context_user == user2 || almighty_users.include?(context_user),
+      owner_user.nil? || owner_user.empty?
+      )
+  end
+
   def self.get_from_db(dbh, name, version, user, private_envs=false, public_envs=false)
     version = version.to_s if version.is_a?(Fixnum)
 
@@ -590,6 +627,11 @@ class Environment
     @options = env.options
     @recorded = env.recorded
     self
+  end
+
+  def load_from_db_context(dbh,name,version,user,context_user,almighty_users)
+    ret =  self.class.get_from_db_context(dbh,name,version,user,context_user,almighty_users)
+    load_from_env(ret[0]) if ret
   end
 
   def load_from_db(dbh, name, version, user, private_env=false, public_env=false)
