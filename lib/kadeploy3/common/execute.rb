@@ -156,7 +156,11 @@ class Execute
         else
           close_all_pipes()
         end
-        raise SignalException.new(@status.termsig) if @status and @status.signaled?
+        if opts[:checkstatus]
+          # raise SignalException if the process was terminated by a signal and we care
+          # about the status
+          raise SignalException.new(@status.termsig) if @status and @status.signaled?
+        end
       end
 
       raise KadeployExecuteError.new(
