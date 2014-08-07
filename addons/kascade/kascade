@@ -299,6 +299,11 @@ end
 
 #deploy with ruby-netssh
 class Ssh < Deploy
+  attr_accessor :params
+  def initialize()
+    @params="No parameter for SSH"
+  end
+
   def deploy
     $log.info 'Using ssh'
     require 'net/ssh'
@@ -357,8 +362,12 @@ end
 
 #deploy with taktuk in two step, first copy necessary files and second launch the process
 class Taktuk < Deploy
+  attr_accessor :params
+  def initialize()
+    @params="-t 3 -d -1 -w 100"
+  end
   def deploy
-    $log.info 'Using Taktuk'
+    $log.info "Using Taktuk with parameters : '#{@params}'"
 
     if $config[:nodeFile]==nil || $config[:modified_node_list]
       node_file=Tempfile.new('node_with_port')
@@ -376,7 +385,7 @@ class Taktuk < Deploy
     else
       ssh_opt=''
     end
-    taktuk_common="taktuk  -t 1 -d -1 -w 100 #{ssh_opt}  #{$log.info? ? '' : '-o status=-'} -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' -f #{file.path}"
+    taktuk_common="taktuk  #{@params} #{ssh_opt}  #{$log.info? ? '' : '-o status=-'} -o output='\"$host\t- $message\"' -o error='\"$host\t- $message\"' -f #{file.path}"
     cmd="#{taktuk_common} broadcast put [ #{__FILE__} ] [ #{@fountain_path} ], broadcast put [ #{node_file} ] [ #{@nodes_path} ]"
     $log.debug 'launching: '+cmd
     system(cmd)
@@ -392,15 +401,19 @@ end
 
 #deploy with clush in two step, first copy necessary files and second launch the process
 class Clush < Deploy
+  attr_accessor :params
+  def initialize()
+    @params="-t 3"
+  end
   def deploy
-    $log.info 'Using ClusterShell'
+    $log.info "Using ClusterShell with parameters : #{@params}"
     node_set=`nodeset -f #{get_nodes_list*' '}`.strip
     if $config[:ssh_command]!=nil
       ssh_opt="--option='#{$config[:ssh_command]}'"
     else
       ssh_opt=''
     end
-    clush = "clush -t 1 -w '#{node_set}' #{$log.info? ? '' : '-q'} #{ssh_opt}"
+    clush = "clush #{@params} -w '#{node_set}' #{$log.info? ? '' : '-q'} #{ssh_opt}"
     cmd="#{clush} --copy #{__FILE__} --dest #{@fountain_path} "
     $log.debug 'launching: '+cmd
     system(cmd)
@@ -514,7 +527,7 @@ end
 class Output
   attr_reader :queue
 
-  #initialize with variable output. In abstract class i can define without parameter and extend it with paramter.
+  #initialize with variable output. In abstract class i can define without parameter and extend it with parameter.
   def initialize(e)
     @stream=nil
     @threads=[]
@@ -1336,6 +1349,7 @@ OptionParser.new do |opts|
   opts.on('-m', '--master HOST', 'Specify the master hostname') { |v| $config[:master] = v }
   opts.on('-M', '--[no-]mr-proper', 'delete the script and node list') { |v| $config[:mr_proper] = v }
   opts.on('-p', '--port PORT', 'default port') { |v| $config[:port] = v }
+  opts.on('-P', '--deploy-parameter PARAMETERS', "Set parameter for deployer") { |v| $config[:deploy_params] = v}
   opts.on('-r', '--retry NUM', "Set number retry attempts, by default this value is #{$config[:retries]} and each retry is performed after 1s") { |v| $config[:retries] = v.to_i }
   opts.on('-R', '--retry2 TIME,retries', Array, "Set new retries number after time second default is #{$config[:retries2][0]},#{$config[:retries2][1]} ") { |v| $config[:retries2] = v }
   opts.on('-S', '--ssh-command SSH', 'custom ssh command (experimental)') { |v| $config[:ssh_command] = v }
@@ -1355,6 +1369,9 @@ fatal_error("Retries value must be > 0") unless $config[:retries] > 0
 if $config[:output].nil?
   fatal_error("No output mode specified. Use '-o FILE' or '-O COMMAND'. See kascade -?")
 end
+
+#Set deploy parameters if all is defined
+$config[:deploy].params = $config[:deploy_params] if $config[:deploy_params] and $config[:deploy]
 
 #Sort node by name
 if $config[:sort]
