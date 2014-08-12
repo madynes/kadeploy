@@ -230,13 +230,13 @@ module Kaworkflow
               :default=>'database')
             if type == 'database'
               p.check(env['user'],String,:errno=>APIError::INVALID_ENVIRONMENT)
-              unless context.environment.load_from_db(
+              unless context.environment.load_from_db_context(
                 context.database,
                 env['name'],
                 env['version'],
                 env['user'],
-                env['user'] == context.user,
-                env['user'].nil?
+                context.user,
+                context.almighty_users
               ) then
                 kaerror(APIError::INVALID_ENVIRONMENT,"the environment #{env['name']},#{env['version']} of #{env['user']} does not exist")
               end
