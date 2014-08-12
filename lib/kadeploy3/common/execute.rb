@@ -68,10 +68,17 @@ class Execute
           # After performing exec(), all file descriptors are closed excepted 0,1,2
           # https://bugs.ruby-lang.org/issues/5041
           if RUBY_VERSION < "2.0"
-            ObjectSpace.each_object(IO) do |f|
-              #Some IO objects are not initialized while testing.
-              #So the function 'closed?' raises an exception. We ignore that.
-              f.close  if !f.closed? && ![0,1,2].include?(f.fileno) rescue IOError
+            Dir.foreach('/proc/self/fd') do |opened_fd|
+              begin
+                fd=opened_fd.to_i
+                if fd>2
+                   f_IO=IO.new(fd)
+                   f_IO.close if !f_IO.closed?
+                end
+              rescue Exception
+                #Some file descriptor are reserved for the rubyVM.
+                #So the function 'IO.new' raises an exception. We ignore that.
+              end
             end
           end
           exec(*@command)
