@@ -30,6 +30,7 @@ module HTTPd
   LOGFILE_ACCESS='access.log'
   MAX_CLIENTS = 1000
   MAX_CONTENT_SIZE = 1048576 # 1 MB
+  SERVLET_TIMEOUT = 600 #10 min
 
   class HTTPError < Exception
     attr_reader :code,:headers
@@ -75,6 +76,18 @@ module HTTPd
       super(503,'Service Unavailable',msg,headers)
     end
   end
+
+  class ServletTimeout < Exception
+    def set_backtrace(array)
+      time=Time.now()
+      $stderr.puts("[#{time}] Servlet execution is timed out")
+      $stderr.puts("[#{time}] #{array.join("\n[#{time}] ")}")
+      $stderr.puts("[#{time}] === End of trace ===")
+      $stderr.flush()
+      super(array)
+    end
+  end
+
 
   class ContentBinding < Hash
   end
@@ -263,7 +276,6 @@ module HTTPd
     end
 
     def treatment(req,resp)
-      request_handler = RequestHandler.new(req)
 #
 # = A client disconnection kills the handle thread. 
 #   The handle thread can allocate some resources (ex : refs token in cache or compressedCSV) and be killed
@@ -296,8 +308,18 @@ module HTTPd
 #        raise WEBrick::HTTPStatus::EOFError
 #      end
 # ======
-      ret = handle(req,resp,request_handler)
-      [ret,request_handler]
+
+      # The webrick server has pool of threads. Threrefore, when a servlet never
+      # finishes, the used thread becomes busy.  When all threads are busy, the webrick
+      # server can't respond to new request.  This timeout raise an exception after 10
+      # min if the servlet has not finished. This exception shows where the thread was
+      # locked.
+
+      Timeout.timeout(SERVLET_TIMEOUT, ServletTimeout) do
+        request_handler = RequestHandler.new(req)
+        ret = handle(req,resp,request_handler)
+        return [ret,request_handler]
+      end
     end
 
     def do_METHOD(request, response)

@@ -18,6 +18,7 @@ class Execute
 
     @child_io = nil
     @parent_io = nil
+    @pipe_lock = Mutex.new
 
     @kill_lock = Mutex.new
   end
@@ -49,7 +50,7 @@ class Execute
   def run(opts={:stdin => false})
     @@forkmutex.synchronize do
       @child_io, @parent_io = Execute.init_ios(opts)
-      @exec_pid = fork {
+      @exec_pid = fork do
         begin
 
           #stdin
@@ -67,10 +68,17 @@ class Execute
           # After performing exec(), all file descriptors are closed excepted 0,1,2
           # https://bugs.ruby-lang.org/issues/5041
           if RUBY_VERSION < "2.0"
-            ObjectSpace.each_object(IO) do |f|
-              #Some IO objects are not initialized while testing.
-              #So the function 'closed?' raises an exception. We ignore that.
-              f.close  if !f.closed? && ![0,1,2].include?(f.fileno) rescue IOError
+            Dir.foreach('/proc/self/fd') do |opened_fd|
+              begin
+                fd=opened_fd.to_i
+                if fd>2
+                   f_IO=IO.new(fd)
+                   f_IO.close if !f_IO.closed?
+                end
+              rescue Exception
+                #Some file descriptor are reserved for the rubyVM.
+                #So the function 'IO.new' raises an exception. We ignore that.
+              end
             end
           end
           exec(*@command)
@@ -79,10 +87,12 @@ class Execute
           STDERR.puts e.backtrace
         end
         exit! 1
-      }
-
-      @child_io.each do |io|
-        io.close if io and !io.closed?
+      end
+      @pipe_lock.synchronize do
+        @child_io.each do |io|
+          io.close if io and !io.closed?
+        end
+        @child_io = nil
       end
     end
     result = [@exec_pid, *@parent_io]
@@ -92,14 +102,7 @@ class Execute
         wait(opts)
         return ret
       ensure
-        @parent_io.each do |io|
-          begin
-            io.close if io and !io.closed?
-          rescue IOError
-          end
-        end if @parent_io
-        @parent_io = nil
-        @child_io = nil
+        close_all_pipes()
       end
     end
     result
@@ -114,15 +117,20 @@ class Execute
     self
   end
   def read_parent_io(num,size,emptypipes)
-    if @parent_io[num]
+    out=''
+    if @parent_io and @parent_io[num]
       if size and size > 0
-        out = @parent_io[num].read(size) unless @parent_io[num].closed?
-        emptypipes = false if !@parent_io[num].closed? and !@parent_io[num].eof?
-        unless @parent_io[num].closed?
-            @parent_io[num].readpartial(4096) until @parent_io[num].eof?
+        @pipe_lock.synchronize do
+          out = @parent_io[num].read(size) unless @parent_io[num].closed?
+          emptypipes = false if !@parent_io[num].closed? and !@parent_io[num].eof?
+          unless @parent_io[num].closed?
+              @parent_io[num].readpartial(4096) until @parent_io[num].eof?
+          end
         end
       else
-        out = @parent_io[num].read unless @parent_io[num].closed?
+        @pipe_lock.synchronize do
+          out = @parent_io[num].read unless @parent_io[num].closed?
+        end
       end
     end
     [out,emptypipes]
@@ -130,13 +138,15 @@ class Execute
   # When :stdout_size or :stderr_size is given, if after have read the specified
   # amount of data, the pipe is not empty, the 4th return value is set to false
   def wait(opts={:checkstatus => true})
+    # WARNING: #wait cannot be called by two concurrent threads. This will break,
+    # as e.g. there's a race with @exec_pid. This needs to be fixed if we ever
+    # want to call #wait from two threads.
     unless @exec_pid.nil?
       emptypipes = true
       begin
-        if @parent_io
-          begin
-            @parent_io[0].close if @parent_io[0] and !@parent_io[0].closed?
-          rescue IOError
+        @pipe_lock.synchronize do
+          if @parent_io and @parent_io[0] and !@parent_io[0].closed?
+            @parent_io[0].close
           end
         end
 
@@ -154,16 +164,13 @@ class Execute
           end
           @exec_pid = nil
         else
-          @kill_lock.synchronize do
-            @parent_io.each do |io|
-              begin
-                io.close if io and !io.closed?
-              rescue IOError
-              end
-            end if @parent_io
-          end
+          close_all_pipes()
         end
-        raise SignalException.new(@status.termsig) if @status and @status.signaled?
+        if opts[:checkstatus]
+          # raise SignalException if the process was terminated by a signal and we care
+          # about the status
+          raise SignalException.new(@status.termsig) if @status and @status.signaled?
+        end
       end
 
       raise KadeployExecuteError.new(
@@ -217,20 +224,21 @@ class Execute
       Execute.kill_recursive(@exec_pid)
       # This function do not wait the PID since the thread that use wait() is supposed to be running and to do so
     end
+    close_all_pipes()
+  end
 
-    @parent_io.each do |io|
-      begin
+  def close_all_pipes()
+    @pipe_lock.synchronize do
+      @parent_io.each do |io|
         io.close if io and !io.closed?
-      rescue IOError
-      end
-    end if @parent_io
+      end if @parent_io
+      @parent_io = nil
 
-    @child_io.each do |io|
-      begin
+      @child_io.each do |io|
         io.close if io and !io.closed?
-      rescue IOError
-      end
-    end if @child_io
+      end if @child_io
+      @child_io = nil
+    end
   end
 
   def self.do(*cmd,&block)
