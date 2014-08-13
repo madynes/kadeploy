@@ -10,6 +10,7 @@ use Getopt::Long;
 use File::Basename;
 use Fcntl;
 use POSIX qw(:errno_h);
+use File::Temp qw(tempfile);
 
 my $src_cmd;
 my $cat_cmd;
@@ -42,6 +43,8 @@ my $nodefile;
 my $kasta_port = 34567;
 my $nested = 0;
 my $non_blocking;
+my $next_node_file = "";
+
 
 # Print help message
 sub usage()
@@ -159,17 +162,18 @@ if (not	$double_minus)
 Getopt::Long::Configure ("gnu_getopt");
 GetOptions ("source_command|s=s" => \$src_cmd,
             "cat_command|c=s" => \$cat_cmd,
-	    "input|i=s" => \$input_tar,
-	    "directory|d=s" => \$directory,
-	    "directory_src_tar|C=s"  => \$directory_src_tar,
-	    "flush|f" => \$flush,
-	    "nodefile|n=s" => \$nodefile,
-	    "port|p=i" => \$kasta_port,
+            "input|i=s" => \$input_tar,
+            "directory|d=s" => \$directory,
+            "directory_src_tar|C=s"  => \$directory_src_tar,
+            "flush|f" => \$flush,
+            "nodefile|n=s" => \$nodefile,
+            "port|p=i" => \$kasta_port,
             "verbose|v" => \$verbose,
-	    "debug|D" => \$debug,
-	    "nested|z=i" => \$nested,
-	    "nonblocking|w" => \$non_blocking,
-            "help|h" => \$sos
+            "debug|D" => \$debug,
+            "nested|z=i" => \$nested,
+            "nonblocking|w" => \$non_blocking,
+            "help|h" => \$sos,
+            "next_node_file|N=s" => \$next_node_file
     );
 
 # Treate -h or --help option
@@ -210,6 +214,11 @@ if (not defined($cat_cmd))
 
 if ($nested == 0)
 {
+
+    my $tmp_fh;
+    ($tmp_fh,$next_node_file) = tempfile();
+    close($tmp_fh);
+
     my $str_kasta_args = "";
     foreach my $argument (@kasta_args) 
     {	
@@ -217,11 +226,11 @@ if ($nested == 0)
     }
     $str_kasta_args =  "\"$str_kasta_args\"";
 
-    my $cmd = 'taktuk -n -o status -o output '.$taktuk_args.' -f '.$nodefile.' b e [ "sed -n \"/\$([ -r /tmp/kastafior_hostname ] && cat /tmp/kastafior_hostname || hostname)/{n;p}\" >/tmp/next" ]\\; b input file [ '.$nodefile.' ]';
+    my $cmd = 'taktuk -n -o status -o output '.$taktuk_args.' -f '.$nodefile.' b e [ "sed -n \"/\$([ -r /tmp/kastafior_hostname ] && cat /tmp/kastafior_hostname || hostname)/{n;p}\" >'.$next_node_file.'" ]\\; b input file [ '.$nodefile.' ]';
     exit(1) if (system($cmd) != 0);
 
     my $taktuk_cmd = "taktuk -o status -o output='\$rank.\":\".\$line.\"\\n\"' $taktuk_args -f $nodefile";
-    $taktuk_cmd .= " broadcast taktuk_perl [ -w -- - -- -z 1 $str_kasta_args $built_options ]\\;";
+    $taktuk_cmd .= " broadcast taktuk_perl [ -w -- - -- -z 1 -N $next_node_file $str_kasta_args $built_options ]\\;";
     $taktuk_cmd .= " broadcast input file [ $0 ]";
     print "[VERBOSE] taktuk command: $taktuk_cmd\n" if ($verbose);
     exit(1) if (system ($taktuk_cmd) != 0);
@@ -235,9 +244,10 @@ else
 
     print "[DEBUG] Rank $ENV{TAKTUK_RANK} among $ENV{TAKTUK_COUNT}\n" if ($debug);
 
-    open(FD, "/tmp/next");
+    open(FD, $next_node_file);
     my $next_host = <FD>;
     close(FD);
+    unlink($next_node_file);
     chomp($next_host) if defined($next_host);
 
     if ($ENV{TAKTUK_RANK} == 1)
