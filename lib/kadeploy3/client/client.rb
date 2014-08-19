@@ -1325,7 +1325,7 @@ class ClientWorkflow < Client
       if res['nodes']['ok'] and !res['nodes']['ok'].empty?
         debug "The #{self.class.operation().downcase} is successful on nodes"
         debug res['nodes']['ok'].join("\n")
-        File.open(options[:nodes_ok_file],'w+') do |f|
+        File.open(options[:nodes_ok_file],'a+') do |f|
           f.puts res['nodes']['ok'].join("\n")
         end if options[:nodes_ok_file]
       end
@@ -1336,7 +1336,7 @@ class ClientWorkflow < Client
         res['nodes']['ko'].each do |node|
           debug "#{node} (#{states[node]['error'] if states[node]})\n"
         end
-        File.open(options[:nodes_ko_file],'w+') do |f|
+        File.open(options[:nodes_ko_file],'a+') do |f|
           f.puts res['nodes']['ko'].join("\n")
         end if options[:nodes_ko_file]
       end
