@@ -22,24 +22,25 @@ $httpd = nil
 $mainthread = nil
 $ssh_key = nil
 
+def sigtrap_exit(sig)
+  th = Thread.new do
+    puts "\n#{sig} trapped, let's clean everything ..."
+    $kadeploy.shutdown = true if $kadeploy
+    $autoclean.kill() if $autoclean
+    $kadeploy.kill() if $kadeploy
+    $mainthread.kill() if $mainthread
+    $httpd.kill() if $httpd
+    exit 1
+  end
+  th.join()
+end
+
 Signal::trap("INT") do
-  puts "\nSIGINT trapped, let's clean everything ..."
-  $kadeploy.shutdown = true if $kadeploy
-  $autoclean.kill() if $autoclean
-  $kadeploy.kill() if $kadeploy
-  $mainthread.kill if $mainthread
-  $httpd.kill() if $httpd
-  exit 1
+  sigtrap_exit("INT")
 end
 
 Signal::trap("TERM") do
-  puts "\nSIGTERM trapped, let's clean everything ..."
-  $kadeploy.shutdown = true if $kadeploy
-  $autoclean.kill() if $autoclean
-  $mainthread.kill if $mainthread
-  $kadeploy.kill() if $kadeploy
-  $httpd.kill() if $httpd
-  exit 1
+  sigtrap_exit("TERM")
 end
 
 #require 'stringio'
