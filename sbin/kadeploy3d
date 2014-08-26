@@ -47,48 +47,51 @@ end
 
 # Reload the service & logfiles rotation (syslogd)
 Signal::trap("HUP") do
-  $stdout.puts "[#{Time.now}] HUP Received, reopening logs and reloading configuration."
-  $stdout.flush
-  # The launcher will read the file RUNFILE_RELOAD to know if the reload operation was successful
-  # In this file, the first line is the return code (0 if successfull)
-  # The following lines are representing the error message if there is an error
-  stderr = $stderr
-  $stderr = StringIO.new
-  # The config parser writes error messages on $stderr, since we want to
-  # write the return code as the first line of the reload file, and since
-  # to know if there is an error or not we have to launch the config parser,
-  # we cant redirect $stderr to the reload file directly
-  # That's why we are using a StringIO object in order to be able to store the
-  # error message that are written on $stderr and then write this message in the
-  # reload file AFTER the return code
+  th = Thread.new do
+    $stdout.puts "[#{Time.now}] HUP Received, reopening logs and reloading configuration."
+    $stdout.flush
+    # The launcher will read the file RUNFILE_RELOAD to know if the reload operation was successful
+    # In this file, the first line is the return code (0 if successfull)
+    # The following lines are representing the error message if there is an error
+    stderr = $stderr
+    $stderr = StringIO.new
+    # The config parser writes error messages on $stderr, since we want to
+    # write the return code as the first line of the reload file, and since
+    # to know if there is an error or not we have to launch the config parser,
+    # we cant redirect $stderr to the reload file directly
+    # That's why we are using a StringIO object in order to be able to store the
+    # error message that are written on $stderr and then write this message in the
+    # reload file AFTER the return code
 
-  $kadeploy_logfiles.each_value do |io|
-    if io
-      filename = File.readlink(File.join("/proc/self/fd/#{io.fileno}"))
-      io.reopen(filename,'a+')
+    $kadeploy_logfiles.each_value do |io|
+      if io
+        filename = File.readlink(File.join("/proc/self/fd/#{io.fileno}"))
+        io.reopen(filename,'a+')
+      end
+    end
+    file = File.open(File.join($kadeploy_rundir,RUNFILE_RELOAD),'w+')
+    begin
+      STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
+      $kadeploy.reload_config()
+      file.puts '0'
+    rescue Exception => e
+      STDERR.puts "[#{Time.now.to_s}] Failed to reload configuration files !"
+      if e.is_a?(Kadeploy::KadeployError)
+        file.puts '1'
+        error("#{Kadeploy::KadeployError.to_msg(e.errno)}"\
+          "#{(e.message and !e.message.empty? ? ': ' + e.message : '')}",false)
+      else
+        file.puts '2'
+        error(e.message,false)
+      end
+      file.write($stderr.string)
+    ensure
+      file.close unless file.closed?
+      $stderr.close unless $stderr.closed?
+      $stderr = stderr
     end
   end
-  file = File.open(File.join($kadeploy_rundir,RUNFILE_RELOAD),'w+')
-  begin
-    STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
-    $kadeploy.reload_config()
-    file.puts '0'
-  rescue Exception => e
-    STDERR.puts "[#{Time.now.to_s}] Failed to reload configuration files !"
-    if e.is_a?(Kadeploy::KadeployError)
-      file.puts '1'
-      error("#{Kadeploy::KadeployError.to_msg(e.errno)}"\
-        "#{(e.message and !e.message.empty? ? ': ' + e.message : '')}",false)
-    else
-      file.puts '2'
-      error(e.message,false)
-    end
-    file.write($stderr.string)
-  ensure
-    file.close unless file.closed?
-    $stderr.close unless $stderr.closed?
-    $stderr = stderr
-  end
+  th.join
 end
 
 
