@@ -1,0 +1,65 @@
+#!/usr/bin/ruby -w
+
+require 'socket'
+require 'pp'
+
+CommandLogger="/var/log/kadeploy3/command.log"
+
+Port=25301
+Command_port=25000
+system("touch #{CommandLogger} chmod o+x #{CommandLogger} && chmod 666 #{CommandLogger}")
+
+class HostOpen
+  def initialize(host)
+    @host = host
+    Thread.new do
+      @socket = TCPServer.new(host,Port)
+      puts "connexion #{host}:#{Port} is opened"
+      begin
+        while true
+           @socket.accept
+	   puts "test #{host}:#{Port}"
+        end
+      rescue Exception
+      end
+      puts "connexion #{host}:#{Port} is closed"
+    end
+  end
+  def shutdown
+    @socket.shutdown
+  end
+end
+
+connections={}
+commandsocket = TCPServer.new(Command_port)
+puts "logger path : #{CommandLogger}"
+puts "socket opened at #{Command_port} port"
+begin
+  while true do
+    t=commandsocket.accept
+       c=t.readline
+       s=c.split(' ')
+       host = s[1].strip if s.size > 1
+       case s[0].downcase
+       when 'start'
+           if connections[host]
+             puts "#{host} already opened"
+           else
+             connections[host] = HostOpen.new(host)
+           end
+       when 'stop'
+           if connections[host]
+             connections[host].shutdown
+             connections.delete(host)
+           else
+             puts "#{host} already down"
+           end
+       when 'turnoff'
+         commandsocket.shutdown
+       end
+       t.close
+  end
+rescue Exception
+
+end
+puts 'that\'s all folks'

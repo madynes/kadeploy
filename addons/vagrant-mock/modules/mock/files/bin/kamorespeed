@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sed -i 's/sleep(20)/#sleep(20)/g' /usr/lib/ruby/vendor_ruby/kadeploy3/server/microsteps.rb
