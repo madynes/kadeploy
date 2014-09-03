@@ -71,9 +71,10 @@ Signal::trap("HUP") do
     end
     file = File.open(File.join($kadeploy_rundir,RUNFILE_RELOAD),'w+')
     begin
-      STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
-      $kadeploy.reload_config()
-      file.puts '0'
+#      Hot relead is disabled.
+#      STDOUT.puts "[#{Time.now.to_s}] Reloading configuration files"
+#      $kadeploy.reload_config()
+#      file.puts '0'
     rescue Exception => e
       STDERR.puts "[#{Time.now.to_s}] Failed to reload configuration files !"
       if e.is_a?(Kadeploy::KadeployError)
