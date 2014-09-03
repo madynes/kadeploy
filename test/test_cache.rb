@@ -1,18 +1,36 @@
-$:.unshift File.join(File.dirname(__FILE__), '..', 'src','lib')
-require 'cache'
-require 'md5'
+#!/usr/bin/env ruby
+require '../lib/kadeploy3/server/cache'
+require '../lib/kadeploy3/common/error'
 require 'test/unit'
 require 'tempfile'
 require 'tmpdir'
 require 'pp'
 
-class TestCache < Test::Unit::TestCase
+class Oops < Exception
+  def initialize()
+    super("Oops")
+  end
+end
+class Cache < Test::Unit::TestCase
   def setup
     @dir = Dir.mktmpdir
     @tmpfiles = []
-    10.times { |i| @tmpfiles << Tempfile.new("FILE[#{i}]") }
     @files = []
-    @tmpfiles.each { |f| @files << f.path }
+    @pathbase = []
+  end
+
+  def create(i,size_start=30,size_inc=5)
+    tmpfiles= (1..i).map { |i| Tempfile.new("FILE[#{i}]") }
+    pathbase = (1..i).map { |i| "http://www.toton#{i}.fr"}
+    files = tmpfiles.map { |f| f.path }
+    size=size_start
+    files.each do |f|
+      `dd if=/dev/urandom of=#{f} bs=1 count=#{size} 2>/dev/null`
+      size+=size_inc
+    end
+    @tmpfiles+=tmpfiles
+    @files+=files
+    @pathbase+=pathbase
   end
 
   def teardown
@@ -20,76 +38,90 @@ class TestCache < Test::Unit::TestCase
     FileUtils.remove_entry_secure(@dir)
   end
 
-  def test_default
-    dir = Dir.mktmpdir
-    `dd if=/dev/urandom of=#{@files[0]} bs=1 count=30 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[1]} bs=1 count=45 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[2]} bs=1 count=20 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[3]} bs=1 count=50 2>/dev/null`
-    `cp #{@files[3]} #{@files[4]}`
+  def dir_empty(path)
+    Dir.foreach(path) do |f|
+      return false if !['.','..'].include?(f)
+    end
+    true
+  end
 
-    hashs = []
-    @files[0..4].each { |f| hashs << lambda { MD5::get_md5_sum(f) } }
-
-    cache = Cache.new(@dir,100,CacheIndexPHash)
-
-    f1 = cache.cache(@files[0],'http://testbed.lan/FILE0','u1',2,'pxe',hashs[0],Time.now)
-    f1dup = f1.dup
-    f2 = cache.cache(@files[1],'/home/testuser/FILE1','u2',1,'http',hashs[1],Time.now)
-    f3 = cache.cache(@files[2],'http://testbed.lan/FILE2','u1',1,'pxe',hashs[2],Time.now)
-    f4 = cache.cache(@files[3],'http://testbed.lan/FILE0','u2',2,'http',hashs[3],Time.now)
-    f4dup = f4.dup
-    f5 = cache.cache(@files[4],'http://testbed.lan/FILE0','u3',1,'env',hashs[4],Time.now)
-    f5dup = f5.dup
+  def md5(file)
+    Digest::MD5.file(file).hexdigest!
+  end
+  def test_basic
+    cache = Kadeploy::Cache.new(@dir,300,Kadeploy::CacheIndexPVHash,true,true)
+    create(5)
+    #cache(origin_uri,version,user,priority,tag,size,file_in_cache=nil,md5=nil,mtime=nil,&block)
+    f1 = cache.cache(@files[0],@pathbase[0],'u1',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',1,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u1',1,'pxe',File.size(@files[2]))
+    f4 = cache.cache(@files[3],@pathbase[3],'u2',2,'http',File.size(@files[3]))
+    f5 = cache.cache(@files[4],@pathbase[4],'u3',1,'env',File.size(@files[4]))
 
     assert_not_equal(f1,f2)
     assert_not_equal(f1,f3)
     assert_not_equal(f1,f4)
-    assert_not_equal(f1dup.filename,f4dup.filename)
     assert_not_equal(f1,f5)
-    assert_not_equal(f1dup.filename,f5dup.filename)
     assert_not_equal(f2,f3)
     assert_not_equal(f2,f4)
     assert_not_equal(f2,f5)
     assert_not_equal(f3,f4)
     assert_not_equal(f3,f5)
-    assert_equal(f4,f5)
-    assert_not_equal(f4dup.filename,f5dup.filename)
 
-    assert(cache.hit?(:path => f1.path))
-    assert(cache.hit?(:path => f2.path))
-    assert(!cache.hit?(:path => f3.path))
+    assert_equal(@files[0],f1.origin_uri)
+    assert_equal(@files[1],f2.origin_uri)
+    assert_equal(@files[2],f3.origin_uri)
+    assert_equal(@files[3],f4.origin_uri)
+    assert_equal(@files[4],f5.origin_uri)
 
-pp cache.files
-    cache2 = Cache.new(@dir,100,CacheIndexPHash)
-    assert_equal(cache.files.keys,cache2.files.keys)
+    assert_equal(f1.file,f1.file_in_cache)
 
+    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+      cache.free
+    end
+    assert(f1.used?,"f1 must be used")
+    assert(f2.used?,"f2 must be used")
+    assert(f3.used?,"f3 must be used")
+    assert(f4.used?,"f4 must be used")
+    assert(f5.used?,"f5 must be used")
+    f1.release
+    f2.release
+    cache.release(f3)
+    f4.release
+    cache.release(f5)
+    assert_raise Kadeploy::KadeployError do
+      f5.release
+    end
     cache.free
-    cache2.free
+    assert(dir_empty(@dir))
+  end
+  def test_limit()
+    cache = Kadeploy::Cache.new(@dir,300,Kadeploy::CacheIndexPVHash,true,true)
+    create(2,50,0)
+    #cache(origin_uri,version,user,priority,tag,size,file_in_cache=nil,md5=nil,mtime=nil,&block)
+    f1 = cache.cache(@files[0],@pathbase[0],'u1',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',1,'http',File.size(@files[1]))
+    assert_equal(f1.size,50)
+    assert_equal(f2.size,50)
   end
 
-  def test_lru
-    dir = Dir.mktmpdir
-    `dd if=/dev/urandom of=#{@files[0]} bs=1 count=15 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[1]} bs=1 count=15 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[2]} bs=1 count=15 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[3]} bs=1 count=60 2>/dev/null`
+  def test_last_recently_used
+    create(3,22,0)
+    create(1,60)
 
-    hashs = []
-    @files[0..3].each { |f| hashs << lambda { MD5::get_md5_sum(f) } }
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
 
-    cache = Cache.new(@dir,100,CacheIndexPHash)
 
-    pathbase = 'http://testbed.lan/FILE'
-
-    f1 = cache.cache(@files[0],pathbase+'0','u1',1,'pxe',hashs[0],Time.now)
+    f1 = cache.cache(@files[0],@pathbase[0],'u1',1,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',1,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'http',File.size(@files[2]))
     sleep(1)
-    f2 = cache.cache(@files[1],pathbase+'1','u2',1,'http',hashs[1],Time.now)
-    sleep(1)
-    f3 = cache.cache(@files[2],pathbase+'2','u2',1,'http',hashs[1],Time.now)
-    sleep(1)
-    f1.update_atime
-    f4 = cache.cache(@files[3],pathbase+'3','u1',1,'http',hashs[1],Time.now)
+    f2.file
+    f1.release
+    f2.release
+    f3.release
+    f4 = cache.cache(@files[3],@pathbase[3],'u1',1,'http',File.size(@files[3]))
+    f4.release
 
     assert_not_equal(f1,f2)
     assert_not_equal(f1,f3)
@@ -97,36 +129,33 @@ pp cache.files
     assert_not_equal(f2,f3)
     assert_not_equal(f2,f4)
     assert_not_equal(f3,f4)
-    assert(cache.hit?(:path => pathbase+'0'))
-    assert(!cache.hit?(:path => pathbase+'1'))
-    assert(cache.hit?(:path => pathbase+'2'))
-    assert(cache.hit?(:path => pathbase+'3'))
-
-pp cache.files
+    assert(f1.is_freed?,"f1 must be freed")
+    assert(!f2.is_freed?,"f2 must stay")
+    assert(f3.is_freed?,"f3 must be freed")
+    assert(!f4.is_freed?,"f4 must stay")
+    assert_equal(@files[0],f1.origin_uri)
+    assert_equal(@files[1],f2.origin_uri)
+    assert_equal(@files[2],f3.origin_uri)
+    assert_equal(@files[3],f4.origin_uri)
 
     cache.free
+    assert(dir_empty(@dir))
   end
 
   def test_prio
-    dir = Dir.mktmpdir
-    `dd if=/dev/urandom of=#{@files[0]} bs=1 count=15 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[1]} bs=1 count=15 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[2]} bs=1 count=15 2>/dev/null`
-    `dd if=/dev/urandom of=#{@files[3]} bs=1 count=60 2>/dev/null`
-
-    hashs = []
-    @files[0..3].each { |f| hashs << lambda { MD5::get_md5_sum(f) } }
-
-    cache = Cache.new(@dir,100,CacheIndexPHash)
-
-    pathbase = 'http://testbed.lan/FILE'
-
-    f1 = cache.cache(@files[0],pathbase+'0','u1',2,'pxe',hashs[0],Time.now)
-    f2 = cache.cache(@files[1],pathbase+'1','u2',1,'http',hashs[1],Time.now)
-    f3 = cache.cache(@files[2],pathbase+'2','u2',1,'http',hashs[1],Time.now)
+    create(3,22,0)
+    create(1,60)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',1,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'http',File.size(@files[2]))
+    f1.release
+    f2.release
+    f3.release
     sleep(1)
-    f2.update_atime
-    f4 = cache.cache(@files[3],pathbase+'3','u1',1,'http',hashs[1],Time.now)
+    f2.file
+    f4 = cache.cache(@files[3],@pathbase[3],'u2',1,'http',File.size(@files[3]))
+    f4.release
 
     assert_not_equal(f1,f2)
     assert_not_equal(f1,f3)
@@ -134,13 +163,276 @@ pp cache.files
     assert_not_equal(f2,f3)
     assert_not_equal(f2,f4)
     assert_not_equal(f3,f4)
-    assert(cache.hit?(:path => pathbase+'0'))
-    assert(cache.hit?(:path => pathbase+'1'))
-    assert(!cache.hit?(:path => pathbase+'2'))
-    assert(cache.hit?(:path => pathbase+'3'))
-
-pp cache.files
+    assert(!f1.is_freed?,"f1 must stay")
+    assert(f2.is_freed?,"f2 must be freed")
+    assert(f3.is_freed?,"f3 must be freed")
+    assert(!f4.is_freed?,"f4 must be stay")
+    assert_equal(@files[0],f1.origin_uri)
+    assert_equal(@files[1],f2.origin_uri)
+    assert_equal(@files[2],f3.origin_uri)
+    assert_equal(@files[3],f4.origin_uri)
 
     cache.free
+    assert(dir_empty(@dir))
+  end
+  def test_anonymous
+    create(3,22,0)
+    create(1,60)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'http',File.size(@files[2]))
+    f1.release
+    f2.release
+    f3.release
+    cache.clean
+    assert(!f1.is_freed?,"f1 must stay")
+    assert(f2.is_freed?,"f2 must be freed")
+    assert(!f3.is_freed?,"f3 must be freed")
+    cache.free
+    assert(dir_empty(@dir))
+  end
+  def test_reload_empty
+    create(3,22,0)
+    create(1,60)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'http',File.size(@files[2]))
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    assert_equal(0,cache.nb_files)
+    assert(dir_empty(@dir),"Dir is not empty!")
+  end
+  def test_reload
+    create(3,22,0)
+    hashf1 = Digest::MD5.file(@files[0]).hexdigest!
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'uaaa',2,'pxe',File.size(@files[0]),
+        nil,hashf1,'2007-02-25 15:20')
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'env',File.size(@files[2]))
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,false,true)
+    assert_equal(3,cache.nb_files)
+
+    h1 = cache.files[f1.file_in_cache].to_hash
+    assert_nil(h1[:lock],"no lock could be saved")
+    assert_nil(h1[:refs], "no refs could be saved")
+    assert_not_nil(h1[:atime_virt], "atime could be saved")
+    assert_equal(@files[0],h1[:origin_uri])
+    assert_equal(f1.file_in_cache,h1[:file_in_cache])
+    assert_equal(@pathbase[0],h1[:version])
+    assert_equal(2,h1[:priority])
+    assert_equal('uaaa',h1[:user])
+    assert_equal('pxe',h1[:tag] )
+    assert_equal(hashf1,h1[:md5])
+    assert_equal('2007-02-25 15:20',h1[:mtime])
+    assert_equal(22,h1[:size])
+
+    assert_equal(f1.to_hash,cache.files[f1.file_in_cache].to_hash)
+    assert_equal(f2.to_hash,cache.files[f2.file_in_cache].to_hash)
+    assert_equal(f3.to_hash,cache.files[f3.file_in_cache].to_hash)
+    cache.free
+    assert(dir_empty(@dir),"Dir is not empty!")
+  end
+  def test_reload_with_fail
+    create(3,22,0)
+    hashf1 = Digest::MD5.file(@files[0]).hexdigest!
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'uaaa',2,'pxe',File.size(@files[0]),
+        nil,hashf1,'2007-02-25 15:20')
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'env',File.size(@files[2]))
+    File.open(f2.meta,'w'){}
+    cache2= Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,false,true)
+    assert_equal(2,cache2.nb_files)
+
+    h1 = cache2.files[f1.file_in_cache].to_hash
+    assert_nil(h1[:lock], "no lock could be saved")
+    assert_nil(h1[:refs], "no refs could be saved")
+    assert_not_nil(h1[:atime_virt], "atime could be saved")
+    assert_equal(@files[0],h1[:origin_uri])
+    assert_equal(f1.file_in_cache,h1[:file_in_cache])
+    assert_equal(@pathbase[0],h1[:version])
+    assert_equal(2,h1[:priority])
+    assert_equal('uaaa',h1[:user])
+    assert_equal('pxe',h1[:tag] )
+    assert_equal(hashf1,h1[:md5])
+    assert_equal('2007-02-25 15:20',h1[:mtime])
+    assert_equal(22,h1[:size])
+
+    assert_equal(f1.to_hash,cache2.files[f1.file_in_cache].to_hash)
+    assert_equal(f3.to_hash,cache2.files[f3.file_in_cache].to_hash)
+    f1.release()
+    f2.release()
+    f3.release()
+    cache.free
+  end
+  def test_reload_with_fail2
+    skip("This test does not work with root user") if ENV["USER"] == "root"
+    create(3,22,0)
+    hashf1 = Digest::MD5.file(@files[0]).hexdigest!
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'uaaa',2,'pxe',File.size(@files[0]),
+        nil,hashf1,'2007-02-25 15:20')
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',1,'env',File.size(@files[2]))
+    system("chmod 000 #{f2.meta}")
+    assert(!File.readable?(f2.meta),"#{f2.meta} must be unreadable")
+    cache2= Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,false,true)
+    assert_equal(2,cache2.nb_files)
+
+    h1 = cache2.files[f1.file_in_cache].to_hash
+    assert_nil(h1[:lock], "no lock could be saved")
+    assert_nil(h1[:refs], "no refs could be saved")
+    assert_not_nil(h1[:atime_virt], "atime could be saved")
+    assert_equal(@files[0],h1[:origin_uri])
+    assert_equal(f1.file_in_cache,h1[:file_in_cache])
+    assert_equal(@pathbase[0],h1[:version])
+    assert_equal(2,h1[:priority])
+    assert_equal('uaaa',h1[:user])
+    assert_equal('pxe',h1[:tag] )
+    assert_equal(hashf1,h1[:md5])
+    assert_equal('2007-02-25 15:20',h1[:mtime])
+    assert_equal(22,h1[:size])
+
+    assert_equal(f1.to_hash,cache2.files[f1.file_in_cache].to_hash)
+    assert_equal(f3.to_hash,cache2.files[f3.file_in_cache].to_hash)
+    f1.release()
+    f2.release()
+    f3.release()
+    system("chmod 666 #{f2.meta}")
+    cache.free
+  end
+  def test_new_mtime
+    create(3,50,0)
+    f0md5= md5(@files[0])
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,nil,Time.now.to_s)
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    sleep(1)
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,nil,Time.now.to_s)
+    #must be fetched
+    assert_equal(f1,f3)
+    assert_equal(md5(f1.file_in_cache), md5(@files[2]))
+    assert_not_equal(md5(f1.file_in_cache), f0md5)
+  end
+  def test_old_mtime
+    create(3,50,0)
+    f0md5= md5(@files[0])
+    assert_not_equal(@files[0],@files[2],"files must be different")
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    t = Time.now.to_s
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,nil,t)
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,nil,t)
+    #does not be fetched
+    assert_equal(f1,f3)
+    assert_equal(md5(f1.file_in_cache), f0md5)
+    assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
+  end
+  def test_new_md5
+    create(3,50,0)
+    f0md5= md5(@files[0])
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,md5(@files[0]))
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,md5(@files[0]))
+    #must be fetched
+    assert_equal(f1,f3)
+    assert_equal(md5(f1.file_in_cache), md5(@files[2]))
+    assert_not_equal(md5(f1.file_in_cache), f0md5)
+  end
+  def test_old_md5
+    create(3,50,0)
+    f0md5= md5(@files[0])
+    assert_not_equal(@files[0],@files[2],"files must be different")
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    t = md5(@files[0])
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,t)
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,t)
+    #does not be fetched
+    assert_equal(f1,f3)
+    assert_equal(md5(f1.file_in_cache), f0md5)
+    assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
+  end
+  def test_bad_md5()
+    create(3,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,md5(@files[0]))
+    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+      f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',File.size(@files[1]),nil,"zejfziojfoazeifjozeijfazoiefo")
+    end
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',2,'pxe',File.size(@files[2]),nil,md5(@files[2]))
+    assert_equal(2,cache.nb_files)
+  end
+  def test_bad_size()
+    create(3,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+      f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',54544)
+    end
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',2,'pxe',File.size(@files[2]))
+    assert_equal(2,cache.nb_files)
+  end
+  def test_cache_is_full()
+    create(3,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u1',2,nil,File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',1,nil,File.size(@files[1]))
+    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+      f3 = cache.cache(@files[2],@pathbase[2],'u1',1,nil,File.size(@files[2]))
+    end
+    assert_equal(2,cache.nb_files)
+  end
+
+  def test_fetch()
+    create(2,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+      f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',File.size(@files[1])) do |origin,fic,size,md5|
+        FileUtils.cp(origin,fic)
+      end
+    assert_equal(2,cache.nb_files)
+  end
+  def test_raise_fetch()
+    create(3,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    assert_raise Oops do #Fails if no Exceptions are raised
+      f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',File.size(@files[1])) do
+        raise Oops.new()
+      end
+    end
+    f3 = cache.cache(@files[2],@pathbase[2],'u2',2,'pxe',File.size(@files[2]))
+    assert_equal(2,cache.nb_files)
+  end
+  def test_Cache_Index()
+    create(1,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPath,true,true)
+    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+      f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    end
+    assert_equal(0,cache.nb_files)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),"/tmp/toto.txt")
+    assert_equal(1,cache.nb_files)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPath,false,true)
+    assert_equal(1,cache.nb_files)
+    assert_equal(f1.to_hash,cache.files[f1.file_in_cache].to_hash)
+    cache.free()
+    assert(!File.exists?(f1.file_in_cache))
   end
 end
