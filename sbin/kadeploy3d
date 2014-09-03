@@ -47,6 +47,8 @@ end
 
 # Reload the service & logfiles rotation (syslogd)
 Signal::trap("HUP") do
+  $stdout.puts "[#{Time.now}] HUP Received, reopening logs and reloading configuration."
+  $stdout.flush
   # The launcher will read the file RUNFILE_RELOAD to know if the reload operation was successful
   # In this file, the first line is the return code (0 if successfull)
   # The following lines are representing the error message if there is an error
