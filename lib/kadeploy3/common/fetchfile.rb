@@ -6,15 +6,15 @@ require 'digest/md5'
 module Kadeploy
 
 class FetchFile
-  attr_reader :path
+  attr_reader :origin_uri
 
-  def initialize(path,client=nil)
-    @path = path
+  def initialize(origin_uri,client=nil)
+    @origin_uri = origin_uri
     @client = client
   end
 
-  def self.[](path,client=nil)
-    uri = URI.parse(path)
+  def self.[](origin_uri,client=nil)
+    uri = URI.parse(origin_uri)
     kind = uri.scheme || 'local'
     case kind
     when 'local'
@@ -22,11 +22,11 @@ class FetchFile
     when 'server'
       fetcher = ServerFetchFile.new(uri.path,client)
     when 'http','https'
-      fetcher = HTTPFetchFile.new(path,client)
+      fetcher = HTTPFetchFile.new(origin_uri,client)
     else
       raise KadeployError.new(
         APIError::INVALID_FILE,nil,
-        "Unable to grab the file '#{path}', unknown protocol #{kind}"
+        "Unable to grab the file '#{origin_uri}', unknown protocol #{kind}"
       )
     end
     fetcher
@@ -59,110 +59,118 @@ end
 
 class ServerFetchFile < FetchFile
   def size
-    if File.readable?(@path)
-      File.size(@path)
+    if File.readable?(@origin_uri)
+      File.size(@origin_uri)
     else
-      error("Unable to grab the file #{@path}")
+      error("Unable to grab the file #{@origin_uri}")
     end
   end
 
   def checksum
-    if File.readable?(@path)
-      Digest::MD5.file(@path).hexdigest!
+    if File.readable?(@origin_uri)
+      Digest::MD5.file(@origin_uri).hexdigest!
     else
-      error("Unable to grab the file #{@path}")
+      error("Unable to grab the file #{@origin_uri}")
     end
   end
 
   def mtime
-    if File.readable?(@path)
-      File.mtime(@path).to_i
+    if File.readable?(@origin_uri)
+      File.mtime(@origin_uri).to_i
     else
-      error("Unable to grab the file #{@path}")
+      error("Unable to grab the file #{@origin_uri}")
     end
   end
 
   def grab(dest,dir=nil)
-    if File.readable?(@path)
+    if File.readable?(@origin_uri)
       begin
-        Execute['cp',@path,dest].run!.wait
+        Execute['cp',@origin_uri,dest].run!.wait
       rescue Exception => e
-        error("Unable to grab the file #{@path} (#{e.message})")
+        error("Unable to grab the file #{@origin_uri} (#{e.message})")
       end
     else
-      error("Unable to grab the file #{@path}")
+      error("Unable to grab the file #{@origin_uri}")
     end
   end
 end
 
 class HTTPFetchFile < FetchFile
+  #Get file status when at first time.
+  def get_file_status(uri)
+    if @file_status
+      @file_status
+    else
+      @file_status = HTTP.check_file(uri)
+    end
+  end
   def size
     begin
-      HTTP::get_file_size(@path)
+      Time.parse(get_file_status(@origin_uri)['Content-Length'][0]).to_i
     rescue KadeployHTTPError => k
-      error("Unable to get the size of #{@path} (http error ##{k.errno})")
+      error("Unable to get the size of #{@origin_uri} (http error ##{k.errno})")
     rescue Errno::ECONNREFUSED
-      error("Unable to get the size of #{@path} (connection refused)")
+      error("Unable to get the size of #{@origin_uri} (connection refused)")
     rescue KadeployError => ke
       raise ke
     rescue Exception => e
-      error("Unable to grab the file #{@path} (#{e.message})")
+      error("Unable to grab the file #{@origin_uri} (#{e.message})")
     end
   end
 
   def checksum
     begin
-      HTTP.check_file(@path)['etag'][0]
+      get_file_status(@origin_uri)['etag'][0]
     rescue KadeployHTTPError => k
-      error("Unable to get the checksum of #{@path} (http error ##{k.errno})")
+      error("Unable to get the checksum of #{@origin_uri} (http error ##{k.errno})")
     rescue KadeployError => ke
       raise ke
     rescue Exception => e
-      error("Unable to get the checksum of #{@path} (#{e.message})")
+      error("Unable to get the checksum of #{@origin_uri} (#{e.message})")
     end
   end
 
   def mtime
     begin
-      HTTP::get_file_mtime(@path)
+      get_file_status(@origin_uri)['last-modified'][0]
     rescue KadeployHTTPError => k
-      error("Unable to get the mtime of #{@path} (http error ##{k.errno})")
+      error("Unable to get the mtime of #{@origin_uri} (http error ##{k.errno})")
     rescue KadeployError => ke
       raise ke
     rescue Errno::ECONNREFUSED
-      error("Unable to get the mtime of #{@path} (connection refused)")
+      error("Unable to get the mtime of #{@origin_uri} (connection refused)")
     rescue Exception => e
-      error("Unable to grab the file #{@path} (#{e.message})")
+      error("Unable to grab the file #{@origin_uri} (#{e.message})")
     end
   end
 
   def grab(dest,dir=nil)
     begin
-      HTTP.fetch_file(@path,dest)
+      HTTP.fetch_file(@origin_uri,dest)
       nil
     rescue KadeployHTTPError => k
-      error("Unable to get the mtime of #{@path} (http error ##{k.errno})")
+      error("Unable to get the mtime of #{@origin_uri} (http error ##{k.errno})")
     rescue KadeployError => ke
       raise ke
     rescue Errno::ECONNREFUSED
-      error("Unable to get the mtime of #{@path} (connection refused)")
+      error("Unable to get the mtime of #{@origin_uri} (connection refused)")
     rescue Exception => e
-      error("Unable to grab the file #{@path} (#{e.message})")
+      error("Unable to grab the file #{@origin_uri} (#{e.message})")
     end
   end
 end
 
 class LocalFetchFile < HTTPFetchFile
-  def initialize(path,client=nil)
-    super(path,client)
+  def initialize(origin_uri,client=nil)
+    super(origin_uri,client)
     raise KadeployError.new(APIError::INVALID_CLIENT,nil,'No client was specified') unless @client
 
-    @path = File.join(@client.to_s,Base64.urlsafe_encode64(@path))
+    @origin_uri = File.join(@client.to_s,Base64.urlsafe_encode64(@origin_uri))
     begin
-      URI.parse(@path)
+      URI.parse(@origin_uri)
       nil
     rescue
-      raise KadeployError.new(APIError::INVALID_CLIENT,nil,'Invalid client path')
+      raise KadeployError.new(APIError::INVALID_CLIENT,nil,'Invalid client origin_uri')
     end
   end
 end

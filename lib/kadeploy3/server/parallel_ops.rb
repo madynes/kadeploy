@@ -27,7 +27,7 @@ module Kadeploy
 
     def kill
       @taktuk.kill! unless @taktuk.nil?
-      free()
+      #free() It is a race condition and it will be freed by do_taktuk
     end
 
     def free

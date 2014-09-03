@@ -604,7 +604,6 @@ module Kaworkflow
           end
         end
       end
-      info[:database].disconnect if info[:database]
       if info[:cached_files]
         info[:cached_files][:global].each do |file|
           info[:config].caches[:global].release(file)

@@ -25,7 +25,7 @@ module Database
       end
     end
   end
-  
+
   class Db
     attr_accessor :dbh
 
@@ -34,9 +34,18 @@ module Database
     # Arguments
     # * nothing
     # Output
-    # * nothing    
+    # * nothing
     def initialize
       @dbh = nil
+    end
+
+    # Abstract method to disconnect from the database and free internal data structures
+    #
+    # Arguments
+    # * nothing
+    # Output
+    # * nothing
+    def free
     end
 
     # Abstract method to connect to the database
@@ -51,14 +60,6 @@ module Database
     def connect(host, user, passwd, base)
     end
 
-    # Abstract method to disconnect from the database
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def disconnect
-    end
 
     # Abstract method to run a query
     #
@@ -131,6 +132,7 @@ module Database
 
   class DbMysql < Db
     def free()
+      @dbh.close if (@dbh != nil)
       @dbh = nil
     end
 
@@ -165,16 +167,6 @@ module Database
         ret = false
       end
       return ret
-    end
-
-    # Disconnect from the MySQL database
-    #
-    # Arguments
-    # * nothing
-    # Output
-    # * nothing
-    def disconnect
-      @dbh.close if (@dbh != nil)
     end
 
     # Run a query using SQL

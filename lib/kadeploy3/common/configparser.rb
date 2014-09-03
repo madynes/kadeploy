@@ -198,7 +198,7 @@ module Configuration
 
     # A file, checking if exists (creating it otherwise) and writable
     def check_file(val, file, fieldname)
-      if File.exists?(val)
+      if File.exist?(val)
         unless File.file?(val)
           raise ParserError.new("The file '#{val}' is not a regular file")
         end
@@ -259,7 +259,7 @@ module Configuration
         val.gsub!(val,File.join(args[:prefix],val)) if !tmp.absolute? and !val.empty?
       end
       val.gsub!(val,File.join(val,args[:suffix])) if args[:suffix]
-      if File.exists?(val)
+      if File.exist?(val)
         if File.file?(val)
           if args[:writable]
             unless File.stat(val).writable?

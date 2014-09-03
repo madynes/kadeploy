@@ -425,13 +425,14 @@ module TakTuk
       @args += @hostlist.to_cmd
       @args += @commands.to_cmd
 
-      @exec = Execute[@binary,*@args].run!
       hosts = @hostlist.to_a
       outputs_size = opts[:outputs_size] || 0
-      @status, @stdout, @stderr, emptypipes = @exec.wait(
+      @exec = Execute[@binary,*@args].run!(
         :stdout_size => outputs_size * hosts.size,
-        :stderr_size => outputs_size * hosts.size
+        :stderr_size => outputs_size * hosts.size,
+        :stdin => false
       )
+      @status, @stdout, @stderr, emptypipes = @exec.wait({:checkstatus=>false})
 
       unless @status.success?
         @curthread = nil

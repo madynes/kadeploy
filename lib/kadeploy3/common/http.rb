@@ -212,6 +212,8 @@ module HTTP
       case kind
       when :GET
         ret = Net::HTTP::Get.new(path,header)
+      when :HEAD
+        ret = Net::HTTP::Head.new(path,header)
       when :POST
         ret = Net::HTTP::Post.new(path,header)
       when :PUT

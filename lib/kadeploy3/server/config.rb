@@ -147,7 +147,7 @@ module Configuration
         ret[:global] = Cache.new(
           @static[:caches][:global][:directory],
           @static[:caches][:global][:size],
-          CacheIndexPVHash,true,nil,true
+          CacheIndexPVHash,true,true
         )
       end
 
@@ -155,7 +155,7 @@ module Configuration
         ret[:netboot] = Cache.new(
           @static[:caches][:netboot][:directory],
           @static[:caches][:netboot][:size],
-          CacheIndexPVHash,false,nil,false
+          CacheIndexPath,false,false
         )
       end
 

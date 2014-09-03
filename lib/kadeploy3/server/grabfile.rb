@@ -26,54 +26,50 @@ class GrabFile
     raise KadeployError.new(errno,nil,msg)
   end
 
-  def grab(path,version,user,priority,tag,checksum=nil,opts={})
-    return nil if !path or path.empty?
+  def grab(origin_uri,version,user,priority,tag,checksum=nil,opts={})
+    return nil if !origin_uri or origin_uri.empty?
     cf = nil
-    fetcher = FetchFile[path,@client]
+    fetcher = FetchFile[origin_uri,@client]
 
     unless @cache
       error(APIError::CACHE_ERROR,
-        "Impossible to cache the file '#{path}', the cache is disabled")
+        "Impossible to cache the file '#{origin_uri}', the cache is disabled")
     end
 
-    if fetcher.size > @cache.maxsize
+    if fetcher.size > @cache.max_size
       error(APIError::CACHE_ERROR,
-        "Impossible to cache the file '#{path}', the file is too big for the cache")
+        "Impossible to cache the file '#{origin_uri}', the file is too big for the cache")
     end
 
     if opts[:maxsize] and fetcher.size > opts[:maxsize]
       error(APIError::INVALID_FILE,
-        "The #{tag} file '#{path}' is too big "\
+        "The #{tag} file '#{origin_uri}' is too big "\
         "(#{opts[:maxsize]/(1024*1024)} MB is the max allowed size)"
       )
     end
 
-    fmtime = lambda{ fetcher.mtime }
-    fchecksum = lambda{ fetcher.checksum }
-    fpath = nil
-    fpath = opts[:file] if opts[:file]
+    fmtime = checksum ? nil : fetcher.mtime #does not use the mtime if checksum is provided
+    fchecksum = checksum ? checksum : nil #use checksum if it provided.
 
     cf = @cache.cache(
-      path,version,user,priority,tag,fetcher.size,
-      fpath,fchecksum,fmtime
-    ) do |file,op,hit|
-      if checksum and !checksum.empty?
-        # A file was already on the cache with the wrong checksum
-        if hit
-          error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
+      origin_uri,version,user,priority,tag,fetcher.size,
+      opts[:file],fchecksum,fmtime
+    ) do |source,destination,size,md5|
+
+      if md5 && fetcher.checksum && md5 != fetcher.checksum # fetcher provides the checksum
+        error(APIError::INVALID_FILE,"Checksum of the file '#{source}' does not match "\
             "(an update is necessary)")
-        # The file does not have the checksum specified in the database
-        elsif !fetcher.uptodate?(checksum,0)
-          error(APIError::INVALID_FILE,"Checksum of the file '#{path}' does not match "\
-            "(an update is necessary)")
-        end
       end
 
-      # The file isnt in the cache, grab it
-      debug(3, "Grab the #{tag} file #{path}")
-      fetcher.grab(file,@cache.directory)
-      op[:mode] = @mode
-      op[:norename] = (!opts[:file].nil? and !opts[:file].empty?)
+      # The file does not in the cache, grab it
+      debug(3, "Grab the #{tag} file #{source}")
+      fetcher.grab(destination)
+
+      #fetcher does not provides checksum
+      if md5 && fetcher.checksum.nil? && md5 != Digest::MD5.file(destination).hexdigest!
+        error(APIError::INVALID_FILE,"Checksum of the file '#{source}' does not match "\
+            "(an update is necessary)")
+      end
     end
 
     @lock.synchronize do
@@ -137,7 +133,7 @@ class GrabFile
     # SSH key file
     grab(gfm,context,cexec.key,:anon,'key')
 
-    #Grab tarball, Prinstall and Postinstall archive if only inside deploy kind
+    #Grab tarball, Preinstall and Postinstall archive if only inside deploy kind
     if kind == :deploy
       # Env tarball
       if env and tmp = env.tarball
