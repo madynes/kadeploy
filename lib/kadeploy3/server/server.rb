@@ -120,7 +120,7 @@ class KadeployServer
 
   def check_database()
     begin
-      database_handler().disconnect
+      database_handler().free
     rescue
       kaerror(APIError::DATABASE_ERROR,'Cannot connect to the database')
     end
@@ -209,7 +209,7 @@ class KadeployServer
   end
 
   def free_exec_context(context)
-    context.database.disconnect if context.database
+    context.database.free if context.database
     context.almighty_users.clear if context.almighty_users
     context.almighty_users = nil
     context.database = nil
