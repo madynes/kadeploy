@@ -115,7 +115,8 @@ Signal::trap('USR2') do
     Thread.list.each do |thread|
       t=Time.now
       STDERR.puts "[#{t}]========= Thread #{thread.object_id.to_s} =========="
-      STDERR.puts thread.backtrace.join("\n[#{t}]    \\_ ")
+      bt = thread.backtrace
+      STDERR.puts "[#{t}] #{bt ? bt.join("\n[#{t}]    \\_ ") : "Thread has no backtrace, its status is: #{thread.status}"}"
       STDERR.puts "[#{t}]================= END ================="
     end
   end
