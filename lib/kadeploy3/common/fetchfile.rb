@@ -96,6 +96,11 @@ class ServerFetchFile < FetchFile
 end
 
 class HTTPFetchFile < FetchFile
+  def initialize(origin_uri,client=nil)
+    super(origin_uri,client)
+    @file_status = nil
+  end
+
   #Get file status when at first time.
   def get_file_status(uri)
     if @file_status
@@ -106,7 +111,7 @@ class HTTPFetchFile < FetchFile
   end
   def size
     begin
-      Time.parse(get_file_status(@origin_uri)['Content-Length'][0]).to_i
+      get_file_status(@origin_uri)['content-length'][0].to_i
     rescue KadeployHTTPError => k
       error("Unable to get the size of #{@origin_uri} (http error ##{k.errno})")
     rescue Errno::ECONNREFUSED
@@ -132,7 +137,7 @@ class HTTPFetchFile < FetchFile
 
   def mtime
     begin
-      get_file_status(@origin_uri)['last-modified'][0]
+      Time.parse(get_file_status(@origin_uri)['last-modified'][0])
     rescue KadeployHTTPError => k
       error("Unable to get the mtime of #{@origin_uri} (http error ##{k.errno})")
     rescue KadeployError => ke
