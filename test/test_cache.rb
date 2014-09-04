@@ -51,7 +51,6 @@ class Cache < Test::Unit::TestCase
   def test_basic
     cache = Kadeploy::Cache.new(@dir,300,Kadeploy::CacheIndexPVHash,true,true)
     create(5)
-    #cache(origin_uri,version,user,priority,tag,size,file_in_cache=nil,md5=nil,mtime=nil,&block)
     f1 = cache.cache(@files[0],@pathbase[0],'u1',2,'pxe',File.size(@files[0]))
     f2 = cache.cache(@files[1],@pathbase[1],'u2',1,'http',File.size(@files[1]))
     f3 = cache.cache(@files[2],@pathbase[2],'u1',1,'pxe',File.size(@files[2]))
@@ -76,7 +75,7 @@ class Cache < Test::Unit::TestCase
 
     assert_equal(f1.file,f1.file_in_cache)
 
-    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+    assert_raise Kadeploy::KadeployError do #Fails, if no Exception is raised
       cache.free
     end
     assert(f1.used?,"f1 must be used")
@@ -331,7 +330,7 @@ class Cache < Test::Unit::TestCase
     f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
     FileUtils.cp(@files[2], @files[0])
     f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,nil,t)
-    #does not be fetched
+    #The file must not be fetched
     assert_equal(f1,f3)
     assert_equal(md5(f1.file_in_cache), f0md5)
     assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
@@ -363,7 +362,7 @@ class Cache < Test::Unit::TestCase
     f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
     FileUtils.cp(@files[2], @files[0])
     f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,t)
-    #does not be fetched
+    #The file must not be fetched
     assert_equal(f1,f3)
     assert_equal(md5(f1.file_in_cache), f0md5)
     assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
@@ -372,7 +371,7 @@ class Cache < Test::Unit::TestCase
     create(3,50,0)
     cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
     f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]),nil,md5(@files[0]))
-    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+    assert_raise Kadeploy::KadeployError do #Fails, if no Exception is raised
       f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',File.size(@files[1]),nil,"zejfziojfoazeifjozeijfazoiefo")
     end
     f3 = cache.cache(@files[2],@pathbase[2],'u2',2,'pxe',File.size(@files[2]),nil,md5(@files[2]))
@@ -382,7 +381,7 @@ class Cache < Test::Unit::TestCase
     create(3,50,0)
     cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
     f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
-    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+    assert_raise Kadeploy::KadeployError do #Fails, if no Exception is raised
       f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',54544)
     end
     f3 = cache.cache(@files[2],@pathbase[2],'u2',2,'pxe',File.size(@files[2]))
@@ -393,7 +392,7 @@ class Cache < Test::Unit::TestCase
     cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
     f1 = cache.cache(@files[0],@pathbase[0],'u1',2,nil,File.size(@files[0]))
     f2 = cache.cache(@files[1],@pathbase[1],'u2',1,nil,File.size(@files[1]))
-    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+    assert_raise Kadeploy::KadeployError do #Fails, if no Exception is raised
       f3 = cache.cache(@files[2],@pathbase[2],'u1',1,nil,File.size(@files[2]))
     end
     assert_equal(2,cache.nb_files)
@@ -412,7 +411,7 @@ class Cache < Test::Unit::TestCase
     create(3,50,0)
     cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
     f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
-    assert_raise Oops do #Fails if no Exceptions are raised
+    assert_raise Oops do #Fails, if no Exception is raised
       f2 = cache.cache(@files[1],@pathbase[1],'u2',2,'pxe',File.size(@files[1])) do
         raise Oops.new()
       end
@@ -420,10 +419,10 @@ class Cache < Test::Unit::TestCase
     f3 = cache.cache(@files[2],@pathbase[2],'u2',2,'pxe',File.size(@files[2]))
     assert_equal(2,cache.nb_files)
   end
-  def test_Cache_Index()
+  def test_Cache_index()
     create(1,50,0)
     cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPath,true,true)
-    assert_raise Kadeploy::KadeployError do #Fails if no Exceptions are raised
+    assert_raise Kadeploy::KadeployError do #Fails, if no Exception is raised
       f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
     end
     assert_equal(0,cache.nb_files)
@@ -434,5 +433,102 @@ class Cache < Test::Unit::TestCase
     assert_equal(f1.to_hash,cache.files[f1.file_in_cache].to_hash)
     cache.free()
     assert(!File.exists?(f1.file_in_cache))
+  end
+  def test_Cache_until_fetch()
+    create(3,50,0)
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = nil
+    th = Thread.new do
+      f1 = cache.cache(@files[0],@pathbase[0],'u0',0,'pxe',File.size(@files[0])) do |origin,fic,size,md5|
+        sleep(1)
+        FileUtils.cp(origin,fic)
+      end
+    end
+    sleep(0.2)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,nil,File.size(@files[1]))
+    f2.release()
+    f3 = cache.cache(@files[2],@pathbase[2],'u3',1,nil,File.size(@files[2]))
+    th.join
+    assert_equal(2,cache.nb_files)
+    f1.release()
+    f3.release()
+    cache.free()
+  end
+  def test_new_size
+    create(3,50,5)
+    cache = Kadeploy::Cache.new(@dir,120,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f2.release()
+    FileUtils.cp(@files[2], @files[0])
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[2]))
+    #must be fetched
+    assert_equal(f1,f3)
+    assert_equal(md5(f1.file_in_cache), md5(@files[2]))
+  end
+  def test_new_size_alone
+    create(3,50,5)
+    cache = Kadeploy::Cache.new(@dir,105,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    f2.release()
+    FileUtils.cp(@files[2], @files[0])
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    #must be fetched
+    assert_equal(f1.file_in_cache,f3.file_in_cache)
+    assert_equal(md5(f1.file_in_cache), md5(@files[2]))
+    assert_equal(1,cache.nb_files())
+  end
+  def test_new_size_used
+    create(3,50,10)
+    cache = Kadeploy::Cache.new(@dir,200,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    assert_raise Kadeploy::KadeployError do #Fails, if no Exception is raised
+      f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[2]))
+    end
+    assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
+  end
+
+  def test_old_size_used
+    create(3,50,0)
+    assert_not_equal(@files[0],@files[2],"files must be different")
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    assert(f1.used?)
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    #The file must not be fetched
+    assert_equal(f1,f3)
+    assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
+  end
+  def test_old_size
+    create(3,50,0)
+    size = File.size(@files[0])
+    assert_not_equal(@files[0],@files[2],"files must be different")
+    cache = Kadeploy::Cache.new(@dir,100,Kadeploy::CacheIndexPVHash,true,true)
+    f1 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',File.size(@files[0]))
+    f1.release
+    assert_equal(0,f1.refs)
+    f2 = cache.cache(@files[1],@pathbase[1],'u2',0,'http',File.size(@files[1]))
+    FileUtils.cp(@files[2], @files[0])
+    f3 = cache.cache(@files[0],@pathbase[0],'u2',2,'pxe',size)
+    #The file must not be fetched
+    assert_equal(f1,f3)
+    assert_not_equal(md5(f1.file_in_cache), md5(@files[2]))
+  end
+  def test_nil_priority
+    cache = Kadeploy::Cache.new(@dir,300,Kadeploy::CacheIndexPVHash,true,true)
+    create(1)
+    assert_raise RuntimeError do #Fails, if no Exception is raised
+      f1 = cache.cache(@files[0],@pathbase[0],'u1',nil,'pxe',File.size(@files[0]))
+    end
+    cache.free
   end
 end
