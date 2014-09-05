@@ -1,6 +1,12 @@
 #!/usr/bin/env ruby
-require '../lib/kadeploy3/server/cache'
-require '../lib/kadeploy3/common/error'
+#Launch test inside the root of the project for simple cov
+if ENV['SIMPLECOV']
+  require 'simplecov'
+  SimpleCov.start
+end
+require_relative '../lib/kadeploy3/server/cache'
+require_relative '../lib/kadeploy3/common/error'
+
 require 'test/unit'
 require 'tempfile'
 require 'tmpdir'
