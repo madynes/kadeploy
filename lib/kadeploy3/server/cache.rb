@@ -70,7 +70,6 @@ module Kadeploy
     #   +directory: directory where the meta will be stored
     #   +save_meta: boolean which enables or disables the meta file writting
     def initialize(file_in_cache, user, directory, save_meta=false)
-
       @lock = Mutex.new              #: Lock of file
       @user = user.clone             #: The user who has cached the file
       @version = nil                 #: The version of the file
@@ -80,6 +79,7 @@ module Kadeploy
       @fetched = false               #: Fetch status
       @fetch_error = nil             #: Potential fetch error
       @size = 0                      #: Size of cached file
+      update_atime
       if save_meta && directory
         @meta = meta_file(directory)
         save!()
