@@ -3,8 +3,8 @@ require 'pathname'
 module Kadeploy
 
 module NetBoot
-  def self.custom_prefix(user,id)
-    "#{user}-#{id.to_s}"
+  def self.custom_prefix(user)
+    "pxe-#{user}"
   end
 
   def self.Factory(kind, binary, export_kind, export_server, repository_dir, custom_dir, profiles_dir, profiles_kind, chain=nil)
@@ -110,7 +110,7 @@ module NetBoot
           prof.gsub!("FILES_PREFIX",
             File.join(
               export_path(@custom_dir),
-              NetBoot.custom_prefix(user,id)
+              NetBoot.custom_prefix(user)
             )
           )
           prof
