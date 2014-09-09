@@ -27,7 +27,7 @@ DEB_REPOSITORY    = 'http://apt.grid5000.fr/kadeploy'
 GIT_REPOSITORY    = 'https://gforge.inria.fr/git/kadeploy3/kadeploy3.git'
 GERRIT_REPOSITORY = 'http://gerrit.nancy.grid5000.fr:8080/gerrit/kadeploy3'
 DEPENDANCIES      = ['libmysql-ruby','ruby']
-BUILD_DEPENDANCIES = ['git']
+BUILD_DEPENDANCIES = ['git','help2man','rake']
 
 if g5k?
   G5K_API         = 'https://api.grid5000.fr/2.0'
@@ -2223,6 +2223,9 @@ optparse = OptionParser.new(USAGE) do |opts|
   opts.on( '-n', '--network-config <network_config_file>', 'The network configuration that be will used for the testbed. Need to be a YAML file with fields "network" and "subnetworks" (list of "name","address"). Subnetworks are only used to optimise services configuration, they are not created/routed. Address have to be in CIDR notation (default: the network hosts are currently in)' ) do |n|
     options[:network_config] = n
   end
+  opts.on('', '--rake-install', 'Uses rake install to install kadeploy') do
+    options[:rake_install] = true
+  end
 
   opts.on( '', '--no-tunnels', 'Disable SSH tunnels (VLAN connections should be routed)' ) do
     $tunnels = false
@@ -3468,7 +3471,8 @@ sshgw.ssh(servername,'root') do |session|
       msg('Installing scm and build packages',MSG_INFO)
       build_extra = nil
       if $version >= 8
-        build_extra = [ 'debhelper','gem2deb','help2man','rake','texlive-latex-base','texlive-latex-recommended','texlive-latex-extra','git-buildpackage' ]
+        build_extra = [ 'debhelper','gem2deb','git-buildpackage' ]
+        build_extra.concat(['texlive-latex-base','texlive-latex-recommended','texlive-latex-extra']) if !options[:rake_install]
       else
         build_extra = [ 'docbook2x' ]
       end
@@ -3518,11 +3522,17 @@ sshgw.ssh(servername,'root') do |session|
           sexec(session,"dpkg --force-all -i #{File.join(tmpdir,'*.deb')}")
         end
       else
-        msg("Building Kadeploy packages",MSG_INFO)
-        sexec(session,"cd #{tmpdir} && #{env_vars} rake deb 2>&1")
+        if options[:rake_install]
+          msg("Installing Kadeploy",MSG_INFO)
+          sexec(session,"cd #{tmpdir} && #{env_vars} rake install 2>&1")
+        else
 
-        msg('Installing Kadeploy server/client',MSG_INFO)
-        sexec(session,"cd #{tmpdir} && dpkg --force-all -i ../*.deb")
+          msg("Building Kadeploy packages",MSG_INFO)
+          sexec(session,"cd #{tmpdir} && #{env_vars} rake deb 2>&1")
+
+          msg('Installing Kadeploy server/client',MSG_INFO)
+          sexec(session,"cd #{tmpdir} && dpkg --force-all -i ../*.deb")
+        end
 
         msg("Copying the deploy ssh key pair",MSG_INFO)
         sexec(session,"mkdir -p #{CFG_KADEPLOY_SSHKEY_PATH}")
@@ -3533,13 +3543,22 @@ sshgw.ssh(servername,'root') do |session|
         sexec(session,"cp -f #{File.join(tmpdir,'scripts','**','*')} #{CFG_KADEPLOY_CONF_PATH}")
 
         msg("Copying kastafior",MSG_INFO)
-        sexec(session,"cp -f #{File.join(tmpdir,'addons','kastafior','kastafior')} #{CFG_KASTAFIOR_BIN_FILE}")
-        sexec(session,"chmod +x #{CFG_KASTAFIOR_BIN_FILE}")
+
+        if options[:rake_install]
+          sexec(session,"cd #{tmpdir} && rake install_kastafior")
+        else
+          sexec(session,"cp -f #{File.join(tmpdir,'addons','kastafior','kastafior')} #{CFG_KASTAFIOR_BIN_FILE}")
+          sexec(session,"chmod +x #{CFG_KASTAFIOR_BIN_FILE}")
+        end
 
         if $version >= 8
           msg("Copying kascade",MSG_INFO)
-          sexec(session,"cp -f #{File.join(tmpdir,'addons','kascade','kascade')} #{CFG_KASCADE_BIN_FILE}")
-          sexec(session,"chmod +x #{CFG_KASCADE_BIN_FILE}")
+          if options[:rake_install]
+            sexec(session,"cd #{tmpdir} && rake install_kascade")
+          else
+            sexec(session,"cp -f #{File.join(tmpdir,'addons','kascade','kascade')} #{CFG_KASCADE_BIN_FILE}")
+            sexec(session,"chmod +x #{CFG_KASCADE_BIN_FILE}")
+          end
         end
       end
 
@@ -3940,11 +3959,13 @@ sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
 
   kadeploy_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
-    apt_update(session,server)
+    if !options[:rake_install]
+      msg('Updating debian packages list',MSG_INFO)
+      apt_update(session,server)
 
-    msg('Installing Kadeploy client',MSG_INFO)
-    apt_install(session,kapkg('client'),server)
+      msg('Installing Kadeploy client',MSG_INFO)
+      apt_install(session,kapkg('client'),server)
+    end
 
     msg('Configuring Kadeploy client',MSG_INFO)
     tempfile(cfg_kadeploy_client()) do |path|
