@@ -66,6 +66,10 @@ Vagrant.configure("2") do |config|
         vb.customize ["modifyvm", :id, "--nic2", "hostonly"]
         vb.customize ["modifyvm", :id, "--hostonlyadapter2", "vboxnet0"]
       end
+    else
+      master.vm.provider :virtualbox do |vb|
+        vb.memory = 1024
+      end
     end
 
     if ENV['http_proxy']
