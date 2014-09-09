@@ -1578,6 +1578,7 @@ $git = false
 $gerrit = false
 $version = 8
 $tunnels = {}
+$updated = {}
 
 options = {}
 
@@ -1872,7 +1873,11 @@ def apt_cmd(session,shcmd,aptcmd,aptopts,server=nil,params='')
 end
 
 def apt_update(session,server=nil)
-  apt_cmd(session,'apt-get','update',['q'],server)
+  if !$updated[session]
+    msg('Updating debian packages list',MSG_INFO)
+    $updated[session] = true
+    apt_cmd(session,'apt-get','update',['q'],server)
+  end
 end
 
 def apt_install(session,packages,server=nil)
@@ -3207,7 +3212,6 @@ sshgw.ssh(servername,'root') do |session|
 
   if $mode == :KAVLAN or $mode == :VLANKVM
     http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Getting nodes IPv4/MAC addresses',MSG_INFO)
@@ -3258,7 +3262,6 @@ select_server_type($kanodes,:dns).each do |server|
     set_arp_cache(session)
 
     http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Installing DNS server',MSG_INFO)
@@ -3348,7 +3351,6 @@ select_server_type($kanodes,:dhcp).each do |server|
     set_arp_cache(session)
 
     http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Installing DHCP server',MSG_INFO)
@@ -3408,7 +3410,6 @@ sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
 
   http_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
     apt_update(session,server)
 
     msg('Installing mySQL server',MSG_INFO)
@@ -3444,7 +3445,6 @@ sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
 
   http_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
     apt_update(session,server)
 
     case $deploysendmeth
@@ -3530,7 +3530,6 @@ sshgw.ssh(servername,'root') do |session|
   set_arp_cache(session)
 
   kadeploy_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
     apt_update(session,server)
 
     if options[:git] or options[:gerrit]
@@ -3921,7 +3920,6 @@ if $deploysendmeth == :HTTP
       msg("Connected to #{server[:basename]}",MSG_INFO)
 
       http_tunnel(server,session) do
-        msg('Updating debian packages list',MSG_INFO)
         apt_update(session,server)
         msg('Installing HTTP server',MSG_INFO)
         apt_install(session,['apache2','apache2-mpm-worker'],server)
@@ -4033,7 +4031,6 @@ sshgw.ssh(servername,'root') do |session|
 
   kadeploy_tunnel(server,session) do
     if !options[:rake_install]
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Installing Kadeploy client',MSG_INFO)
