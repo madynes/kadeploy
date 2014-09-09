@@ -386,6 +386,9 @@ module HTTPd
           response['Content-Type'] = 'text/plain'
           response['X-Application-Error-Code'] = ke.errno
           response['X-Application-Error-Info'] = Base64.strict_encode64(res)
+          $stderr.puts("[#{Time.now}] Internal Server Error  #{res}")
+          $stderr.puts(ke.backtrace())
+          $stderr.flush
         rescue Exception => e
           res = "---- #{e.class.name} ----\n"\
             "#{e.message}\n"\

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+sed -i 's/\/sbin\/reboot/reboot/g' /usr/lib/ruby/vendor_ruby/kadeploy3/server/microsteps.rb
+sed -i 's/\/sbin\/kexec/kexec/g' /usr/lib/ruby/vendor_ruby/kadeploy3/server/microsteps.rb

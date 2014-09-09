@@ -1,0 +1,3 @@
+#!/bin/bash
+
+echo -e 'use deploy3;update nodes set state = "deployed";' | mysql -u root --password=deploy-password

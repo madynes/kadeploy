@@ -996,7 +996,7 @@ class FirstFountain<AbstractFountain
       counter += 1
       begin
         port = get_port($config[:master],counter)
-        @master_server=TCPServer.new(port)
+        @master_server=TCPServer.new('0.0.0.0', port)
       rescue Errno::EADDRINUSE => ex
         raise ex if !$config[:adjust_port]
       end

@@ -37,7 +37,7 @@ module Kadeploy
     MODE=0640
 
     #This function checks if a file is readable.
-    #Raise an exeception if the file is not readable.
+    #It raises an exception if the file is not readable.
     def self.readable?(file)
       raise KadeployError.new(APIError::CACHE_ERROR,nil,"File '#{file}' is not readable") if !File.file?(file) or !File.readable?(file) or !File.readable_real?(file)
     end
@@ -51,7 +51,7 @@ module Kadeploy
         meta[:file_in_cache],
         meta[:user],
         nil,
-        false #this avoids to create new meta file, the parameter will be override by the next lines
+        false #this avoids to create a new meta file, this parameter will be overridden by the next lines.
       )
       meta.each_pair do |key,value|
         ret.instance_variable_set("@#{key}", value)
@@ -63,14 +63,13 @@ module Kadeploy
     attr_reader :mtime, :lock, :refs, :fetched, :fetch_error,:file_in_cache,:meta
 
 
-    # file_in_cache: is the filename in a cache this parameter
+    # file_in_cache: is the filename in a cache this parameter could not be nil.
     # Arguments:
     #   +file_in_cache: path where the file is stored in cache
     #   +user: user who stores the file
     #   +directory: directory where the meta will be stored
-    #   +save_meta: boolean which enables or disables the meta file writting
+    #   +save_meta: boolean which enables or disables the meta file writing
     def initialize(file_in_cache, user, directory, save_meta=false)
-
       @lock = Mutex.new              #: Lock of file
       @user = user.clone             #: The user who has cached the file
       @version = nil                 #: The version of the file
@@ -80,6 +79,7 @@ module Kadeploy
       @fetched = false               #: Fetch status
       @fetch_error = nil             #: Potential fetch error
       @size = 0                      #: Size of cached file
+      update_atime
       if save_meta && directory
         @meta = meta_file(directory)
         save!()
@@ -101,7 +101,7 @@ module Kadeploy
     #  +md5 is md5 checksum of file
     #  +tag is the tag of file
     #  +block is the block to fetch file.
-    #     block has four paramters : origin_uri, file_in_cache,size and md5 which are the parameter of this function
+    #     block has four parameters : origin_uri, file_in_cache,size and md5 which are the parameter of this function
     def fetch(user,origin_uri,priority,version,size,md5,mtime,tag,&block)
       @lock.synchronize do
         if @fetched # File has already been fetched
@@ -111,6 +111,18 @@ module Kadeploy
           end
         else
           get_file(user,origin_uri,priority,version,size,md5,mtime,tag,&block)
+        end
+      end
+    end
+
+    #Update size if it changed.
+    #If the file is already in use it raise an exception.
+    def update_size(size)
+      @lock.synchronize do
+        if @size != size
+          raise KadeployError.new(APIError::CACHE_ERROR,nil,"File #{origin_uri} is already in use, it can't be updated !\nPlease try again later.") if @refs > 1
+          @size = size
+          @fetched = false
         end
       end
     end
@@ -220,7 +232,7 @@ module Kadeploy
       (@refs > 0)
     end
 
-    #Tranform variables to hash format
+    #Transform variables to hash format
     def to_hash!()
       ret = {}
       instance_variables.each do |instvar|
@@ -259,7 +271,7 @@ module Kadeploy
           "(an update is necessary)")) if md5 && md5 != Digest::MD5.file(origin_uri).hexdigest!
           FileUtils.cp(origin_uri,@file_in_cache)
         end
-        #update all paramters if fetch raise nothing
+        #update all parameters if fetch raise nothing
         @origin_uri = origin_uri
         @mtime = mtime
         @size = File.size(@file_in_cache)
@@ -317,11 +329,12 @@ module Kadeploy
       puts msg
     end
 
-    # This puts the file at origin_uri in cache
+
+    # Cache puts the file at origin_uri in cache
     # if block is given it used to get file
     # else a simple cp is used
     #
-    # This function take un token.
+    # This function takes a token.
     # This token must be released at end.
     #
     # Arguments:
@@ -333,11 +346,12 @@ module Kadeploy
     #  +md5 is md5 checksum of file
     #  +tag is the tag of file
     #  +block is the block to fetch file
-    #     block has four paramters : origin_uri, file_in_cache,size and md5 which are the parameter of this function
+    #     block has four parameters : origin_uri, file_in_cache,size and md5 which are the parameter of this function
     # Output:
     #   FileCache
     # This function take a token that have to be released after a deployment
     def cache(origin_uri,version,user,priority,tag,size,file_in_cache=nil,md5=nil,mtime=nil,&block)
+      raise ("The priority argument is nil in cache call") if priority.nil?
       fentry = absolute_path(@naming_meth.name({
           :origin_uri => origin_uri,
           :version => version,
@@ -361,11 +375,12 @@ module Kadeploy
            end
            file.acquire()
            check_space_and_clean!(size-file.size,origin_uri)
+           file.update_size(size)
         end
         file.fetch(user,origin_uri,priority,version,size,md5,mtime,tag,&block)
       rescue Exception => ex
-        file.release()
         @lock.synchronize do
+          file.release()
           if !file.fetched && file.try_free
             @files.delete(fentry)
           end
@@ -394,8 +409,8 @@ module Kadeploy
       @files.size
     end
 
-    # Clean cached files that are freeable and have a priority lower or equal to max_priority
-    # if max_priority is negative, ignore priority.
+    # Clean clean the cached files that are releasable and have a priority lower or equal to max_priority
+    # if max_priority is negative, it tries to free all files.
     def clean(max_priority=0)
       @lock.synchronize do
         to_del=[]
@@ -461,7 +476,7 @@ module Kadeploy
       end
     end
 
-    #Free all ressources
+    #Free all resources
     #Raise an exception if there is a file still used !
     def free()
       clean(-1)
@@ -497,7 +512,7 @@ module Kadeploy
       free_space!(size - (@max_size - used_space))
     end
 
-    #Compute the unfreable and the used cache space
+    #Compute the releasable and the used cache space
     #Output:
     # Array[ file cache used in byte, total of file cache in byte ]
     def compute_space!()
