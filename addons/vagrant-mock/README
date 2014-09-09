@@ -1,0 +1,16 @@
+HOWTO
+
+0/ Ignore changes to the generated file nodes.yaml (avoid git build-package issues)
+$> git update-index --assume-unchanged puppet/hiera/nodes.yaml
+
+1/ Launch vagrant up from the root of this project: 
+$> NODES=0 vagrant up
+
+2/ Connect into the kadeploy VM
+$> vagrant ssh kadeploy
+
+3/ Launch the port simulator 
+$> sudo dooropenclose > /dev/null &
+
+3/ Try kadeploy
+$> kadeploy3 -e wheezy-min -m node-[1-30]

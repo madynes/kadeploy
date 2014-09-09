@@ -1,0 +1,10 @@
+#!/usr/bin/ruby -w
+require 'pp'
+
+if ENV['USER'] == 'mock'
+  args=['/bin/bash']+ARGV.map{ |v| v.gsub(/(^|\W)(\/s?bin\/|[>]+)/,' ')}
+else
+  args=['/bin/bash']+ARGV
+end
+
+exec(*args)

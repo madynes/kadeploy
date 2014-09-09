@@ -1,0 +1,66 @@
+#!/usr/bin/ruby
+
+require 'socket'
+require 'pp'
+$more = nil
+
+TFTP="/var/lib/deploy/tftp/pxelinux.cfg"
+CommandLogger="/var/log/kadeploy3/command.log"
+
+def convert_to_filename(ip)
+  hexa=ip.split('.').map do |p| 
+    i=p.to_i.to_s(16)
+    i='0'+i if i.size == 1
+    i
+  end
+  hexa.join('').upcase
+end
+
+def check_chainc32(ip)
+  f=File.join(TFTP,convert_to_filename(ip))
+  system("sync")
+  out=`grep chain.c32 #{f} 2> /dev/null`
+  $?.exitstatus != 0
+end
+def connect_openport(ip,open)
+  cmd = 'stop'
+  cmd = 'start' if open
+  t=TCPSocket.new('127.0.0.1',25000)
+  t.puts("#{cmd} #{ip}")
+  t.close
+end
+
+def update_port(ip)
+  connect_openport(ip,check_chainc32(ip))
+end
+
+date=`date`.strip
+connection_ssh = 'kadeploy'
+connection_ssh_ip = '127.0.0.1'
+if (ENV['SSH_CONNECTION'])
+	connection_ssh = ENV['SSH_CONNECTION'].split(' ')[2]
+	connection_ssh_ip = connection_ssh.clone
+	connection_ssh.gsub!('127.0.2.','node-')
+end
+
+case File.basename($0)
+when 'reboot'
+  update_port(connection_ssh_ip)
+when 'kexec'
+  test = ARGV.join(' ')
+  if test.include? "-l"
+    if test.include?  "/dev/shm/kexec_repository"
+      connect_openport(connection_ssh_ip,true)
+    else
+      connect_openport(connection_ssh_ip,false)
+    end
+  end
+when 'lanpower'
+  name = ARGV[-1].gsub('node-','127.0.2.')
+  update_port(name)
+end
+
+open(CommandLogger, 'a') do |f|
+  f.puts("#{date}   #{connection_ssh}   #{$0}   #{ARGV.join(' ')}")
+  f.puts("#{date}   #{connection_ssh}   #{$more}") if $more
+end

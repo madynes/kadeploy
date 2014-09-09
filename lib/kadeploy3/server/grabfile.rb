@@ -183,7 +183,7 @@ class GrabFile
         context[:output],744, cexec.client)
 
       cexec.pxe[:files].each do |pxefile|
-        grab(gfmk,context,pxefile,:anon,'pxe',
+        grab(gfmk,context,pxefile,:anon_keep,'pxe',
           :file => File.join(context[:caches][:netboot].directory,
             (
               NetBoot.custom_prefix(
