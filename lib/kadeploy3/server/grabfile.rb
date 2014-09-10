@@ -26,7 +26,7 @@ class GrabFile
     raise KadeployError.new(errno,nil,msg)
   end
 
-  def grab(origin_uri,version,user,priority,tag,checksum=nil,opts={})
+  def grab(origin_uri,version,user,priority,tag,wid,checksum=nil,opts={})
     return nil if !origin_uri or origin_uri.empty?
     cf = nil
     fetcher = FetchFile[origin_uri,@client]
@@ -52,9 +52,9 @@ class GrabFile
     fchecksum = checksum ? checksum : nil #use checksum if it provided.
 
     cf = @cache.cache(
-      origin_uri,version,user,priority,tag,fetcher.size,
-      opts[:file],fchecksum,fmtime
-    ) do |source,destination,size,md5|
+            origin_uri,version,user,priority,tag,fetcher.size,
+            wid,opts[:file],fchecksum,fmtime
+            ) do |source,destination,size,md5|
 
       if md5 && fetcher.checksum && md5 != fetcher.checksum # fetcher provides the checksum
         error(APIError::INVALID_FILE,"Checksum of the file '#{source}' does not match "\
@@ -102,6 +102,7 @@ class GrabFile
         user,
         Cache::PRIORITIES[prio],
         tag,
+        context[:wid],
         opts[:md5],
         opts
       )

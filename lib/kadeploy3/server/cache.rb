@@ -5,6 +5,7 @@ require 'digest'
 require 'digest/md5'
 require 'uri'
 require 'yaml'
+require 'set'
 
 YAML::ENGINE.yamler = 'syck' if RUBY_VERSION >= '1.9'
 
@@ -75,7 +76,7 @@ module Kadeploy
       @version = nil                 #: The version of the file
       @priority = 0                  #: The lower priority will be deleted before the higher priority. At end, kaworkflow deletes all files with priority 0.
       @file_in_cache = file_in_cache #: The file path inside the cache system
-      @refs = 0                      #: Number of references on a file
+      @refs = Set.new                #: list of references wid
       @fetched = false               #: Fetch status
       @fetch_error = nil             #: Potential fetch error
       @size = 0                      #: Size of cached file
@@ -106,7 +107,7 @@ module Kadeploy
       @lock.synchronize do
         if @fetched # File has already been fetched
           if ( mtime != @mtime || ( size > 0 && size != @size) || version != @version || md5 != @md5 ) #Update
-            raise KadeployError.new(APIError::CACHE_ERROR,nil,"File #{origin_uri} is already in use, it can't be updated !\nPlease try again later.") if @refs > 1
+            raise KadeployError.new(APIError::CACHE_ERROR,nil,"File #{origin_uri} is already in use, it can't be updated !\nPlease try again later.") if @refs.size > 1
             get_file(user,origin_uri,priority,version,size,md5,mtime,tag,&block)      # We assume that an update can dammage a file.
           end
         else
@@ -120,7 +121,7 @@ module Kadeploy
     def update_size(size)
       @lock.synchronize do
         if @size != size
-          raise KadeployError.new(APIError::CACHE_ERROR,nil,"File #{origin_uri} is already in use, it can't be updated !\nPlease try again later.") if @refs > 1
+          raise KadeployError.new(APIError::CACHE_ERROR,nil,"File #{origin_uri} is already in use, it can't be updated !\nPlease try again later.") if @refs.size > 1
           @size = size
           @fetched = false
         end
@@ -149,15 +150,16 @@ module Kadeploy
     end
 
     # Take a token
-    def acquire
-      @lock.synchronize{ @refs += 1 }
+    def acquire(wid)
+      @lock.synchronize do
+        @refs.add(wid)
+      end
     end
 
     # Release a token
-    def release
+    def release(wid)
       @lock.synchronize do
-        raise KadeployError.new(APIError::CACHE_ERROR,nil,"Too much release") if @refs < 1
-        @refs -= 1
+        @refs.delete(wid)
       end
     end
 
@@ -229,7 +231,7 @@ module Kadeploy
 
     #Check if file is still used
     def used!()
-      (@refs > 0)
+      (@refs.size > 0)
     end
 
     #Transform variables to hash format
@@ -343,14 +345,15 @@ module Kadeploy
     #  +user who store the file
     #  +priority is fixnum of PRIORITIES
     #  +size is the size file
-    #  +md5 is md5 checksum of file
+    #  +wid is the identifier of the operation. It's useful to release all tokens even if the token was lost by a kill of the main thread.
+    #  +md5 is MD5 checksum of file
     #  +tag is the tag of file
     #  +block is the block to fetch file
     #     block has four parameters : origin_uri, file_in_cache,size and md5 which are the parameter of this function
     # Output:
     #   FileCache
     # This function take a token that have to be released after a deployment
-    def cache(origin_uri,version,user,priority,tag,size,file_in_cache=nil,md5=nil,mtime=nil,&block)
+    def cache(origin_uri,version,user,priority,tag,size,wid,file_in_cache=nil,md5=nil,mtime=nil,&block)
       raise("The priority argument is nil in cache call") if priority.nil?
       fentry = absolute_path(@naming_meth.name({
           :origin_uri => origin_uri,
@@ -373,14 +376,14 @@ module Kadeploy
               file =  CacheFile.new(fentry,user,@directory,@save_meta)
               @files[fentry] = file
            end
-           file.acquire()
+           file.acquire(wid)
            check_space_and_clean!(size-file.size,origin_uri)
            file.update_size(size)
         end
         file.fetch(user,origin_uri,priority,version,size,md5,mtime,tag,&block)
       rescue Exception => ex
         @lock.synchronize do
-          file.release()
+          file.release(wid)
           if !file.fetched && file.try_free
             @files.delete(fentry)
           end
@@ -427,10 +430,13 @@ module Kadeploy
       end
     end
 
-    # Release the token
-    # The file is not being used anymore
-    def release(file)
-      file.release
+    # Release the token of wid
+    def release(wid)
+      @lock.synchronize do
+        @files.each_value do |f|
+          f.release(wid)
+        end
+      end
     end
 
 
@@ -483,7 +489,7 @@ module Kadeploy
       if @files.size > 0
         raise KadeployError.new(APIError::CACHE_ERROR,
                 nil,
-                "Many files are used: #{@files.values.map{|f| "#{f.file_in_cache} #{f.refs} time(s)"}.join("\n")}"
+                "Many files are used: #{@files.values.map{|f| "#{f.file_in_cache} by workflow #{f.refs.to_a.join(', ')}"}.join("\n")}"
         )
       end
     end
