@@ -187,8 +187,7 @@ class GrabFile
           :file => File.join(context[:caches][:netboot].directory,
             (
               NetBoot.custom_prefix(
-                cexec.user,
-                context[:wid]
+                cexec.user
               ) + '--' + File.basename(pxefile)
             )
           )
