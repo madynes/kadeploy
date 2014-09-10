@@ -351,7 +351,7 @@ module Kadeploy
     #   FileCache
     # This function take a token that have to be released after a deployment
     def cache(origin_uri,version,user,priority,tag,size,file_in_cache=nil,md5=nil,mtime=nil,&block)
-      raise ("The priority argument is nil in cache call") if priority.nil?
+      raise("The priority argument is nil in cache call") if priority.nil?
       fentry = absolute_path(@naming_meth.name({
           :origin_uri => origin_uri,
           :version => version,
