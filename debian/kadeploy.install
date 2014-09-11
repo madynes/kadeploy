@@ -4,3 +4,4 @@ conf/clusters.conf /etc/kadeploy3
 conf/command.conf /etc/kadeploy3
 conf/*-cluster.conf /etc/kadeploy3
 conf/version /etc/kadeploy3
+addons/kascade/kascade /usr/bin
