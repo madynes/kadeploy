@@ -171,7 +171,6 @@ module Kaenvs
   end
 
   def envs_modify(cexec,user=nil,name=nil,version=nil)
-    cache = cexec.config.caches[:global]
     fileupdate = Proc.new do |env,kind,upfile|
       file = env.send(kind.to_sym)
       next unless file
