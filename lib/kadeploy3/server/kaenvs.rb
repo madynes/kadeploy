@@ -197,13 +197,6 @@ module Kaenvs
             md5 = FetchFile[f['file'],cexec.client].checksum
             kaerror(APIError::INVALID_FILE,"#{kind} md5") if !md5 or md5.empty?
             kaerror(APIError::NOTHING_MODIFIED) if f['md5'] and f['md5'] == md5
-            # Remove the file from the cache if it was modified
-            if cache
-              tmp = cache.remove(f['file'],env.cache_version,env.user,:db,kind)
-              if !tmp.nil? and !tmp # The element was present in the cache but currently in used so not removed
-                kaerror(APIError::NOTHING_MODIFIED,"The environment is currently being used")
-              end
-            end
             f['md5'] = md5
           end
           changes = true

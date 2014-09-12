@@ -592,6 +592,7 @@ module Kaworkflow
     { :wid => info[:wid] }
   end
 
+
   def work_kill(kind,info)
     unless info[:freed]
       info[:thread].kill if info[:thread] and info[:thread].alive? and info[:thread] != Thread.current
@@ -604,20 +605,26 @@ module Kaworkflow
           end
         end
       end
-      if info[:cached_files]
-        info[:cached_files][:global].each do |file|
-          info[:config].caches[:global].release(file)
-        end if info[:config].caches[:global]
-        info[:cached_files][:netboot].each do |file|
-          info[:config].caches[:netboot].release(file)
-        end if info[:config].caches[:netboot]
-        info.delete(:cached_files)
+      release_cache(info)
+    end
+  end
+  def release_cache(info)
+    if info[:cached_files]
+      if info[:config].caches[:global]
+        info[:config].caches[:global].release(info[:wid])
+        info[:config].caches[:global].clean
       end
+      if info[:config].caches[:netboot]
+        info[:config].caches[:netboot].release(info[:wid])
+        info[:config].caches[:netboot].clean
+      end
+      info.delete(:cached_files)
     end
   end
 
   def work_free(kind,info)
     unless info[:freed]
+      info[:freed] = true
       info[:nodes].free if info[:nodes]
       info.delete(:nodes)
       info[:clusterlist].clear if info[:clusterlist]
@@ -645,25 +652,12 @@ module Kaworkflow
       info[:database].free if info[:database]
       info.delete(:database)
 
-      if info[:cached_files]
-        info[:cached_files][:global].each do |file|
-          info[:config].caches[:global].release(file)
-        end if info[:config].caches[:global]
-        info[:cached_files][:netboot].each do |file|
-          info[:config].caches[:netboot].release(file)
-        end if info[:config].caches[:netboot]
-        info.delete(:cached_files)
-      end
-
-      info[:config].caches[:global].clean if info[:config].caches[:global]
-      info[:config].caches[:netboot].clean if info[:config].caches[:netboot]
+      release_cache(info)
 
       info[:config].free
       info.delete(:config)
 
       info.delete(:resources)
-      # ...
-      info[:freed] = true
     end
   end
 
