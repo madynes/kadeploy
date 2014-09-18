@@ -144,26 +144,14 @@ module Kaenvs
 
   def envs_get(cexec)
     envs = nil
-    if cexec.env_user and cexec.env_name
-      error_not_found! if cexec.env_name.empty?
-      $stderr.flush
-      envs = Environment.get_from_db_context(
+    envs = Environment.get_from_db_context(
           cexec.database,
           cexec.env_name,
           cexec.env_version || !cexec.last || nil, # if nil->last, if version->version, if true->all
           cexec.env_user,
           cexec.user,
           cexec.almighty_users
-          )
-    else
-      envs = Environment.get_list_from_db(
-        cexec.database,
-        cexec.env_user || (cexec.almighty_users.include?(cexec.user) ? nil : cexec.user), # Almighty user can see everything
-        (!cexec.env_user or cexec.user == cexec.env_user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
-        (cexec.env_user.nil? or cexec.env_user.empty?),# Show only the environments of a specific user if user is defined
-        !cexec.last
-      )
-    end
+        )
 
     if envs
       envs.collect do |env|
@@ -220,7 +208,7 @@ module Kaenvs
       ret = []
       updates = {}
 
-      envs = Environment.get_list_from_db(cexec.database,user,true,true,true)
+      envs = Environment.get_from_db(cexec.database,user,nil,nil,true,true,true)
 
       envs.each do |env|
         cexec.environment[:update_files].each do |oldf,newf|
