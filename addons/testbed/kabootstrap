@@ -158,6 +158,51 @@ CFG_KADEPLOY_TEST_VLAN_PATH="#{CFG_KADEPLOY_TEST_PATH}-vlan"
 CFG_KADEPLOY_TEST_HOOK_PATH="#{CFG_KADEPLOY_TEST_PATH}-hook"
 
 
+#This class keep the connexion of servers to reuse after.
+class LazyConnexion
+  def initialize()
+    @connexions = {}
+    @servername = {}
+    @proxy = Net::SSH::Gateway.new(getgw(), ENV['USER'], :keys => $sshkeyfile)
+    @tunnels = {}
+  end
+  #Establish all connexion on each node in parallel.
+  def prefetch_connexion(nodes)
+    raise "to be implemented"
+  end
+  def ssh(servername,user = ENV['USER'],proxy=true)
+    id_con="#{user}@#{servername}"
+    if !@connexions[id_con]
+      if proxy
+        @connexions[id_con] = @proxy.ssh(servername,user)
+      else
+        @connexions[id_con] = Net::SSH.start(servername, user, :keys => $sshkeyfile)
+      end
+    end
+    yield @connexions[id_con]
+  end
+  def self.http_tunnel(server,session,verbose)
+    $tunnels[server] = {} if !$tunnels[server]
+    if !$tunnels[server][session]
+      http_tunnel_create(server,session,verbose)
+      $tunnels[server][session]=true
+    end
+  end
+
+  def close()
+    $tunnels.each_pair do |server_name,sessions|
+      sessions.each_key do |session|
+        http_tunnel_drop(server_name,session)
+      end
+    end
+    $tunnels.clear
+    @connexions.each_value do |session|
+      session.close()
+    end
+    @connexions.clear()
+  end
+end
+
 def cfg_console_baudrate(cluster=nil)
   cluster = {:basename=>'unknown'} if !cluster
   case cluster[:basename]
@@ -1531,7 +1576,9 @@ $configs = {}
 $tunnels = true
 $git = false
 $gerrit = false
-$version = 7
+$version = 8
+$tunnels = {}
+$updated = {}
 
 options = {}
 
@@ -1826,7 +1873,11 @@ def apt_cmd(session,shcmd,aptcmd,aptopts,server=nil,params='')
 end
 
 def apt_update(session,server=nil)
-  apt_cmd(session,'apt-get','update',['q'],server)
+  if !$updated[session]
+    msg('Updating debian packages list',MSG_INFO)
+    $updated[session] = true
+    apt_cmd(session,'apt-get','update',['q'],server)
+  end
 end
 
 def apt_install(session,packages,server=nil)
@@ -1962,8 +2013,27 @@ def tempfile(content)
 
   tmp.unlink
 end
+def http_tunnel_drop(host,session,verbose=true)
+  if $tunnels
+    host = host[:basename] if host.is_a?(Hash)
+    case $mode
+      when :KAVLAN, :VLANKVM
+        msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
+        ssh_tunnel_destroy(session,3128,getnode(host))
+      when :KVM
 
-def http_tunnel(host,session, verbose=true)
+        msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
+        sexec(session,'route del default')
+        sexec(session,"route add default gw #{gateway} dev #{iface}") if gateway
+      else
+        msg('Unknown mode',MSG_ERROR,true)
+    end
+  else
+    yield
+  end
+end
+
+def http_tunnel_create(host,session, verbose=true)
   if $tunnels
     host = host[:basename] if host.is_a?(Hash)
     case $mode
@@ -1971,10 +2041,6 @@ def http_tunnel(host,session, verbose=true)
         msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
         ssh_tunnel_create(session,HTTP_PROXY_PORT,HTTP_PROXY_ADDR)
 
-        yield
-
-        msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
-        ssh_tunnel_destroy(session,3128,getnode(host))
       when :KVM
         msg('Creating HTTP proxy SSH tunnel',MSG_INFO) if verbose
         tmp = sexec(session,'route -n')
@@ -1995,17 +2061,20 @@ def http_tunnel(host,session, verbose=true)
         sexec(session,'route del default') if gateway
         sexec(session,"route add default gw #{$network[:gateway]}")
 
-        yield
-
-        msg('Destroying HTTP proxy SSH tunnel',MSG_INFO) if verbose
-        sexec(session,'route del default')
-        sexec(session,"route add default gw #{gateway} dev #{iface}") if gateway
       else
         msg('Unknown mode',MSG_ERROR,true)
     end
   else
     yield
   end
+end
+
+
+
+def http_tunnel(host,session, verbose=true)
+  LazyConnexion.http_tunnel(host,session,verbose)
+  yield
+  #http_tunnel_drop(host,session, verbose)
 end
 
 def set_default_route(session)
@@ -3060,9 +3129,13 @@ $clusters.values.collect! do |v|
   msg("  net driver: #{v[:drivers][:network]}",MSG_INFO)
   msg("  disk driver: #{v[:drivers][:disk]}",MSG_INFO)
 end
+def test_indent()
+  yield
+end
 
-Net::SSH.start(getgw(), ENV['USER'], :keys => $sshkeyfile) do |gwsession|
-sshgw = Net::SSH::Gateway.new(getgw(), ENV['USER'], :keys => $sshkeyfile)
+sshgw = LazyConnexion.new #Net::SSH::Gateway.new(getgw(), ENV['USER'], :keys => $sshkeyfile)
+sshgw.ssh(getgw(),ENV['USER'],false) do |gwsession|
+#Net::SSH.start(getgw(), ENV['USER'], :keys => $sshkeyfile) do |gwsession|
 
 begin
   pubkey = File.open("#{$sshkeyfile}.pub",'r').read
@@ -3139,7 +3212,6 @@ sshgw.ssh(servername,'root') do |session|
 
   if $mode == :KAVLAN or $mode == :VLANKVM
     http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Getting nodes IPv4/MAC addresses',MSG_INFO)
@@ -3190,7 +3262,6 @@ select_server_type($kanodes,:dns).each do |server|
     set_arp_cache(session)
 
     http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Installing DNS server',MSG_INFO)
@@ -3280,7 +3351,6 @@ select_server_type($kanodes,:dhcp).each do |server|
     set_arp_cache(session)
 
     http_tunnel(server,session) do
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Installing DHCP server',MSG_INFO)
@@ -3340,7 +3410,6 @@ sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
 
   http_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
     apt_update(session,server)
 
     msg('Installing mySQL server',MSG_INFO)
@@ -3376,7 +3445,6 @@ sshgw.ssh(servername,'root') do |session|
   msg("Connected to #{server[:basename]}",MSG_INFO)
 
   http_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
     apt_update(session,server)
 
     case $deploysendmeth
@@ -3462,7 +3530,6 @@ sshgw.ssh(servername,'root') do |session|
   set_arp_cache(session)
 
   kadeploy_tunnel(server,session) do
-    msg('Updating debian packages list',MSG_INFO)
     apt_update(session,server)
 
     if options[:git] or options[:gerrit]
@@ -3853,7 +3920,6 @@ if $deploysendmeth == :HTTP
       msg("Connected to #{server[:basename]}",MSG_INFO)
 
       http_tunnel(server,session) do
-        msg('Updating debian packages list',MSG_INFO)
         apt_update(session,server)
         msg('Installing HTTP server',MSG_INFO)
         apt_install(session,['apache2','apache2-mpm-worker'],server)
@@ -3965,7 +4031,6 @@ sshgw.ssh(servername,'root') do |session|
 
   kadeploy_tunnel(server,session) do
     if !options[:rake_install]
-      msg('Updating debian packages list',MSG_INFO)
       apt_update(session,server)
 
       msg('Installing Kadeploy client',MSG_INFO)
@@ -4048,6 +4113,7 @@ end
 msg("Disconnected from #{server[:basename]}\n",MSG_INFO)
 msg("",MSG_INFO)
 
+sshgw.close()
 end
 
 msg("Installation done",MSG_INFO)
