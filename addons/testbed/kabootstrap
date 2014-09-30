@@ -2105,6 +2105,7 @@ options[:dns_forward] = nil
 options[:dns_config] = nil
 options[:upload] = []
 options[:sort] = true
+options[:git_url] = GIT_REPOSITORY
 
 $debug                = false
 $netiface             = NET_ADMIN_IFACE
@@ -2234,6 +2235,10 @@ optparse = OptionParser.new(USAGE) do |opts|
   opts.on( '', '--git [<commit>]', 'Install a git snapshot of Kadeploy3 (default: master).' ) do |c|
     options[:git] = c || :master
     $git = true
+  end
+
+  opts.on('', '--git-url URL' ,"define the url of git repository (default is '#{options[:git_url]}').") do |c|
+    options[:git_url] = c
   end
 
   opts.on( '', '--gerrit <reference>', 'Install a gerrit snapshot of Kadeploy3' ) do |r|
@@ -3484,7 +3489,7 @@ sshgw.ssh(servername,'root') do |session|
       env_vars = 'http_proxy=http://localhost:3128 https_proxy=$http_proxy GIT_SSL_NO_VERIFY=1'
       if options[:git]
         msg("Cloning Kadeploy git repository",MSG_INFO)
-        sexec(session,"#{env_vars} git clone #{GIT_REPOSITORY} #{tmpdir}")
+        sexec(session,"#{env_vars} git clone #{options[:git_url]} #{tmpdir}")
 
         unless options[:git] == :master
           msg("Checkout git revision #{options[:git].to_s}",MSG_INFO)
