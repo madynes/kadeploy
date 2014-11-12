@@ -99,8 +99,9 @@ class KaenvsClient < Client
         options[:env_name] = n
         options[:operation] = :delete
       }
-      add_opt(opt,"-l", "--list", "List environments") {
+      add_opt(opt,"-l", "--list [ENVNAME]", "List environments with the environment name pattern (% is the wildcard).") { |n|
         options[:operation] = :list
+        options[:env_name] = n if n
       }
       add_opt(opt,"-m", "--files-to-move FILES", "Files to move (src1::dst1,src2::dst2,...)") { |f|
         if /\A.+::.+(,.+::.+)*\Z/ =~f then
@@ -202,12 +203,15 @@ class KaenvsClient < Client
       when :'move-files'
         desc = options[:files_to_move].values
       else
-        username = URI.encode_www_form_component(options[:env_user]) || ''
+        username = URI.encode_www_form_component(options[:env_user])
         envname = URI.encode_www_form_component(options[:env_name])
-        envversion = options[:env_version] || ''
+        envversion = options[:env_version]
         tmp = params.dup
         tmp[:last] = true unless options[:env_version]
-        envs = get2(options,api_path("/#{username}/#{envname}/#{envversion}"),tmp)
+        tmp[:username] = username if username && !username.empty?
+        tmp[:name] = envname if envname && !envname.empty?
+        tmp[:version] = envversion if envversion && !envversion.empty?
+        envs = get2(options,api_path("/",:envs),tmp)
         error("The environment '#{envname}' does not exist") if envs.size <= 0
         desc = envs.first
       end
@@ -245,12 +249,15 @@ class KaenvsClient < Client
 
     if ![:add, :'move-files'].include?(options[:operation])
       if [:print,:list].include?(options[:operation])
-        path = File.join(path,"/#{URI.encode_www_form_component(options[:env_user]||'')}/")
+        if options[:env_user] && !options[:env_user].empty?
+          params[:username] = options[:env_user]
+        elsif options[:operation] == :print
+          params[:username] = USER
+        end
+        params[:version]  = options[:env_version] if options[:env_version]
+        params[:name]  = options[:env_name] if options[:env_name] && !options[:env_name].empty?
       else
         path = File.join(path,URI.encode_www_form_component(options[:env_user]||USER))
-      end
-
-      if options[:operation] != :list
         path = File.join(path,URI.encode_www_form_component(options[:env_name])) if options[:env_name]
         path = File.join(path,options[:env_version].to_s) if options[:env_version]
       end

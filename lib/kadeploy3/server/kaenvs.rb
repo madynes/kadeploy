@@ -39,18 +39,23 @@ module Kaenvs
           context.username = context.user
         end
 
-        unless (context.environment.load_from_desc(
-          env,
-          context.almighty_users,
-          context.username,
-          context.client
-        ))
+        unless (
+              context.environment.load_from_desc(
+                env,
+                context.almighty_users,
+                context.username,
+                context.client
+              )
+            )
           kaerror(APIError::INVALID_ENVIRONMENT)
         end
       end
     when :get
       parse_params(params) do |p|
         context.last = p.parse('last',nil,:toggle=>true)
+        context.env_user = p.parse('username',String)
+        context.env_version = p.parse('version',String)
+        context.env_name = p.parse('name',String)
       end
     when :modify
       context.config = duplicate_config()
@@ -137,33 +142,22 @@ module Kaenvs
     end
   end
 
-  def envs_get(cexec,user=nil,name=nil,version=nil)
+  def envs_get(cexec)
     envs = nil
-    if user and name
-      error_not_found! if name.empty?
-      envs = Environment.get_from_db_context(
+    envs = Environment.get_from_db_context(
           cexec.database,
-          name,
-          version || !cexec.last || nil, # if nil->last, if version->version, if true->all
-          user,
+          cexec.env_name,
+          cexec.env_version || !cexec.last || nil, # if nil->last, if version->version, if true->all
+          cexec.env_user,
           cexec.user,
           cexec.almighty_users
-          )
-    else
-      envs = Environment.get_list_from_db(
-        cexec.database,
-        user || (cexec.almighty_users.include?(cexec.user) ? nil : cexec.user), # Almighty user can see everything
-        (!user or cexec.user == user) || cexec.almighty_users.include?(cexec.user), #If the user wants to print the environments of another user, private environments are not shown
-        (user.nil? or user.empty?),# Show only the environments of a specific user if user is defined
-        !cexec.last
-      )
-    end
+        )
 
     if envs
       envs.collect do |env|
         env.to_hash.merge!({'user'=>env.user})
       end
-    elsif name or version
+    elsif cexec.env_name or cexec.env_version
       error_not_found!
     else
       []
@@ -214,7 +208,7 @@ module Kaenvs
       ret = []
       updates = {}
 
-      envs = Environment.get_list_from_db(cexec.database,user,true,true,true)
+      envs = Environment.get_from_db(cexec.database,user,nil,nil,true,true,true)
 
       envs.each do |env|
         cexec.environment[:update_files].each do |oldf,newf|
@@ -307,6 +301,7 @@ module Kaenvs
       end
     end
   end
+
 
   def envs_delete(cexec,user,name,version=nil)
     if (envs = Environment.del_from_db(
