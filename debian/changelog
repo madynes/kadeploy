@@ -1,10 +1,14 @@
-kadeploy (3.3.0~rc2-1) UNRELEASED; urgency=low
+kadeploy (3.3.0.stable-1) UNRELEASED; urgency=low
 
+  [ Lucas Nussbaum ]
   * New Git snapshot based on v3.3.0_rc0.
   * New Git snapshot based on v3.3.0_rc0.2.
   * New Git snapshot based on v3.3.0_rc2.
 
- -- Lucas Nussbaum <lucas@debian.org>  Wed, 06 Aug 2014 08:19:49 +0200
+  [ Emmanuel Jeanvoine ]
+  * New Git snapshot based on v3.3.0.stable.
+
+ -- Emmanuel Jeanvoine <ejeanvoi@vm-wheezy.loria.fr>  Wed, 12 Nov 2014 17:19:04 +0100
 
 kadeploy (3.2.0~git+20140221163831+bbf7f5d-1) UNRELEASED; urgency=low
 
