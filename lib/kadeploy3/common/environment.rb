@@ -356,7 +356,7 @@ class Environment
   # * Otherwise only the last version is returned
   #
   # ======= Behavior wrt the optional parameters
-  # * If owner_user is nil or empty, look for the environments belonging to context_user first.
+  # * If owner_user is nil or empty, look for the environments belonging to context_user first, excepted for almighty users who can see everything
   # * Private environments are returned if:
   #   * context_user is equal to owner_user or owner_user is nil
   #   * context_user is an almighty user
@@ -364,123 +364,71 @@ class Environment
   #   * owner_user is nil or empty
   #   * no environment belongs to owner_user
   def self.get_from_db_context(dbh,name,version,owner_user,context_user,almighty_users)
-    user2 = owner_user.nil? || owner_user.empty? ? context_user : owner_user
+    is_almighty = almighty_users.include?(context_user)
+
+    user2 = (owner_user.nil? || owner_user.empty?) && !is_almighty  ? context_user : owner_user
+
     get_from_db(
       dbh,
       name,
       version,
       user2,
-      context_user == user2 || almighty_users.include?(context_user),
+      context_user == user2 || is_almighty,
       owner_user.nil? || owner_user.empty?
-      )
+    )
+  end
+
+  def self.add_cond(args,condition,sql,value)
+    if value && !value.empty?
+      args<<value
+      condition += sql
+    end
+    condition
   end
 
   def self.get_from_db(dbh, name, version, user, private_envs=false, public_envs=false)
     version = version.to_s if version.is_a?(Fixnum)
-
-    dbproc = Proc.new do |userq,visiq|
-      args = []
-      query = "SELECT * FROM environments WHERE name=?"
-      args << name
-      if userq and !userq.empty? and user and !user.empty?
-        query += " AND #{userq}"
-        args << user
-      end
-      query += " AND #{visiq}" if visiq and !visiq.empty?
-
-      if version == true
-        query += " ORDER BY version"
-      elsif version and !version.empty?
-        query += " AND version = ?"
-        args << version
-      else
-        subquery = "SELECT MAX(version) FROM environments WHERE name = ?"
-        args << name
-        if userq and !userq.empty? and user and !user.empty?
-          subquery += " AND #{userq}"
-          args << user
-        end
-        subquery += " AND #{visiq}" if visiq and !visiq.empty?
-        query += " AND version = (#{subquery})"
-      end
-
-      res = dbh.run_query(query, *args)
-      tmp = res.to_hash if res
-      if tmp and !tmp.empty?
-        ret = []
-        tmp.each do |hash|
-          ret << Environment.new.load_from_dbhash(hash)
-        end
-        ret
-      else
-        false
-      end
-    end
-
-    visiq = (private_envs ? nil : "visibility <> 'private'")
-
-    # look for the environment of the specified user
-    # allowing or not the check private envs
-    ret = dbproc.call('user=?',visiq)
-
-    # if no envs were found and allowed to check publics envs,
-    # we check publics envs with a different user than the one specified
-    if (!ret or ret.size > 1) and public_envs
-      ret = dbproc.call('user<>?',"visibility = 'public'")
-    end
-
-    return ret
-  end
-
-  def self.get_list_from_db(dbh, user, private_envs=false, public_envs=false, show_all_version=false)
     args = []
-    where = ''
-    if user
-      if show_all_version
-        where = "user = ?"
+    last_version = false
+    sort=''
+    conditions = "WHERE true "
+    if name && !name.empty?
+      args << name
+      conditions += ' AND name like ?'
+    end
+    if user && !user.empty?
+      args << user
+      if public_envs
+        conditions += " AND (user like ? OR (user <> ? AND visibility = 'public'))"
         args << user
-
-        where << " AND visibility <> 'private'" unless private_envs
-
-        if public_envs
-          where <<  " OR (user <> ? AND visibility = 'public')"
-          args << user
-        end
       else
-        cond = Proc.new do |lab,ar|
-          ret = "(e1.user = ?"
-          ar << user
-          ret << " AND visibility <> 'private'" unless private_envs
-          if public_envs
-            ret <<  " OR (user <> ? AND visibility = 'public')"
-            ar << user
-          end
-          ret << ")"
-        end
-
-        where = "#{cond.call('e1',args)} \
-                 AND e1.version = ( \
-                   SELECT MAX(e2.version) FROM environments e2 \
-                   WHERE e2.name = e1.name \
-                   AND e2.user = e1.user \
-                   AND #{cond.call('e2',args)} \
-                   GROUP BY e2.user,e2.name)"
-      end
-    else #we show the environments of all the users
-      unless show_all_version
-        where = "e1.version=( \
-                   SELECT MAX(e2.version) FROM environments e2 \
-                   WHERE e2.name = e1.name \
-                   AND e2.user = e1.user \
-                   GROUP BY e2.user, e2.name)"
+        conditions += ' AND user like ?'
       end
     end
+    if !private_envs
+      conditions += " AND visibility <> 'private'"
+    end
 
-    query = "SELECT * FROM environments e1"
-    query += " WHERE #{where}" unless where.empty?
-    query += " ORDER BY e1.user, e1.name, e1.version"
+    if version == true
+      sort=', version desc'
+    elsif version and !version.empty?
+      conditions += " AND version = ?"
+      args << version
+    else
+      last_version = true
+    end
 
-    res = dbh.run_query(query, *args)
+    sql = if last_version
+      "select e.* from (select name,max(version) as maxversion "\
+      "from environments #{conditions} group by name,user) m "\
+      "inner join environments e on e.name = m.name and m.maxversion = e.version "\
+      "ORDER BY field(visibility,'public','private','shared'), name#{sort};"
+    else
+      "select * from environments #{conditions} "\
+      "ORDER BY field(visibility,'public','private','shared'), name#{sort};"
+    end
+
+    res = dbh.run_query(sql, *args)
     tmp = res.to_hash if res
     if tmp and !tmp.empty?
       ret = []

@@ -32,7 +32,10 @@ KADEPLOY \version, CECILL 2.0 license, All rights reserved.
 This is the Kadeploy \version{} documentation file.
 \\
 
-It contains a short \nameref{chap:Overview} of Kadeploy, followed by the \nameref{chap:Installation} instructions, a description of the \nameref{chap:Server_side_conf} and the \nameref{chap:Client_side_conf} , to finish with the \nameref{chap:User_guide}.
+It contains a short \nameref{chap:Overview} of Kadeploy, followed by the
+\nameref{chap:Installation} instructions, a description of the
+\nameref{chap:Server_side_conf} and the \nameref{chap:Client_side_conf} , to
+finish with the \nameref{chap:User_guide}.
 \\
 
 For a better understanding of how Kadeploy3 works see this publication:\\
@@ -59,10 +62,16 @@ reconfigure the software environment on the nodes.
 \section{How it works?}
 This is how Kadeploy works:
 \begin{enumerate}
-  \item \texttt{Minimal environment setup}
-  The nodes reboot into a trusted minimal environment that contains all the tools required for the deployment (partitioning tools, archive management,...) and the required partitioning is performed.
-  \item \texttt{Environment installation}
-  The environment is broadcast to all the nodes and extracted on the disks. Some post-installations operations can also be performed.
+
+  \item \texttt{Minimal environment setup} The nodes reboot into a trusted
+    minimal environment that contains all the tools required for the deployment
+    (partitioning tools, archive management, \dots) and the required partitioning
+    is performed.
+
+  \item \texttt{Environment installation} The environment is sent to all
+    the nodes and extracted on the disks. Some post-installations operations
+    can also be performed.
+
   \item \texttt{Reboot on the deployed environment}
 \end{enumerate}
 
@@ -74,7 +83,10 @@ the operating system's filesystem (as a tarball, for Linux environments).
 
 
 \section{How does Kadeploy control the boot of the nodes ?}
-This is how Kadeploy controls the boot process of the nodes in order to be able to perform it's installation task:
+
+This is how Kadeploy controls the boot process of the nodes in order to be able
+to perform the installation tasks:
+
 \begin{enumerate}
   \item Kadeploy writes PXE profiles on a TFTP or HTTP server
   \item Kadeploy triggers the reboot of compute nodes using SSH, IPMI or a manageable PDU
@@ -88,91 +100,148 @@ This is how Kadeploy controls the boot process of the nodes in order to be able 
 \chapter{Installation}\label{chap:Installation}
 \section{Requirements}
 \subsection{Packages}\label{sec:required-packages}
-Kadeploy requires the following softwares (the Debian packages available in the Lenny flavor are given):
+
+Kadeploy requires the following softwares (the given packages names are
+valid for the Debian/Wheezy distribution):
+
 \begin{itemize}
-\item \texttt{ruby1.8}
-\item \texttt{mysql-ruby1.8}
-\item \texttt{bittorrent}
-\item \texttt{ctorrent}
-\item \texttt{taktuk >= 3.6}
+  \item \texttt{ruby >= 1.8.7}
+  \item \texttt{ruby-mysql}
+  \item \texttt{taktuk >= 3.6}
+  \item \texttt{isc-dhcp-server}
+  \item \texttt{syslinux}
+  \item \texttt{tftpd-hpa}
 \end{itemize}
 
 \subsection{DHCP and TFTP}
 \paragraph{The DHCP service\\}
-A DHCP server (\texttt{isc-dhcp-server} on Debian for instance) must be configured to provide a static IP address to the set of nodes that must be deployed. Furthermore, the DHCP response must contains the hostname of the node (see the \texttt{use-host-decl-names on;} option in \texttt{dhcpd.conf}).
 
-Here is an example of a configuration for GPXELinux:
+A DHCP server (\texttt{isc-dhcp-server} on Debian for instance) must be
+configured to provide a static IP address to the set of nodes that must be
+deployed. Furthermore, the DHCP response must contain the hostname of the node
+(see the \texttt{use-host-decl-names on;} option in \texttt{dhcpd.conf}).
+
+Here is an example of a configuration for PXELinux:
 \begin{verbatim}
 default-lease-time 28800;
 max-lease-time 86400;
 allow booting;
 allow bootp;
-
 not-authoritative;
-
 use-host-decl-names on;
 
-  subnet 192.168.208.0 netmask 255.255.240.0 {
-    option subnet-mask 255.255.240.0;
-    option broadcast-address 192.168.223.255;
-    option routers 192.168.223.254;
-    option domain-name "testbed.lan";
-    option domain-name-servers 192.168.209.5;
-    if exists user-class and option user-class = "iPXE" {
-      filename=concat("http://192.168.209.5/",host-decl-name);
-    } else {
-      filename "gpxelinux.0";
-    }
-    next-server 192.168.209.5;
+subnet 192.168.0.0 netmask 255.255.255.0 {
+  option subnet-mask 255.255.255.0;
+  option broadcast-address 192.168.0.255;
+  option routers 192.168.0.254;
+  option domain-name "testbed.lan";
+  filename "pxelinux.0";
+  next-server 192.168.0.1;
 
   host node-1.testbed.lan {
-    hardware ethernet 00:e0:81:b2:c4:a0;
-    fixed-address 192.168.209.8;
+    hardware ethernet 00:09:3d:12:33:e6;
+    fixed-address 192.168.0.10;
     option host-name "node-1";
   }
-
+  host node-2.testbed.lan {
+    hardware ethernet 00:09:3d:12:33:e7;
+    fixed-address 192.168.0.11;
+    option host-name "node-2";
   }
+}
 \end{verbatim}
-More information about the configuration of PXElinux can be found at \url{http://www.syslinux.org/wiki/index.php/PXELINUX}.
 
-\paragraph{The TFTP service\\}
-A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed. Configuration example:
-\begin{verbatim}
-# /etc/default/tftpd-hpa
-TFTP_USERNAME="deploy"
-TFTP_DIRECTORY="/var/lib/tftpboot"
-TFTP_ADDRESS="0.0.0.0:69"
-TFTP_OPTIONS="-v -l -s -c"
-\end{verbatim}
+More information about the configuration of PXElinux can be found at
+\url{http://www.syslinux.org/wiki/index.php/PXELINUX}.
+
 
 \paragraph{Booting over the network\\}
-To allow the network booting, you must specify in the DHCP configuration file the file name option that define the file retrieve by a client. This file name can be pxelinux.0 or gpxelinux.0.
 
-Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain the following files and directories:
+To allow the network booting, you must specify in the DHCP configuration file
+the \texttt{filename} option. This option defines the name of file which will
+be downloaded at the boot time. This file name can be
+pxelinux.0, gpxelinux.0, or ipxelinux.0.
+
+Finally, the TFTP repository (see~\ref{sec:general_config} part) must contain
+the following files and directories:
+
 \begin{itemize}
- \item pxelinux.0 (or gpxelinux.0)
+ \item pxelinux.0 (or similar)
  \item chain.c32
  \item mboot.c32
  \item a kernels/ directory (can be changed in the server configuration file)
  \item a pxelinux.cfg/ directory
 \end{itemize}
-These files can be found in the Syslinux software (\url{http://syslinux.org}) or directly downloaded on the kernel.org website (\url{https://www.kernel.org/pub/linux/utils/boot/syslinux/}), the 3.73 version is at least required.
+
+These files can be found in the Syslinux software (\url{http://syslinux.org})
+or directly downloaded on the kernel.org website
+(\url{https://www.kernel.org/pub/linux/utils/boot/syslinux/}), the 3.73 version
+is at least required.
+
+\paragraph{The TFTP service\\}
+A TFTP server (\texttt{tftpd-hpa} on Debian for instance) must be installed. 
+Configuration example:
+\begin{verbatim}
+# /etc/default/tftpd-hpa
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="/var/lib/tftpboot"
+TFTP_ADDRESS="0.0.0.0:69"
+TFTP_OPTIONS="-v -l -c -s"
+\end{verbatim}
 
 \subsection{HTTP server (optional)}
-In order to use the HTTP fetching capabilities of gpxelinux, an HTTP server must be configured and must contain the production environment kernel/initrtd and the deployment environment kernel/initrd (see~\ref{sec:specific_config} part).
 
-\subsection{MySql}
-A MySql server must be configured with a database and a user dedicated to Kadeploy. The rights on this database must be granted to the chosen user, from the Kadeploy server. The server used to host the database, the database name, the dedicated user and its password must be specified in the general Kadeploy configuration (see~\ref{sec:general_config} part).
+In order to use the HTTP fetching capabilities of gpxelinux or iPXE, an HTTP server
+must be configured and must contain the production environment kernel/initrtd
+and the deployment environment kernel/initrd (see~\ref{sec:specific_config}
+part).
 
-Just provided as an example, let's see a way to create the database \texttt{deploy3} and to give the suitable rights to the \texttt{deploy} user.
+\subsection{MySQL}
+
+A MySQL server must be configured with a database and a user dedicated to
+Kadeploy. The rights on this database must be granted to the chosen user, from
+the Kadeploy server. The server used to host the database, the database name,
+the dedicated user and its password must be specified in the general Kadeploy
+configuration (see~\ref{sec:general_config} part).
+
+Just provided as an example, let's see a way to create the database
+\texttt{deploy3} and to give the suitable rights to the \texttt{deploy} user.
+
 \begin{verbatim}
 mysql> CREATE DATABASE deploy3;
 mysql> GRANT select, insert, update, delete, create, drop, alter, \
              create temporary tables, lock tables ON deploy3.* \
-             TO 'deploy'@'frontale.site.grid5000.fr';
+             TO 'deploy'@'kadeploy.site.grid5000.fr';
 \end{verbatim}
 
-Once the database is created and the user granted, you can use the SQL script provided in the distribution (\texttt{db/db\_creation.sql}) to create the tables in the database.
+Once the database is created and the user granted, you can use the SQL script
+provided in the distribution (\texttt{db/db\_creation.sql}) to create the
+tables in the database.
+
+\begin{verbatim}
+mysql> use deploy3
+mysql> source /usr/share/doc/kadeploy/db_creation.sql;
+\end{verbatim}
+
+
+\subsection{TakTuk}
+
+Kadeploy3 requires TakTuk, a powerful tool to achieve remote executions. Thus
+it must be installed on the Kadeploy3 server.
+
+\noindent \textbf{Note for Debian users}
+
+\noindent TakTuk is available in the official repositories.
+
+\noindent \textbf{Note for RedHat users}
+
+\noindent TakTuk is not packaged for RedHat-based distributions.
+Some RPM packages are available on the Kadeploy3 website:
+\url{http://kadeploy3.gforge.inria.fr/files/taktuk/}. It's also possible to
+install TakTuk from the sources, more information on the project's
+website: \url{http://taktuk.gforge.inria.fr/}.
+
+
 
 \subsection{TakTuk}
 Kadeploy3 have a strong dependence on the TakTuk software, this software should be installed on the machine that hosts the Kadeploy3 service in order for it to work properly.
@@ -188,12 +257,19 @@ Kadeploy3 have a strong dependence on the TakTuk software, this software should 
 
 
 \section{Kadeploy installation}
-Since Kadeploy is based on a client/server architecture, you must perform the install on both the server and the client if it is not the same machine.
 
-Two ways are provided to install Kadeploy, a basic installer and packages (for Debian and RedHat). In both cases, you had to ensure that a user \texttt{deploy} is existing on your system. This user is used to execute the Kadeploy server. Furthermore, all the installation operations must be performed with root rights.
+Since Kadeploy is based on a client/server architecture, it must be installed
+both on the server and on the client side (in case of distinct hosts).
 
-\subsection{Basic installation}
-First of all , you have to uncompress the Kadeploy tarball.
+Two ways are provided to install Kadeploy: 1) the packages available in the download
+section at \url{http://kadeploy3.gforge.inria.fr/} (for Debian and RedHat) and
+2) Rake installation from sources. In both cases, you have to ensure that a user
+\texttt{deploy} exists on the system since it is used to execute the
+Kadeploy server. Furthermore, all the installation operations must be performed
+with root rights.
+
+\subsection{Installation with Rake}
+First of all, you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{Verbatim}[commandchars=\\\{\}]
 > tar xzf kadeploy-\version.tar.gz -C DESTINATION_DIR
@@ -221,9 +297,14 @@ First of all , you have to uncompress the Kadeploy tarball.
 \end{verbatim}
 \end{small}
 
-\paragraph{remark:} If there are already configuration files, the new example of configuration files will be installed with \texttt{.dist} extension.
+\paragraph{remark:} If there are already configuration files, the new example
+of configuration files will be installed with \texttt{.dist} extension.
 
-\noindent If you want to install the rc script, you can add the \texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and RedHat (it should include CentOS and RHEL) values are supported. For instance, you cans execute:
+\noindent If you want to install the rc script, you can add the
+\texttt{DISTRIB} flag. Currently, only Debian (it includes Ubuntu at least) and
+RedHat (it should include CentOS and RHEL) values are supported. For instance,
+you can execute:
+
 \begin{small}
 \begin{verbatim}
 > rake install[root_dir,redhat]
@@ -236,8 +317,6 @@ or if you do not install the server side on the same machine than the client sid
 \end{verbatim}
 \end{small}
 
-\noindent In order to preserve a previous configuration, the configuration directory \texttt{/etc/kadeploy3} is saved, if existing, to a directory named \texttt{/etc/kadeploy3-save-TIMESTAMP} where \texttt{TIMESTAMP} is the moment of the new installation launch.
-
 \noindent Finally, Kadeploy can be simply uninstalled by executing:
 \begin{small}
 \begin{verbatim}
@@ -247,9 +326,9 @@ or if you do not install the server side on the same machine than the client sid
 
 \noindent In case of uninstallation, the configuration directory \texttt{/etc/kadeploy3} is not removed.
 
-\subsection{Debian packages}
-The following installation method works only an Debian based distribution.
-\subsubsection{Build}
+\subsection{Build packages}
+The following installation method works only on Debian based distribution.
+\subsubsection{Build Debian Package}
 \noindent First, you have to uncompress the Kadeploy tarball.
 \begin{small}
 \begin{Verbatim}[commandchars=\\\{\}]
@@ -263,7 +342,12 @@ The following installation method works only an Debian based distribution.
 > rake deb
 \end{verbatim}
 \end{small}
-This will generate three Debian package: \texttt{kadeploy-common-\version.deb}, \texttt{kadeploy-client-\version.deb}, and \texttt{kadeploy-\version.deb}.
+
+This will generate three Debian package: \texttt{kadeploy-common-\version.deb},
+\texttt{kadeploy-client-\version.deb}, and \texttt{kadeploy-\version.deb}.
+
+\
+
 \subsubsection{Installation}
 \noindent On the server side, you have to install the \texttt{kadeploy-common-\version.deb} and \texttt{kadeploy-\version.deb} packages.
 \begin{small}
@@ -346,7 +430,7 @@ After being installed and configured, the Kadeploy server can be run either inte
 \noindent or in background using the rc script:
 \begin{small}
 \begin{verbatim}
-> /etc/init.d/kadeploy start
+> service kadeploy start
 \end{verbatim}
 \end{small}
 
@@ -405,7 +489,13 @@ example-complex:{\footnotesize # Complex structure}
 \end{small}
 
 \paragraph{Documentation: paths\\}
-Kadeploy configuration settings will be described by giving a \emph{path} to each resources. A \emph{path} explicit the hierarchy structure to follow to spefify a setting in the configuration file. In a \emph{path}, the character \texttt{/} describes a nested \emph{Associative array}, characters \texttt{$[...]$} describes an \emph{Ordered list} of identical \emph{Associative arrays}.\\
+
+Kadeploy configuration settings are described in YAML files.
+A \emph{path} defines the hierarchy structure to
+specify a setting in the configuration file. In a \emph{path},
+\texttt{/} describes a nested \emph{Associative array},
+\texttt{$[...]$} describes an \emph{Ordered list} of identical
+\emph{Associative arrays}.\\
 
 Example of \emph{path}s:
 \begin{itemize}
@@ -502,7 +592,7 @@ verbosity:
   logs: 4
 cache:
   directory: /var/cache/kadeploy
-  size: /tmp/kadeploy_cache
+  size: 8000
 network:
   server_hostname: kadeploy.lan
   vlan:
@@ -707,7 +797,7 @@ external:
   \end{itemize}
   \item \ypath{/pxe/dhcp/export}
   \begin{itemize}
-    \item \yfieldd{kind}{String}{tftp} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
+    \item \yfieldd{kind}{String}{tftp} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the PXE profiles depends on this method.
     \item \yfieldd{server}{String}{hostname} The server where PXE files are stored. To be complicant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
   \end{itemize}
   \item \ypath{/pxe/dhcp/profiles}
@@ -755,7 +845,7 @@ The information used to generate this filenames are the one specified for each n
   \item \ypath{/pxe/localboot/export}
   \begin{itemize}
     \item \yfield{kind}{String} The method used to export PXE files (expected values are \emph{tftp}, \emph{http} and \emph{ftp}). The path to the files in the profiles will be generated depending on this method.
-    \item \yfield{server}{String} The server where PXE files are stored. To be complicant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
+    \item \yfield{server}{String} The server where PXE files are stored. To be compliant with most NBPs, it's recommended to specify this server by IP address (it will also make the nodes boot faster since there is no need to make a DNS request).
   \end{itemize}
   \item \ypath{/pxe/localboot/profiles}
   \begin{itemize}
@@ -775,14 +865,13 @@ The information used to generate this filenames are the one specified for each n
   \end{itemize}
 
   \item \yfieldd{autoclean\_threshold}{Fixnum}{360} at the end of an operation (deploy/reboot/power) it's status kept until the user explicitly deletes them. This value fix the maximal time (in minutes) this information will be kept in memory by the server until the autoclean loop delete them.
-
-  \item \yfieldd{/external/default\_connector}{String}{ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes} define alias for DEFAULT\_CONNECTOR in taktuk connector and remoteops for cluster specific file.
+  \item \yfieldd{/external/default\_connector}{String}{ssh -A -l root -q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PreferredAuthentications=publickey -o BatchMode=yes} define alias for DEFAULT\_CONNECTOR in Taktuk connector and remoteops for cluster specific file.
   \item \ypath{/external/taktuk}
   \begin{itemize}
     \item \yfieldd{connector}{String}{DEFAULT\_CONNECTOR} connector used by Taktuk
     \item \yfieldd{tree\_arity}{Integer}{0} Taktuk tree arity for command executed through a tree. Use 0 if you want to use the work stealing algorithm of Taktuk and thus a dynamic tree arity. Use another value >0 to specify a static tree arity (should be avoided).
     \item \yfieldd{auto\_propagate}{Boolean}{true} use of the auto propagation feature of Taktuk. You should use this feature if the deployment environment doesn't contain Taktuk.
-    \item \yfieldd{outputs\_size}{Integer}{20000} to avoid big taktuk outputs to be loaded in the server's memory, it's possible to setup a limit of the per-node output size. If TakTuk returns an output bigger than \texttt{(NODES\_NUMBER * outputs\_size)} an error will be returned. This limit can be disabled by setting the \texttt{0} value.
+    \item \yfieldd{outputs\_size}{Integer}{20000} to avoid big Taktuk outputs to be loaded in the server's memory, it's possible to setup a limit of the per-node output size. If TakTuk returns an output bigger than \texttt{(NODES\_NUMBER * outputs\_size)} an error will be returned. This limit can be disabled by setting the \texttt{0} value.
   \end{itemize}
 
   \item \ypath{/external/bittorrent}
@@ -853,6 +942,7 @@ This file describes the list of all the clusters, the location of their specific
 
 Warning, a cluster-specific configuration file and some partitioning/bootloader\_install scripts must be defined for each cluster define in this file.
 
+%TODO : keep same example ...
 \subsection{Example of a clusters file\\}
 \begin{small}
 \begin{verbatim}

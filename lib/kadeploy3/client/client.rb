@@ -693,6 +693,10 @@ class Client
       opt.separator "Contact: #{CONTACT_EMAIL}"
       opt.separator ""
       opt.separator "Generic options:"
+      opt.on("-h", "--help", "Show this message") do
+        puts opts
+        exit 0
+      end
       add_opt(opt,"-v", "--version", "Get the server's version") {
         options[:get_version] = true
       }

@@ -409,7 +409,7 @@ operation 'Environments management' do
       EOS
   end
 
-  resource :GET, '/environments/:username?/:name?/:version?', 'Gather the description of environments. If no user is given, the public environment will be displayed, otherwise a list of all environments that are public or owned by the user will be returned. The :username or the :name fields have to be encoded following the RFC 3986 specifications (non-ASCII characters are encoded with a percent notation)' do
+  resource :GET, '/environments?username=:username?&name=:name?&version=:version?', 'Gather the description of environments. If no user is given, the public environment will be displayed, otherwise a list of all environments that are public or owned by the user will be returned. The :username or the :name fields have to be encoded following the RFC 3986 specifications (non-ASCII characters are encoded with a percent notation)' do
     request do
       parameter ':username', :String, 'The owner of the environment', false
       parameter ':name', :String, 'The name of the environment', false
@@ -496,7 +496,7 @@ operation 'Environments management' do
 
     example 'Get the list of the environments a specified user can see',
       <<-EOS ,
-        GET /environments/frontend HTTP/1.1
+        GET /environments?username=frontend HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
         X-Kadeploy-User: frontend
@@ -589,7 +589,7 @@ operation 'Environments management' do
 
     example 'Get the description of a specific environment',
       <<-EOS ,
-        GET /environments/frontend/debian-custom HTTP/1.1
+        GET /environments?username=frontend&name=debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
         X-Kadeploy-User: frontend
@@ -624,7 +624,7 @@ operation 'Environments management' do
 
     example 'Get the description of a specific version of a specific environment',
       <<-EOS ,
-        GET /environments/frontend/debian-custom/1 HTTP/1.1
+        GET /environments?username=frontend&name=debian-custom&version=1 HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
         X-Kadeploy-User: frontend
@@ -657,9 +657,9 @@ operation 'Environments management' do
         ]
       EOS
 
-    example 'Get the description of every versions of a specific environment',
+    example 'Get the description of every debian-custom',
       <<-EOS ,
-        GET /environments/frontend/debian-custom HTTP/1.1
+        GET /environments?name=debian-custom HTTP/1.1
         Accept: text/plain, application/json
         Host: kadeploy.testbed.lan:25300
         X-Kadeploy-User: frontend
