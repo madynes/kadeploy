@@ -26,7 +26,7 @@ XB-Ruby-Versions: ${ruby:Versions}
 
 Package: kadeploy-client
 Architecture: all
-Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby | ruby-interpreter
+Depends: ${shlibs:Depends}, ${misc:Depends}, kadeploy-common (= ${binary:Version}), ruby | ruby-interpreter, file
 Recommends: oidentd | pidentd | ident2 | nullidentd
 Description: Scalable, efficient and reliable cluster provisioning solution (client)
  Kadeploy is a scalable, efficient and reliable deployment system (cluster
