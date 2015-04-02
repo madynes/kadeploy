@@ -419,9 +419,9 @@ class Environment
     end
 
     sql = if last_version
-      "select e.* from (select name,max(version) as maxversion "\
+      "select e.* from (select name,max(version) as maxversion,user "\
       "from environments #{conditions} group by name,user) m "\
-      "inner join environments e on e.name = m.name and m.maxversion = e.version "\
+      "inner join environments e on e.name = m.name and m.maxversion = e.version and m.user = e.user "\
       "ORDER BY field(visibility,'public','private','shared'), name#{sort};"
     else
       "select * from environments #{conditions} "\
@@ -579,7 +579,15 @@ class Environment
 
   def load_from_db_context(dbh,name,version,user,context_user,almighty_users)
     ret =  self.class.get_from_db_context(dbh,name,version,user,context_user,almighty_users)
-    load_from_env(ret[0]) if ret
+    #if user is not defined, own environments are selected if available
+    if user.nil?
+      list = ret.select { |env| env["user"] == context_user }
+      list = ret if list.empty?
+    else
+      list = ret
+    end
+    #list should not contain more than one element when only one user is allowed to publish public environments
+    load_from_env(list.first) if ret
   end
 
   def load_from_db(dbh, name, version, user, private_env=false, public_env=false)

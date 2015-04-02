@@ -156,7 +156,15 @@ class KadeployClient < ClientWorkflow
       tmp[:version] = envversion if envversion
       envs = get2(options,api_path("/",:envs),tmp)
       error("The environment '#{options[:env_name]}' does not exist") if envs.size <= 0
-      env = envs.first
+      #if env_user is not defined, own environments are selected if available
+      if options[:env_user].nil?
+        list = envs.select { |e| e["user"] == USER }
+        list = envs if list.empty?
+      else
+        list = envs
+      end
+      #List should not have a size > 1 when only one user is allowed to publish public environments
+      env = list.first
 
       params[:environment][:user] = env['user']
       params[:environment][:name] = env['name']
