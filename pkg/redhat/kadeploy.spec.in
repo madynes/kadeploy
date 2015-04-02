@@ -16,21 +16,21 @@ in Grid5000, allowing the users to deploy their own OS on their reserved nodes.
 
 %package common
 Summary:        Common part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, ruby-libs
+Requires:       ruby, ruby-libs
 Group:          System/Cluster
 %description common
 This package provide the common part of the Kadeploy deployment tool.
 
 %package server
 Summary:        Server part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}
+Requires:       ruby,  kadeploy-common = %{version}
 Group:          System/Cluster
 %description server
 This package provide the server part of the Kadeploy deployment tool.
 
 %package client
 Summary:        Client part of the Kadeploy deployment tool.
-Requires:       ruby, ruby-mysql, kadeploy-common = %{version}
+Requires:       ruby, kadeploy-common = %{version}
 Group:          System/Cluster
 %description client
 This package provide the client part of the Kadeploy deployment tool.
@@ -43,7 +43,7 @@ This package provide the client part of the Kadeploy deployment tool.
 %install
 rm -rf $RPM_BUILD_ROOT
 rake install[${RPM_BUILD_ROOT},redhat]
-rake install_kastafior[${RPM_BUILD_ROOT}]
+rake install_kascade[${RPM_BUILD_ROOT}]
 
 %check
 
@@ -53,7 +53,8 @@ rm -rf $RPM_BUILD_ROOT
 %files common
 %defattr(-,deploy,deploy,-)
 %doc License.txt README AUTHORS NEWS doc/*.pdf
-KADEPLOY3_LIBS/*
+KADEPLOY3_LIBS/common.rb
+KADEPLOY3_LIBS/common/*.rb
 %dir /etc/kadeploy3
 %{_bindir}/*
 %{_sbindir}/*
@@ -64,6 +65,9 @@ KADEPLOY3_LIBS/*
 %{_defaultdocdir}/kadeploy3/kascade.gz
 
 %files server
+KADEPLOY3_LIBS/server.rb
+KADEPLOY3_LIBS/server/*.rb
+%dir /etc/kadeploy3/keys
 %dir /var/log/kadeploy3
 %attr(0770,root,deploy) /var/log/kadeploy3
 %dir /var/run/kadeploy3d
@@ -75,11 +79,13 @@ KADEPLOY3_LIBS/*
 %config(noreplace) /etc/kadeploy3/command.conf
 %config(noreplace) /etc/kadeploy3/server.conf
 /etc/kadeploy3/version
-/usr/bin/kastafior
+/usr/bin/kascade
 /usr/sbin/kadeploy3d
 
 
 %files client
+KADEPLOY3_LIBS/client.rb
+KADEPLOY3_LIBS/client/*.rb
 %defattr(-,deploy,deploy,-)
 %config(noreplace) /etc/kadeploy3/client.conf
 /usr/bin/kaconsole3

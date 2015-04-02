@@ -41,6 +41,7 @@ D = {
   :bin => File.join(File.dirname(__FILE__),'bin'),
   :sbin => File.join(File.dirname(__FILE__),'sbin'),
   :conf => File.join(File.dirname(__FILE__),'conf'),
+  :keys => File.join(File.dirname(__FILE__),'keys'),
   :scripts => File.join(File.dirname(__FILE__),'scripts'),
   :pkg => File.join(File.dirname(__FILE__),'pkg'),
   :addons => File.join(File.dirname(__FILE__),'addons'),
@@ -108,6 +109,12 @@ INSTALL = {
   },
   :conf => {
     :dir => '/etc/kadeploy3',
+    :user => 'root',
+    :group => 'deploy',
+    :mode => '640',
+  },
+  :keys => {
+    :dir => '/etc/kadeploy3/keys',
     :user => 'root',
     :group => 'deploy',
     :mode => '640',
@@ -433,6 +440,7 @@ task :install_server, [:root_dir,:distrib] => [:prepare,:man_server, :install_co
   installf(:man8,File.join(D[:man],'kadeploy3d.8'))
 
   create_dir(:conf)
+  create_dir(:keys)
   installf(:conf,:'server.conf',nil,false)
   installf(:conf,:'clusters.conf',nil,false)
   installf(:conf,:'command.conf',nil,false)

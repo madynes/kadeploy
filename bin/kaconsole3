@@ -124,6 +124,10 @@ class KaconsoleClient < Client
       end
 
       # From console to network
+      if not $stdin.isatty
+        puts "Kaconsole output must be a TTY."
+        exit 1
+      end
       threads << Thread.new do
         i = 0
         begin

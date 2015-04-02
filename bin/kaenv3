@@ -251,8 +251,6 @@ class KaenvsClient < Client
       if [:print,:list].include?(options[:operation])
         if options[:env_user] && !options[:env_user].empty?
           params[:username] = options[:env_user]
-        elsif options[:operation] == :print
-          params[:username] = USER
         end
         params[:version]  = options[:env_version] if options[:env_version]
         params[:name]  = options[:env_name] if options[:env_name] && !options[:env_name].empty?
@@ -319,7 +317,14 @@ class KaenvsClient < Client
       if ret.empty?
         debug 'No environment has been found'
       else
-        ret.each do |env|
+        #if env_user is not defined, own environments are selected if available
+        if options[:env_user].nil?
+          list = ret.select { |e| e["user"] == USER }
+          list = ret if list.empty?
+        else
+          list = ret
+        end
+        list.each do |env|
           print_full(env)
         end
       end
