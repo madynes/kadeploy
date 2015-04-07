@@ -580,8 +580,8 @@ class Environment
   def load_from_db_context(dbh,name,version,user,context_user,almighty_users)
     ret =  self.class.get_from_db_context(dbh,name,version,user,context_user,almighty_users)
     #if user is not defined, own environments are selected if available
-    if user.nil?
-      list = ret.select { |env| env["user"] == context_user }
+    if !ret.nil? && user.nil?
+      list = ret.select { |env| env.user == context_user }
       list = ret if list.empty?
     else
       list = ret
