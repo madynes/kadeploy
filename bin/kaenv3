@@ -210,7 +210,7 @@ class KaenvsClient < Client
         tmp[:last] = true unless options[:env_version]
         tmp[:username] = username if username && !username.empty?
         tmp[:name] = envname if envname && !envname.empty?
-        tmp[:version] = envversion if envversion && !envversion.empty?
+        tmp[:version] = envversion if envversion && !envversion.nil?
         envs = get2(options,api_path("/",:envs),tmp)
         error("The environment '#{envname}' does not exist") if envs.size <= 0
         desc = envs.first
