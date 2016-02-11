@@ -23,6 +23,13 @@ if RUBY_VERSION < "2.0"
   end
 end
 
+# Monkey patch to increase MAX_URI_LENGTH
+class WEBrick::HTTPRequest
+  # avoid warning about constant redefining
+  remove_const :MAX_URI_LENGTH
+  MAX_URI_LENGTH=100000
+end
+
 module Kadeploy
 
 module HTTPd
@@ -277,7 +284,7 @@ module HTTPd
 
     def treatment(req,resp)
 #
-# = A client disconnection kills the handle thread. 
+# = A client disconnection kills the handle thread.
 #   The handle thread can allocate some resources (ex : refs token in cache or compressedCSV) and be killed
 #   out of all ensure and it does not return ret.
 #
