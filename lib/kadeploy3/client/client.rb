@@ -1007,6 +1007,10 @@ class ClientWorkflow < Client
   end
 
   def self.parse_keyfile(opt,options)
+    if !ENV['HOME'].nil?
+      options[:key] =  ''
+      load_keyfile(nil, options[:key])
+    end
     add_opt(opt,"-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use ~/.ssh/authorized_keys") { |f|
       options[:key] =  ''
       load_keyfile(f,options[:key])
