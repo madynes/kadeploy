@@ -324,15 +324,7 @@ class Client
       unreachables = []
       options[:servers].each_pair do |server,inf|
         next if server.downcase == "default"
-
-        reachable = nil
-        4.times do
-          reachable = PortScanner::is_open?(inf[0], inf[1])
-          break if reachable
-          sleep 2
-        end
-
-        unless reachable
+        unless test_get(inf[0],inf[1],'/version',inf[2])
           debug("The #{server} server is unreachable")
           unreachables << server
         end
@@ -341,9 +333,8 @@ class Client
     else
       info = options[:servers][options[:chosen_server]]
       error("Unknown server #{info[0]}") unless info
-      error("The #{info[0]} server is unreachable") unless PortScanner::is_open?(info[0], info[1])
+      error("The #{info[0]} server is unreachable") unless test_get(info[0],info[1],'/version',info[2])
     end
-
     return true
   end
 
@@ -501,6 +492,17 @@ class Client
       error(e.message)
     end
     ret
+  end
+
+  def self.test_get(host,port,path,secure,headers=nil)
+    begin
+      Timeout.timeout(5) do
+        HTTP::Client::get(host,port,path,secure,nil,nil,nil,headers)
+        return true
+      end
+    rescue Exception
+      return false
+    end
   end
 
   def self.get2(options,path,params=nil)
@@ -791,6 +793,10 @@ class Client
         options[:nodes] = nil
       else
         options[:nodes].uniq!
+        options[:nodes].map! { |node|
+          node =~ /\[.*\]/ ? Nodes::NodeSet::nodes_list_expand(node) : node
+        }
+        options[:nodes].flatten!
       end
     end
     treated = []
@@ -1001,6 +1007,10 @@ class ClientWorkflow < Client
   end
 
   def self.parse_keyfile(opt,options)
+    if !ENV['HOME'].nil? and File.readable?(File.expand_path("~/.ssh/authorized_keys"))
+      options[:key] =  ''
+      load_keyfile(nil, options[:key])
+    end
     add_opt(opt,"-k", "--key [FILE]", "Public key to copy in the root's authorized_keys, if no argument is specified, use ~/.ssh/authorized_keys") { |f|
       options[:key] =  ''
       load_keyfile(f,options[:key])

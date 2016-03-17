@@ -10,6 +10,11 @@
 #
 # !!! Be careful, once the VMs were deployed with kadeploy it's not possible to re-launch them using the "vagrant up" command (pxe boot profiles)
 
+# Note: to install VirtualBox Guest Additions automatically (required to
+# share /vagrant with the host), just add vagrant-vbguest plugin on the host:
+# $> vagrant plugin install vagrant-vbguest
+
+
 require 'yaml'
 
 TAKTUK_VERSION = '3.7.5-1.el6.x86_64'
@@ -42,7 +47,7 @@ Vagrant.configure("2") do |config|
       if distrib == 'redhat'
         master.vm.box = 'chef/centos-6.5'
       else
-        master.vm.box = 'chef/debian-7.4'
+        master.vm.box = 'debian/wheezy64'
       end
     else
       if distrib == 'redhat'
@@ -50,9 +55,8 @@ Vagrant.configure("2") do |config|
         master.vm.box_url =
           "https://vagrantcloud.com/chef/centos-6.5/version/1/provider/virtualbox.box"
       else
-        master.vm.box = 'debian-7.4'
-        master.vm.box_url =
-          "https://vagrantcloud.com/chef/debian-7.4/version/1/provider/virtualbox.box"
+        master.vm.box = 'debian/wheezy64'
+        master.vm.box_url = 'https://vagrantcloud.com/debian/boxes/wheezy64/versions/7.9.1/providers/virtualbox.box'
       end
     end
 
@@ -92,7 +96,8 @@ Vagrant.configure("2") do |config|
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get update'
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get install -y ruby rubygems lsb-release'
     end
-    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter puppet hiera'
+    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc puppet -v3.6.2'
+    master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter hiera'
     if mock
       master.vm.provision 'puppet' do |puppet|
         puppet.manifests_path = 'addons/vagrant-mock/manifests'
