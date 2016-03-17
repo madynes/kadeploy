@@ -374,7 +374,7 @@ class Microstep < Automata::QueueTask
   # Replace a group of nodes in a command
   #
   # Arguments
-  # * str: command that contains the patterns GROUP_FQDN or GROUP_SHORT 
+  # * str: command that contains the patterns GROUP_FQDN or GROUP_SHORT
   # * array_of_hostname: array of hostnames
   # Output
   # * return a string with the patterns replaced by the hostnames
@@ -576,7 +576,7 @@ class Microstep < Automata::QueueTask
   # * kind: kind of command to perform (reboot, power_on, power_off)
   # * level: start level of the command (soft, hard, very_hard)
   # Output
-  # * nothing 
+  # * nothing
   def escalation_cmd_wrapper(kind, level)
     node_set = Nodes::NodeSet.new(@nodes.id)
     initial_node_set = Nodes::NodeSet.new(@nodes.id)
@@ -858,15 +858,10 @@ class Microstep < Automata::QueueTask
   # Output
   # * return the kernel parameters
   def get_kernel_params
-    #We first check if the kernel parameters are defined in the environment
-    if !context[:execution].environment.kernel_params.nil? and !context[:execution].environment.kernel_params.empty?
-      context[:execution].environment.kernel_params
-    #Otherwise we eventually check in the cluster specific configuration
-    elsif !context[:cluster].kernel_params.nil?
-      context[:cluster].kernel_params
-    else
-      ''
-    end
+    params = ''
+    params += context[:cluster].kernel_params if !context[:cluster].kernel_params.nil?
+    params += ' ' + context[:execution].environment.kernel_params if !context[:execution].environment.kernel_params.nil? and !context[:execution].environment.kernel_params.empty?
+    return params
   end
 
   def get_decompress_cmd(kind,directory,partition=nil,input_file=nil,output_file=nil)
@@ -1537,7 +1532,7 @@ class Microstep < Automata::QueueTask
   #
   # Arguments
   # * reboot_kind: kind of reboot (soft, hard, very_hard)
-  # * first_attempt (opt): specify if it is the first attempt or not 
+  # * first_attempt (opt): specify if it is the first attempt or not
   # Output
   # * return true (should be false sometimes :D)
   def ms_reboot(reboot_kind)
@@ -1553,7 +1548,7 @@ class Microstep < Automata::QueueTask
       if first_attempt then
         escalation_cmd_wrapper("reboot", "soft")
       else
-        #After the first attempt, we must not perform another soft reboot in order to avoid loop reboot on the same environment 
+        #After the first attempt, we must not perform another soft reboot in order to avoid loop reboot on the same environment
         escalation_cmd_wrapper("reboot", "hard")
       end
     when "hard"
@@ -1654,7 +1649,7 @@ class Microstep < Automata::QueueTask
       "--append=\"#{kernel_params}\" "
   end
 
-  # Get the shell command used to follow a symbolic link until reaching the real file 
+  # Get the shell command used to follow a symbolic link until reaching the real file
   # such as inside of chroot prefix.
   # * filename: the file
   # * prefixpath: if specified, follow the link as if chrooted in 'prefixpath' directory
@@ -2151,7 +2146,7 @@ class Microstep < Automata::QueueTask
   # Arguments
   # * scattering_kind: kind of taktuk scatter (tree, chain)
   # Output
-  # * return true if the admin postinstall has been successfully uncompressed, false otherwise   
+  # * return true if the admin postinstall has been successfully uncompressed, false otherwise
   def ms_manage_admin_post_install(scattering_kind)
     context[:cluster].admin_post_install.each do |postinstall|
       unless (decompress = get_decompress_cmd(
