@@ -512,7 +512,7 @@ module Kadeploy
       if size > @max_size - unfreeable
           raise KadeployError.new(
             APIError::CACHE_FULL,nil,
-            "Cache is full: impossible to cache the file '#{origin_uri}'"
+            "Cache is full: impossible to cache the file '#{origin_uri}'. Too many deployments are probably running concurrently."
           )
       end
       free_space!(size - (@max_size - used_space))
