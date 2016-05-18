@@ -1007,7 +1007,7 @@ class ClientWorkflow < Client
   end
 
   def self.parse_keyfile(opt,options)
-    if !ENV['HOME'].nil? and File.readable?(File.expand_path("~/.ssh/authorized_keys"))
+    if !ENV['HOME'].nil?
       options[:key] =  ''
       load_keyfile(nil, options[:key])
     end
