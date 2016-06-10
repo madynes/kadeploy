@@ -608,7 +608,7 @@ task :deb_info do |f, args|
 ## When you package is ready, you will need to:
 ### Push upstream and merge modifications and tags
  First, push your changes on the master or 3.X branch. EXAMPLES:
-  git push origin master:master
+  git push origin master
   OR git push origin 3.2
  Then:
   git push origin upstream#{suff}
