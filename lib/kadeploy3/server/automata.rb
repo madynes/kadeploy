@@ -413,7 +413,7 @@ module Automata
         to_delete2.clear
 
         # Treatment of this task is done, cleaning everything
-        if @threads[task] and @threads[task].empty? and task.nodes.empty?
+        if @threads[task] and @threads[task].empty? and !task.nodes.nil? and task.nodes.empty?
           if task.cleaner
             task.cleaner.kill if task.cleaner.alive?
             task.cleaner.join

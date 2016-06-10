@@ -168,7 +168,7 @@ end
 class LocalFetchFile < HTTPFetchFile
   def initialize(origin_uri,client=nil)
     super(origin_uri,client)
-    raise KadeployError.new(APIError::INVALID_CLIENT,nil,'No client was specified') unless @client
+    raise KadeployError.new(APIError::INVALID_CLIENT,nil,"There is no way to retrieve #{origin_uri} from the Kadeploy server. Consider using a server:// or a http:// URL") unless @client
 
     @origin_uri = File.join(@client.to_s,Base64.urlsafe_encode64(@origin_uri))
     begin

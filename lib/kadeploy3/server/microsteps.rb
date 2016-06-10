@@ -16,6 +16,7 @@ class Microstep < Automata::QueueTask
     @runthread = nil
     @current_operation = nil
     @waitreboot_threads = ThreadGroup.new
+    @waitreboot_threads_lock = Mutex.new
     @timestart = Time.now.to_i
     @done = false
     @lock = Mutex.new
@@ -81,14 +82,18 @@ class Microstep < Automata::QueueTask
   end
 
   def status
-    {
-      :nodes => {
-        :OK => @nodes_ok.make_array_of_hostname,
-        :KO => @nodes_ko.make_array_of_hostname,
-        :'**' => @nodes.diff(@nodes_ok).diff(@nodes_ko).make_array_of_hostname,
-      },
-      :time => (Time.now.to_i - @timestart),
-    }
+    if @nodes.nil?
+      return { :nodes => { :OK => [], :KO => [], :'**' => [] }, :time => 0 }
+    else
+      return {
+        :nodes => {
+          :OK => @nodes_ok.make_array_of_hostname,
+          :KO => @nodes_ko.make_array_of_hostname,
+          :'**' => @nodes.diff(@nodes_ok).diff(@nodes_ko).make_array_of_hostname,
+        },
+        :time => (Time.now.to_i - @timestart),
+      }
+    end
   end
 
   def done?()
@@ -96,8 +101,12 @@ class Microstep < Automata::QueueTask
   end
 
   def kill(dofree=true)
-    @waitreboot_threads.list.each do |thr|
-      thr.kill if thr.alive?
+    @waitreboot_threads_lock.synchronize do
+      if @waitreboot_threads
+        @waitreboot_threads.list.each do |thr|
+          thr.kill if thr.alive?
+        end
+      end
     end
     @lock.synchronize do
       @current_operation.kill unless @current_operation.nil?
@@ -129,7 +138,9 @@ class Microstep < Automata::QueueTask
     @output = nil
     @debugger = nil
     @current_operation.free if @current_operation
-    @waitreboot_threads = nil
+    @waitreboot_threads_lock.synchronize do
+      @waitreboot_threads = nil
+    end
     @timestart = nil
     @done = nil
   end
@@ -1962,14 +1973,18 @@ class Microstep < Automata::QueueTask
               debug(5,"#{node.hostname} is here after #{Time.now.tv_sec - start}s")
             end
           end
-          @waitreboot_threads.add(thr)
+          @waitreboot_threads_lock.synchronize do
+            @waitreboot_threads.add(thr)
+          end
         end
 
         #let's wait everybody
-        @waitreboot_threads.list.each do |thr|
-          thr.join
+        @waitreboot_threads_lock.synchronize do
+          @waitreboot_threads.list.each do |thr|
+            thr.join
+          end
+          @waitreboot_threads = ThreadGroup.new
         end
-        @waitreboot_threads = ThreadGroup.new
       end
       nodes_to_test = nil
     end
