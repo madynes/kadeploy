@@ -608,18 +608,18 @@ task :deb_info do |f, args|
 ## When you package is ready, you will need to:
 ### Push upstream and merge modifications and tags
  First, push your changes on the master or 3.X branch. EXAMPLES:
-  git push origin master:refs/for/master
-  OR git push origin 3.2:refs/for/3.2
+  git push origin master
+  OR git push origin 3.2
  Then:
-  git push origin upstream#{suff}:refs/for/upstream#{suff}
-  git push origin debian#{suff}:refs/for/debian#{suff}
-  git push origin #{tag_version}:refs/tags/#{tag_version}
-  git push origin pristine-tar#{suff}:refs/for/pristine-tar#{suff}
-  git push origin upstream#{suff}/#{tag_version}:refs/tags/upstream#{suff}/#{tag_version}
+  git push origin upstream#{suff}
+  git push origin debian#{suff}
+  git push origin #{tag_version}
+  git push origin pristine-tar#{suff}
+  git push origin upstream#{suff}/#{tag_version}
 ### After the packaging work, tag the final Debian package, push the tag:
   git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
   git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
-  git push origin debian#{suff}/#{tag_version}-1:refs/tags/debian#{suff}/#{tag_version}-1
+  git push origin debian#{suff}/#{tag_version}-1
 ### If you want to build a -dev package, use:
   DEB_BUILD_OPTIONS=devpkg=dev git-buildpackage -us -uc
 EOF
