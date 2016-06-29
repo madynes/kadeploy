@@ -2,10 +2,6 @@
 require 'fileutils'
 
 stage = ARGV[0]
-# extract suffix from DEB_BUILD_OPTIONS
-suffix = ENV['DEB_BUILD_OPTIONS'].split(/ /).select { |e| e =~ /^devpkg=/ }.first.split(/=/)[1]
-
-pkgs = ['kadeploy-common', 'kadeploy', 'kadeploy-client']
 
 if stage == "clean"
   if File::exist?('debian/control.devpkg')
@@ -13,6 +9,11 @@ if stage == "clean"
   end
   exit(0)
 end
+
+# extract suffix from DEB_BUILD_OPTIONS
+suffix = ENV['DEB_BUILD_OPTIONS'].split(/ /).select { |e| e =~ /^devpkg=/ }.first.split(/=/)[1]
+
+pkgs = ['kadeploy-common', 'kadeploy', 'kadeploy-client']
 
 if stage != 'build'
   puts "Invalid stage."
