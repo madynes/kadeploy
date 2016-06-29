@@ -1,34 +1,5 @@
-kadeploy (3.3.0~rc2-1) UNRELEASED; urgency=low
+kadeploy (3.3.10.stable) unstable; urgency=low
 
-  * New Git snapshot based on v3.3.0_rc0.
-  * New Git snapshot based on v3.3.0_rc0.2.
-  * New Git snapshot based on v3.3.0_rc2.
+  * Changelog entry automatically generated.
 
- -- Lucas Nussbaum <lucas@debian.org>  Wed, 06 Aug 2014 08:19:49 +0200
-
-kadeploy (3.2.0~git+20140221163831+bbf7f5d-1) UNRELEASED; urgency=low
-
-  * Move karights3 binaries in the client package
-  * Add the Kastafior binary in the server package
-  * New Git snapshot based on v3.2.0_rc2.
-  * Move ruby-mysql dependency from common to server package
-  * Modify ruby-mysql dependency to be compatible with squeeze
-  * New Git snapshot based on v3.2.0_rc3.
-  * Create the /var/run/kadeploy3 directory in the server package
-  * Modify the devel-package generator to work with the new init script
-  * New Git snapshot based on v3.2.0_rc4.
-  * Add the Kascade binary in the server package
-  * Create the /etc/kadeploy3/keys directory in the server package
-  * Renamed .yml configuration files to .conf
-
- -- Luc Sarzyniec <lsarzyniec@grimoire.loria.fr>  Fri, 21 Feb 2014 16:52:34 +0100
-
-kadeploy (3.2.0~alpha1) unstable; urgency=low
-
-  * Initial release. Closes: #756521
-  * TODO:
-    - add README.Debian that describes post-install setup
-    - test ; additional dependencies?
-    - lintian warnings and errors
-
- -- Lucas Nussbaum <lucas@debian.org>  Mon, 21 Oct 2013 13:24:17 +0200
+ -- Lucas Nussbaum <lucas.nussbaum@loria.fr>  Wed, 29 Jun 2016 17:16:26 +0200
