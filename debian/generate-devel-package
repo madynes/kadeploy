@@ -110,14 +110,14 @@ files = [
   File.join('debian',"kadeploy-client-#{suffix}",'/usr/bin/*'),
   File.join('debian',"kadeploy-client-#{suffix}",'/usr/sbin/*'),
 ]
-Dir[*files].uniq.each do |f|
-  if File.file?(f)
-    s = File.read(f)
+Dir[*files].uniq.each do |f2|
+  if File.file?(f2)
+    s = File.read(f2)
     s.gsub!(/^\s*(require ['"]kadeploy3)/,"\\1-#{suffix}")
     s.gsub!(/^\s*(\$kadeploy_confdir\s*=.*\/[a-zA-Z_\/]+\/kadeploy3)/,"\\1-#{suffix}")
     s.gsub!(/^\s*(\$kadeploy_rundir\s*=.*\/[a-zA-Z_\/]+\/kadeploy3d)/,"\\1-#{suffix}")
     s.gsub!(/^\s*(\$kadeploy_logdir\s*=.*\/[a-zA-Z_\/]+\/kadeploy3)/,"\\1-#{suffix}")
-    File::open(f, 'w') { |fd| fd.puts s }
+    File::open(f2, 'w') { |fd| fd.puts s }
   end
 end
 
