@@ -601,8 +601,16 @@ task :debian do |f|
 
 # To build a normal package, do:
   dpkg-buildpackage -us -uc
+
+# To clean after the build, do:
+  debclean
+
 # To build a -dev package, do:
   DEB_BUILD_OPTIONS=devpkg=dev dpkg-buildpackage -us -uc
+
+
+# To clean after the build, do:
+  DEB_BUILD_OPTIONS=devpkg=dev debclean
 EOF
 end
 
