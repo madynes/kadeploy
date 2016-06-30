@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+
+%:
+	dh $@ --buildsystem=ruby --with ruby
+
+override_dh_installinit:
+	# copy the upstream init script to debian/
+	cp addons/rc/debian/kadeploy debian/kadeploy.init
+	dh_installinit
+
+override_dh_auto_install:
+	dh_auto_install
+	# gem2deb install binaries to debian/kadeploy-common. we move them manually
+	# to the correct binary package
+	mv debian/kadeploy-common/usr/bin/* debian/kadeploy-client/usr/bin/
+	rmdir debian/kadeploy-common/usr/bin
+
+override_dh_fixperms:
+	dh_fixperms
+	chmod 640 debian/kadeploy/etc/kadeploy3/*.conf
+
+override_dh_clean:
+	dh_clean
+	rm -f debian/kadeploy.init
+
+# generation of custom packages with a suffix
+# use with DEB_BUILD_OPTIONS=devpkg=dev
+ifneq (,$(filter devpkg=%,$(subst $(COMMA), ,$(DEB_BUILD_OPTIONS))))
+override_dh_md5sums:
+	debian/generate-devel-package build
+
+override_dh_builddeb:
+	# will be done by generate-devel-package. yes, eeeek!
+
+override_dh_clean:
+	dh_clean
+	rm -f debian/kadeploy.init
+	debian/generate-devel-package clean
+endif

@@ -1,0 +1,7 @@
+# We install files in /etc/kadeploy3 with mode 640 (and gid deploy) so that
+# the Kadeploy daemon can read them, but not random users on the system.
+# Those files might contain passwords (e.g. IPMI ones).
+kadeploy binary: non-standard-file-perm etc/kadeploy3/clusters.conf 0640 != 0644
+kadeploy binary: non-standard-file-perm etc/kadeploy3/command.conf 0640 != 0644
+kadeploy binary: non-standard-file-perm etc/kadeploy3/sample-cluster.conf 0640 != 0644
+kadeploy binary: non-standard-file-perm etc/kadeploy3/server.conf 0640 != 0644

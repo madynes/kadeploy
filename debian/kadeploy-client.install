@@ -1,0 +1,2 @@
+sbin/karights3 /usr/sbin
+conf/client.conf /etc/kadeploy3

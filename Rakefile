@@ -248,21 +248,6 @@ def gen_man(file,level)
   sh "COLUMNS=0 help2man -N -n '#{DESC[filename.to_sym]}' -i #{D[:man]}/TEMPLATE -s #{level} -o #{D[:man]}/#{filename}.#{level} #{file}"
 end
 
-def deb_versions()
-  if RELEASE_VERSION =~ /git|alpha|rc/
-    [
-      "#{MAJOR_VERSION}.#{MINOR_VERSION}~#{RELEASE_VERSION}",
-      "v#{MAJOR_VERSION}.#{MINOR_VERSION}_#{RELEASE_VERSION}",
-    ]
-  else
-    [
-      "#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
-      "v#{MAJOR_VERSION}.#{MINOR_VERSION}.#{RELEASE_VERSION}",
-    ]
-  end
-end
-
-
 task :default => [:build]
 
 desc "Generate manpages"
@@ -594,67 +579,39 @@ task :build, [:dir,:kind] => [:build_prepare, :build_clean, :man, :doc, :apidoc]
   Rake::Task[:build_deb].invoke if args.kind == 'deb'
 end
 
-desc "Build an origin archive for debian packaging"
-task :build_deb, [:dir] => :build do
-  tmp = File.join(D[:build],"kadeploy")
-  sh "mv #{tmp}-#{VERSION}.tar.gz #{tmp}_#{VERSION}.orig.tar.gz"
-end
+USER_NAME = %x{git config --get user.name}.chomp
+USER_EMAIL = %x{git config --get user.email}.chomp
+def create_debian_changelog
+  File::open('debian/changelog', 'w') do |fd|
+    fd.puts <<-EOF
+kadeploy (#{VERSION}) unstable; urgency=low
 
-desc "Show information about the Debian package building process"
-task :deb_info do |f, args|
-  suff = args.branch_suffix || ''
-  deb_version, tag_version = deb_versions()
-  puts <<-EOF
-## When you package is ready, you will need to:
-### Push upstream and merge modifications and tags
- First, push your changes on the master or 3.X branch. EXAMPLES:
-  git push origin master
-  OR git push origin 3.2
- Then:
-  git push origin upstream#{suff}
-  git push origin debian#{suff}
-  git push origin #{tag_version}
-  git push origin pristine-tar#{suff}
-  git push origin upstream#{suff}/#{tag_version}
-### After the packaging work, tag the final Debian package, push the tag:
-  git commit -m "Update Debian changelog for #{deb_version}" debian/changelog
-  git-buildpackage --git-tag-only --git-no-hooks --git-ignore-new
-  git push origin debian#{suff}/#{tag_version}-1
-### If you want to build a -dev package, use:
-  DEB_BUILD_OPTIONS=devpkg=dev git-buildpackage -us -uc
-EOF
-end
+  * Changelog entry automatically generated.
 
-desc "Generate debian package (Be careful it will break your Git repository !)"
-task :deb, [:dir,:branch_suffix] => :build_deb do |f,args|
-  suff = args.branch_suffix || ''
-  deb_version, tag_version = deb_versions()
-  sh "git tag -d '#{tag_version}'; git tag -am '#{tag_version}' '#{tag_version}'"
-  sh "git tag -d 'upstream#{suff}/#{tag_version}'; true"
-  sh "git branch -D upstream#{suff}; git checkout -b upstream#{suff} origin/upstream#{suff}"
-  sh "git branch -D debian#{suff}; git checkout -b debian#{suff} origin/debian#{suff}"
-  sh "git checkout debian#{suff}"
-  sh "git-import-orig "\
-    "--upstream-version=#{deb_version} "\
-    "--upstream-vcs-tag='#{tag_version}' "\
-    "#{File.join(D[:build],"kadeploy_#{VERSION}.orig.tar.gz")}"
-  sh "dch -v '#{deb_version}-1' 'New Git snapshot based on #{tag_version}.'"
-  sh 'git-buildpackage --git-ignore-new -uc -us || true'
-  Rake::Task[:build_clean].reenable
-  Rake::Task[:build_clean].invoke
-  Rake::Task[:deb_info].invoke
-end
-
-desc "Generate debian changelog file"
-task :deb_changelog, [:dir] do |f,args|
-  args.with_defaults(:dir => D[:pkg])
-  news = File.read(File.join(D[:base],'NEWS'))
-  news = news.split(/##.*##/).select{|v| !v.strip.empty?}[0].split("\n")
-  news = news.grep(/^\s*\*/).collect{|v| v.gsub(/^\s*\*\s*/,'')}
-  sh "dch --create -v #{VERSION} --package kadeploy --empty --changelog #{File.join(args.dir,'changelog')}"
-  news.each do |n|
-    sh "dch -a \"#{n}\" --changelog #{File.join(args.dir,'changelog')}"
+ -- #{USER_NAME} <#{USER_EMAIL}>  #{Time.now.strftime("%a, %d %b %Y %H:%M:%S %z")}
+ EOF
   end
+end
+
+desc "Build Debian package (normal)"
+task :debian do |f|
+  create_debian_changelog
+  puts <<-EOF
+# Changelog entry generated.
+
+# To build a normal package, do:
+  dpkg-buildpackage -us -uc
+
+# To clean after the build, do:
+  debclean
+
+# To build a -dev package, do:
+  DEB_BUILD_OPTIONS=devpkg=dev dpkg-buildpackage -us -uc
+
+
+# To clean after the build, do:
+  DEB_BUILD_OPTIONS=devpkg=dev debclean
+EOF
 end
 
 desc "Generate rpm package"
