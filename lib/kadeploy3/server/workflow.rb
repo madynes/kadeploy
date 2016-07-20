@@ -351,7 +351,6 @@ module Workflow
                     :filename => entry[:filename],
                     :timeout => entry[:timeout],
                     :retries => entry[:retries],
-                    :destination => entry[:destination],
                     :scattering => entry[:scattering]
                   }
                 elsif entry[:action] == :exec
