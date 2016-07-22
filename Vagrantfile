@@ -94,7 +94,7 @@ Vagrant.configure("2") do |config|
       master.vm.provision :shell, inline: "yum localinstall -y #{TAKTUK_URL}/taktuk-#{TAKTUK_VERSION}.rpm"
     else
       master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get update'
-      master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get install -y ruby rubygems lsb-release'
+      master.vm.provision :shell, inline: 'DEBIAN_FRONTEND=noninteractive apt-get install -y ruby rubygems lsb-release git'
     end
     master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc puppet -v3.6.2'
     master.vm.provision :shell, inline: 'gem install --no-ri --no-rdoc facter hiera'
