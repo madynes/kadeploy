@@ -292,6 +292,50 @@ module Kadeploy
   end
 
   class Cache
+    class Semaphore
+      # The size of the semaphore
+      attr_reader :size
+      # Create a new Semaphore object
+      # ==== Attributes
+      # * +size+ The size of the semaphore
+      #
+      def initialize(size)
+        @size = size
+        @val = @size
+        @lock = Mutex.new
+        @positive = ConditionVariable.new
+      end
+
+      # Try to acquire a a resource
+      def acquire
+        @lock.synchronize do
+          if @val == 0
+            @positive.wait(@lock)
+          end
+
+          @val -= 1
+        end
+      end
+
+      # Release a resource
+      def release
+        @lock.synchronize do
+          @val += 1
+          @positive.signal
+        end
+      end
+
+      # Acquire then release a resource
+      def synchronize
+        acquire
+        begin
+          yield
+        ensure
+          release
+        end
+      end
+    end
+
 
     # Be careful, elements with priority 0 are not kept in cache after use (suitable for anonymous deployments)
     # Different priorities
@@ -309,11 +353,12 @@ module Kadeploy
     # Be carefully the file is written in path given by idxmeth.
     # Arguments:
     #   +directory: directory by default and directory where meta will be written
+    #   +concurrency_level is maximum number of threads allowed to write in the cache simultaneously
     #   +max_size is maximum size in Bytes
-    #   +naming_metsh is object which contains name function with all parameter of cache and it gives the path where file will be stored
+    #   +naming_meth is object which contains name function with all parameter of cache and it gives the path where file will be stored
     #   +emptycache is a boolean the cache is cleaned at start if true and loaded from finded meta file in directory at start
     #   +same_meta boolean which enable or disable the meta saving.
-    def initialize(directory, max_size, naming_meth, emptycache=true, save_meta=false)
+    def initialize(directory, max_size, concurrency_level, naming_meth, emptycache=true, save_meta=false)
       raise KadeployError.new(APIError::CACHE_ERROR,nil,"#{directory} is not a directory") if directory && !File.directory?(directory)
       raise KadeployError.new(APIError::CACHE_ERROR,nil,"Save meta without directory is not allowed") if save_meta && directory.nil?
       raise KadeployError.new(APIError::CACHE_ERROR,nil,"Invalid cache size '#{max_size}'") if !(max_size.is_a?(Fixnum) or max_size.is_a?(Bignum))  or max_size <= 0
@@ -324,6 +369,7 @@ module Kadeploy
       @naming_meth = naming_meth
       @lock = Mutex.new
       @save_meta = save_meta
+      @sem = Semaphore.new(concurrency_level)
       load(emptycache)
     end
 
@@ -370,17 +416,19 @@ module Kadeploy
       file = nil
 
       begin
-        @lock.synchronize do
-           file = @files[fentry]
-           if !file
-              file =  CacheFile.new(fentry,user,@directory,@save_meta)
-              @files[fentry] = file
-           end
-           file.acquire(wid)
-           check_space_and_clean!(size-file.size,origin_uri)
-           file.update_size(size)
+        @sem.synchronize do
+          @lock.synchronize do
+             file = @files[fentry]
+             if !file
+                file =  CacheFile.new(fentry,user,@directory,@save_meta)
+                @files[fentry] = file
+             end
+             file.acquire(wid)
+             check_space_and_clean!(size-file.size,origin_uri)
+             file.update_size(size)
+          end
+          file.fetch(user,origin_uri,priority,version,size,md5,mtime,tag,&block)
         end
-        file.fetch(user,origin_uri,priority,version,size,md5,mtime,tag,&block)
       rescue Exception => ex
         @lock.synchronize do
           file.release(wid)

@@ -579,6 +579,7 @@ verbosity:
 cache:
   directory: /var/cache/kadeploy
   size: 8000
+  concurrency_level: 10
 network:
   server_hostname: kadeploy.lan
   vlan:
@@ -615,6 +616,7 @@ pxe:
     userfiles:
       directory: userfiles
       max_size: 200
+      concurrency_level: 10
   localboot:
     method: GrubPXE
     binary: grubpxe.0
@@ -731,6 +733,7 @@ external:
   \begin{itemize}
     \item \yfieldd{directory}{String}{/tmp} absolute path of the Kadeploy cache. The cache dir is used to store the files of a user in a deployment.
     \item \yfield{size}{Integer} size (MB) of the Kadeploy cache.
+    \item \yfield{concurrency\_level}{Integer} Number of concurrent threads that can write to the cache simultaneously. Default value is 10.
   \end{itemize}
 
   \item \ypath{/network}
@@ -798,7 +801,8 @@ The information used to generate this filenames are the one specified for each n
   \item \ypath{/pxe/dhcp/userfiles} PXE user custom files (option \emph{-{}-upload-pxe-files}). \textbf{Be careful}, this directory is emptied at each server launch.
   \begin{itemize}
     \item \yfield{directory}{String} The directory where PXE user custom files (option \emph{-{}-upload-pxe-files}) are to be saved. This path is relative to the PXE repository path.
-    \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE user custom files sub-directory
+    \item \yfield{max\_size}{Integer} maximal size (MB) of the PXE user custom files sub-directory.
+    \item \yfield{concurrency\_level}{Integer} Maximal number of threads that can write to the PXE user custom files sub-directory simultaneously. Default value is 10.
    \end{itemize}
 
   \item \ypath{/pxe/networkboot} the method used to boot operating system images sent from the network (the deployment environment kernel). This setting is optional by default, the DHCP method is used.

@@ -147,6 +147,7 @@ module Configuration
         ret[:global] = Cache.new(
           @static[:caches][:global][:directory],
           @static[:caches][:global][:size],
+          @static[:caches][:global][:concurrency_level],
           CacheIndexPVHash,true,true
         )
       end
@@ -155,6 +156,7 @@ module Configuration
         ret[:netboot] = Cache.new(
           @static[:caches][:netboot][:directory],
           @static[:caches][:netboot][:size],
+          @static[:caches][:netboot][:concurrency_level],
           CacheIndexPath,false,false
         )
       end
@@ -523,6 +525,7 @@ module Configuration
             }
           )
           static[:caches][:global][:size] = cp.value('size', Fixnum)*1024*1024
+          static[:caches][:global][:concurrency_level] = cp.value('concurrency_level', Fixnum, 10)
         end
 
         cp.parse('windows') do
@@ -675,6 +678,7 @@ module Configuration
               static[:caches][:netboot] = {}
               static[:caches][:netboot][:directory] = File.join(args[:repository_dir],args[:custom_dir])
               static[:caches][:netboot][:size] = cp.value('max_size',Fixnum)*1024*1024
+              static[:caches][:netboot][:concurrency_level] = cp.value('concurrency_level', Fixnum, 10)
             end
         else
           args[:custom_dir] = 'PXE_CUSTOM'
