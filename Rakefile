@@ -593,8 +593,15 @@ kadeploy (#{VERSION}) unstable; urgency=low
   end
 end
 
+def create_version
+  File::open('conf/version', 'w') do |fd|
+    fd.puts VERSION
+  end
+end
+
 desc "Build Debian package (normal)"
 task :debian do |f|
+  create_version
   create_debian_changelog
   puts <<-EOF
 # Changelog entry generated.
@@ -616,6 +623,7 @@ end
 
 desc "Generate rpm package"
 task :rpm, [:dir] => :build do
+  create_version
   sh "mkdir -p #{File.join(D[:build],'SOURCES')}"
   sh "mv #{File.join(D[:build],'*')} #{File.join(D[:build],'SOURCES')} || true"
   specs = File.read(File.join(D[:pkg],'redhat','kadeploy.spec.in'))
