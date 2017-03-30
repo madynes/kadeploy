@@ -1,0 +1,15 @@
+#!/bin/sh -e
+
+# debirf module: add_backports
+#
+
+mkdir -p "${DEBIRF_ROOT}/etc/apt/sources.list.d"
+
+case "${DEBIRF_DISTRO}" in
+    debian)
+        cat <<EOF > "${DEBIRF_ROOT}/etc/apt/sources.list.d/backports.list"
+deb ${DEBIRF_MIRROR} ${DEBIRF_SUITE}-backports main
+EOF
+        ;;
+esac
+
