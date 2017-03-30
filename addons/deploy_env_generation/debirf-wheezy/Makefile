@@ -1,5 +1,5 @@
 MODULES_DIR:=/usr/share/debirf/modules/
-MODULES:=a0_add_extra_repos a0_motd install-kernel network serial-terminal z1_clean-root a0_prep-root z0_remove-locales
+MODULES:=a0_add_extra_repos a0_motd network serial-terminal z1_clean-root a0_prep-root z0_remove-locales
 MAKEFILE_PATH:=$(shell pwd)
 VERSION:=$(shell cat ${MAKEFILE_PATH}/version)
 

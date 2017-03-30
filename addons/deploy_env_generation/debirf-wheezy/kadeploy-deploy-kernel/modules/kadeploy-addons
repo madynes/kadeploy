@@ -63,14 +63,3 @@ EOF
 mkdir -p $DEBIRF_ROOT/root/.ssh
 cat $DEBIRF_BUILDD/kadeploy_specific/ssh/*.pub >> $DEBIRF_ROOT/root/.ssh/authorized_keys
 
-# Add recent megaraid drivers for new clusters at Rennes and Nancy
-#
-cp $DEBIRF_BUILDD/kadeploy_specific/megaraid_sas-06.806.08.00-1_Debian7.0.amd64.deb $DEBIRF_ROOT/root
-debirf_exec dpkg -i /root/megaraid_sas-06.806.08.00-1_Debian7.0.amd64.deb
-rm $DEBIRF_ROOT/root/megaraid_sas-06.806.08.00-1_Debian7.0.amd64.deb
-
-# depmod to create module list
-KVERS=$(ls -1 -t "$DEBIRF_ROOT/lib/modules" | head -n1)
-echo "generating modules.dep..."
-debirf_exec depmod -a "$KVERS"
-
