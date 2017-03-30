@@ -16,5 +16,5 @@ clean:
 	(cd /tmp/kadeploy-deploy-kernel ; find -maxdepth 1 -mindepth 1 ! -iname 'kadeploy_specific' ! -iname 'modules' ! -iname 'debirf.conf' -exec rm -rf '{}' \+)
 
 copy:
-	mv /tmp/kadeploy-deploy-kernel/debirf-kadeploy-deploy-kernel_wheezy_3.2.0-4-amd64.cgz /vagrant/kernel/deploy-initrd-3.2.0-4-amd64-$(VERSION)
-	mv /tmp/kadeploy-deploy-kernel/vmlinuz-3.2.0-4-amd64 /vagrant/kernel/deploy-vmlinuz-3.2.0-4-amd64-$(VERSION)
+	mv /tmp/kadeploy-deploy-kernel/debirf-kadeploy-deploy-kernel_wheezy_3.2.0-4-amd64.cgz /vagrant/kernel/deploy-wheezy-initrd-$(VERSION)-g5k
+	mv /tmp/kadeploy-deploy-kernel/vmlinuz-3.2.0-4-amd64 /vagrant/kernel/deploy-wheezy-vmlinuz-$(VERSION)-g5k
