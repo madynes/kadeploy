@@ -72,3 +72,5 @@ debirf_exec ln -s "/lib/systemd/system/rc-local.service" "/etc/systemd/system/rc
 
 mkdir -p $DEBIRF_ROOT/root/.ssh
 cat $DEBIRF_BUILDD/kadeploy_specific/ssh/*.pub >> $DEBIRF_ROOT/root/.ssh/authorized_keys
+
+debirf_exec apt-get -y install firmware-bnx2 firmware-bnx2x
