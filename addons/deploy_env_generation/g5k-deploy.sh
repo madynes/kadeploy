@@ -1,15 +1,20 @@
 #!/bin/bash
 
-SITES="rennes nantes lille reims nancy luxembourg lyon grenoble sophia"
+SITES="rennes nantes lille nancy luxembourg lyon grenoble sophia"
 
-if [ ! $# -eq 1 ]; then
-  echo "USAGE: $0 version"
+if [ ! $# -eq 1 2; then
+  echo "USAGE: $0 [debirf dir] [version]"
   exit 1
 fi
 
-kernel_parts="deploy-wheezy-initrd deploy-wheezy-vmlinuz"
+DEBIRF_DIR=$1
+DEBIAN_VERSION=${DEBIRF_DIR#debirf-}
+VERSION=$2
+
+
+kernel_parts="deploy-$DEBIAN_VERSION-initrd deploy-$DEBIAN_VERSION-vmlinuz"
 for kernel_part in $kernel_parts; do
-  file=../kernel/$kernel_part-$1-g5k
+  file=$DEBIRF_DIR/kernel/$kernel_part-$VERSION-g5k
   if [ ! -f $file ]; then
     echo "$file does not exists !"
     exit 1
@@ -21,7 +26,7 @@ for site in $SITES; do
   server=kadeploy.$site.grid5000.fr
   for kernel_part in $kernel_parts; do
     file=$kernel_part-$1-g5k
-    scp ../kernel/$file $server:/tmp
+    scp $DEBIRF_DIR/kernel/$file $server:/tmp
     echo "    * move $file into /var/lib/tftpboot/kernels"
     ssh $server sudo mv /tmp/$file /var/lib/tftpboot/kernels
     echo "    * change owner on $file"
