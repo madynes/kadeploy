@@ -1,3 +1,7 @@
+This is deprecated: kadeploy3 deploy kernel are now build with kameleon.
+See: https://github.com/oar-team/kameleon-recipes/tree/master/kadeploy3_deploy_kernel_from_scratch
+
+
 # Grid5000 deployment kernel generation
 
 ## Create the vagrant virtual machine
