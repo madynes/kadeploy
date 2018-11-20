@@ -1,0 +1,6 @@
+#!/bin/bash -e
+# Generate the ssh keys to be used by addons
+
+mkdir -p ssh
+cd ssh 
+ssh-keygen -f id_deploy -N ""

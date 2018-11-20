@@ -1,0 +1,3 @@
+# First generate the deploy ssh key pair before building the addons
+
+kadeploy/addons$ ./generate-deploy-ssh-keys

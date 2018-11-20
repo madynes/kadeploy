@@ -1,0 +1,3 @@
+kernel/
+.vagrant/
+debirf-wheezy/kadeploy-deploy-kernel/.fakeroot-state.debirf-kadeploy-deploy-kernel

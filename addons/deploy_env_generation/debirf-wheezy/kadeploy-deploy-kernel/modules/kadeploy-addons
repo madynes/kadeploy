@@ -62,3 +62,6 @@ EOF
 
 mkdir -p $DEBIRF_ROOT/root/.ssh
 cat $DEBIRF_BUILDD/kadeploy_specific/ssh/*.pub >> $DEBIRF_ROOT/root/.ssh/authorized_keys
+
+debirf_exec apt-get -y install firmware-bnx2 firmware-bnx2x
+debirf_exec apt-get -y -t wheezy-backports install tar
